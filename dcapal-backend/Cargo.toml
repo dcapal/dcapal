@@ -1,0 +1,35 @@
+[package]
+name = "dcapal-backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.6.0-rc.5", features = ["macros"] }
+hyper = { version = "0", features = ["full"] }
+deadpool-redis = { version = "0.10", features = ["serde"] }
+redis = { version = "0.21", features = ["tokio-comp"] }
+reqwest = { version = "0", features = ["gzip", "json"] }
+serde = "1"
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+tower = "0"
+tower-http = { version = "0", features = ["trace"] }
+tracing = "0"
+tracing-log = "0"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter", "json"] }
+chrono = { version = "0", features = ["serde"] }
+const_format = "0"
+futures = "0.3.24"
+strum = "0.24"
+strum_macros = "0.24"
+config = "0"
+lazy_static = "1"
+parking_lot = "0.12.1"
+dashmap = "5.4.0"
+metrics = "0.20.1"
+metrics-exporter-prometheus = "0.11.0"
+tracing-appender = "0.2.2"

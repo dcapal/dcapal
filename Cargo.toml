@@ -1,0 +1,2 @@
+[workspace]
+members = ["dcapal-backend", "dcapal-optimizer-wasm"]

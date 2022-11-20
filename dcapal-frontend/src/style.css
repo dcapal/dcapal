@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .app-bg {
+    background-image: url(../images/stacked-wave-2.svg);
+    background-repeat: no-repeat;
+    background-position: top;
+    background-size: 100% auto;
+    transform: rotate(180deg);
+    @apply w-full h-[381px];
+  }
+}
+
+@layer utilities {
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}

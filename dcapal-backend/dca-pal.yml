@@ -1,0 +1,17 @@
+app:
+  provider: yahoo
+  log:
+    level: dca_backend=info,tower_http=debug
+    file: dcapal.log
+    enableStdout: true
+
+server:
+  web:
+    hostname: 127.0.0.1
+    port: 8080
+  metrics:
+    hostname: 127.0.0.1
+    port: 9000
+  redis:
+    hostname: 127.0.0.1
+    port: 6379
