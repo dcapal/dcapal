@@ -15,7 +15,6 @@ use crate::{
 use adapter::{CryptoWatchProvider, IpApi, YahooProvider};
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get, Router,
-    RouterService,
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
@@ -72,7 +71,7 @@ pub struct Provider {
 
 pub struct DcaServer {
     addr: SocketAddr,
-    app: IntoMakeServiceWithConnectInfo<RouterService<Body>, SocketAddr>,
+    app: IntoMakeServiceWithConnectInfo<Router<(), Body>, SocketAddr>,
     ctx: AppContext,
     maintenance_handle: Option<JoinHandle<()>>,
     stop_tx: tokio::sync::watch::Sender<bool>,
