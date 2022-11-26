@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
@@ -28,11 +28,11 @@ jobs:
     
     - name: Lint
       run: |
-        cd dcapal_backend
+        cd dcapal-backend
         cargo fmt -- --check
         cargo clippy -- -D warnings
 
     - name: Build and Test
       run: |
-        cd dcapal_backend
+        cd dcapal-backend
         cargo test
