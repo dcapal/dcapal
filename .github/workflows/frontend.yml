@@ -48,7 +48,7 @@ jobs:
         wasm-pack build
         
     - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v3
-        with:
-          name: dcapal-optimizer-wasm-pkg
-          path: dcapal-optimizer-wasm/pkg
+      uses: actions/upload-artifact@v3
+      with:
+        name: dcapal-optimizer-wasm-pkg
+        path: dcapal-optimizer-wasm/pkg
