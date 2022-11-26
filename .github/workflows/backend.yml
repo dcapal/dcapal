@@ -1,0 +1,38 @@
+name: DcaPal Backend
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        components: clippy, rustfmt
+    - uses: Swatinem/rust-cache@v2
+    
+    - name: Toolchain info
+      run: |
+        cargo --version --verbose
+        rustc --version
+        cargo clippy --version
+    
+    - name: Lint
+      run: |
+        cd dcapal_backend
+        cargo fmt -- --check
+        cargo clippy -- -D warnings
+
+    - name: Build and Test
+      run: |
+        cd dcapal_backend
+        cargo test
