@@ -1,4 +1,5 @@
 data/**
-./dca-pal.yml
+dca-pal.yml
+*.log
 
 !data/.gitkeep
