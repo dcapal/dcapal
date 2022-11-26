@@ -40,7 +40,7 @@ impl Problem {
             // =>
             // a_i / budget - s_i_pos <= target_weight
             problem.add_constraint(
-                &[(a_i, budget_inv), (s_i_pos, -1.)],
+                [(a_i, budget_inv), (s_i_pos, -1.)],
                 ComparisonOp::Le,
                 asset.target_weight,
             );
@@ -48,7 +48,7 @@ impl Problem {
             // =>
             // a_i / budget + s_i_neg >= target_weight
             problem.add_constraint(
-                &[(a_i, budget_inv), (s_i_neg, 1.)],
+                [(a_i, budget_inv), (s_i_neg, 1.)],
                 ComparisonOp::Ge,
                 asset.target_weight,
             );
@@ -66,7 +66,7 @@ impl Problem {
         //    a_i >= current_amount   -- No sell
         for (aid, a_i) in &vars {
             problem.add_constraint(
-                &[(*a_i, 1.0)],
+                [(*a_i, 1.0)],
                 ComparisonOp::Ge,
                 options.assets.get(aid).unwrap().current_amount,
             );
