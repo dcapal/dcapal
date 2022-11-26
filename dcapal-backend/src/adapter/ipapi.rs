@@ -1,21 +1,24 @@
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
-
-static API_KEY: &str = "e09ef61487de4fa4459d32603e896c1f";
+use crate::{config, error::Result};
 
 #[derive(Clone)]
 pub struct IpApi {
     http: reqwest::Client,
+    api_key: String,
 }
 
 impl IpApi {
-    pub fn new(http: reqwest::Client) -> Self {
-        Self { http }
+    pub fn new(http: reqwest::Client, config: &config::Providers) -> Self {
+        Self {
+            http,
+            api_key: config.ip_api_key.clone(),
+        }
     }
 
     pub async fn fetch_geo(&self, ip: &str) -> Result<Option<GeoData>> {
-        let url = format!("http://api.ipapi.com/{ip}?access_key={API_KEY}&format=1");
+        let api_key = &self.api_key;
+        let url = format!("http://api.ipapi.com/{ip}?access_key={api_key}&format=1");
 
         let res = self.http.get(url).send().await?;
         if res.status().is_success() {

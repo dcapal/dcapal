@@ -28,9 +28,17 @@ fn default_enable_stdout() -> bool {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Providers {
+    pub price_provider: PriceProvider,
+    pub cw_api_key: String,
+    pub ip_api_key: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Application {
     pub log: Log,
-    pub provider: PriceProvider,
+    pub providers: Providers,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

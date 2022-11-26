@@ -1,7 +1,11 @@
 app:
-  provider: yahoo
+  providers:
+    priceProvider: yahoo
+    cwApiKey: CW_API_KEY
+    ipApiKey: IP_API_KEY
+
   log:
-    level: dca_backend=info,tower_http=debug
+    level: dcapal_backend=info,tower_http=debug
     file: dcapal.log
     enableStdout: true
 

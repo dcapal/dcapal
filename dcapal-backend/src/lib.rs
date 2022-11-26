@@ -97,9 +97,12 @@ impl DcaServer {
         });
 
         let providers = Arc::new(Provider {
-            cw: Arc::new(CryptoWatchProvider::new(http.clone())),
+            cw: Arc::new(CryptoWatchProvider::new(
+                http.clone(),
+                &config.app.providers,
+            )),
             yahoo: Arc::new(YahooProvider::new(http.clone())),
-            ipapi: Arc::new(IpApi::new(http.clone())),
+            ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
         let service = Arc::new(MarketDataService::new(

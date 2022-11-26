@@ -12,6 +12,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::new()?;
 
     let _guard = init_tracing(&config.app.log)?;
+
     init_prometheus_exporter(&config.server.metrics)?;
 
     let mut server = DcaServer::try_new(config)?;

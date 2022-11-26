@@ -115,11 +115,11 @@ impl MarketDataService {
 
         info!(
             mkt = mkt.id,
-            "Fetching price from {}", self.config.app.provider
+            "Fetching price from {}", self.config.app.providers.price_provider
         );
 
         let now = Utc::now();
-        let price = match self.config.app.provider {
+        let price = match self.config.app.providers.price_provider {
             PriceProvider::CryptoWatch => self.providers.cw.fetch_market_price(&mkt, now).await?,
             PriceProvider::Yahoo => self.providers.yahoo.fetch_market_price(&mkt, now).await?,
         };

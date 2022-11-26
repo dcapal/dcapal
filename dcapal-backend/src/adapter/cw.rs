@@ -8,6 +8,7 @@ use std::{
 use tracing::{debug, error, info};
 
 use crate::{
+    config,
     domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     error::{DcaError, Result},
     repository::MarketDataRepository,
@@ -17,11 +18,15 @@ use crate::{
 #[derive(Clone)]
 pub struct CryptoWatchProvider {
     http: reqwest::Client,
+    api_key: String,
 }
 
 impl CryptoWatchProvider {
-    pub fn new(http: reqwest::Client) -> Self {
-        Self { http }
+    pub fn new(http: reqwest::Client, config: &config::Providers) -> Self {
+        Self {
+            http,
+            api_key: config.cw_api_key.clone(),
+        }
     }
 
     pub async fn fetch_assets(
@@ -149,8 +154,6 @@ impl CryptoWatchProvider {
     }
 
     async fn fetch_cw_api<T: DeserializeOwned + Debug>(&self, url: &str) -> Result<T> {
-        static CW_API_KEY: &str = "J1FV2TI4FUQMCJCLJ3K0";
-
         let res = self.http.get(url).send().await?;
         if res.status().is_success() {
             return Ok(res.json::<T>().await?);
@@ -165,7 +168,7 @@ impl CryptoWatchProvider {
         let res = self
             .http
             .get(url)
-            .header("X-CW-API-Key", CW_API_KEY)
+            .header("X-CW-API-Key", &self.api_key)
             .send()
             .await?;
 
