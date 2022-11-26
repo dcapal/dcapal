@@ -11,7 +11,7 @@ where
 {
     let json = serde_json::to_string(value).unwrap();
     let mut cmd = redis::cmd("JSON.SET");
-    cmd.arg(&id).arg("$").arg(&json);
+    cmd.arg(id).arg("$").arg(&json);
 
     if !replace {
         cmd.arg("NX");

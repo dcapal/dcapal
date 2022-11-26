@@ -101,11 +101,7 @@ impl YahooProvider {
                 let price = if q.close.is_empty() {
                     None
                 } else {
-                    q.close
-                        .iter()
-                        .rev()
-                        .find(|p| p.is_some())
-                        .map(|p| p.unwrap())
+                    q.close.iter().rev().find_map(|p| *p)
                 };
 
                 Ok(price)
