@@ -1,4 +1,4 @@
-name: DcaPal Build/Test
+name: DcaPal Build & Test
 
 on:
   push:
@@ -88,6 +88,7 @@ jobs:
       with:
         node-version: 18
         cache: 'npm'
+        cache-dependency-path: dcapal-frontend/package-lock.json
 
     - name: Download dcapal-optimizer-wasm pkg
       uses: actions/download-artifact@v3
