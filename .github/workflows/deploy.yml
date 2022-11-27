@@ -32,8 +32,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: extract-version
     env:
-      VERSION: ${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}
-      VERSION_TAG: v${{ env.VERSION }}
+      VERSION_TAG: v${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
