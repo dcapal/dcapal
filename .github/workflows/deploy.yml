@@ -36,8 +36,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: extract-version
     env:
-      LATEST_TAG: "${{ env.DOCKER_REPO }}:latest"
-      VERSION_TAG: "${{ env.DOCKER_REPO }}:v${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}"
+      LATEST_TAG: "$DOCKER_REPO:latest"
+      VERSION_TAG: "$DOCKER_REPO:v${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}"
     steps:
       - uses: actions/checkout@v3
       - name: Set up Docker Buildx
