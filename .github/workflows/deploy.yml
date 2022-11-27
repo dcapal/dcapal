@@ -36,8 +36,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: extract-version
     env:
-      LATEST_TAG: "$DOCKER_REPO:latest"
-      VERSION_TAG: "$DOCKER_REPO:v${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}"
+      VERSION: ${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up Docker Buildx
@@ -60,7 +59,7 @@ jobs:
           context: ./dcapal-backend
           file: ./dcapal-backend/docker/Dockerfile
           push: true
-          tags: ${{ env.LATEST_TAG }},${{ env.VERSION_TAG }} 
+          tags: ${{ env.DOCKER_REPO }}:latest,${{ env.DOCKER_REPO }}:${{ env.VERSION }} 
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
       -
