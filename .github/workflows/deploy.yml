@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  LATEST_TAG: leonardoarcari/dcapal:latest
+  DOCKER_REPO: leonardoarcari/dcapal
 
 jobs:
   extract-version:
@@ -36,7 +36,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: extract-version
     env:
-      VERSION_TAG: v${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}
+      LATEST_TAG: "${{ env.DOCKER_REPO }}:latest"
+      VERSION_TAG: "${{ env.DOCKER_REPO }}:v${{ fromJson(needs.extract-version.outputs.metadata).packages[0].version }}"
     steps:
       - uses: actions/checkout@v3
       - name: Set up Docker Buildx
