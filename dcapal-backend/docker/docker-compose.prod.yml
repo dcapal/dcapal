@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  dcapal:
+    image: leonardoarcari/dcapal:latest
+    restart: always
+    ports:
+      - 8080:8080
+      - 9000:9000
+    networks:
+      - dcapalnetwork
+    volumes:
+      - ./dcapal.yml:/var/dcapal-backend/dcapal.yml
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: curl --fail http://localhost:8080 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 5

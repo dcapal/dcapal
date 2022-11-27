@@ -1,0 +1,36 @@
+version: "3.9"
+services:
+  redis:
+    image: redis/redis-stack
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - 9090:9090
+    networks:
+      - dcapalnetwork
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - ./data/prometheus/:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.external-url=http://localhost:9090"
+    extra_hosts:
+      host.docker.internal: host-gateway
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - 3000:3000
+    networks:
+      - dcapalnetwork
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin

@@ -1,43 +1,22 @@
 version: "3.9"
 services:
   redis:
-    image: redis/redis-stack
+    image: redis/redis-stack-server
     container_name: redis
     restart: always
     ports:
       - 6379:6379
       - 8001:8001
+    networks:
+      - dcapalnetwork
     volumes:
       - ./config/redis/redis-stack.conf:/redis-stack.conf
       - ./data/redis/:/data
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    restart: always
-    ports:
-      - 9090:9090
-    volumes:
-      - ./config/prometheus:/etc/prometheus
-      - ./data/prometheus/:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--web.external-url=http://localhost:9090"
-    extra_hosts:
-      host.docker.internal: host-gateway
-  
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    restart: always
-    ports:
-      - 3000:3000
-    volumes:
-      - ./data/grafana:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+    healthcheck:
+      test: redis-cli --raw incr ping
+      interval: 10s
+      timeout: 10s
+      retries: 3
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -45,8 +24,14 @@ services:
     restart: always
     ports:
       - 8010:8080
+    networks:
+      - dcapalnetwork
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+
+
+networks:
+  dcapalnetwork:

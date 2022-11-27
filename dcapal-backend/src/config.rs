@@ -75,7 +75,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Result<Self> {
         let s = config::Config::builder()
-            .add_source(config::File::with_name("dca-pal.yml").format(config::FileFormat::Yaml))
+            .add_source(config::File::with_name("dcapal.yml").format(config::FileFormat::Yaml))
             .build()?;
 
         Ok(s.try_deserialize()?)
