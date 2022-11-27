@@ -1,0 +1,106 @@
+name: DcaPal Build/Test
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  backend-build-test:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        components: clippy, rustfmt
+    - uses: Swatinem/rust-cache@v2
+    
+    - name: Toolchain info
+      run: |
+        cargo --version --verbose
+        rustc --version
+        cargo clippy --version
+    
+    - name: Lint
+      run: |
+        cd dcapal-backend
+        cargo fmt -- --check
+        cargo clippy -- -D warnings
+
+    - name: Build and Test
+      run: |
+        cd dcapal-backend
+        cargo test
+
+  optimizer-build-test:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        components: clippy, rustfmt
+    - uses: Swatinem/rust-cache@v2
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Toolchain info
+      run: |
+        cargo --version --verbose
+        rustc --version
+        cargo clippy --version
+    
+    - name: Lint
+      run: |
+        cd dcapal-optimizer-wasm
+        cargo fmt -- --check
+        cargo clippy -- -D warnings
+ 
+    - name: Test
+      run: |
+        cd dcapal-optimizer-wasm
+        cargo test
+        wasm-pack test --headless --chrome
+        
+    - name: Build
+      run: |
+        cd dcapal-optimizer-wasm
+        wasm-pack build
+        
+    - name: Archive dcapal-optimizer-wasm pkg
+      uses: actions/upload-artifact@v3
+      with:
+        name: dcapal-optimizer-wasm-pkg
+        path: dcapal-optimizer-wasm/pkg
+
+  frontend-build-test:
+    runs-on: ubuntu-22.04
+    needs: optimizer-build-test
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+
+    - name: Download dcapal-optimizer-wasm pkg
+      uses: actions/download-artifact@v3
+      with:
+        name: dcapal-optimizer-wasm-pkg
+        path: dcapal-optimizer-wasm/pkg
+    
+    - name: Install dependencies
+      run: |
+        cd dcapal-frontend
+        npm ci
+
+    - name: Build
+      run: |
+        cd dcapal-frontend
+        npm run build
