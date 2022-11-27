@@ -17,6 +17,9 @@ jobs:
     outputs:
       metadata: ${{ steps.step_metadata.outputs.metadata }}
     steps:
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
       - id: step_metadata
         run: |
           cargo metadata --no-deps --format-version=1 > metadata.json
