@@ -3,6 +3,7 @@
 **/bin/
 **/pkg/
 wasm-pack.log
+TODO.md
 
 # IDE stuff
 .vscode

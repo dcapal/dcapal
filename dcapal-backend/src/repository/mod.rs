@@ -301,11 +301,34 @@ impl MarketDataRepository {
     }
 
     async fn migrate_asset_idx(redis: &mut Connection) -> Result<()> {
-        let res: Value = redis::cmd("FT.INFO")
+        let res = redis::cmd("FT.INFO")
             .arg(Self::ASSET_IDX)
             .query_async(redis)
-            .await?;
+            .await;
 
+        if let Err(ref e) = res {
+            if let redis::ErrorKind::ExtensionError = e.kind() {
+                if e.detail().unwrap() == "Index name" {
+                    info!("Missing index '{}'. Creating", Self::ASSET_IDX);
+
+                    redis::cmd("FT.CREATE")
+                        .arg(Self::ASSET_IDX)
+                        .arg(&["ON", "JSON", "PREFIX", "1"])
+                        .arg(MarketDataRepository::ASSET_BASE)
+                        .arg(&[
+                            "SCHEMA", "$.id", "AS", "id", "TEXT", "$.symbol", "as", "symbol",
+                            "TEXT", "$.type", "AS", "type", "TEXT",
+                        ])
+                        .query_async::<_, ()>(redis)
+                        .await?;
+
+                    info!("Redis index '{}' created", Self::ASSET_IDX);
+                    return Ok(());
+                }
+            }
+        }
+
+        let res = res?;
         if let Value::Bulk(v) = res {
             if let Some(s) = v.get(0) {
                 match String::from_redis_value(s) {
@@ -313,32 +336,46 @@ impl MarketDataRepository {
                         info!("Index '{}' already exists", Self::ASSET_IDX);
                         return Ok(());
                     }
-                    _ => info!("Missing index '{}'. Creating", Self::ASSET_IDX),
+                    _ => {}
                 }
             }
         }
 
-        redis::cmd("FT.CREATE")
-            .arg(Self::ASSET_IDX)
-            .arg(&["ON", "JSON", "PREFIX", "1"])
-            .arg(MarketDataRepository::ASSET_BASE)
-            .arg(&[
-                "SCHEMA", "$.id", "AS", "id", "TEXT", "$.symbol", "as", "symbol", "TEXT", "$.type",
-                "AS", "type", "TEXT",
-            ])
-            .query_async::<_, ()>(redis)
-            .await?;
-
-        info!("Redis index '{}' created", Self::ASSET_IDX);
-        Ok(())
+        Err(DcaError::Generic(format!(
+            "Failed to check for index {}",
+            Self::ASSET_IDX,
+        )))
     }
 
     async fn migrate_market_idx(redis: &mut Connection) -> Result<()> {
-        let res: Value = redis::cmd("FT.INFO")
+        let res = redis::cmd("FT.INFO")
             .arg(Self::MARKET_IDX)
             .query_async(redis)
-            .await?;
+            .await;
 
+        if let Err(ref e) = res {
+            if let redis::ErrorKind::ExtensionError = e.kind() {
+                if e.detail().unwrap() == "Index name" {
+                    info!("Missing index '{}'. Creating", Self::MARKET_IDX);
+
+                    redis::cmd("FT.CREATE")
+                        .arg(Self::MARKET_IDX)
+                        .arg(&["ON", "JSON", "PREFIX", "1"])
+                        .arg(MarketDataRepository::MARKET_BASE)
+                        .arg(&[
+                            "SCHEMA", "$.id", "AS", "id", "TEXT", "$.base", "as", "base", "TEXT",
+                            "$.quote", "as", "quote", "TEXT",
+                        ])
+                        .query_async::<_, ()>(redis)
+                        .await?;
+
+                    info!("Redis index '{}' created", Self::MARKET_IDX);
+                    return Ok(());
+                }
+            }
+        }
+
+        let res = res?;
         if let Value::Bulk(v) = res {
             if let Some(s) = v.get(0) {
                 match String::from_redis_value(s) {
@@ -346,24 +383,15 @@ impl MarketDataRepository {
                         info!("Index '{}' already exists", Self::MARKET_IDX);
                         return Ok(());
                     }
-                    _ => info!("Missing index '{}'. Creating", Self::MARKET_IDX),
+                    _ => {}
                 }
             }
         }
 
-        redis::cmd("FT.CREATE")
-            .arg(Self::MARKET_IDX)
-            .arg(&["ON", "JSON", "PREFIX", "1"])
-            .arg(MarketDataRepository::MARKET_BASE)
-            .arg(&[
-                "SCHEMA", "$.id", "AS", "id", "TEXT", "$.base", "as", "base", "TEXT", "$.quote",
-                "as", "quote", "TEXT",
-            ])
-            .query_async::<_, ()>(redis)
-            .await?;
-
-        info!("Redis index '{}' created", Self::MARKET_IDX);
-        Ok(())
+        Err(DcaError::Generic(format!(
+            "Failed to check for index {}",
+            Self::MARKET_IDX,
+        )))
     }
 }
 
