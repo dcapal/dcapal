@@ -1,5 +1,6 @@
 import axios from "axios";
 import { api } from "./api";
+import { DCAPAL_API, YF_API_1 } from "./config";
 
 export const Provider = Object.freeze({
   DCA_PAL: "DCAPal",
@@ -7,7 +8,7 @@ export const Provider = Object.freeze({
 });
 
 export const fetchPrice = async (base, quote, token) => {
-  const url = `/api/dcapal/price/${base}?quote=${quote}`;
+  const url = `${DCAPAL_API}/price/${base}?quote=${quote}`;
   try {
     const response = await api.get(url, { cancelToken: token });
 
@@ -38,7 +39,7 @@ export const fetchPriceYF = async (symbol, quote, token) => {
   lastThreeDays.setDate(lastThreeDays.getDate() - 3);
   const period1 = toUnixTimestamp(lastThreeDays);
   const period2 = toUnixTimestamp(new Date());
-  const url = `/api/yfinance1/v8/finance/chart/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
+  const url = `${YF_API_1}/v8/finance/chart/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
   try {
     const response = await api.get(url, {
       cancelToken: token,
@@ -118,7 +119,7 @@ export const getFetcher = (provider) => {
 };
 
 export const fetchAssetsDcaPal = async (type) => {
-  const url = `/api/dcapal/assets/${type}`;
+  const url = `${DCAPAL_API}/assets/${type}`;
   try {
     const response = await api.get(url);
 

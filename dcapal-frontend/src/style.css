@@ -7,7 +7,6 @@
     background-image: url(../images/stacked-wave-2.svg);
     background-repeat: no-repeat;
     background-position: top;
-    background-size: 100% auto;
     transform: rotate(180deg);
     @apply w-full h-[381px];
   }

@@ -10,11 +10,12 @@ import {
   fetchPriceYF,
   Provider,
 } from "../../../app/providers";
+import { YF_API_2 } from "../../../app/config";
 
 let searchId = undefined;
 
 const fetchAssetsYF = async (query) => {
-  const url = `/api/yfinance2/v1/finance/search?q=${query}`;
+  const url = `${YF_API_2}/v1/finance/search?q=${query}`;
   try {
     const response = await api.get(url);
 

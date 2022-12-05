@@ -20,15 +20,15 @@ const buildCards = (assets, solution) => {
   }));
 
   if (!solution?.vars) return cards;
+  let totalAmount = 0;
 
-  const totalAmount = Object.values(solution.vars).reduce(
-    (tot, a) => tot + a,
-    0
-  );
+  for (const a of solution.vars.values()) {
+    totalAmount += a;
+  }
 
   for (const card of cards) {
-    if (card.symbol in solution.vars) {
-      card.amount = solution.vars[card.symbol];
+    if (solution.vars.has(card.symbol)) {
+      card.amount = solution.vars.get(card.symbol);
       card.weight = (100 * card.amount) / totalAmount;
     }
   }

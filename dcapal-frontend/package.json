@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "description": "A web client for DcaPal web application",
   "main": "index.js",
-  "bin": {
-    "dcapal-frontend": ".bin/dcapal-frontend.js"
-  },
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "start": "webpack-dev-server"
+    "build": "webpack --config webpack.prod.js --mode production",
+    "dev": "webpack --config webpack.dev.js --mode development",
+    "start": "webpack-dev-server --open --config webpack.dev.js --mode development"
   },
   "repository": {
     "type": "git",
@@ -55,6 +53,7 @@
     "threads-plugin": "^1.4.0",
     "webpack": "^4.29.3",
     "webpack-cli": "^3.1.0",
-    "webpack-dev-server": "^3.1.5"
+    "webpack-dev-server": "^3.1.5",
+    "webpack-merge": "^5.8.0"
   }
 }

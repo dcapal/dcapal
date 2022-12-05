@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 
 export const InputNumberType = Object.freeze({
   INTEGRAL: 0,
