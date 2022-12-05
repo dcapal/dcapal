@@ -70,3 +70,64 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  optimizer-build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: 1.65.0
+    - uses: Swatinem/rust-cache@v2
+    
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    
+    - name: Toolchain info
+      run: |
+        cargo --version --verbose
+        rustc --version    
+        
+    - name: Build
+      run: |
+        cd dcapal-optimizer-wasm
+        wasm-pack build --release
+        
+    - name: Archive dcapal-optimizer-wasm pkg
+      uses: actions/upload-artifact@v3
+      with:
+        name: dcapal-optimizer-wasm-pkg
+        path: dcapal-optimizer-wasm/pkg
+
+  frontend-build-test:
+    runs-on: ubuntu-22.04
+    needs: optimizer-build
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 16
+        cache: 'npm'
+        cache-dependency-path: dcapal-frontend/package-lock.json
+
+    - name: Download dcapal-optimizer-wasm pkg
+      uses: actions/download-artifact@v3
+      with:
+        name: dcapal-optimizer-wasm-pkg
+        path: dcapal-optimizer-wasm/pkg
+    
+    - name: Install dependencies
+      run: |
+        cd dcapal-frontend
+        npm ci
+
+    - name: Build
+      run: |
+        cd dcapal-frontend
+        npm run build
+
+    - name: Archive dcapal-frontend
+      uses: actions/upload-artifact@v3
+      with:
+        name: dcapal-frontend-dist
+        path: dcapal-frontend/dist
