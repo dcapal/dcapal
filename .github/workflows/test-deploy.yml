@@ -1,4 +1,4 @@
-name: Build and Test
+name: Test deploy
 
 on:
   push:
@@ -13,7 +13,6 @@ env:
 jobs:
   extract-version:
     runs-on: ubuntu-22.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     outputs:
       metadata: ${{ steps.step_metadata.outputs.metadata }}
     steps:
