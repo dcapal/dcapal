@@ -186,6 +186,8 @@ jobs:
 
       - name: Configure dcapal.yml
         env:
+          DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
+          DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
           DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
           DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
@@ -194,8 +196,8 @@ jobs:
           app:
             providers:
               priceProvider: yahoo
-              cwApiKey: GM30A3RPSBWO3VKUK8XW
-              ipApiKey: 909f4331e8a74121588d17f2e1ece2b0
+              cwApiKey: ${DCAPAL_CW_API_KEY}
+              ipApiKey: ${DCAPAL_IP_API_KEY}
 
             log:
               level: dcapal_backend=info,tower_http=debug
@@ -234,6 +236,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
+          envs: DCAPAL_DIR
           script: |
             cd ${DCAPAL_DIR}
             ls -la
