@@ -214,7 +214,7 @@ jobs:
                 - dcapalnetwork
               volumes:
                 - ./dcapal.yml:/var/dcapal-backend/dcapal.yml
-                - ./data/dcapal.log:/var/dcapal-backend/dcapal.log
+                - ./data/dcapal/dcapal.log:/var/dcapal-backend/dcapal.log
               depends_on:
                 redis:
                   condition: service_healthy
