@@ -152,6 +152,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-frontend/dist
           target: ${{ secrets.WEB_DIR }}
+          strip_components: 2
       
       - name: Configure docker-compose.yml
         env:
