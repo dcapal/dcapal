@@ -99,7 +99,7 @@ jobs:
         name: dcapal-optimizer-wasm-pkg
         path: dcapal-optimizer-wasm/pkg
 
-  frontend-build-test:
+  frontend-build:
     runs-on: ubuntu-22.04
     needs: optimizer-build
     steps:
