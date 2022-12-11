@@ -1,6 +1,9 @@
-use std::{fs::File, net::SocketAddr};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
-use dcapal_backend::{config::Config, DcaServer};
+use dcapal_backend::{config::Config, error::DcaError, DcaServer};
 use futures::FutureExt;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::signal;
@@ -25,9 +28,30 @@ fn init_tracing(config: &dcapal_backend::config::Log) -> anyhow::Result<Option<W
 
     let mut file_guard = None;
     if let Some(ref file_path) = config.file {
-        let file = File::create(file_path)?;
+        let file_name_prefix = Path::new(file_path)
+            .file_name()
+            .ok_or_else(|| DcaError::InvalidLogPath(file_path.clone()))?;
 
-        let (non_blocking, guard) = tracing_appender::non_blocking(file);
+        let directory = Path::new(file_path)
+            .parent()
+            .map(|p| p.to_owned())
+            .map(|p| {
+                if p == Path::new("") {
+                    PathBuf::from("./")
+                } else {
+                    p
+                }
+            })
+            .unwrap_or_else(|| PathBuf::from("./"))
+            .canonicalize()
+            .map_err(|e| DcaError::InvalidLogPath2(file_path.clone(), e))?;
+
+        if !directory.is_dir() {
+            return Err(DcaError::InvalidLogPath(file_path.clone()))?;
+        }
+
+        let file_appender = tracing_appender::rolling::hourly(directory, file_name_prefix);
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
         file_guard.replace(guard);
 
         let layer = tracing_subscriber::fmt::layer()

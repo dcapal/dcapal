@@ -1,5 +1,5 @@
 data/**
 dcapal.yml
-*.log
+**/*.log*
 
 !data/.gitkeep
