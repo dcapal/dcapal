@@ -58,8 +58,8 @@ impl From<res::GeoIp> for GeoData {
             region_name: geo.region_name.unwrap_or_default(),
             city: geo.city.unwrap_or_default(),
             zip: geo.zip.unwrap_or_default(),
-            latitude: geo.latitude.unwrap_or_default(),
-            longitude: geo.longitude.unwrap_or_default(),
+            latitude: geo.latitude.unwrap_or_default().to_string(),
+            longitude: geo.longitude.unwrap_or_default().to_string(),
         }
     }
 }
@@ -85,8 +85,8 @@ mod res {
         pub region_name: Option<String>,
         pub city: Option<String>,
         pub zip: Option<String>,
-        pub latitude: Option<String>,
-        pub longitude: Option<String>,
+        pub latitude: Option<f64>,
+        pub longitude: Option<f64>,
     }
 
     #[derive(Debug, Clone, Deserialize)]
