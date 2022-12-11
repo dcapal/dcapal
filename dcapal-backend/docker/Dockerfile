@@ -21,5 +21,6 @@ RUN apt-get install -qq \
 # Prepare binary
 WORKDIR /var/dcapal-backend
 RUN mkdir bin
+RUN mkdir data
 COPY --from=builder /var/dcapal-backend/target/release/dcapal-backend /var/dcapal-backend/bin
 ENTRYPOINT ["/var/dcapal-backend/bin/dcapal-backend"]

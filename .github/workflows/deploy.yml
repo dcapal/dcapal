@@ -215,7 +215,7 @@ jobs:
                 - dcapalnetwork
               volumes:
                 - ./dcapal.yml:/var/dcapal-backend/dcapal.yml
-                - ./data/dcapal/dcapal.log:/var/dcapal-backend/dcapal.log
+                - ./data/dcapal:/var/dcapal-backend/data
               depends_on:
                 redis:
                   condition: service_healthy
@@ -243,7 +243,7 @@ jobs:
 
             log:
               level: dcapal_backend=info,tower_http=debug
-              file: dcapal.log
+              file: data/dcapal.log
               enableStdout: false
 
           server:
