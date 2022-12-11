@@ -61,8 +61,8 @@ pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
     let last_fetched = misc.get_cw_last_fetched().await?;
     if let Some(ts) = last_fetched {
-        let ts_day = Utc.from_utc_datetime(&ts.naive_utc());
-        let today = Utc::now();
+        let ts_day = Utc.from_utc_datetime(&ts.naive_utc()).date_naive();
+        let today = Utc::now().date_naive();
         return Ok((ts_day < today, Some(ts)));
     }
 

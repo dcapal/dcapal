@@ -23,6 +23,10 @@ pub enum DcaError {
     StartupFailure(String, #[source] anyhow::Error),
     #[error("Failed to parse config")]
     Config(#[from] ConfigError),
+    #[error("Invalid log file path: {0}")]
+    InvalidLogPath(String),
+    #[error("Invalid log file path: {0}")]
+    InvalidLogPath2(String, #[source] std::io::Error),
     #[error("Failed to obtain Redis connection")]
     RedisPool(#[from] PoolError),
     #[error(transparent)]
