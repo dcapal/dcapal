@@ -66,15 +66,15 @@ pub async fn requests_stats<B>(
 
 async fn fetch_geo_ip(ip: String, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) {
     if let Err(e) = fetch_geo_ip_inner(&ip, repo, ipapi).await {
-        error!("Error occurred in fetching GeoIP for {}: {}", ip, e);
+        error!(
+            "Error occurred in fetching GeoIP for {}: {}",
+            ip,
+            e.msg_chain()
+        );
     }
 }
 
-async fn fetch_geo_ip_inner(
-    ip: &str,
-    repo: Arc<StatsRepository>,
-    ipapi: Arc<IpApi>,
-) -> anyhow::Result<()> {
+async fn fetch_geo_ip_inner(ip: &str, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) -> Result<()> {
     let geo = repo.find_visitor_ip(ip).await?;
     if geo.is_some() {
         return Ok(());
