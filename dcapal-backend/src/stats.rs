@@ -19,6 +19,9 @@ pub const LATENCY_SUMMARY: &str = concatcp!(BASE, '_', "latency_summary");
 
 pub async fn latency_stats<B>(req: Request<B>, next: Next<B>) -> Response {
     let path = req.uri().path().to_string();
+    if path == "/" {
+        return next.run(req).await;
+    }
 
     let start = Instant::now();
     let res = next.run(req).await;
@@ -39,8 +42,12 @@ pub async fn requests_stats<B>(
     req: Request<B>,
     next: Next<B>,
 ) -> Result<Response> {
-    // Request stats
     let path = req.uri().path().to_string();
+    if path == "/" {
+        return Ok(next.run(req).await);
+    }
+
+    // Request stats
     increment_counter!(REQUESTS_TOTAL, &[("path", path)]);
 
     // Visitors stats
