@@ -82,6 +82,12 @@ async fn fetch_geo_ip(ip: String, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>)
 }
 
 async fn fetch_geo_ip_inner(ip: &str, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) -> Result<()> {
+    static IGNORED_IP: [&str; 3] = ["127.0.0.1", "0.0.0.0", "localhost"];
+
+    if IGNORED_IP.iter().any(|ignored| ip == *ignored) {
+        return Ok(());
+    }
+
     let geo = repo.find_visitor_ip(ip).await?;
     if geo.is_some() {
         return Ok(());
