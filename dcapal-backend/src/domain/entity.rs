@@ -42,6 +42,13 @@ impl Asset {
     pub fn is_fiat(&self) -> bool {
         matches!(self, Asset::Fiat(_))
     }
+
+    pub fn kind(&self) -> AssetKind {
+        match self {
+            Asset::Crypto(_) => AssetKind::Crypto,
+            Asset::Fiat(_) => AssetKind::Fiat,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]

@@ -1,6 +1,6 @@
 use crate::{
     error::{DcaError, Result},
-    repository::MarketDataRepository,
+    repository::market_data::MarketDataRepository,
 };
 
 use super::entity::{Asset, AssetId};

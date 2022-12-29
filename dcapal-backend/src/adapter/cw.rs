@@ -11,7 +11,7 @@ use crate::{
     config,
     domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     error::{DcaError, Result},
-    repository::MarketDataRepository,
+    repository::market_data::MarketDataRepository,
     DateTime,
 };
 

@@ -22,7 +22,7 @@ use domain::MarketDataService;
 use futures::future::BoxFuture;
 use hyper::Body;
 use metrics::{describe_counter, Unit};
-use repository::{MarketDataRepository, MiscRepository, StatsRepository};
+use repository::{market_data::MarketDataRepository, MiscRepository, StatsRepository};
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
@@ -159,9 +159,6 @@ impl DcaServer {
     pub async fn start(&mut self, signal_handler: BoxFuture<'_, ()>) -> Result<()> {
         info!("Initializing metrics");
         self.init_metrics();
-
-        info!("Starting AssetRepository migration");
-        self.ctx.repos.mkt_data.migrate_redis().await?;
 
         info!("Starting Maintenance task");
         {

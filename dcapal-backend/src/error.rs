@@ -27,6 +27,8 @@ pub enum DcaError {
     InvalidLogPath(String),
     #[error("Invalid log file path: {0}")]
     InvalidLogPath2(String, #[source] std::io::Error),
+    #[error("Failed to deserialized into {1}: {0}")]
+    JsonDeserializationFailure(String, String, #[source] serde_json::Error),
     #[error("Failed to obtain Redis connection")]
     RedisPool(#[from] PoolError),
     #[error(transparent)]
@@ -38,7 +40,7 @@ pub enum DcaError {
 impl DcaError {
     pub fn msg_chain(self) -> String {
         let e = anyhow::Error::from(self);
-        build_msg_chain(&e)
+        format!("{}{}", e, build_msg_chain(&e))
     }
 }
 

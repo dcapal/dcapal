@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 use crate::{
     config::Config,
     error::{DcaError, Result},
-    repository::MarketDataRepository,
+    repository::market_data::MarketDataRepository,
     Provider,
 };
 
