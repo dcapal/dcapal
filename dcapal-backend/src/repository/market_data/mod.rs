@@ -1,8 +1,6 @@
 mod redis_asset;
 mod redis_market;
 
-use std::string::ToString;
-
 use crate::{
     domain::entity::{Asset, AssetId, AssetKind, Market, MarketId},
     error::{DcaError, Result},
@@ -35,11 +33,9 @@ impl MarketDataRepository {
     pub async fn store_asset(&self, asset: &Asset) -> Result<()> {
         let mut redis = self.redis.get().await?;
 
-        if asset.store(&mut redis).await? {
-            Ok(())
-        } else {
-            Err(DcaError::RepositoryStoreFailure(asset.id().to_string()))
-        }
+        asset.store(&mut redis).await?;
+
+        Ok(())
     }
 
     pub async fn find_market(&self, id: &MarketId) -> Result<Option<Market>> {
@@ -70,15 +66,10 @@ impl MarketDataRepository {
         }
 
         let mut redis = self.redis.get().await?;
-        if market.store(&mut redis).await? {
-            Ok(())
-        } else {
-            Err(DcaError::RepositoryStoreFailure(format!(
-                "Price for market '{}': {:?}",
-                market.id,
-                market.price().unwrap()
-            )))
-        }
+
+        market.store(&mut redis).await?;
+
+        Ok(())
     }
 
     pub async fn load_markets(&self) -> Result<Vec<Market>> {
