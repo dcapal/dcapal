@@ -28,17 +28,19 @@ export const fetchPrice = async (base, quote, token) => {
   }
 };
 
-const toUnixTimestamp = (date) => {
+const toUnixTimestamp = (date, startOfDay) => {
   const d = new Date(date.getTime());
-  d.setUTCHours(0, 0, 0, 0);
+  if (startOfDay) {
+    d.setUTCHours(0, 0, 0, 0);
+  }
   return Math.floor(d.getTime() / 1000);
 };
 
 export const fetchPriceYF = async (symbol, quote, token) => {
   const lastThreeDays = new Date();
   lastThreeDays.setDate(lastThreeDays.getDate() - 3);
-  const period1 = toUnixTimestamp(lastThreeDays);
-  const period2 = toUnixTimestamp(new Date());
+  const period1 = toUnixTimestamp(lastThreeDays, true);
+  const period2 = toUnixTimestamp(new Date(), false);
   const url = `${YF_API_1}/v8/finance/chart/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
   try {
     const response = await api.get(url, {
