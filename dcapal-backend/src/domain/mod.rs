@@ -25,7 +25,7 @@ pub struct MarketDataService {
     config: Arc<Config>,
     repo: Arc<MarketDataRepository>,
     providers: Arc<Provider>,
-    mkt_loaders: DashMap<MarketId, Arc<ExpiringOnceCell<Arc<Market>>>>,
+    mkt_loaders: DashMap<MarketId, Arc<ExpiringOnceCell<Option<Arc<Market>>>>>,
     pricers: DashMap<(AssetId, AssetId), Arc<ExpiringOnceCell<Price>>>,
     mkt_cache: DashMap<MarketId, Arc<Market>>,
     px_cache: DashMap<(AssetId, AssetId), Price>,
@@ -70,25 +70,30 @@ impl MarketDataService {
         loader
             .get_or_try_init(
                 || async { self.load_market(&id).await },
-                |m| m.is_price_outdated(),
+                |market| {
+                    if let Some(ref m) = market {
+                        m.is_price_outdated()
+                    } else {
+                        false
+                    }
+                },
             )
             .await
-            .map(Some)
             .unwrap_or_else(|e| {
                 error!("{}", e);
                 None
             })
     }
 
-    async fn load_market(&self, id: &MarketId) -> Result<Arc<Market>> {
+    async fn load_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
         let mkt = self.repo.find_market(id).await.map_err(|e| {
             error!(mkt = id, "Error occured in loading market: {}", e);
             DcaError::MarketNotFound(id.clone())
         })?;
 
         if mkt.is_none() {
-            warn!("Cannot find market '{}'", id);
-            return Err(DcaError::MarketNotFound(id.clone()));
+            info!("Cannot find market '{}'", id);
+            return Ok(None);
         }
 
         let mkt = self
@@ -104,7 +109,7 @@ impl MarketDataService {
             if let Err(e) = self.repo.update_mkt_price(&mkt).await {
                 error!(mkt = id, "Failed to update price: {}", e);
             }
-            Ok(mkt)
+            Ok(Some(mkt))
         } else {
             Err(DcaError::MarketNotFound(id.clone()))
         }
