@@ -45,6 +45,17 @@ pub struct Application {
 pub struct Redis {
     pub hostname: String,
     pub port: u32,
+    pub user: String,
+    pub password: String,
+}
+
+impl Redis {
+    pub fn connection_url(&self) -> String {
+        format!(
+            "redis://{}:{}@{}:{}/",
+            self.user, self.password, self.hostname, self.port
+        )
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

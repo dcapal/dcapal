@@ -4,13 +4,13 @@ services:
     image: redis/redis-stack-server
     container_name: redis
     restart: always
-    ports:
-      - 6379:6379
-      - 8001:8001
+    expose:
+      - 6379
     networks:
       - dcapalnetwork
     volumes:
       - ./config/redis/redis-stack.conf:/redis-stack.conf
+      - ./config/redis/users.acl:/etc/redis/users.acl
       - ./data/redis/:/data
     healthcheck:
       test: redis-cli --raw incr ping

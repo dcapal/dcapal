@@ -165,12 +165,13 @@ jobs:
               image: redis/redis-stack-server
               container_name: redis
               restart: always
-              ports:
-                - ${REDIS_PORT}:6379
+              expose:
+                - 6379
               networks:
                 - dcapalnetwork
               volumes:
                 - ./config/redis/redis-stack.conf:/redis-stack.conf
+                - ./config/redis/users.acl:/etc/redis/users.acl
                 - ./data/redis/:/data
               healthcheck:
                 test: redis-cli --raw incr ping
@@ -226,6 +227,19 @@ jobs:
                 retries: 5
           EOF
 
+      - name: Configure Redis ACL
+        env:
+          REDIS_USER: ${{ secrets.REDIS_USER }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_ADMIN: ${{ secrets.REDIS_ADMIN }}
+          REDIS_ADMIN_PASSWORD: ${{ secrets.REDIS_ADMIN_PASSWORD }}
+        run: |
+          cat > dcapal-backend/config/redis/users.acl << EOF
+          user ${REDIS_USER} +@all -@dangerous ~* on >${REDIS_PASSWORD}
+          user ${REDIS_ADMIN} ~* &* +@all on >${REDIS_ADMIN_PASSWORD}
+          user default off
+          EOF
+
       - name: Configure dcapal.yml
         env:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
@@ -233,6 +247,8 @@ jobs:
           DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
           DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_USER: ${{ secrets.REDIS_USER }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
           app:
@@ -256,6 +272,8 @@ jobs:
             redis:
               hostname: redis
               port: ${REDIS_PORT}
+              user: ${REDIS_USER}
+              password: ${REDIS_PASSWORD}
           EOF
       
       - name: Deploy dcapal-backend config

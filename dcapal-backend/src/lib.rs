@@ -194,14 +194,14 @@ impl DcaServer {
 }
 
 fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
-    let redis_addr = format!("redis://{}:{}/", &config.hostname, &config.port);
-    let redis_pool = deadpool_redis::Config::from_url(redis_addr)
+    let url = config.connection_url();
+    let redis_pool = deadpool_redis::Config::from_url(url)
         .builder()
         .map_err(|e| {
             DcaError::StartupFailure(
                 format!(
-                    "Error in building Redis poll config (hostname={}, port={})",
-                    &config.hostname, &config.port
+                    "Error in building Redis poll config (user={}, hostname={}, port={})",
+                    &config.user, &config.hostname, &config.port
                 ),
                 e.into(),
             )
