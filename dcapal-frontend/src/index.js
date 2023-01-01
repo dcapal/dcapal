@@ -8,7 +8,9 @@ import "./style.css";
 import { ExportBtn } from "./components/exportBtn";
 import { PersistGate } from "redux-persist/integration/react";
 import { fetchAssetsDcaPal } from "./app/providers";
-import { setCurrencies } from "./app/appSlice";
+import { setAllocationFlowStep, setCurrencies } from "./app/appSlice";
+import { clearPortfolio } from "./components/allocationFlow/portfolioStep/portfolioSlice";
+import { Step } from "./components/allocationFlow";
 
 const loadCurrencies = async (dispatch) => {
   const res = await fetchAssetsDcaPal("fiat");
@@ -24,13 +26,23 @@ const App = () => {
     loadCurrencies(dispatch);
   }, []);
 
+  const onClickHome = () => {
+    dispatch(clearPortfolio({}));
+    dispatch(setAllocationFlowStep({ step: Step.INIT }));
+  };
+
   return (
     <div className="relative w-full h-screen">
       <div className="absolute bg-[#ededed] w-full h-[50px] top-10 -z-40" />
       <div className="absolute app-bg -z-50" />
       <div className="flex flex-col h-full">
         <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
-          <div className="text-xl font-semibold text-white">DcaPal</div>
+          <div
+            className="text-xl font-semibold text-white cursor-pointer"
+            onClick={onClickHome}
+          >
+            DcaPal
+          </div>
           <ExportBtn />
         </div>
         <div className="flex flex-col h-full px-6 pt-4">
@@ -42,6 +54,7 @@ const App = () => {
     </div>
   );
 };
+
 const root = createRoot(document.getElementById("app"));
 root.render(
   <Provider store={store}>
