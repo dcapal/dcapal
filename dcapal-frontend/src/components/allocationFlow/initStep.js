@@ -33,7 +33,7 @@ export const InitStep = ({ setPfolioFile, ...props }) => {
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div
-        className="w-80 h-36 mt-6 mb-4 flex justify-center items-center cursor-pointer bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-4xl rounded-md shadow-md"
+        className="pt-1 pb-2 px-3 mt-6 mb-4 flex justify-center items-center cursor-pointer bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-2xl rounded shadow-md"
         onClick={nextStep}
       >
         New Portfolio

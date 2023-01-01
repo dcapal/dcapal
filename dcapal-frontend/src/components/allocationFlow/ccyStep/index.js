@@ -45,14 +45,14 @@ export const CcyStep = ({ ...props }) => {
       <div className="mt-2 mb-8 text-3xl font-light">
         Choose your portfolio currency
       </div>
-      <div className="grow">
+      <div>
         <CcyGroup
           ccys={sortedCcys}
           selected={selected}
           setSelected={setSelected}
         />
       </div>
-      <div className="w-[38em] mt-10 flex justify-between items-center">
+      <div className="w-full mt-12 flex justify-between items-center">
         <span
           className="font-medium underline cursor-pointer"
           onClick={onClickBack}

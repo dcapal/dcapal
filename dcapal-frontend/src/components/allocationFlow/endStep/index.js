@@ -104,7 +104,7 @@ export const EndStep = ({ ...props }) => {
             <span className="text-4xl">📈</span> Great Success! Your allocation
             is ready
           </div>
-          <div className="grow">
+          <div className="w-full flex flex-col items-center">
             {cards.map((c) => (
               <AllocateCard
                 key={c.symbol}
@@ -119,7 +119,21 @@ export const EndStep = ({ ...props }) => {
             ))}
           </div>
           <span
-            className="mt-2 font-medium underline cursor-pointer"
+            className="mt-6 font-medium underline cursor-pointer"
+            onClick={onClickGoBack}
+          >
+            Back to Portfolio
+          </span>
+        </>
+      )}
+      {!isLoading && !solution && (
+        <>
+          <div className="mt-2 mb-8 text-3xl font-light">
+            <span className="text-4xl">⚠️</span> Oops! Something bad happened.
+            Please review your portfolio.
+          </div>
+          <span
+            className="mt-6 font-medium underline cursor-pointer"
             onClick={onClickGoBack}
           >
             Back to Portfolio

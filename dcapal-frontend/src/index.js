@@ -33,11 +33,10 @@ const App = () => {
           <div className="text-xl font-semibold text-white">DcaPal</div>
           <ExportBtn />
         </div>
-        <div className="flex flex-col h-full px-6 py-4">
-          <div className="grow w-full max-w-4xl self-center">
+        <div className="flex flex-col h-full px-6 pt-4">
+          <div className="w-full max-w-[42rem] pb-6 grow self-center">
             <Main />
           </div>
-          <div className="text-md font-light">Footer</div>
         </div>
       </div>
     </div>

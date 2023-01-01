@@ -109,15 +109,15 @@ export const SearchBar = (props) => {
     results.yf.length > 0;
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div className="relative flex flex-col items-center justify-center">
       <input
-        className="w-[36rem] h-12 px-6 pb-px border-2 rounded-3xl border-gray-500/40 uppercase placeholder:normal-case z-20"
+        className="w-full h-12 px-6 pb-px border-2 rounded-3xl border-gray-500/40 uppercase placeholder:normal-case z-20"
         value={props.text}
         placeholder={"Search Crypto, ETF and much more"}
         onChange={handleAddAssetInputChange}
       />
       {isAnyResult && (
-        <ul className="w-[34rem] max-h-48 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10">
+        <ul className="w-[calc(100%-2rem)] max-h-72 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10">
           {results.fiat.length > 0 && <SearchHeader text="cash" />}
           {results.fiat.map((r) => (
             <SearchItemCW

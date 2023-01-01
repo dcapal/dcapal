@@ -30,11 +30,11 @@ export const InvestStep = ({ ...props }) => {
       <div className="mt-2 mb-8 text-3xl font-light">
         How much you would like to allocate?
       </div>
-      <div className="grow flex justify-center">
-        <div className="w-96">
+      <div className="w-full flex justify-center items-end">
+        <div className="w-full">
           <InputNumber
-            height="128"
-            textSize="120"
+            height="68"
+            textSize="60"
             textAlign="text-right"
             type={InputNumberType.DECIMAL}
             value={cash}
@@ -43,11 +43,11 @@ export const InvestStep = ({ ...props }) => {
             min={0}
           />
         </div>
-        <div className="mt-16 ml-2 pb-2 text-6xl font-light uppercase">
+        <div className="ml-2 pb-2 text-2xl font-light uppercase">
           {quoteCcy}
         </div>
       </div>
-      <div className="w-[38em] mt-6 flex justify-start">
+      <div className="w-full mt-20 flex justify-start">
         <div>
           <input
             id="tax-efficient-checkbox"
@@ -64,7 +64,7 @@ export const InvestStep = ({ ...props }) => {
           </label>
         </div>
       </div>
-      <div className="w-[38em] mt-2 flex items-center justify-between">
+      <div className="w-full mt-6 flex items-center justify-between">
         <span
           className="font-medium underline cursor-pointer"
           onClick={onClickGoBack}

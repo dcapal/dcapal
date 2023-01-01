@@ -50,14 +50,14 @@ export const PortfolioStep = ({ ...props }) => {
 
   return (
     <div className="w-full h-full flex flex-col pt-2 items-center">
-      <div className="mt-2 mb-6 flex">
+      <div className="w-full mt-2 mb-6">
         <SearchBar
           text={searchText}
           setText={setSearchText}
           addAsset={addAssetToPortfolio}
         />
       </div>
-      <div className="grow">
+      <div className="w-full flex flex-col items-center">
         {assets.map((a, idx) => {
           const setAssetQty = (qty) => {
             dispatch(setQty({ symbol: a.symbol, qty: qty }));
@@ -92,13 +92,13 @@ export const PortfolioStep = ({ ...props }) => {
         </span>
       )}
       {Object.keys(assetStore).length > 0 && !isAllAllocated && (
-        <div className="mt-3 text-red-500">
+        <div className="mt-6 text-red-500">
           Review your <span className="font-medium">Target Weights</span>. They
           must sum up to 100%
         </div>
       )}
       {Object.keys(assetStore).length > 0 && (
-        <div className="w-[38em] mt-3 flex justify-between items-center">
+        <div className="w-full mt-6 flex justify-between items-center">
           <span
             className="font-medium underline cursor-pointer"
             onClick={onClickDiscard}
