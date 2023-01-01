@@ -18,20 +18,5 @@ services:
       timeout: 10s
       retries: 3
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    restart: always
-    ports:
-      - 8010:8080
-    networks:
-      - dcapalnetwork
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:rw
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-
-
 networks:
   dcapalnetwork:
