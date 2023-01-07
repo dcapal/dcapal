@@ -88,28 +88,29 @@ async fn fetch_geo_ip_inner(ip: &str, repo: Arc<StatsRepository>, ipapi: Arc<IpA
         return Ok(());
     }
 
-    let geo = repo.find_visitor_ip(ip).await?;
-    if geo.is_some() {
+    if let Some(geo) = repo.find_visitor_ip(ip).await? {
+        increment_counter!(
+            VISITORS_TOTAL,
+            &[
+                ("ip", geo.ip),
+                ("latitude", geo.latitude),
+                ("longitude", geo.longitude),
+            ]
+        );
         return Ok(());
     }
 
-    let geo = ipapi.fetch_geo(ip).await?;
-
-    if geo.is_none() {
+    let Some(geo) = ipapi.fetch_geo(ip).await? else {
         error!("Failed to fetch visitor ip ({}) from IpApi", ip);
         return Ok(());
-    }
+    };
 
-    let geo = geo.unwrap();
     increment_counter!(
         VISITORS_TOTAL,
         &[
             ("ip", geo.ip.clone()),
             ("latitude", geo.latitude.clone()),
             ("longitude", geo.longitude.clone()),
-            ("city", geo.city.clone()),
-            ("country_code", geo.country_code.clone()),
-            ("country_name", geo.country_name.clone())
         ]
     );
 
