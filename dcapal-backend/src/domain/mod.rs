@@ -102,6 +102,12 @@ impl MarketDataService {
         }
     }
 
+    fn invalidate_asset_cache(&self) {
+        let mut cache = self.assets_cache.write();
+        cache.crypto = None;
+        cache.fiats = None;
+    }
+
     pub async fn get_market(&self, id: MarketId) -> Option<Arc<Market>> {
         // Check market from cache
         if let Some(mkt) = self.mkt_cache.get(&id) {
@@ -370,6 +376,7 @@ impl MarketDataService {
         }
 
         // Invalidate caches
+        self.invalidate_asset_cache();
         self.mkt_cache.clear();
         self.px_cache.clear();
 
