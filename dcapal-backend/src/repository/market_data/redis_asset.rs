@@ -100,7 +100,7 @@ impl RedisAsset for Asset {
                             std::any::type_name::<Asset>().to_string(),
                             e,
                         );
-                        error!("{}", err.msg_chain());
+                        error!("{:?}", err);
                         None
                     }
                 }

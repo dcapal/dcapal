@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use futures::Future;
 use tokio::sync::{OnceCell, RwLock};
 
@@ -58,5 +60,33 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+pub trait Expiring {
+    fn is_outdated(&self) -> bool;
+}
+
+#[derive(Debug, Clone)]
+pub enum ExpiringOption<T: Expiring> {
+    Some(T),
+    None(Instant, Duration),
+}
+
+impl<T: Expiring> From<ExpiringOption<T>> for Option<T> {
+    fn from(v: ExpiringOption<T>) -> Self {
+        match v {
+            ExpiringOption::Some(v) => Some(v),
+            ExpiringOption::None(_, _) => None,
+        }
+    }
+}
+
+impl<T: Expiring> Expiring for ExpiringOption<T> {
+    fn is_outdated(&self) -> bool {
+        match self {
+            ExpiringOption::Some(v) => v.is_outdated(),
+            ExpiringOption::None(start, ttl) => start.elapsed() >= *ttl,
+        }
     }
 }

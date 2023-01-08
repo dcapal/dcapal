@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::DateTime;
 
+use super::utils::Expiring;
+
 pub type AssetId = String;
 pub type MarketId = String;
 
@@ -64,8 +66,10 @@ impl Price {
     pub fn new(price: f64, ts: DateTime) -> Self {
         Self { price, ts }
     }
+}
 
-    pub fn is_outdated(&self) -> bool {
+impl Expiring for Price {
+    fn is_outdated(&self) -> bool {
         let now = Utc::now();
         if now.time().hour() > self.ts.time().hour() {
             return true;
@@ -166,5 +170,11 @@ impl Market {
     pub fn is_price_outdated(&self) -> bool {
         let last_price = self.price();
         last_price.is_some() && last_price.as_ref().unwrap().is_outdated()
+    }
+}
+
+impl Expiring for Market {
+    fn is_outdated(&self) -> bool {
+        self.is_price_outdated()
     }
 }

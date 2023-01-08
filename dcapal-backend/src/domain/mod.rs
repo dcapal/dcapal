@@ -2,10 +2,14 @@ pub mod command;
 pub mod entity;
 pub mod utils;
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use chrono::Utc;
 use dashmap::DashMap;
+use parking_lot::RwLock;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -17,8 +21,8 @@ use crate::{
 
 use self::{
     command::ConversionRateQuery,
-    entity::{AssetId, Market, MarketId, Price},
-    utils::ExpiringOnceCell,
+    entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
+    utils::{Expiring, ExpiringOnceCell, ExpiringOption},
 };
 
 pub struct MarketDataService {
@@ -26,12 +30,15 @@ pub struct MarketDataService {
     repo: Arc<MarketDataRepository>,
     providers: Arc<Provider>,
     mkt_loaders: DashMap<MarketId, Arc<ExpiringOnceCell<Option<Arc<Market>>>>>,
-    pricers: DashMap<(AssetId, AssetId), Arc<ExpiringOnceCell<Price>>>,
+    pricers: DashMap<(AssetId, AssetId), Arc<ExpiringOnceCell<ExpiringOption<Price>>>>,
+    assets_cache: RwLock<AssetsCache>,
     mkt_cache: DashMap<MarketId, Arc<Market>>,
     px_cache: DashMap<(AssetId, AssetId), Price>,
 }
 
 impl MarketDataService {
+    const DEFAULT_TTL: Duration = Duration::from_secs(5 * 60);
+
     pub fn new(
         config: Arc<Config>,
         repo: Arc<MarketDataRepository>,
@@ -39,6 +46,7 @@ impl MarketDataService {
     ) -> Self {
         let mkt_loaders = DashMap::new();
         let pricers = DashMap::new();
+        let assets_cache = RwLock::new(AssetsCache::new());
         let mkt_cache = DashMap::new();
         let px_cache = DashMap::new();
 
@@ -48,8 +56,49 @@ impl MarketDataService {
             providers,
             mkt_loaders,
             pricers,
+            assets_cache,
             mkt_cache,
             px_cache,
+        }
+    }
+
+    pub async fn get_assets_by_type(&self, kind: AssetKind) -> Arc<Vec<Asset>> {
+        {
+            let cache = self.assets_cache.read();
+            match kind {
+                AssetKind::Crypto => {
+                    if let Some(assets) = &cache.crypto {
+                        return assets.clone();
+                    }
+                }
+                AssetKind::Fiat => {
+                    if let Some(assets) = &cache.fiats {
+                        return assets.clone();
+                    }
+                }
+            }
+        }
+
+        let assets = self
+            .repo
+            .load_assets_by_type(kind)
+            .await
+            .unwrap_or_else(|e| {
+                error!("{:?}", e);
+                vec![]
+            });
+
+        let mut cache = self.assets_cache.write();
+
+        match kind {
+            AssetKind::Crypto => {
+                cache.crypto = Some(Arc::new(assets));
+                cache.crypto.as_ref().unwrap().clone()
+            }
+            AssetKind::Fiat => {
+                cache.fiats = Some(Arc::new(assets));
+                cache.fiats.as_ref().unwrap().clone()
+            }
         }
     }
 
@@ -140,14 +189,14 @@ impl MarketDataService {
         }
     }
 
-    pub async fn get_conversion_rate(&self, cmd: ConversionRateQuery) -> Result<Price> {
+    pub async fn get_conversion_rate(&self, cmd: ConversionRateQuery) -> Result<Option<Price>> {
         let (base, quote) = (cmd.base.id(), cmd.quote.id());
         let pair = (base.clone(), quote.clone());
 
         // Check price from cache
         if let Some(price) = self.px_cache.get(&pair) {
             if !price.is_outdated() {
-                return Ok(*price);
+                return Ok(Some(*price));
             }
         }
 
@@ -157,18 +206,24 @@ impl MarketDataService {
             .or_insert_with(|| Arc::new(ExpiringOnceCell::default()))
             .clone();
 
-        pricer
+        let price = pricer
             .get_or_try_init(
                 || async { self.compute_conversion_rate(base, quote).await },
                 |p| p.is_outdated(),
             )
-            .await
+            .await?;
+
+        Ok(price.into())
     }
 
-    async fn compute_conversion_rate(&self, base: &AssetId, quote: &AssetId) -> Result<Price> {
+    async fn compute_conversion_rate(
+        &self,
+        base: &AssetId,
+        quote: &AssetId,
+    ) -> Result<ExpiringOption<Price>> {
         // Base/base => 1.
         if base == quote {
-            return Ok(Price::new(1., Utc::now()));
+            return Ok(ExpiringOption::Some(Price::new(1., Utc::now())));
         }
 
         // Handle ETH2
@@ -189,7 +244,7 @@ impl MarketDataService {
         let mkt = self.get_market(id).await;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
-                return Ok(*px);
+                return Ok(ExpiringOption::Some(*px));
             }
         }
 
@@ -198,55 +253,33 @@ impl MarketDataService {
         let mkt = self.get_market(id).await;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
-                return Ok(Price::new(1. / px.price, px.ts));
+                return Ok(ExpiringOption::Some(Price::new(1. / px.price, px.ts)));
             }
         }
 
         // Find alternative markets
-        let base_usd_id = format!("{}{}", base, "usd");
+        let Some(base_usd_px )=self.get_base_usd_price(&base, &quote).await else {
+            return Ok(ExpiringOption::None(Instant::now(), Self::DEFAULT_TTL));
+        };
+
         let usd_quote_id = format!("{}{}", "usd", quote);
         let quote_usd_id = format!("{}{}", quote, "usd");
 
-        let base_usd = self.get_market(base_usd_id.clone()).await;
         let usd_quote = self.get_market(usd_quote_id.clone()).await;
-        let quote_usd = self.get_market(quote_usd_id.clone()).await;
-
-        if base_usd.is_none() {
-            warn!(
-                base = base,
-                quote = quote,
-                "Cannot find '{}' market",
-                base_usd_id
-            );
-            return Err(DcaError::PriceNotAvailable(base.clone(), quote.clone()));
-        }
-
-        let base_usd = base_usd.unwrap();
-        if base_usd.price().is_none() {
-            warn!(
-                base = base,
-                quote = quote,
-                "Price not available for '{}' market",
-                base_usd_id
-            );
-            return Err(DcaError::PriceNotAvailable(base.clone(), quote.clone()));
-        }
-
-        let base_usd_px = base_usd.price().as_ref().unwrap();
-
         if let Some(usd_quote) = usd_quote {
             if let Some(usd_quote_px) = usd_quote.price() {
                 let price = base_usd_px.price * usd_quote_px.price;
                 let ts = std::cmp::min(base_usd_px.ts, usd_quote_px.ts);
-                return Ok(Price::new(price, ts));
+                return Ok(ExpiringOption::Some(Price::new(price, ts)));
             }
         }
 
+        let quote_usd = self.get_market(quote_usd_id.clone()).await;
         if let Some(quote_usd) = quote_usd {
             if let Some(quote_usd_px) = quote_usd.price() {
                 let price = base_usd_px.price / quote_usd_px.price;
                 let ts = std::cmp::min(base_usd_px.ts, quote_usd_px.ts);
-                return Ok(Price::new(price, ts));
+                return Ok(ExpiringOption::Some(Price::new(price, ts)));
             }
         }
 
@@ -258,7 +291,52 @@ impl MarketDataService {
             quote_usd_id
         );
 
-        Err(DcaError::PriceNotAvailable(base.clone(), quote.clone()))
+        Ok(ExpiringOption::None(Instant::now(), Self::DEFAULT_TTL))
+    }
+
+    async fn get_base_usd_price(&self, base: &AssetId, quote: &AssetId) -> Option<Price> {
+        let base_usd_id = format!("{}{}", base, "usd");
+        let usd_base_id = format!("{}{}", "usd", base);
+
+        let base_usd = self.get_market(base_usd_id.clone()).await;
+        if let Some(ref m) = base_usd {
+            if let Some(px) = m.price() {
+                return Some(*px);
+            }
+        }
+
+        let usd_base = self.get_market(usd_base_id.clone()).await;
+        if let Some(ref m) = usd_base {
+            if let Some(px) = m.price() {
+                return Some(Price {
+                    price: 1. / px.price,
+                    ts: px.ts,
+                });
+            }
+        }
+
+        match (base_usd, usd_base) {
+            (None, None) => {
+                warn!(
+                    base = base,
+                    quote = quote,
+                    "Cannot find any of markets: '{}', '{}'",
+                    base_usd_id,
+                    usd_base_id
+                );
+                None
+            }
+            (_, _) => {
+                warn!(
+                    base = base,
+                    quote = quote,
+                    "Price not available for any of markets: '{}', '{}'",
+                    base_usd_id,
+                    usd_base_id
+                );
+                None
+            }
+        }
     }
 
     pub async fn update_cw_data(&self) -> Result<()> {
@@ -309,5 +387,19 @@ impl MarketDataService {
         }
 
         Ok(())
+    }
+}
+
+struct AssetsCache {
+    fiats: Option<Arc<Vec<Asset>>>,
+    crypto: Option<Arc<Vec<Asset>>>,
+}
+
+impl AssetsCache {
+    fn new() -> Self {
+        Self {
+            fiats: None,
+            crypto: None,
+        }
     }
 }

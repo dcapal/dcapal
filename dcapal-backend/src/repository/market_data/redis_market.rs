@@ -96,7 +96,7 @@ impl RedisMarket for Market {
                     match dto {
                         Ok(dto) => Some(dto),
                         Err(e) => {
-                            error!("{}", e.msg_chain());
+                            error!("{:?}", e);
                             None
                         }
                     }

@@ -26,7 +26,7 @@ pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
 
         let res = is_outdated(&ctx.repos.misc).await;
         if let Err(e) = res {
-            error!("Failed to fetch last update time: {}", e.msg_chain());
+            error!("Failed to fetch last update time: {:?}", e);
             continue;
         }
 
@@ -41,19 +41,16 @@ pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
 
         info!("Updating CW market data");
         if let Err(e) = mkt_data.update_cw_data().await {
-            error!(
-                "Failed to update CW Assets and Markets data: {}",
-                e.msg_chain()
-            );
+            error!("Failed to update CW Assets and Markets data: {:?}", e);
         }
 
         if let Err(e) = mkt_data.update_market_prices().await {
-            error!("Failed to update Market prices: {}", e.msg_chain());
+            error!("Failed to update Market prices: {:?}", e);
         }
 
         let now = Utc::now();
         if let Err(e) = ctx.repos.misc.set_cw_last_fetched(now).await {
-            error!("Failed to update last update time: {}", e.msg_chain());
+            error!("Failed to update last update time: {:?}", e);
         }
     }
 }

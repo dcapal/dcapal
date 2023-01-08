@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use axum::response::IntoResponse;
 use config::ConfigError;
 use deadpool_redis::PoolError;
@@ -7,7 +9,7 @@ use tracing::error;
 
 use crate::domain::entity::{AssetId, MarketId};
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error)]
 pub enum DcaError {
     #[error("{0}")]
     Generic(String),
@@ -37,10 +39,23 @@ pub enum DcaError {
     Reqwest(#[from] reqwest::Error),
 }
 
+impl Debug for DcaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self))?;
+
+        for e in self.iter_sources() {
+            f.write_fmt(format_args!(" -- Caused by: {}", e))?;
+        }
+
+        Ok(())
+    }
+}
+
 impl DcaError {
-    pub fn msg_chain(self) -> String {
-        let e = anyhow::Error::from(self);
-        format!("{}{}", e, build_msg_chain(&e))
+    pub fn iter_sources(&self) -> ErrorIter {
+        ErrorIter {
+            current: (self as &dyn std::error::Error).source(),
+        }
     }
 }
 
@@ -48,7 +63,8 @@ pub type Result<T> = std::result::Result<T, DcaError>;
 
 impl IntoResponse for DcaError {
     fn into_response(self) -> axum::response::Response {
-        let response = match self {
+        error!("{:?}", &self);
+        match self {
             DcaError::BadRequest(_) => {
                 (StatusCode::BAD_REQUEST, format!("{}", self)).into_response()
             }
@@ -56,20 +72,21 @@ impl IntoResponse for DcaError {
                 (StatusCode::NOT_FOUND, format!("{}", self)).into_response()
             }
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
-        };
-
-        let e = anyhow::Error::from(self);
-        let msg = build_msg_chain(&e);
-        error!("{}{}", e, msg);
-
-        response
+        }
     }
 }
 
-fn build_msg_chain(e: &anyhow::Error) -> String {
-    e.chain()
-        .skip(1)
-        .map(|c| format!(" -- Caused by: {}", c))
-        .collect::<Vec<String>>()
-        .join("")
+#[derive(Copy, Clone, Debug)]
+pub struct ErrorIter<'a> {
+    current: Option<&'a (dyn std::error::Error + 'static)>,
+}
+
+impl<'a> Iterator for ErrorIter<'a> {
+    type Item = &'a (dyn std::error::Error + 'static);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.current;
+        self.current = self.current.and_then(std::error::Error::source);
+        current
+    }
 }

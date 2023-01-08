@@ -73,11 +73,7 @@ pub async fn requests_stats<B>(
 
 async fn fetch_geo_ip(ip: String, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) {
     if let Err(e) = fetch_geo_ip_inner(&ip, repo, ipapi).await {
-        error!(
-            "Error occurred in fetching GeoIP for {}: {}",
-            ip,
-            e.msg_chain()
-        );
+        error!("Error occurred in fetching GeoIP for {}: {:?}", ip, e);
     }
 }
 
