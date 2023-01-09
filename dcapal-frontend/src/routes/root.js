@@ -52,10 +52,10 @@ export const Root = () => {
               </p>
             </div>
             <img className="w-full px-4 max-w-[26rem]" src={FrontImage} />
-            <div className="w-full max-w-[26rem] flex gap-x-4 justify-center">
-              <div>
+            <div className="w-full max-w-[26rem] flex flex-wrap-reverse sm:flex-wrap gap-x-4 gap-y-3 justify-center">
+              <div className="min-w-full sm:min-w-0">
                 <button
-                  className="px-3 py-2 flex justify-center items-center border border-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-black hover:text-white text-lg rounded"
+                  className="w-full px-3 py-2 flex justify-center items-center border border-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-black hover:text-white text-lg rounded"
                   onClick={onClickUpload}
                 >
                   Import portfolio
@@ -69,7 +69,7 @@ export const Root = () => {
                 />
               </div>
               <button
-                className="px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded"
+                className="min-w-full sm:min-w-0 px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded"
                 onClick={onClickStart}
               >
                 Start from scratch
