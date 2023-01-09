@@ -9,16 +9,14 @@ import { InvestStep } from "./investStep";
 import { PortfolioStep } from "./portfolioStep";
 
 export const AllocationFlow = () => {
-  const [pfolioFile, setPfolioFile] = useState("");
-
   const step = useSelector((state) => state.app.allocationFlowStep);
 
   if (step === Step.INIT) {
-    return <InitStep setPfolioFile={setPfolioFile} />;
+    return <InitStep />;
   } else if (step === Step.CCY) {
     return <CcyStep />;
   } else if (step === Step.IMPORT) {
-    return <ImportStep pfolioFile={pfolioFile} setPfolioFile={setPfolioFile} />;
+    return <ImportStep />;
   } else if (step === Step.PORTFOLIO) {
     return <PortfolioStep />;
   } else if (step === Step.INVEST) {
