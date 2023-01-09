@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Step } from "..";
-import { setAllocationFlowStep } from "../../../app/appSlice";
+import { useNavigate } from "react-router-dom";
+import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 import { setQuoteCurrency } from "../portfolioStep/portfolioSlice";
 import { CcyGroup } from "./ccyGroup";
 
@@ -28,9 +28,10 @@ export const CcyStep = ({ ...props }) => {
   const [selected, setSelected] = useState("");
   const ccys = useSelector((state) => state.app.currencies);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const onClickBack = () => {
-    dispatch(setAllocationFlowStep({ step: Step.INIT }));
+    navigate("/");
   };
 
   const onClickNext = () => {

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
-import { Step } from ".";
-import { setAllocationFlowStep } from "../../app/appSlice";
+import { useNavigate } from "react-router-dom";
+import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice";
 import { getFetcher } from "../../app/providers";
 import { timeout } from "../../utils";
 import { Spinner } from "../spinner/spinner";
@@ -56,14 +57,17 @@ const importPfolio = async (pfolio, setError, setIsLoading, dispatch) => {
   }
 };
 
-export const ImportStep = ({ pfolioFile, setPfolioFile, ...props }) => {
+export const ImportStep = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const pfolioFile = useSelector((state) => state.app.pfolioFile);
 
   useEffect(() => {
     return () => {
-      setPfolioFile("");
+      dispatch(setPfolioFile({ file: "" }));
     };
   }, []);
 
@@ -86,7 +90,7 @@ export const ImportStep = ({ pfolioFile, setPfolioFile, ...props }) => {
   }, [pfolioFile]);
 
   const onClickGoBack = () => {
-    dispatch(setAllocationFlowStep({ step: Step.INIT }));
+    navigate("/");
   };
 
   return (

@@ -4,19 +4,15 @@ import { useSelector, useDispatch } from "react-redux";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 
-import {
-  addAsset,
-  clearPortfolio,
-  setQty,
-  setTargetWeight,
-} from "./portfolioSlice";
-import { Step } from "..";
-import { setAllocationFlowStep } from "../../../app/appSlice";
+import { addAsset, setQty, setTargetWeight } from "./portfolioSlice";
+import { setAllocationFlowStep, Step } from "../../../app/appSlice";
+import { useNavigate } from "react-router-dom";
 
 export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
   const assetStore = useSelector((state) => state.pfolio.assets);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const assets = Object.values(assetStore).sort((a, b) => a.idx - b.idx);
   let cumWeight = 0;
@@ -40,8 +36,7 @@ export const PortfolioStep = ({ ...props }) => {
   };
 
   const onClickDiscard = () => {
-    dispatch(clearPortfolio({}));
-    dispatch(setAllocationFlowStep({ step: Step.INIT }));
+    navigate("/");
   };
 
   const onClickAddLiquidity = () => {

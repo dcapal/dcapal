@@ -41,16 +41,13 @@ export const AllocateCard = ({
       : diffAmount < 0
       ? "text-red-800"
       : "text-white";
-  const diffAmountClass = `ml-4 py-1 px-2 ${bgColor} ${textColor} font-semibold rounded-md`;
+  const diffAmountClass = `ml-4 py-1 px-2 whitespace-nowrap ${bgColor} ${textColor} font-semibold rounded-md`;
 
   return (
     <div className="w-full max-w-[36rem] flex flex-col my-1 first:mt-0 px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white">
       <div className="mb-2 flex justify-between items-center">
-        <div className="flex flex-col">
-          <div
-            className="max-w-[350px] truncate text-lg font-medium capitalize"
-            title={name}
-          >
+        <div className="min-w-0 flex flex-col">
+          <div className="text-lg truncate font-medium capitalize" title={name}>
             {name}
           </div>
           <div className="text-sm font-light uppercase">{symbol}</div>

@@ -10,6 +10,7 @@ module.exports = (env, argv) =>
     devServer: {
       contentBase: path.resolve(__dirname, "./dist"),
       hot: true,
+      historyApiFallback: true,
       proxy: {
         "/api/yf/1": {
           target: "https://query1.finance.yahoo.com",

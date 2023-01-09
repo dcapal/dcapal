@@ -1,6 +1,6 @@
 import React from "react";
 import { useSelector } from "react-redux";
-import { Step } from "./allocationFlow";
+import { Step } from "../app/appSlice";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 

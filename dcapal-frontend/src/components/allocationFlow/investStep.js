@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Step } from ".";
-import { setAllocationFlowStep } from "../../app/appSlice";
+import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
 
