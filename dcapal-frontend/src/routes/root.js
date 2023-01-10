@@ -2,9 +2,16 @@ import React, { useEffect, useRef } from "react";
 import { NavBar } from "../components/core/navBar";
 
 import FrontImage from "../../images/investing_front.svg";
+import PortfolioLogo from "../../images/icons/portfolio.svg";
+import AmountLogo from "../../images/icons/amount.svg";
+import RebalanceLogo from "../../images/icons/rebalance.svg";
+import MarketLogo from "../../images/icons/market.svg";
+
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
+import { LaunchBtn } from "../components/core/launchBtn";
+import { RootCard } from "../components/core/rootCard";
 
 export const Root = () => {
   const inputPfolio = useRef(null);
@@ -38,9 +45,9 @@ export const Root = () => {
 
   return (
     <div className="w-full h-screen">
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full items-center">
         <NavBar />
-        <div className="w-full px-4 py-8 bg-[#ededed]">
+        <div className="w-full px-4 py-8 mb-8 bg-[#ededed]">
           <div className="flex flex-col items-center gap-y-7">
             <div className="w-full max-w-[35rem] flex flex-col items-start gap-y-7">
               <p className="text-3xl sm:text-4xl font-bold">
@@ -52,30 +59,66 @@ export const Root = () => {
               </p>
             </div>
             <img className="w-full px-4 max-w-[26rem]" src={FrontImage} />
-            <div className="w-full max-w-[26rem] flex flex-wrap-reverse sm:flex-wrap gap-x-4 gap-y-3 justify-center">
-              <div className="min-w-full sm:min-w-0">
-                <button
-                  className="w-full px-3 py-2 flex justify-center items-center border border-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-black hover:text-white text-lg rounded"
-                  onClick={onClickUpload}
-                >
-                  Import portfolio
-                </button>
-                <input
-                  style={{ display: "none" }}
-                  type="file"
-                  accept=".json"
-                  ref={inputPfolio}
-                  onChange={onChangeInputPfolio}
-                />
-              </div>
-              <button
-                className="min-w-full sm:min-w-0 px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded"
-                onClick={onClickStart}
-              >
-                Start from scratch
-              </button>
-            </div>
+            <LaunchBtn />
           </div>
+        </div>
+        <div className="w-full max-w-[38rem] px-4 flex flex-col gap-y-5 text-center">
+          <p className="w-full text-3xl font-semibold">
+            Your smart assistant to know how much to invest on each asset every
+            month
+          </p>
+          <span className="w-full flex flex-col text-xl font-light gap-y-2">
+            <p>
+              Keeping your portfolio well-balanced is tough. We know how it is.
+            </p>
+            <p>
+              You do your asset allocation on day one, then market moves and you
+              get lost on how to split your monthly savings.
+            </p>
+            <p>DcaPal takes care of that for you.</p>
+          </span>
+        </div>
+        <div className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-4">
+          <RootCard
+            imgSrc={PortfolioLogo}
+            text={
+              <p>
+                <span className="font-normal">Build your portfolio</span> and
+                define your asset allocation
+              </p>
+            }
+          />
+          <RootCard
+            imgSrc={AmountLogo}
+            text={
+              <p>
+                Tell us <span className="font-normal">your budget</span> for
+                this month
+              </p>
+            }
+          />
+          <RootCard
+            imgSrc={RebalanceLogo}
+            text={
+              <p>
+                Choose between
+                <span className="font-normal"> tax-efficient</span> or standard
+                <span className="font-normal"> rebalancing</span>
+              </p>
+            }
+          />
+          <RootCard
+            imgSrc={MarketLogo}
+            text={
+              <p>
+                Learn how much to invest on each asset and
+                <span className="font-normal"> go to market</span>
+              </p>
+            }
+          />
+        </div>
+        <div className="w-full px-4 py-8 flex justify-center">
+          <LaunchBtn />
         </div>
       </div>
     </div>

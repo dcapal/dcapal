@@ -213,9 +213,11 @@ const SearchItemCW = (props) => {
         className="flex items-center justify-between h-10 uppercase"
         onClick={handleResultClick}
       >
-        <div className="flex flex-col">
+        <div className="grow flex flex-col min-w-0">
           <div className="font-medium uppercase">{props.data.symbol}</div>
-          <div className="text-xs font-light capitalize">{props.data.name}</div>
+          <div className="text-xs font-light capitalize truncate">
+            {props.data.name}
+          </div>
         </div>
         <div className="mr-2">
           <div>
@@ -293,9 +295,11 @@ const SearchItemYF = (props) => {
         className="flex items-center justify-between h-10 uppercase"
         onClick={handleResultClick}
       >
-        <div className="flex flex-col">
+        <div className="grow flex flex-col min-w-0">
           <div className="font-medium uppercase">{props.data.symbol}</div>
-          <div className="text-xs font-light capitalize">{props.data.name}</div>
+          <div className="text-xs font-light capitalize truncate">
+            {props.data.name}
+          </div>
         </div>
         <div className="mr-2">
           <div>
