@@ -78,7 +78,7 @@ export const Root = () => {
             <p>DcaPal takes care of that for you.</p>
           </span>
         </div>
-        <div className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-4">
+        <div className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-6">
           <RootCard
             imgSrc={PortfolioLogo}
             text={
