@@ -10,12 +10,13 @@ import {
   fetchPriceYF,
   Provider,
 } from "../../../app/providers";
-import { YF_API_2 } from "../../../app/config";
+import { DCAPAL_API_SEARCH } from "../../../app/config";
+import { timeout } from "../../../utils";
 
 let searchId = undefined;
 
 const fetchAssetsYF = async (query) => {
-  const url = `${YF_API_2}/v1/finance/search?q=${query}`;
+  const url = `${DCAPAL_API_SEARCH}?q=${query}`;
   try {
     const response = await api.get(url);
 
@@ -59,48 +60,57 @@ export const SearchBar = (props) => {
     if (!props.text || props.text.length < 1) {
       setResults({ ...emptyRes });
     }
+
+    const delayedSearch = setTimeout(() => {
+      console.log("Delayed!");
+      fetchSearchApi(props.text);
+    }, 400);
+
+    return () => clearTimeout(delayedSearch);
   }, [props.text]);
 
   const handleAddAssetInputChange = async (e) => {
     const text = e.target.value;
     props.setText(text);
+  };
 
-    if (text && text.length > 2) {
-      searchId = uuidv4();
-      const currentSearchId = searchId;
+  const fetchSearchApi = async (text) => {
+    if (!text || text.length < 2) return;
 
-      const fromDcaPal = async (type) => {
-        const assets = await fetchAssetsDcaPal(type);
-        const fuse = new Fuse(assets, searchOptions);
+    searchId = uuidv4();
+    const currentSearchId = searchId;
 
-        const res = fuse
-          .search(text)
-          .map((r) => r.item)
-          .sort((a, b) => a.symbol - b.symbol);
+    const fromDcaPal = async (type) => {
+      const assets = await fetchAssetsDcaPal(type);
+      const fuse = new Fuse(assets, searchOptions);
 
-        return res;
-      };
+      const res = fuse
+        .search(text)
+        .map((r) => r.item)
+        .sort((a, b) => a.symbol - b.symbol);
 
-      const fromYF = async () => {
-        const assetsYF = await fetchAssetsYF(text);
-        return assetsYF;
-      };
+      return res;
+    };
 
-      const [fiats, cryptos, equities] = await Promise.all([
-        fromDcaPal("fiat"),
-        fromDcaPal("crypto"),
-        fromYF(),
-      ]);
+    const fromYF = async () => {
+      const assetsYF = await fetchAssetsYF(text.toLowerCase());
+      return assetsYF;
+    };
 
-      if (currentSearchId !== searchId) return;
+    const [fiats, cryptos, equities] = await Promise.all([
+      fromDcaPal("fiat"),
+      fromDcaPal("crypto"),
+      fromYF(),
+    ]);
 
-      setResults({
-        ...results,
-        fiat: fiats && fiats.length > 0 ? fiats : [],
-        crypto: cryptos && cryptos.length > 0 ? cryptos : [],
-        yf: equities && equities.length > 0 ? equities : [],
-      });
-    }
+    if (currentSearchId !== searchId) return;
+
+    setResults({
+      ...results,
+      fiat: fiats && fiats.length > 0 ? fiats : [],
+      crypto: cryptos && cryptos.length > 0 ? cryptos : [],
+      yf: equities && equities.length > 0 ? equities : [],
+    });
   };
 
   const isAnyResult =

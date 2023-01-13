@@ -9,17 +9,17 @@ module.exports = (env, argv) =>
     devtool: "inline-source-map",
     devServer: {
       contentBase: path.resolve(__dirname, "./dist"),
-      hot: true,
       historyApiFallback: true,
+      hot: true,
       proxy: {
-        "/api/yf/1": {
-          target: "https://query1.finance.yahoo.com",
-          pathRewrite: { "^/api/yf/1": "" },
+        "/api/external/chart": {
+          target: "https://query1.finance.yahoo.com/v8/finance/chart/",
+          pathRewrite: { "^/api/external/chart": "" },
           changeOrigin: true,
         },
-        "/api/yf/2": {
-          target: "https://query2.finance.yahoo.com",
-          pathRewrite: { "^/api/yf/2": "" },
+        "/api/external/search": {
+          target: "https://query2.finance.yahoo.com/v1/finance/search",
+          pathRewrite: { "^/api/external/search": "" },
           changeOrigin: true,
         },
         "/api": {

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "./api";
-import { DCAPAL_API, YF_API_1 } from "./config";
+import { DCAPAL_API, DCAPAL_API_CHART } from "./config";
 
 export const Provider = Object.freeze({
   DCA_PAL: "DCAPal",
@@ -41,7 +41,7 @@ export const fetchPriceYF = async (symbol, quote, token) => {
   lastThreeDays.setDate(lastThreeDays.getDate() - 3);
   const period1 = toUnixTimestamp(lastThreeDays, true);
   const period2 = toUnixTimestamp(new Date(), false);
-  const url = `${YF_API_1}/v8/finance/chart/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
+  const url = `${DCAPAL_API_CHART}/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
   try {
     const response = await api.get(url, {
       cancelToken: token,
