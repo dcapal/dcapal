@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-axum = { version = "0.6", features = ["macros"] }
+axum = { version = "0.6", features = ["macros", "headers"] }
 hyper = { version = "0", features = ["full"] }
 deadpool-redis = { version = "0.10", features = ["serde"] }
 redis = { version = "0.21", features = ["tokio-comp"] }

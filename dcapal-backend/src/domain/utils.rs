@@ -65,6 +65,7 @@ where
 
 pub trait Expiring {
     fn is_outdated(&self) -> bool;
+    fn time_to_live(&self) -> Duration;
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +88,13 @@ impl<T: Expiring> Expiring for ExpiringOption<T> {
         match self {
             ExpiringOption::Some(v) => v.is_outdated(),
             ExpiringOption::None(start, ttl) => start.elapsed() >= *ttl,
+        }
+    }
+
+    fn time_to_live(&self) -> Duration {
+        match self {
+            ExpiringOption::Some(v) => v.time_to_live(),
+            ExpiringOption::None(start, ttl) => (*start + *ttl) - Instant::now(),
         }
     }
 }

@@ -83,6 +83,12 @@ impl Expiring for Price {
 
         now_validity_range > ts_validity_range
     }
+
+    fn time_to_live(&self) -> std::time::Duration {
+        (self.ts + Duration::minutes(Self::VALIDITY_MINS as i64) - Utc::now())
+            .to_std()
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum_macros::Display)]
@@ -176,5 +182,12 @@ impl Market {
 impl Expiring for Market {
     fn is_outdated(&self) -> bool {
         self.is_price_outdated()
+    }
+
+    fn time_to_live(&self) -> std::time::Duration {
+        self.price()
+            .as_ref()
+            .map(|p| p.time_to_live())
+            .unwrap_or_else(|| std::time::Duration::from_secs(0))
     }
 }
