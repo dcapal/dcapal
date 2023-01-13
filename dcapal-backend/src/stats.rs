@@ -53,14 +53,17 @@ pub async fn requests_stats<B>(
     // Visitors stats
     let repo = &state.repos.stats;
 
-    let ip = if let Some(header) = req.headers().get("X-Real-IP") {
-        header
-            .to_str()
-            .map(|h| h.to_string())
-            .unwrap_or_else(|_| addr.ip().to_string())
-    } else {
-        addr.ip().to_string()
-    };
+    static IP_HEADERS: [&str; 2] = ["CF-Connecting-IP", "X-Real-IP"];
+    let ip = IP_HEADERS
+        .iter()
+        .find_map(|header| {
+            req.headers().get(*header).map(|h| {
+                h.to_str()
+                    .map(|h| h.to_string())
+                    .unwrap_or_else(|_| addr.ip().to_string())
+            })
+        })
+        .unwrap_or_else(|| addr.ip().to_string());
 
     repo.bump_visit(&ip).await?;
 
