@@ -10,7 +10,7 @@ export default function ErrorPage() {
   return (
     <div className="w-full h-screen flex flex-col">
       <NavBar />
-      <div className="flex flex-col grow justify-center items-center gap-10">
+      <div className="flex flex-col grow justify-center items-center gap-10 text-center">
         <h1 className="text-4xl font-bold">Oops!</h1>
         <p>Sorry, an unexpected error has occurred.</p>
         <p className="font-light">

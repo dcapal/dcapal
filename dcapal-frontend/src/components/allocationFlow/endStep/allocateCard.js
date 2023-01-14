@@ -61,20 +61,38 @@ export const AllocateCard = ({
       {isMobile && (
         <div className="flex flex-col justify-between items-start">
           <div className="w-full flex items-center justify-between">
-            <div className="min-w-[5.5rem] mr-2 font-light text-xs">Amount</div>
-            <span className="uppercase">
-              {amount.toLocaleString("en-US", priceFmt)} {quoteCcy}
-            </span>
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+              Current amount
+            </div>
+            <p className="uppercase">
+              {oldAmount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+            </p>
           </div>
           <div className="w-full flex items-center justify-between">
-            <div className="min-w-[5.5rem] mr-2 font-light text-xs">Weight</div>
-            <span>{weight.toLocaleString("en-US", weightFmt)} %</span>
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+              New amount
+            </div>
+            <p className="uppercase">
+              {amount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+            </p>
+          </div>
+          <div className="w-full flex items-center justify-between">
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+              Current weight
+            </div>
+            <p>{oldWeight.toLocaleString("en-US", weightFmt)} %</p>
+          </div>
+          <div className="w-full flex items-center justify-between">
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+              New weight
+            </div>
+            <p>{weight.toLocaleString("en-US", weightFmt)} %</p>
           </div>
           <div className="w-full flex items-center justify-between">
             <div className="min-w-[5.5rem] mr-2 font-light text-xs">
               Target weight
             </div>
-            <div>{targetWeight.toLocaleString("en-US", weightFmt)} %</div>
+            <p>{targetWeight.toLocaleString("en-US", weightFmt)} %</p>
           </div>
         </div>
       )}
@@ -82,23 +100,43 @@ export const AllocateCard = ({
         <div className="flex justify-between items-start">
           <div className="flex flex-col">
             <div className="flex items-center">
-              <div className="min-w-[4.5rem] mr-2 font-light text-xs">
-                Weight
+              <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                Current weight
               </div>
-              <span>{weight.toLocaleString("en-US", weightFmt)} %</span>
+              <span>{oldWeight.toLocaleString("en-US", weightFmt)} %</span>
             </div>
             <div className="flex items-center">
-              <div className="min-w-[4.5rem] mr-2 font-light text-xs">
-                Amount
+              <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                Current amount
               </div>
               <span className="uppercase">
+                {oldAmount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                Target weight
+              </div>
+              <div>{targetWeight.toLocaleString("en-US", weightFmt)} %</div>
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center mr-2">
+              <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                New weight
+              </div>
+              <span className="grow text-right">
+                {weight.toLocaleString("en-US", weightFmt)} %
+              </span>
+            </div>
+            <div className="flex items-center mr-2">
+              <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                New amount
+              </div>
+              <span className="grow uppercase text-right">
                 {amount.toLocaleString("en-US", priceFmt)} {quoteCcy}
               </span>
             </div>
-          </div>
-          <div className="flex items-center mr-2">
-            <div className="mr-2 font-light text-xs">Target weight</div>
-            <div>{targetWeight.toLocaleString("en-US", weightFmt)} %</div>
           </div>
         </div>
       )}

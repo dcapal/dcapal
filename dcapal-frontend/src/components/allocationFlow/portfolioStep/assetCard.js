@@ -45,12 +45,14 @@ export const AssetCard = ({
           <div className="text-sm font-light uppercase">{symbol}</div>
         </div>
         <div className="grow flex items-center justify-end">
-          <div className="flex ml-4">
-            <div className="font-medium">
-              {(price * qty).toLocaleString("en-US", priceFmt)}
+          {!isMobile && (
+            <div className="flex ml-4">
+              <div className="font-medium">
+                {(price * qty).toLocaleString("en-US", priceFmt)}
+              </div>
+              <div className="ml-1 uppercase">{quoteCcy}</div>
             </div>
-            <div className="ml-1 uppercase">{quoteCcy}</div>
-          </div>
+          )}
           <div className="whitespace-nowrap ml-4 py-1 px-2 bg-red-300 text-red-800 font-semibold rounded-md">
             {weight.toLocaleString("en-US", {
               minimumFractionDigits: 1,
@@ -63,14 +65,23 @@ export const AssetCard = ({
       {isMobile && (
         <div className="flex flex-col">
           <div className="flex items-center py-2">
-            <div className="w-[5.5rem] mr-2 font-light text-xs">Price</div>
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">Amount</div>
+            <div className="uppercase text-sm">{quoteCcy}</div>
+            <div className="ml-1 text-sm">
+              {(price * qty).toLocaleString("en-US", priceFmt)}
+            </div>
+          </div>
+          <div className="flex items-center py-2">
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">Price</div>
             <div className="uppercase text-sm">{quoteCcy}</div>
             <div className="ml-1 text-sm">
               {price.toLocaleString("en-US", priceFmt)}
             </div>
           </div>
           <div className="flex items-center h-12">
-            <div className="w-[5.5rem] mr-2 font-light text-xs">Quantity</div>
+            <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+              Quantity
+            </div>
             <div className="grow">
               <InputNumber
                 textAlign={"text-right"}
@@ -83,7 +94,7 @@ export const AssetCard = ({
             </div>
           </div>
           <div className="flex items-center h-12">
-            <div className="w-[5.5rem] font-light text-xs">
+            <div className="min-w-[5.5rem] font-light text-xs">
               Target weight (%)
             </div>
             <div className="grow ml-2">

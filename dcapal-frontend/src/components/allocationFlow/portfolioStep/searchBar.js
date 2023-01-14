@@ -64,7 +64,7 @@ export const SearchBar = (props) => {
     const delayedSearch = setTimeout(() => {
       console.log("Delayed!");
       fetchSearchApi(props.text);
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(delayedSearch);
   }, [props.text]);

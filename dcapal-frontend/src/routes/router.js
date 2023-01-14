@@ -6,7 +6,9 @@ import { App } from "../app";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
 import { clearPortfolio } from "../components/allocationFlow/portfolioStep/portfolioSlice";
 import ErrorPage from "./errorPage";
+import NotFoundPage from "./notFoundPage";
 import { Root } from "./root";
+import UnderConstructionPage from "./underConstruction";
 
 export const Router = () => {
   const dispatch = useDispatch();
@@ -22,6 +24,10 @@ export const Router = () => {
 
   const routes = useRoutes([
     {
+      path: "*",
+      element: <NotFoundPage />,
+    },
+    {
       path: "/",
       element: <Root />,
       errorElement: <ErrorPage />,
@@ -29,6 +35,17 @@ export const Router = () => {
     {
       path: "allocate",
       element: <App />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "about",
+      element: <UnderConstructionPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "docs",
+      element: <UnderConstructionPage />,
+      errorElement: <ErrorPage />,
     },
   ]);
 

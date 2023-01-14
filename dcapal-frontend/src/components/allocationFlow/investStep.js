@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
@@ -54,11 +55,12 @@ export const InvestStep = ({ ...props }) => {
             className="w-4 h-4 accent-neutral-500"
             checked={useTaxEfficient}
             onChange={onChangeTaxEfficient}
+            disabled={true}
           />
           <label htmlFor="#tax-efficient-checkbox" className="ml-2">
             Use <span className="font-medium">Tax Efficient</span> algorithm.{" "}
-            <span className="cursor-pointer underline text-[blue]">
-              Read more
+            <span className="underline text-[blue]">
+              <Link to={"/docs"}>Read more</Link>
             </span>
           </label>
         </div>

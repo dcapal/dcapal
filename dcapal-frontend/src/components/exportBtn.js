@@ -53,7 +53,7 @@ export const ExportBtn = () => {
   return (
     <button
       style={{ display: isDisplay ? "flex" : "none" }}
-      className="px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
+      className="px-3 py-2 flex justify-center items-center whitespace-nowrap bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
       onClick={onClick}
       disabled={isDisabled}
     >
