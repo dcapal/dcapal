@@ -15,19 +15,19 @@ export const NavBar = () => {
 
   return (
     <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
-      <div className="flex gap-x-5">
+      <div className="flex gap-x-8">
         <div className="text-xl font-semibold text-white" onClick={onClickHome}>
           <Link to={"/"}>DcaPal</Link>
         </div>
         {!isMobile && (
-          <>
+          <div className="flex gap-x-5">
             <div className="text-lg font-light text-white">
               <Link to={"/about"}>About</Link>
             </div>
             <div className="text-lg font-light text-white">
               <Link to={"/docs"}>Docs</Link>
             </div>
-          </>
+          </div>
         )}
       </div>
       <ExportBtn />
