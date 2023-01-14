@@ -32,7 +32,7 @@ export const Root = () => {
         </div>
         <div className="w-full max-w-[38rem] px-4 flex flex-col gap-y-5 text-center">
           <p className="w-full text-3xl font-semibold">
-            Your smart assistant to split your monthly savings
+            Your smart assistant for allocating your monthly savings
           </p>
           <span className="w-full flex flex-col text-xl font-light gap-y-2">
             <p>
