@@ -47,8 +47,7 @@ const fetchAssetsYF = async (query) => {
 };
 
 export const SearchBar = (props) => {
-  const emptyRes = { fiat: [], crypto: [], yf: [] };
-  const [results, setResults] = useState({ ...emptyRes });
+  const [results, setResults] = useState(null);
 
   const searchOptions = {
     shouldSort: true,
@@ -58,7 +57,7 @@ export const SearchBar = (props) => {
 
   useEffect(() => {
     if (!props.text || props.text.length < 1) {
-      setResults({ ...emptyRes });
+      setResults(null);
     }
 
     const delayedSearch = setTimeout(() => {
@@ -113,10 +112,11 @@ export const SearchBar = (props) => {
     });
   };
 
-  const isAnyResult =
-    results.fiat.length > 0 ||
-    results.crypto.length > 0 ||
-    results.yf.length > 0;
+  const isEmptyResult =
+    results &&
+    results.fiat.length === 0 &&
+    results.crypto.length === 0 &&
+    results.yf.length === 0;
 
   return (
     <div className="relative flex flex-col items-center justify-center">
@@ -126,8 +126,13 @@ export const SearchBar = (props) => {
         placeholder={"Search Crypto, ETF and much more"}
         onChange={handleAddAssetInputChange}
       />
-      {isAnyResult && (
-        <ul className="w-[calc(100%-2rem)] max-h-72 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10">
+      {results && isEmptyResult && (
+        <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10 flex items-center justify-center font-light italic">
+          No asset found for '{props.text}'
+        </div>
+      )}
+      {results && !isEmptyResult && (
+        <ul className="w-[calc(100%-2rem)] max-h-72 min-h-[10rem] overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10">
           {results.fiat.length > 0 && <SearchHeader text="cash" />}
           {results.fiat.map((r) => (
             <SearchItemCW
@@ -136,7 +141,7 @@ export const SearchBar = (props) => {
               currentSearchId={searchId}
               setText={props.setText}
               addAsset={props.addAsset}
-              closeSearchList={() => setResults({ ...emptyRes })}
+              closeSearchList={() => setResults(null)}
             />
           ))}
           {results.crypto.length > 0 && <SearchHeader text="crypto" />}
@@ -147,7 +152,7 @@ export const SearchBar = (props) => {
               currentSearchId={searchId}
               setText={props.setText}
               addAsset={props.addAsset}
-              closeSearchList={() => setResults({ ...emptyRes })}
+              closeSearchList={() => setResults(null)}
             />
           ))}
           {results.yf.length > 0 && <SearchHeader text="equity" />}
@@ -158,7 +163,7 @@ export const SearchBar = (props) => {
               currentSearchId={searchId}
               setText={props.setText}
               addAsset={props.addAsset}
-              closeSearchList={() => setResults({ ...emptyRes })}
+              closeSearchList={() => setResults(null)}
             />
           ))}
         </ul>

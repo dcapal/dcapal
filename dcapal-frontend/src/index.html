@@ -7,7 +7,7 @@
       content="width=device-width, user-scalable=no,
 initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0"
     />
-    <title>DcaPal - A smart assistant for your periodic investments</title>
+    <title><%= htmlWebpackPlugin.options.title %></title>
     <meta
       name="description"
       content="Keep your investment strategy under control with DcaPal: a smart, tax-efficient app for dollar-cost-averaging passive investors."
@@ -34,8 +34,5 @@ initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0"
   <body>
     <!-- Add React app container -->
     <div id="app"></div>
-
-    <!-- Add Webpack bundle.js -->
-    <script src="bundle.js"></script>
   </body>
 </html>

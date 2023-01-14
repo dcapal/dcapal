@@ -1,6 +1,7 @@
 const path = require("path");
 const webpack = require("webpack");
 
+const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const ThreadsPlugin = require("threads-plugin");
 
@@ -13,7 +14,7 @@ module.exports = (env, argv) => {
     entry: "./src/index.js",
     output: {
       path: path.resolve(__dirname, "dist"),
-      filename: "bundle.js",
+      filename: "bundle.[hash].js",
     },
     module: {
       rules: [
@@ -45,9 +46,10 @@ module.exports = (env, argv) => {
       extensions: ["*", ".js", ".jsx"],
     },
     plugins: [
-      new CopyWebpackPlugin([
-        { from: "./src/index.html", to: path.resolve(__dirname, "dist") },
-      ]),
+      new HtmlWebpackPlugin({
+        title: "DcaPal - A smart assistant for your periodic investments",
+        template: path.resolve(__dirname, "src", "index.html"),
+      }),
       new webpack.HotModuleReplacementPlugin(),
       new ThreadsPlugin(),
     ],

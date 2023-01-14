@@ -9,7 +9,7 @@ export default function UnderConstructionPage() {
   return (
     <div className="w-full h-screen flex flex-col">
       <NavBar />
-      <div className="px-6 flex flex-col grow justify-center items-center text-center gap-8">
+      <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
         <img
           className="w-full px-4 sm:max-w-[35rem] pb-2"
           src={UnderConstructionImage}
