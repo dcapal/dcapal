@@ -6,9 +6,9 @@
   .app-bg {
     background-image: url(../images/stacked-wave-2.svg);
     background-repeat: no-repeat;
-    background-position: top;
+    background-position: center top;
     transform: rotate(180deg);
-    @apply w-full h-[381px];
+    @apply w-full h-[381px] 2xl:bg-cover 2xl:top-20;
   }
 }
 
