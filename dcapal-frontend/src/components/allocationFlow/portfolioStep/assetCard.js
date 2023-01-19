@@ -53,7 +53,7 @@ export const AssetCard = ({
               <div className="ml-1 uppercase">{quoteCcy}</div>
             </div>
           )}
-          <div className="whitespace-nowrap ml-4 py-1 px-2 bg-indigo-400/50 text-indigo-800 font-semibold rounded-md">
+          <div className="whitespace-nowrap ml-4 py-1 px-2 bg-green-800 text-green-50 font-semibold rounded-md">
             {weight.toLocaleString("en-US", {
               minimumFractionDigits: 1,
               maximumFractionDigits: 1,

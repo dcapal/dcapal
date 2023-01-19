@@ -31,7 +31,7 @@ export const AllocateCard = ({
 
   const bgColor =
     diffAmount > 0
-      ? "bg-green-700"
+      ? "bg-green-800"
       : diffAmount < 0
       ? "bg-red-300"
       : "bg-neutral-500";

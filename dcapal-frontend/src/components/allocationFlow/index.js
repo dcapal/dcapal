@@ -11,9 +11,7 @@ import { PortfolioStep } from "./portfolioStep";
 export const AllocationFlow = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
 
-  if (step === Step.INIT) {
-    return <InitStep />;
-  } else if (step === Step.CCY) {
+  if (step <= Step.CCY) {
     return <CcyStep />;
   } else if (step === Step.IMPORT) {
     return <ImportStep />;

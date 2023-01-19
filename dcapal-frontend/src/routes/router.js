@@ -20,7 +20,7 @@ export const Router = () => {
 
     if (location.pathname !== "/allocate" && refId !== "allocate") {
       dispatch(clearPortfolio({}));
-      dispatch(setAllocationFlowStep({ step: Step.INIT }));
+      dispatch(setAllocationFlowStep({ step: Step.CCY }));
       dispatch(setPfolioFile({ file: "" }));
     }
   }, [location]);

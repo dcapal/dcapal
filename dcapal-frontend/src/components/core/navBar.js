@@ -1,6 +1,6 @@
 import { useMediaQuery } from "@react-hook/media-query";
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { MEDIA_SMALL } from "../../app/config";
 import { ExportBtn } from "../exportBtn";
@@ -62,6 +62,7 @@ export const NavBar = () => {
   const [menuVisible, setMenuVisible] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
 
   const toggleMenuVisible = () => {
@@ -71,6 +72,8 @@ export const NavBar = () => {
   const onClickHome = () => {
     navigate("/");
   };
+
+  const isAllocate = location.pathname === "/allocate";
 
   return (
     <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
@@ -97,7 +100,7 @@ export const NavBar = () => {
         )}
       </div>
       <div className="flex gap-x-2 items-center">
-        <ExportBtn />
+        {isAllocate && <ExportBtn />}
         {isMobile && <MenuBtn onClick={toggleMenuVisible} />}
       </div>
     </div>

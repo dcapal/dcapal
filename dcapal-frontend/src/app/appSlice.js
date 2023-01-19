@@ -12,7 +12,7 @@ export const Step = Object.freeze({
 export const appSlice = createSlice({
   name: "app",
   initialState: {
-    allocationFlowStep: Step.INIT,
+    allocationFlowStep: Step.CCY,
     currencies: [],
     pfolioFile: "",
   },
