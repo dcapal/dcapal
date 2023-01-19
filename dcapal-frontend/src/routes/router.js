@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useRoutes } from "react-router-dom";
 import { App } from "../app";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
@@ -12,10 +12,13 @@ import UnderConstructionPage from "./underConstruction";
 
 export const Router = () => {
   const dispatch = useDispatch();
+  let [searchParams] = useSearchParams();
   const location = useLocation();
 
   useEffect(() => {
-    if (location.pathname !== "/allocate") {
+    const refId = searchParams.get("refid") || "";
+
+    if (location.pathname !== "/allocate" && refId !== "allocate") {
       dispatch(clearPortfolio({}));
       dispatch(setAllocationFlowStep({ step: Step.INIT }));
       dispatch(setPfolioFile({ file: "" }));
