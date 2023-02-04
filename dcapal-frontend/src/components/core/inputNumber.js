@@ -28,7 +28,7 @@ export const InputNumber = ({
     }
 
     if (newValue === "") {
-      newValue = 0;
+      newValue = null;
     } else if (type === InputNumberType.DECIMAL) {
       newValue = parseFloat(newValue);
     } else {
@@ -53,7 +53,7 @@ export const InputNumber = ({
       className={className}
       placeholder={placeholder}
       type={"number"}
-      value={value !== 0 ? value : ""}
+      value={value}
       onChange={handleChange}
       min={min}
       max={max}
