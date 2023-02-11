@@ -1,14 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { NavBar } from "../components/core/navBar";
-
-import FrontImage from "../../images/investing_front.svg";
-import PortfolioLogo from "../../images/icons/portfolio.svg";
-import AmountLogo from "../../images/icons/amount.svg";
-import RebalanceLogo from "../../images/icons/rebalance.svg";
-import MarketLogo from "../../images/icons/market.svg";
+import { IKImage } from "imagekitio-react";
 
 import { LaunchBtn } from "../components/core/launchBtn";
 import { RootCard } from "../components/core/rootCard";
+
+import { IMAGEKIT_URL } from "../app/config";
+import {
+  HEADER_INVESTING_FRONT_SVG,
+  ICON_AMOUNT_SVG,
+  ICON_MARKET_SVG,
+  ICON_PORTFOLIO_SVG,
+  ICON_REBALANCE_SVG,
+} from "../app/images";
 
 export const Root = () => {
   return (
@@ -18,22 +22,27 @@ export const Root = () => {
         <div className="w-full px-6 py-8 mb-8 bg-[#ededed]">
           <div className="flex flex-col items-center gap-y-7">
             <div className="w-full max-w-[35rem] flex flex-col items-start gap-y-7">
-              <p className="text-3xl sm:text-4xl font-bold">
+              <h1 className="text-3xl sm:text-4xl font-bold">
                 Dollar Cost Averaging made easy
-              </p>
+              </h1>
               <p className="text-xl sm:text-2xl font-light">
                 DcaPal helps you keep your portfolio under control with
                 tax-efficient suggestions for your monthly investments.
               </p>
             </div>
-            <img className="w-full px-4 sm:max-w-[26rem]" src={FrontImage} />
+            <IKImage
+              className="w-full px-4 sm:max-w-[26rem]"
+              urlEndpoint={IMAGEKIT_URL}
+              path={HEADER_INVESTING_FRONT_SVG}
+              lqip={{ active: true }}
+            />
             <LaunchBtn />
           </div>
         </div>
         <div className="w-full max-w-[38rem] px-4 flex flex-col gap-y-5 text-center">
-          <p className="w-full text-3xl font-semibold">
+          <h2 className="w-full text-3xl font-semibold">
             Your smart assistant for allocating your monthly savings
-          </p>
+          </h2>
           <span className="w-full flex flex-col text-xl font-light gap-y-2">
             <p>
               Keeping your portfolio well-balanced is tough.{" "}
@@ -48,7 +57,7 @@ export const Root = () => {
         </div>
         <div className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-6">
           <RootCard
-            imgSrc={PortfolioLogo}
+            imgSrc={ICON_PORTFOLIO_SVG}
             text={
               <p>
                 <span className="font-normal">Build your portfolio</span> and
@@ -57,7 +66,7 @@ export const Root = () => {
             }
           />
           <RootCard
-            imgSrc={AmountLogo}
+            imgSrc={ICON_AMOUNT_SVG}
             text={
               <p>
                 Tell us <span className="font-normal">your budget</span> for
@@ -66,7 +75,7 @@ export const Root = () => {
             }
           />
           <RootCard
-            imgSrc={RebalanceLogo}
+            imgSrc={ICON_REBALANCE_SVG}
             text={
               <p>
                 Choose
@@ -77,7 +86,7 @@ export const Root = () => {
             }
           />
           <RootCard
-            imgSrc={MarketLogo}
+            imgSrc={ICON_MARKET_SVG}
             text={
               <p>
                 Discover{" "}

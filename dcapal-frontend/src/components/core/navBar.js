@@ -2,17 +2,22 @@ import { useMediaQuery } from "@react-hook/media-query";
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { MEDIA_SMALL } from "../../app/config";
+import { IMAGEKIT_URL, MEDIA_SMALL } from "../../app/config";
 import { ExportBtn } from "../exportBtn";
 
-import MenuIcon from "../../../images/icons/hamburger-menu.svg";
-import CloseIcon from "../../../images/icons/close-menu.svg";
 import classNames from "classnames";
+import { IKImage } from "imagekitio-react";
+import { ICON_BURGER_MENU_SVG, ICON_CLOSE_MENU_SVG } from "../../app/images";
 
 const CloseBtn = ({ onClick }) => {
   return (
     <div className="cursor-pointer" onClick={onClick}>
-      <img src={CloseIcon} className="w-full max-w-[32px]" />
+      <IKImage
+        className="w-full max-w-[32px]"
+        urlEndpoint={IMAGEKIT_URL}
+        path={ICON_CLOSE_MENU_SVG}
+        lqip={{ active: true }}
+      />
     </div>
   );
 };
@@ -53,7 +58,12 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
 const MenuBtn = ({ onClick }) => {
   return (
     <div className="cursor-pointer" onClick={onClick}>
-      <img src={MenuIcon} className="w-full max-w-[32px]" />
+      <IKImage
+        className="w-full max-w-[32px]"
+        urlEndpoint={IMAGEKIT_URL}
+        path={ICON_BURGER_MENU_SVG}
+        lqip={{ active: true }}
+      />
     </div>
   );
 };

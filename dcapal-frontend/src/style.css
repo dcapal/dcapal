@@ -4,7 +4,7 @@
 
 @layer components {
   .app-bg {
-    background-image: url(../images/stacked-wave-2.svg);
+    background-image: url(https://ik.imagekit.io/dcapal/headers/stacked-wave-2.svg?ik-sdk-version=javascript-1.4.3&updatedAt=1676111438668);
     background-repeat: no-repeat;
     background-position: center top;
     transform: rotate(180deg);
