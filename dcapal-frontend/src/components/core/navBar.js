@@ -16,7 +16,6 @@ const CloseBtn = ({ onClick }) => {
         className="w-full max-w-[32px]"
         urlEndpoint={IMAGEKIT_URL}
         path={ICON_CLOSE_MENU_SVG}
-        lqip={{ active: true }}
       />
     </div>
   );
@@ -62,7 +61,6 @@ const MenuBtn = ({ onClick }) => {
         className="w-full max-w-[32px]"
         urlEndpoint={IMAGEKIT_URL}
         path={ICON_BURGER_MENU_SVG}
-        lqip={{ active: true }}
       />
     </div>
   );

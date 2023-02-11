@@ -5,6 +5,8 @@ export const InputNumberType = Object.freeze({
   DECIMAL: 1,
 });
 
+const handleFocus = (event) => event.target.select();
+
 export const InputNumber = ({
   type,
   value,
@@ -55,6 +57,7 @@ export const InputNumber = ({
       type={"number"}
       value={value}
       onChange={handleChange}
+      onFocus={handleFocus}
       min={min}
       max={max}
     />

@@ -15,7 +15,6 @@ export default function NotFoundPage() {
           className="w-full px-4 sm:max-w-[35rem] pb-2"
           urlEndpoint={IMAGEKIT_URL}
           path={HEADER_NOT_FOUND_SVG}
-          lqip={{ active: true }}
         />
         <h1 className="text-3xl font-bold">Page not found</h1>
         <span className="flex flex-col gap-y-2 items-center font-light">

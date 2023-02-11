@@ -60,7 +60,7 @@ export const InvestStep = ({ ...props }) => {
           <label htmlFor="#tax-efficient-checkbox" className="ml-2">
             Use <span className="font-medium">Tax Efficient</span> algorithm.{" "}
             <span className="underline text-[blue]">
-              <Link to={"/docs?refid=allocate"}>Read more</Link>
+              <Link to={"/?refid=allocate"}>Read more</Link>
             </span>
           </label>
         </div>

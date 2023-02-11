@@ -34,7 +34,6 @@ export const Root = () => {
               className="w-full px-4 sm:max-w-[26rem]"
               urlEndpoint={IMAGEKIT_URL}
               path={HEADER_INVESTING_FRONT_SVG}
-              lqip={{ active: true }}
             />
             <LaunchBtn />
           </div>
@@ -50,12 +49,15 @@ export const Root = () => {
             </p>
             <p>
               You do your asset allocation on day-one, market goes up and down
-              and you are lost on how to split your monthly savings.
+              and you get lost on how to split your monthly savings.
             </p>
             <p>DcaPal takes care of that for you.</p>
           </span>
         </div>
-        <div className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-6">
+        <div
+          id="allocate-process"
+          className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-6"
+        >
           <RootCard
             imgSrc={ICON_PORTFOLIO_SVG}
             text={
@@ -75,6 +77,7 @@ export const Root = () => {
             }
           />
           <RootCard
+            id={"tax-efficient"}
             imgSrc={ICON_REBALANCE_SVG}
             text={
               <p>

@@ -43,8 +43,8 @@ export const ExportBtn = () => {
     quoteCcy: state.pfolio.quoteCcy,
   }));
 
-  const isDisplay = step && step > Step.IMPORT;
-  const isDisabled = Object.keys(pfolio.assets).length === 0;
+  const isDisplay =
+    step && step > Step.IMPORT && Object.keys(pfolio.assets).length > 0;
 
   const onClick = () => {
     exportPfolio(pfolio);
@@ -55,7 +55,6 @@ export const ExportBtn = () => {
       style={{ display: isDisplay ? "flex" : "none" }}
       className="px-3 py-2 flex justify-center items-center whitespace-nowrap bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
       onClick={onClick}
-      disabled={isDisabled}
     >
       Export Portfolio
     </button>

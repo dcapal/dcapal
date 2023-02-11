@@ -5,6 +5,7 @@ import { useRoutes } from "react-router-dom";
 import { App } from "../app";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
 import { clearPortfolio } from "../components/allocationFlow/portfolioStep/portfolioSlice";
+import AboutPage from "./aboutPage";
 import ErrorPage from "./errorPage";
 import NotFoundPage from "./notFoundPage";
 import { Root } from "./root";
@@ -42,7 +43,7 @@ export const Router = () => {
     },
     {
       path: "about",
-      element: <UnderConstructionPage />,
+      element: <AboutPage />,
       errorElement: <ErrorPage />,
     },
     {

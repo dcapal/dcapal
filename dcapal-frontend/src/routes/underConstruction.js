@@ -16,7 +16,6 @@ export default function UnderConstructionPage() {
           className="w-full px-4 sm:max-w-[35rem] pb-2"
           urlEndpoint={IMAGEKIT_URL}
           path={HEADER_UNDER_CONSTRUCTION_SVG}
-          lqip={{ active: true }}
         />
         <h1 className="text-3xl font-bold">Under construction. Stay tuned!</h1>
         <span className="flex flex-col gap-y-2 items-center font-light">
