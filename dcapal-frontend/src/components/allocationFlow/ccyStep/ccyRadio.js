@@ -20,7 +20,7 @@ export const CcyRadio = ({ ccy, selected, setSelected, ...props }) => {
   });
 
   return (
-    <div className={className} onClick={onClick} >
+    <div aria-checked={isSelected} role="radio" className={className} onClick={onClick} >
       {ccy}
     </div>
   );
