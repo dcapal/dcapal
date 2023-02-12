@@ -48,6 +48,7 @@ export const CcyStep = ({ ...props }) => {
       </div>
       <div>
         <CcyGroup
+          data-testid="back-btn"
           ccys={sortedCcys}
           selected={selected}
           setSelected={setSelected}
@@ -61,6 +62,7 @@ export const CcyStep = ({ ...props }) => {
           Go back
         </span>
         <button
+          data-testid="next-btn"
           className="px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
           onClick={onClickNext}
           disabled={selected.length === 0}

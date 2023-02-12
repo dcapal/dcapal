@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack --config webpack.prod.js --mode production",
-    "start": "webpack-dev-server --open --config webpack.dev.js --mode development"
+    "start": "webpack-dev-server --open --config webpack.dev.js --mode development",
+    "cypress": "cypress open"
   },
   "repository": {
     "type": "git",
@@ -47,6 +48,7 @@
     "babel-loader": "^8.2.5",
     "copy-webpack-plugin": "^5.0.0",
     "css-loader": "^5.2.7",
+    "cypress": "^12.5.1",
     "hello-wasm-pack": "^0.1.0",
     "html-webpack-plugin": "^4.5.2",
     "postcss": "^8.4.16",

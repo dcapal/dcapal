@@ -86,6 +86,7 @@ export const PortfolioStep = ({ ...props }) => {
       </div>
       {Object.keys(assetStore).length === 0 && (
         <span
+          data-testid="back-btn"
           className="font-medium underline cursor-pointer"
           onClick={onClickDiscard}
         >
