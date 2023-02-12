@@ -1,3 +1,5 @@
+export const DCAPAL_CANONICAL = "https://dcapal.com";
+
 export const DCAPAL_API = "/api";
 export const DCAPAL_API_CHART = "/api/external/chart";
 export const DCAPAL_API_SEARCH = "/api/external/search";

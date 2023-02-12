@@ -13,7 +13,7 @@ export const RootCard = ({ id, imgSrc, text, ...props }) => {
         urlEndpoint={IMAGEKIT_URL}
         path={imgSrc}
       />
-      <p className="w-4/5 text-xl text-center font-light">{text}</p>
+      <div className="w-4/5 text-xl text-center font-light">{text}</div>
     </div>
   );
 };

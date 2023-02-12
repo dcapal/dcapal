@@ -4,7 +4,12 @@ import { useSelector, useDispatch } from "react-redux";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 
-import { addAsset, setQty, setTargetWeight } from "./portfolioSlice";
+import {
+  addAsset,
+  clearPortfolio,
+  setQty,
+  setTargetWeight,
+} from "./portfolioSlice";
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 import { useNavigate } from "react-router-dom";
 
@@ -36,7 +41,8 @@ export const PortfolioStep = ({ ...props }) => {
   };
 
   const onClickDiscard = () => {
-    navigate("/");
+    dispatch(clearPortfolio({}));
+    dispatch(setAllocationFlowStep({ step: Step.CCY }));
   };
 
   const onClickAddLiquidity = () => {

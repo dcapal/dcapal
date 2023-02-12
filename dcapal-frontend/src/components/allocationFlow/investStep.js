@@ -47,23 +47,28 @@ export const InvestStep = ({ ...props }) => {
           {quoteCcy}
         </div>
       </div>
-      <div className="w-full mt-20 flex justify-start">
-        <div>
-          <input
-            id="tax-efficient-checkbox"
-            type="checkbox"
-            className="w-4 h-4 accent-neutral-500"
-            checked={useTaxEfficient}
-            onChange={onChangeTaxEfficient}
-            disabled={true}
-          />
-          <label htmlFor="#tax-efficient-checkbox" className="ml-2">
-            Use <span className="font-medium">Tax Efficient</span> algorithm.{" "}
-            <span className="underline text-[blue]">
-              <Link to={"/?refid=allocate"}>Read more</Link>
-            </span>
-          </label>
+      <div className="w-full flex flex-col gap-1 justify-start">
+        <div className="w-full mt-20 flex">
+          <div>
+            <input
+              id="tax-efficient-checkbox"
+              type="checkbox"
+              className="w-4 h-4 accent-neutral-500"
+              checked={useTaxEfficient}
+              onChange={onChangeTaxEfficient}
+              disabled={true}
+            />
+            <label htmlFor="#tax-efficient-checkbox" className="ml-2">
+              Use <span className="font-medium">Tax Efficient</span> algorithm
+            </label>
+          </div>
         </div>
+        <p className="text-sm font-thin">
+          With <span className="italic">Tax Efficient</span> option, we do our
+          best to rebalance your portfolio using your liquidity, with buy-only
+          suggestions. Otherwise, we might suggest to sell part of your
+          positions.
+        </p>
       </div>
       <div className="w-full mt-6 flex items-center justify-between">
         <span

@@ -43,6 +43,11 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
         <CloseBtn onClick={toggleMenu} />
       </div>
       <div className="flex flex-col px-8 py-3 gap-y-6">
+        <Link to={"/allocate"} onClick={toggleMenu}>
+          <div className="w-full text-2xl font-light text-white">
+            Get Started
+          </div>
+        </Link>
         <Link to={"/about"} onClick={toggleMenu}>
           <div className="w-full text-2xl font-light text-white">About</div>
         </Link>
@@ -91,6 +96,9 @@ export const NavBar = () => {
         </div>
         {!isMobile && (
           <div className="flex gap-x-5">
+            <div className="text-lg font-light text-white">
+              <Link to={"/allocate"}>Get Started</Link>
+            </div>
             <div className="text-lg font-light text-white">
               <Link to={"/about"}>About</Link>
             </div>
