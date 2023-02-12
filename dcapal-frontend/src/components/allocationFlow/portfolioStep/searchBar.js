@@ -11,7 +11,6 @@ import {
   Provider,
 } from "../../../app/providers";
 import { DCAPAL_API_SEARCH } from "../../../app/config";
-import { timeout } from "../../../utils";
 
 let searchId = undefined;
 
@@ -128,7 +127,7 @@ export const SearchBar = (props) => {
       />
       {results && isEmptyResult && (
         <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10 flex items-center justify-center font-light italic">
-          No asset found for '{props.text}'
+          No asset found for '{props.text.toUpperCase()}'
         </div>
       )}
       {results && !isEmptyResult && (
