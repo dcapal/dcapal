@@ -40,3 +40,8 @@ $ npm install # Install dcapal-optimizer-wasm pkg as well
 ```bash
 $ npm run start
 ```
+
+- Run frontend e2e test
+```bash
+$ npm run cypress
+```
