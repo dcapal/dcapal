@@ -7,6 +7,11 @@ export const Provider = Object.freeze({
   YF: "YF",
 });
 
+export const FetchError = Object.freeze({
+  BAD_DATA: "BAD_DATA",
+  REQUEST_CANCELED: "REQUEST_CANCELED",
+});
+
 export const fetchPrice = async (base, quote, token) => {
   const url = `${DCAPAL_API}/price/${base}?quote=${quote}`;
   try {
@@ -36,7 +41,7 @@ const toUnixTimestamp = (date, startOfDay) => {
   return Math.floor(d.getTime() / 1000);
 };
 
-export const fetchPriceYF = async (symbol, quote, token) => {
+export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
   const lastThreeDays = new Date();
   lastThreeDays.setDate(lastThreeDays.getDate() - 3);
   const period1 = toUnixTimestamp(lastThreeDays, true);
@@ -57,31 +62,37 @@ export const fetchPriceYF = async (symbol, quote, token) => {
     // On error, log and exit
     if (!response.data.chart || response.data.chart?.error) {
       console.error(response.data.chart?.error);
-      return null;
+      return FetchError.BAD_DATA;
     }
 
     const result = response.data.chart.result;
     if (!Array.isArray(result) || result.length < 1) {
       console.error("Empty YF price result:", response.data, url);
-      return null;
+      return FetchError.BAD_DATA;
     }
 
     const base = result[0].meta?.currency?.toLowerCase();
     if (!base) {
       console.error("Missing base currency:", response.data, url);
-      return null;
+      return FetchError.BAD_DATA;
+    }
+
+    const isValidCcy = validCcys.find((ccy) => ccy === base);
+    if (!isValidCcy) {
+      console.warn("Unsupported currency:", response.data, url, validCcys);
+      return FetchError.BAD_DATA;
     }
 
     const quotes = result[0].indicators?.quote;
     if (!Array.isArray(quotes) || quotes.length < 1) {
       console.error("Empty quotes:", response.data, url);
-      return null;
+      return FetchError.BAD_DATA;
     }
 
     const closePrices = quotes[0].close;
     if (!Array.isArray(closePrices) || closePrices.length < 1) {
       console.error("Empty close prices:", response.data, url);
-      return null;
+      return FetchError.BAD_DATA;
     }
 
     const price = closePrices
@@ -99,11 +110,11 @@ export const fetchPriceYF = async (symbol, quote, token) => {
     if (!axios.isCancel(error)) {
       console.error(error);
     }
-    return null;
+    return FetchError.REQUEST_CANCELED;
   }
 };
 
-export const getFetcher = (provider) => {
+export const getFetcher = (provider, validCcys) => {
   if (provider === Provider.DCA_PAL) {
     return async (symbol, quote) => {
       return await fetchPrice(symbol, quote, null);
@@ -111,8 +122,8 @@ export const getFetcher = (provider) => {
   }
 
   return async (symbol, quote) => {
-    const p = await fetchPriceYF(symbol, quote, null);
-    if (p) {
+    const p = await fetchPriceYF(symbol, quote, validCcys, null);
+    if (p && !(p in FetchError)) {
       const [px] = p;
       return px;
     }

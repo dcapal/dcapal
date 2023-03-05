@@ -13,7 +13,13 @@ import {
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
-const importPfolio = async (pfolio, setError, setIsLoading, dispatch) => {
+const importPfolio = async (
+  pfolio,
+  validCcys,
+  setError,
+  setIsLoading,
+  dispatch
+) => {
   const stopWithError = (...args) => {
     console.log(args);
     setError(true);
@@ -33,9 +39,12 @@ const importPfolio = async (pfolio, setError, setIsLoading, dispatch) => {
   }
 
   for (const a of pfolio.assets) {
-    const price = await getFetcher(a.provider)(a.symbol, pfolio.quoteCcy);
+    const price = await getFetcher(a.provider, validCcys)(
+      a.symbol,
+      pfolio.quoteCcy
+    );
     if (!price) {
-      console.log(
+      console.warn(
         "[ImportStep] Failed to fetch price for",
         a.symbol,
         `(provider: ${pfolio.quoteCcy})`
@@ -64,6 +73,7 @@ export const ImportStep = () => {
   const navigate = useNavigate();
 
   const pfolioFile = useSelector((state) => state.app.pfolioFile);
+  const validCcys = useSelector((state) => state.app.currencies);
 
   useEffect(() => {
     return () => {
@@ -78,7 +88,7 @@ export const ImportStep = () => {
 
     const runImport = async () => {
       await Promise.all([
-        importPfolio(pfolio, setError, setIsLoading, dispatch),
+        importPfolio(pfolio, validCcys, setError, setIsLoading, dispatch),
         timeout(1000),
       ]);
 

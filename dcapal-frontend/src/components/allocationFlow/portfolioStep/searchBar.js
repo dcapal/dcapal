@@ -6,11 +6,13 @@ import Fuse from "fuse.js";
 import { useSelector } from "react-redux";
 import {
   fetchAssetsDcaPal,
+  FetchError,
   fetchPrice,
   fetchPriceYF,
   Provider,
 } from "../../../app/providers";
 import { DCAPAL_API_SEARCH } from "../../../app/config";
+import { Spinner } from "../../spinner/spinner";
 
 let searchId = undefined;
 
@@ -47,6 +49,7 @@ const fetchAssetsYF = async (query) => {
 
 export const SearchBar = (props) => {
   const [results, setResults] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const searchOptions = {
     shouldSort: true,
@@ -57,10 +60,10 @@ export const SearchBar = (props) => {
   useEffect(() => {
     if (!props.text || props.text.length < 1) {
       setResults(null);
+      setIsLoading(false);
     }
 
     const delayedSearch = setTimeout(() => {
-      console.log("Delayed!");
       fetchSearchApi(props.text);
     }, 300);
 
@@ -95,6 +98,8 @@ export const SearchBar = (props) => {
       return assetsYF;
     };
 
+    setIsLoading(true);
+
     const [fiats, cryptos, equities] = await Promise.all([
       fromDcaPal("fiat"),
       fromDcaPal("crypto"),
@@ -109,10 +114,25 @@ export const SearchBar = (props) => {
       crypto: cryptos && cryptos.length > 0 ? cryptos : [],
       yf: equities && equities.length > 0 ? equities : [],
     });
+
+    setIsLoading(false);
+  };
+
+  const removeAssetYf = (symbol) => {
+    if (!results || results.yf.length < 1) return;
+
+    const idx = results.yf.findIndex((r) => r.symbol === symbol);
+    if (idx >= 0) {
+      results.yf.splice(idx, 1);
+      setResults({
+        ...results,
+      });
+    }
   };
 
   const isEmptyResult =
     results &&
+    !isLoading &&
     results.fiat.length === 0 &&
     results.crypto.length === 0 &&
     results.yf.length === 0;
@@ -120,11 +140,16 @@ export const SearchBar = (props) => {
   return (
     <div className="relative flex flex-col items-center justify-center">
       <input
-        className="w-full h-12 px-6 pb-px border-2 rounded-3xl border-gray-500/40 uppercase placeholder:normal-case z-20"
+        className="w-full h-12 px-6 pb-px border-2 rounded-3xl border-neutral-500/40 focus:border-neutral-500 focus-visible:outline-none uppercase placeholder:normal-case z-20"
         value={props.text}
         placeholder={"Search Crypto, ETF and much more"}
         onChange={handleAddAssetInputChange}
       />
+      {isLoading && (
+        <div className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10 flex items-center justify-center font-light italic">
+          <Spinner width="2.5rem" height="2.5rem" />
+        </div>
+      )}
       {results && isEmptyResult && (
         <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10 flex items-center justify-center font-light italic">
           No asset found for '{props.text.toUpperCase()}'
@@ -162,6 +187,7 @@ export const SearchBar = (props) => {
               currentSearchId={searchId}
               setText={props.setText}
               addAsset={props.addAsset}
+              removeAsset={removeAssetYf}
               closeSearchList={() => setResults(null)}
             />
           ))}
@@ -262,20 +288,29 @@ const SearchItemCW = (props) => {
 
 const SearchItemYF = (props) => {
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const validCcys = useSelector((state) => state.app.currencies);
 
   const [price, setPrice] = useState(null);
   const [baseCcy, setBaseCcy] = useState("");
+
   const cancelTokenSourcePrice = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
       cancelTokenSourcePrice.current = axios.CancelToken.source();
       const token = cancelTokenSourcePrice.current.token;
-      const p = await fetchPriceYF(props.data.symbol, quoteCcy, token);
-      if (p) {
+      const p = await fetchPriceYF(
+        props.data.symbol,
+        quoteCcy,
+        validCcys,
+        token
+      );
+      if (p && !(p in FetchError)) {
         const [px, base] = p;
         setPrice(px);
         setBaseCcy(base);
+      } else if (!p || p === FetchError.BAD_DATA) {
+        props.removeAsset(props.data.symbol);
       }
     };
 

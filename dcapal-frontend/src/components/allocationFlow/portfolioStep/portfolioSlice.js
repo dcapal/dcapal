@@ -21,6 +21,9 @@ export const portfolioSlice = createSlice({
   },
   reducers: {
     addAsset: (state, action) => {
+      const symbol = action.payload.symbol;
+      if (symbol && symbol in state.assets) return;
+
       state.assets = {
         ...state.assets,
         [action.payload.symbol]: {
