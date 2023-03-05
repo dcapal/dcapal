@@ -100,8 +100,7 @@ export const PortfolioStep = ({ ...props }) => {
           Go back
         </span>
       )}
-      {Object.keys(assetStore).length > 0 &&
-        isFirstCardFilled &&
+      {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
         !isAllAllocated && (
           <div className="mt-6 font-light text-red-500">
             Review your <span className="font-normal">Target Weights</span>.
