@@ -33,18 +33,9 @@ impl Problem {
         let budget_inv = 1. / options.budget;
         for (aid, asset) in &options.assets {
             let a_i = problem.add_var(0., (0., options.budget));
-            let s_i_pos = problem.add_var(1., (0., f64::INFINITY));
             let s_i_neg = problem.add_var(1., (0., f64::INFINITY));
 
-            // s_i_pos >= a_i / budget - target_weight
-            // =>
-            // a_i / budget - s_i_pos <= target_weight
-            problem.add_constraint(
-                [(a_i, budget_inv), (s_i_pos, -1.)],
-                ComparisonOp::Le,
-                asset.target_weight,
-            );
-            // s_i_neg >= target_weight - a_i / budget
+            // s_i_n eg >= target_weight - a_i / budget
             // =>
             // a_i / budget + s_i_neg >= target_weight
             problem.add_constraint(
