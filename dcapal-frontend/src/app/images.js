@@ -9,6 +9,9 @@ export const ICON_PORTFOLIO_SVG = "icons/portfolio.svg";
 export const ICON_BURGER_MENU_SVG = "icons/hamburger-menu.svg";
 export const ICON_CLOSE_MENU_SVG = "icons/close-menu.svg";
 export const ICON_AMOUNT_SVG = "icons/amount.svg";
+export const ICON_BAG_SVG = "icons/bag.svg";
+export const ICON_TARGET_SVG = "icons/target.svg";
+export const ICON_PIECHART_SVG = "icons/piechart.svg";
 
 export const SOCIAL_LINKEDIN_SVG = "social/linkedin.svg";
 export const SOCIAL_TWITTER_SVG = "social/twitter.svg";

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import classNames from "classnames";
+import { useMediaQuery } from "@react-hook/media-query";
 
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
@@ -10,14 +12,17 @@ import {
   setQty,
   setTargetWeight,
 } from "./portfolioSlice";
+
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { useNavigate } from "react-router-dom";
+import { IKImage } from "imagekitio-react";
+import { IMAGEKIT_URL, MEDIA_SMALL } from "../../../app/config";
+import { ICON_BAG_SVG, ICON_PIECHART_SVG } from "../../../app/images";
 
 export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
   const assetStore = useSelector((state) => state.pfolio.assets);
+  const isMobile = !useMediaQuery(MEDIA_SMALL);
   const dispatch = useDispatch();
-  const navigate = useNavigate();
 
   const assets = Object.values(assetStore).sort((a, b) => a.idx - b.idx);
   let cumWeight = 0;
@@ -26,6 +31,9 @@ export const PortfolioStep = ({ ...props }) => {
     return cumWeight <= 100;
   });
   const isAllAllocated = cumWeight === 100;
+
+  const isFirstCardFilled =
+    assets && assets.length === 1 && assets[0].targetWeight > 0;
 
   const addAssetToPortfolio = (asset) => {
     dispatch(
@@ -92,10 +100,45 @@ export const PortfolioStep = ({ ...props }) => {
           Go back
         </span>
       )}
-      {Object.keys(assetStore).length > 0 && !isAllAllocated && (
-        <div className="mt-6 text-red-500">
-          Review your <span className="font-medium">Target Weights</span>. They
-          must sum up to 100%
+      {Object.keys(assetStore).length > 0 &&
+        isFirstCardFilled &&
+        !isAllAllocated && (
+          <div className="mt-6 font-light text-red-500">
+            Review your <span className="font-normal">Target Weights</span>.
+            They must sum up to 100%.
+          </div>
+        )}
+      {Object.keys(assetStore).length === 1 && !isFirstCardFilled && (
+        <div
+          className={classNames("w-full max-w-[40rem] flex flex-col mt-4", {
+            "gap-4": isMobile,
+            "gap-2": !isMobile,
+          })}
+        >
+          <div className="w-full flex items-center justify-start">
+            <IKImage
+              className="w-full max-w-[3rem] p-1"
+              urlEndpoint={IMAGEKIT_URL}
+              path={ICON_BAG_SVG}
+            />
+            <p className="flex-grow font-light">
+              Fill <span className="font-normal">Quantity</span> field with how
+              many <span className="uppercase">{assets[0].symbol}</span> you
+              already have in your portfolio (e.g. 10 units)
+            </p>
+          </div>
+          <div className="w-full flex items-center justify-start">
+            <IKImage
+              className="w-full max-w-[3rem] p-1"
+              urlEndpoint={IMAGEKIT_URL}
+              path={ICON_PIECHART_SVG}
+            />
+            <p className="flex-grow font-light">
+              Define your desired asset allocation in{" "}
+              <span className="font-normal">Target weight</span> field (e.g.{" "}
+              <span className="italic">20%</span> of total portfolio value)
+            </p>
+          </div>
         </div>
       )}
       {Object.keys(assetStore).length > 0 && (
@@ -107,7 +150,7 @@ export const PortfolioStep = ({ ...props }) => {
             Discard
           </span>
           <button
-            className="px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
+            className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
             onClick={onClickAddLiquidity}
             disabled={!isAllAllocated}
           >
