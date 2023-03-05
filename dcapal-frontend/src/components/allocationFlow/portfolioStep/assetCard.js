@@ -32,7 +32,7 @@ export const AssetCard = ({
   return (
     <div className="relative w-full max-w-[36rem] flex flex-col my-2 first:mt-0 px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white">
       <div
-        className="absolute flex justify-center items-center w-8 h-8 -right-4 -top-4 rounded-full bg-slate-500 cursor-pointer"
+        className="absolute flex justify-center items-center w-8 h-8 -right-4 -top-3.5 rounded-full bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 cursor-pointer"
         onClick={onClickDelete}
       >
         <div className="text-white mb-1">x</div>
