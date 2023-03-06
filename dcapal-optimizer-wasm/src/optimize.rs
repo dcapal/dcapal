@@ -33,15 +33,25 @@ impl Problem {
         let budget_inv = 1. / options.budget;
         for (aid, asset) in &options.assets {
             let a_i = problem.add_var(0., (0., options.budget));
-            let s_i_neg = problem.add_var(1., (0., f64::INFINITY));
+            let s_i_neg = problem.add_var(2. * options.budget, (0., f64::INFINITY));
+            let t_i_neg = problem.add_var(1., (0., f64::INFINITY));
 
-            // s_i_n eg >= target_weight - a_i / budget
+            // s_i_neg >= target_weight - a_i / budget
             // =>
             // a_i / budget + s_i_neg >= target_weight
             problem.add_constraint(
                 [(a_i, budget_inv), (s_i_neg, 1.)],
                 ComparisonOp::Ge,
                 asset.target_weight,
+            );
+
+            // t_i_neg >= -s_i_neg * target_weight + 1
+            // =>
+            // s_i_neg * target_weight + t_i_neg >= 1
+            problem.add_constraint(
+                [(s_i_neg, options.budget), (t_i_neg, 1.)],
+                ComparisonOp::Ge,
+                1.,
             );
 
             vars.insert(aid.clone(), a_i);
