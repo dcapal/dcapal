@@ -100,14 +100,7 @@ export const PortfolioStep = ({ ...props }) => {
           Go back
         </span>
       )}
-      {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
-        !isAllAllocated && (
-          <div className="mt-6 font-light text-red-500">
-            Review your <span className="font-normal">Target Weights</span>.
-            They must sum up to 100%.
-          </div>
-        )}
-      {Object.keys(assetStore).length === 1 && !isFirstCardFilled && (
+      {Object.keys(assetStore).length === 1 && (
         <div
           className={classNames("w-full max-w-[40rem] flex flex-col mt-4", {
             "gap-4": isMobile,
@@ -116,19 +109,19 @@ export const PortfolioStep = ({ ...props }) => {
         >
           <div className="w-full flex items-center justify-start">
             <IKImage
-              className="w-full max-w-[3rem] p-1"
+              className="w-full max-w-[3rem] p-1 self-start"
               urlEndpoint={IMAGEKIT_URL}
               path={ICON_BAG_SVG}
             />
             <p className="flex-grow font-light">
-              Fill <span className="font-normal">Quantity</span> field with how
-              many <span className="uppercase">{assets[0].symbol}</span> you
-              already have in your portfolio (e.g. 10 units)
+              Fill <span className="font-normal">Quantity</span> field with the
+              number of <span className="uppercase">{assets[0].symbol}</span>{" "}
+              you already have in your portfolio (e.g. 10 units)
             </p>
           </div>
           <div className="w-full flex items-center justify-start">
             <IKImage
-              className="w-full max-w-[3rem] p-1"
+              className="w-full max-w-[3rem] p-1 self-start"
               urlEndpoint={IMAGEKIT_URL}
               path={ICON_PIECHART_SVG}
             />
@@ -140,6 +133,13 @@ export const PortfolioStep = ({ ...props }) => {
           </div>
         </div>
       )}
+      {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
+        !isAllAllocated && (
+          <div className="mt-6 font-light text-red-500">
+            Review your <span className="font-normal">Target Weights</span>.
+            They must sum up to 100%.
+          </div>
+        )}
       {Object.keys(assetStore).length > 0 && (
         <div className="w-full mt-6 flex justify-between items-center">
           <span
