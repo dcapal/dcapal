@@ -28,30 +28,29 @@ impl Problem {
 
         // Variables:
         //    a_i - invested amount for asset i
-        //    s_i - slack between solution weight and target weight for asset i
+        //    s_i - slack between solution amount and target amount for asset i
         let mut vars = HashMap::new();
-        let budget_inv = 1. / options.budget;
         for (aid, asset) in &options.assets {
             let a_i = problem.add_var(0., (0., options.budget));
-            let s_i_neg = problem.add_var(2. * options.budget, (0., f64::INFINITY));
-            let t_i_neg = problem.add_var(1., (0., f64::INFINITY));
+            let s_i_neg = problem.add_var(1., (0., f64::INFINITY));
+            let s_i_pos = problem.add_var(1., (0., f64::INFINITY));
 
-            // s_i_neg >= target_weight - a_i / budget
+            // s_i_neg >= target_weight * budget - a_i
             // =>
-            // a_i / budget + s_i_neg >= target_weight
+            // a_i + s_i_neg >= target_weight * budget
             problem.add_constraint(
-                [(a_i, budget_inv), (s_i_neg, 1.)],
+                [(a_i, 1.), (s_i_neg, 1.)],
                 ComparisonOp::Ge,
-                asset.target_weight,
+                asset.target_weight * options.budget,
             );
 
-            // t_i_neg >= -s_i_neg * target_weight + 1
+            // s_i_pos >= a_i - target_weight * budget
             // =>
-            // s_i_neg * target_weight + t_i_neg >= 1
+            // a_i / budget - s_i_pos <= target_weight
             problem.add_constraint(
-                [(s_i_neg, options.budget), (t_i_neg, 1.)],
-                ComparisonOp::Ge,
-                1.,
+                [(a_i, 1.), (s_i_pos, -1.)],
+                ComparisonOp::Le,
+                asset.target_weight * options.budget,
             );
 
             vars.insert(aid.clone(), a_i);
