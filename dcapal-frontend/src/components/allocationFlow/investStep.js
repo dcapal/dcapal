@@ -63,7 +63,7 @@ export const InvestStep = ({ ...props }) => {
             </label>
           </div>
         </div>
-        <p className="text-sm font-thin">
+        <p className="text-sm font-light">
           With <span className="italic">Tax Efficient</span> option, we do our
           best to rebalance your portfolio using your liquidity, with buy-only
           suggestions. Otherwise, we might suggest to sell part of your

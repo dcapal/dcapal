@@ -77,7 +77,7 @@ export default function AboutPage() {
           <SocialBar />
         </div>
         <div className="w-full max-w-[44rem] p-6 flex flex-col items-center gap-6">
-          <div className="w-full flex flex-col gap-4 text-justify font-thin text-lg">
+          <div className="w-full flex flex-col gap-4 text-justify font-light text-lg">
             <p>
               <span className="font-normal">Hey there, I'm Leo!</span> 👋 I'm a
               Software Engineer in Finance, working on low-latency backend
@@ -114,7 +114,7 @@ export default function AboutPage() {
           </div>
           <div
             id="privacy-policy"
-            className="w-full flex flex-col gap-2 text-justify font-thin text-lg"
+            className="w-full flex flex-col gap-2 text-justify font-light text-lg"
           >
             <h2 className="w-full text-3xl font-semibold mt-4 mb-2">
               Privacy policy
@@ -134,7 +134,7 @@ export default function AboutPage() {
           </div>
           <div
             id="feedback"
-            className="w-full flex flex-col gap-2 text-justify font-thin text-lg"
+            className="w-full flex flex-col gap-2 text-justify font-light text-lg"
           >
             <h2 className="w-full text-3xl font-semibold mt-4 mb-2">
               Feedback
