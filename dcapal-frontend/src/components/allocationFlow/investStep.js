@@ -5,9 +5,8 @@ import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
 
-export const InvestStep = ({ ...props }) => {
+export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
   const [cash, setCash] = useState(0);
-  const [useTaxEfficient, setUseTaxEfficient] = useState(true);
   const dispatch = useDispatch();
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
@@ -56,7 +55,6 @@ export const InvestStep = ({ ...props }) => {
               className="w-4 h-4 accent-neutral-500"
               checked={useTaxEfficient}
               onChange={onChangeTaxEfficient}
-              disabled={true}
             />
             <label htmlFor="#tax-efficient-checkbox" className="ml-2">
               Use <span className="font-medium">Tax Efficient</span> algorithm

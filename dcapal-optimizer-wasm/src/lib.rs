@@ -88,6 +88,7 @@ pub struct JsSolution {
 pub struct JsProblemOptions {
     budget: f64,
     assets: HashMap<String, JsProblemAsset>,
+    is_buy_only: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -134,6 +135,7 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
         Ok(ProblemOptions {
             budget: options.budget,
             assets,
+            is_buy_only: options.is_buy_only,
         })
     }
 }

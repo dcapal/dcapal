@@ -11,6 +11,8 @@ import { PortfolioStep } from "./portfolioStep";
 export const AllocationFlow = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
 
+  const [useTaxEfficient, setUseTaxEfficient] = useState(true);
+
   if (step <= Step.CCY) {
     return <CcyStep />;
   } else if (step === Step.IMPORT) {
@@ -18,8 +20,13 @@ export const AllocationFlow = () => {
   } else if (step === Step.PORTFOLIO) {
     return <PortfolioStep />;
   } else if (step === Step.INVEST) {
-    return <InvestStep />;
+    return (
+      <InvestStep
+        useTaxEfficient={useTaxEfficient}
+        setUseTaxEfficient={setUseTaxEfficient}
+      />
+    );
   } else if (step === Step.END) {
-    return <EndStep />;
+    return <EndStep useTaxEfficient={useTaxEfficient} />;
   }
 };
