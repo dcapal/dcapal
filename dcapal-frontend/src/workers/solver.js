@@ -2,7 +2,7 @@ import { import_wasm } from "../wasm/import_wasm";
 import { expose } from "threads";
 
 expose({
-  async makeAndSolve(budget, assets) {
+  async makeAndSolve(budget, assets, isBuyOnly) {
     const { Solver } = await import_wasm();
 
     if (!budget || budget < 0) return null;
@@ -13,6 +13,7 @@ expose({
       assets: {
         ...assets,
       },
+      is_buy_only: isBuyOnly,
     });
 
     return Solver.solve(handle);

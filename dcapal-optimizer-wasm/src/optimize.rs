@@ -6,6 +6,7 @@ use minilp::{ComparisonOp, OptimizationDirection, Variable};
 pub struct ProblemOptions {
     pub budget: f64,
     pub assets: HashMap<String, ProblemAsset>,
+    pub is_buy_only: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -63,13 +64,17 @@ impl Problem {
             ComparisonOp::Eq,
             options.budget,
         );
-        //    a_i >= current_amount   -- No sell
-        for (aid, a_i) in &vars {
-            problem.add_constraint(
-                [(*a_i, 1.0)],
-                ComparisonOp::Ge,
-                options.assets.get(aid).unwrap().current_amount,
-            );
+
+        if options.is_buy_only {
+            // Subject to:
+            //    a_i >= current_amount   -- No sell
+            for (aid, a_i) in &vars {
+                problem.add_constraint(
+                    [(*a_i, 1.0)],
+                    ComparisonOp::Ge,
+                    options.assets.get(aid).unwrap().current_amount,
+                );
+            }
         }
 
         Problem { problem, vars }
@@ -80,9 +85,7 @@ impl Problem {
 mod tests {
     use super::*;
 
-    #[test]
-    fn it_solves_60_40_portfolio() -> anyhow::Result<()> {
-        // Given
+    fn build_60_40_portfolio_no_allocation(is_buy_only: bool) -> (Problem, Vec<String>) {
         let budget = 100.;
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
@@ -104,10 +107,23 @@ mod tests {
                 },
             ),
         ]);
-        let options = ProblemOptions { budget, assets };
+
+        let options = ProblemOptions {
+            budget,
+            assets,
+            is_buy_only,
+        };
+
+        (Problem::new(options), vec![vwce, aggh])
+    }
+
+    #[test]
+    fn it_solves_60_40_portfolio_buy_only() -> anyhow::Result<()> {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_no_allocation(true);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
-        let problem = Problem::new(options);
         let solution = problem.problem.solve()?;
 
         // Expect
@@ -117,8 +133,21 @@ mod tests {
     }
 
     #[test]
-    fn it_solves_60_40_unbalanced_portfolio() -> anyhow::Result<()> {
+    fn it_solves_60_40_portfolio_buy_and_sell() -> anyhow::Result<()> {
         // Given
+        let (problem, assets) = build_60_40_portfolio_no_allocation(false);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.problem.solve()?;
+
+        // Expect
+        assert_eq!(solution[problem.vars[&vwce]], 60.);
+        assert_eq!(solution[problem.vars[&aggh]], 40.);
+        Ok(())
+    }
+
+    fn build_60_40_portfolio_unbalanced(is_buy_only: bool) -> (Problem, Vec<String>) {
         let budget = 100.;
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
@@ -140,10 +169,22 @@ mod tests {
                 },
             ),
         ]);
-        let options = ProblemOptions { budget, assets };
+        let options = ProblemOptions {
+            budget,
+            assets,
+            is_buy_only,
+        };
+
+        (Problem::new(options), vec![vwce, aggh])
+    }
+
+    #[test]
+    fn it_solves_60_40_unbalanced_portfolio_buy_only() -> anyhow::Result<()> {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_unbalanced(true);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
-        let problem = Problem::new(options);
         let solution = problem.problem.solve()?;
 
         // Expect
@@ -153,8 +194,21 @@ mod tests {
     }
 
     #[test]
-    fn it_solves_my_portfolio() -> anyhow::Result<()> {
+    fn it_solves_60_40_unbalanced_portfolio_buy_and_sell() -> anyhow::Result<()> {
         // Given
+        let (problem, assets) = build_60_40_portfolio_unbalanced(false);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.problem.solve()?;
+
+        // Expect
+        assert_eq!(solution[problem.vars[&vwce]], 60.);
+        assert_eq!(solution[problem.vars[&aggh]], 40.);
+        Ok(())
+    }
+
+    fn build_three_assets_portfolio(is_buy_only: bool) -> (Problem, Vec<String>) {
         let budget = 7706.12;
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
@@ -185,10 +239,38 @@ mod tests {
                 },
             ),
         ]);
-        let options = ProblemOptions { budget, assets };
+        let options = ProblemOptions {
+            budget,
+            assets,
+            is_buy_only,
+        };
+
+        (Problem::new(options), vec![vwce, aggh, reit])
+    }
+
+    #[test]
+    fn it_solves_three_assets_portfolio_buy_only() -> anyhow::Result<()> {
+        // Given
+        let (problem, assets) = build_three_assets_portfolio(true);
+        let [vwce, aggh, reit] = <[String; 3]>::try_from(assets).ok().unwrap();
 
         // When
-        let problem = Problem::new(options);
+        let solution = problem.problem.solve()?;
+
+        // Expect
+        println!("{}: {}", &vwce, solution[problem.vars[&vwce]]);
+        println!("{}: {}", &aggh, solution[problem.vars[&aggh]]);
+        println!("{}: {}", &reit, solution[problem.vars[&reit]]);
+        Ok(())
+    }
+
+    #[test]
+    fn it_solves_three_assets_portfolio_buy_and_sell() -> anyhow::Result<()> {
+        // Given
+        let (problem, assets) = build_three_assets_portfolio(false);
+        let [vwce, aggh, reit] = <[String; 3]>::try_from(assets).ok().unwrap();
+
+        // When
         let solution = problem.problem.solve()?;
 
         // Expect

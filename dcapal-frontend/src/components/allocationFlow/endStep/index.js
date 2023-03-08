@@ -35,7 +35,7 @@ const buildCards = (assets, solution) => {
   return cards;
 };
 
-export const EndStep = ({ ...props }) => {
+export const EndStep = ({ useTaxEfficient }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
@@ -66,7 +66,7 @@ export const EndStep = ({ ...props }) => {
         {}
       );
 
-      const sol = await solver.makeAndSolve(budget, as);
+      const sol = await solver.makeAndSolve(budget, as, useTaxEfficient);
       await Thread.terminate(solver);
       return sol;
     };
