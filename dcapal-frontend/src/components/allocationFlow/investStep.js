@@ -12,7 +12,7 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
 
   const onClickTaxEfficient = (e) => {
-    setUseTaxEfficient(useTaxEfficient ^ true);
+    setUseTaxEfficient(!useTaxEfficient);
   };
 
   const onClickGoBack = () => {
