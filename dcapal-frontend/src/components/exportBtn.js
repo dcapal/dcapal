@@ -44,7 +44,7 @@ export const ExportBtn = () => {
   }));
 
   const isDisplay =
-    step && step > Step.IMPORT && Object.keys(pfolio.assets).length > 0;
+    step && step === Step.PORTFOLIO && Object.keys(pfolio.assets).length > 0;
 
   const onClick = () => {
     exportPfolio(pfolio);
