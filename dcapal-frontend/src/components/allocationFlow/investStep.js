@@ -11,8 +11,8 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
 
-  const onChangeTaxEfficient = (e) => {
-    setUseTaxEfficient(e.target.checked || false);
+  const onClickTaxEfficient = (e) => {
+    setUseTaxEfficient(useTaxEfficient ^ true);
   };
 
   const onClickGoBack = () => {
@@ -47,19 +47,23 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
         </div>
       </div>
       <div className="w-full flex flex-col gap-1 justify-start">
-        <div className="w-full mt-20 flex">
-          <div>
-            <input
-              id="tax-efficient-checkbox"
-              type="checkbox"
-              className="w-4 h-4 accent-neutral-500"
-              checked={useTaxEfficient}
-              onChange={onChangeTaxEfficient}
-            />
-            <label htmlFor="#tax-efficient-checkbox" className="ml-2">
-              Use <span className="font-medium">Tax Efficient</span> algorithm
-            </label>
-          </div>
+        <div
+          className="w-full mt-20 flex items-center cursor-pointer"
+          onClick={onClickTaxEfficient}
+        >
+          <input
+            id="tax-efficient-checkbox"
+            type="checkbox"
+            className="w-4 h-4 accent-neutral-500 cursor-pointer"
+            checked={useTaxEfficient}
+            onChange={onClickTaxEfficient}
+          />
+          <label
+            htmlFor="#tax-efficient-checkbox"
+            className="ml-2 cursor-pointer select-none"
+          >
+            Use <span className="font-medium">Tax Efficient</span> algorithm
+          </label>
         </div>
         <p className="text-sm font-light">
           With <span className="italic">Tax Efficient</span> option, we do our
