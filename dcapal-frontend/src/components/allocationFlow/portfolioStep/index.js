@@ -30,6 +30,8 @@ export const PortfolioStep = ({ ...props }) => {
     cumWeight += a.targetWeight;
     return cumWeight <= 100;
   });
+
+  cumWeight = Math.round(cumWeight * 1e6) / 1e6;
   const isAllAllocated = cumWeight === 100;
 
   const isFirstCardFilled =
@@ -73,7 +75,12 @@ export const PortfolioStep = ({ ...props }) => {
           };
 
           const setAssetTargetWeight = (w) => {
-            dispatch(setTargetWeight({ symbol: a.symbol, weight: w }));
+            dispatch(
+              setTargetWeight({
+                symbol: a.symbol,
+                weight: Math.round(w * 1e6) / 1e6,
+              })
+            );
           };
 
           return (
@@ -137,7 +144,14 @@ export const PortfolioStep = ({ ...props }) => {
         !isAllAllocated && (
           <div className="mt-6 font-light text-red-500">
             Review your <span className="font-normal">Target Weights</span>.
-            They must sum up to 100%.
+            They must sum up to 100% (currently{" "}
+            <span className="font-normal">
+              {cumWeight.toLocaleString("en-US", {
+                maximumFractionDigits: 12,
+              })}
+              %
+            </span>
+            )
           </div>
         )}
       {Object.keys(assetStore).length > 0 && (

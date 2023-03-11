@@ -118,7 +118,11 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
             .map(|(aid, a)| ProblemAsset::try_from(a).map(|a| (aid, a)))
             .collect::<Result<HashMap<_, _>, _>>()?;
 
-        let target_total: f64 = assets.values().map(|a| a.target_weight).sum();
+        let target_total: f64 = assets
+            .values()
+            .map(|a| a.target_weight)
+            .sum::<f64>()
+            .round_n(AMOUNT_DECIMALS);
         if target_total != 1. {
             return Err(format!(
                 "Invalid target weights. Sum must be equal to 1 ({} instead)",

@@ -15,6 +15,7 @@ export const InputNumber = ({
   textAlign,
   min,
   max,
+  step,
   height,
   textSize,
 }) => {
@@ -60,6 +61,7 @@ export const InputNumber = ({
       onFocus={handleFocus}
       min={min}
       max={max}
+      step={step ? step : "any"}
     />
   );
 };
