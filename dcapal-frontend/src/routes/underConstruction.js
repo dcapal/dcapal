@@ -7,6 +7,7 @@ import { IMAGEKIT_URL } from "../app/config";
 import { IKImage } from "imagekitio-react";
 import { HEADER_UNDER_CONSTRUCTION_SVG } from "../app/images";
 import { DcaPalHelmet } from "./helmet";
+import { Footer } from "../components/core/footer";
 
 export default function UnderConstructionPage({ title }) {
   return (
@@ -33,6 +34,7 @@ export default function UnderConstructionPage({ title }) {
             </p>
           </span>
         </div>
+        <Footer />
       </div>
     </>
   );

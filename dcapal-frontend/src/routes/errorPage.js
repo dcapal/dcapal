@@ -1,6 +1,7 @@
 import React from "react";
 
 import { useRouteError } from "react-router-dom";
+import { Footer } from "../components/core/footer";
 import { NavBar } from "../components/core/navBar";
 import { DcaPalHelmet } from "./helmet";
 
@@ -20,6 +21,7 @@ export default function ErrorPage() {
             <i>{error.statusText || error.message}</i>
           </p>
         </div>
+        <Footer />
       </div>
     </>
   );

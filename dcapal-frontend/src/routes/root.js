@@ -14,6 +14,7 @@ import {
   ICON_REBALANCE_SVG,
 } from "../app/images";
 import { DcaPalHelmet } from "./helmet";
+import { Footer } from "../components/core/footer";
 
 export const Root = () => {
   return (
@@ -119,6 +120,7 @@ export const Root = () => {
               <LaunchBtn />
             </div>
           </div>
+          <Footer />
         </div>
       </div>
     </>

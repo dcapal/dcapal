@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 
 import { AllocationFlow } from "../components/allocationFlow";
+import { Footer } from "../components/core/footer";
 import { NavBar } from "../components/core/navBar";
 import { DcaPalHelmet } from "../routes/helmet";
 import { setCurrencies } from "./appSlice";
@@ -36,6 +37,7 @@ export const App = () => {
               <Main />
             </div>
           </div>
+          <Footer />
         </div>
       </div>
     </>

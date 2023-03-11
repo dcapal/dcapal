@@ -14,6 +14,7 @@ import {
   SOCIAL_YOUTUBE_SVG,
 } from "../app/images";
 import { DcaPalHelmet } from "./helmet";
+import { Footer } from "../components/core/footer";
 
 const SocialBar = () => {
   return (
@@ -62,7 +63,7 @@ export default function AboutPage() {
     <>
       <DcaPalHelmet title="About" />
       <div
-        id="anchor-social-profiles"
+        id="social-profiles"
         className="w-full h-screen flex flex-col items-center"
       >
         <NavBar />
@@ -144,7 +145,7 @@ export default function AboutPage() {
               simply leave a feedback,{" "}
               <span className="font-normal">feel free to reach out</span> to me
               on any of{" "}
-              <a className="underline" href="#anchor-social-profiles">
+              <a className="underline" href="#social-profiles">
                 my social profiles
               </a>
               .
@@ -185,6 +186,7 @@ export default function AboutPage() {
             <p>Every contribution is much appreciated!</p>
           </div>
         </div>
+        <Footer />
       </div>
     </>
   );

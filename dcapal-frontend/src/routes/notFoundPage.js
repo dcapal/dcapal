@@ -6,6 +6,7 @@ import { IKImage } from "imagekitio-react";
 import { HEADER_NOT_FOUND_SVG } from "../app/images";
 import { IMAGEKIT_URL } from "../app/config";
 import { DcaPalHelmet } from "./helmet";
+import { Footer } from "../components/core/footer";
 
 export default function NotFoundPage() {
   return (
@@ -29,6 +30,7 @@ export default function NotFoundPage() {
             </p>
           </span>
         </div>
+        <Footer />
       </div>
     </>
   );
