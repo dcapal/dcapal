@@ -30,12 +30,10 @@ export const App = () => {
       <div className="relative w-full h-screen">
         <div className="absolute bg-[#ededed] w-full h-[50px] top-10 -z-40" />
         <div className="absolute app-bg -z-50" />
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full items-center">
           <NavBar />
-          <div className="flex flex-col h-full px-6 pt-4">
-            <div className="w-full max-w-[42rem] pb-6 grow self-center">
-              <Main />
-            </div>
+          <div className="w-full max-w-[42rem] grow flex px-6 pt-4 pb-6">
+            <Main />
           </div>
           <Footer />
         </div>
