@@ -26,8 +26,8 @@ export const AllocateCard = ({
   };
 
   const diffAmount = (amount || 0) - (oldAmount || 0);
-  const diffSign = diffAmount > 0 ? "+" : "";
-  const diffAmountTxt = diffAmount.toLocaleString("en-US", priceFmt);
+  const diffSign = diffAmount === 0 ? " " : diffAmount > 0 ? "+" : "-";
+  const diffAmountTxt = Math.abs(diffAmount).toLocaleString("en-US", priceFmt);
 
   const bgColor =
     diffAmount > 0
@@ -35,12 +35,14 @@ export const AllocateCard = ({
       : diffAmount < 0
       ? "bg-red-300"
       : "bg-neutral-500";
+
   const textColor =
     diffAmount > 0
       ? "text-green-50"
       : diffAmount < 0
       ? "text-red-800"
       : "text-white";
+
   const diffAmountClass = `ml-4 py-1 px-2 whitespace-nowrap ${bgColor} ${textColor} font-semibold rounded-md`;
 
   return (
