@@ -8,3 +8,15 @@ pub fn set_panic_hook() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 }
+
+pub trait Round {
+    fn round_n(&self, decimals: i32) -> Self;
+}
+
+impl Round for f64 {
+    fn round_n(&self, decimals: i32) -> Self {
+        let pow = f64::powi(10.0, decimals);
+
+        (self * pow).round() / pow
+    }
+}

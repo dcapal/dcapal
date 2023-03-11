@@ -6,12 +6,15 @@ use std::{collections::HashMap, sync::Mutex};
 use optimize::{ProblemAsset, ProblemOptions};
 use rand::{distributions, Rng};
 use serde::{Deserialize, Serialize};
+use utils::Round;
 use wasm_bindgen::prelude::*;
 
 use crate::optimize::Problem;
 
 #[macro_use]
 extern crate lazy_static;
+
+const AMOUNT_DECIMALS: i32 = 4;
 
 lazy_static! {
     static ref PROBLEMS: Mutex<HashMap<String, Problem>> = Mutex::new(HashMap::new());
@@ -123,17 +126,23 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
             ));
         }
 
-        let current_total: f64 = assets.values().map(|a| a.current_amount).sum();
-        if current_total > options.budget {
+        let budget = options.budget.round_n(AMOUNT_DECIMALS);
+        let current_total = assets
+            .values()
+            .map(|a| a.current_amount)
+            .sum::<f64>()
+            .round_n(AMOUNT_DECIMALS);
+
+        if current_total > budget {
             return Err(format!(
                 "Invalid current amounts. Sum must be less than or equal to budget: {} ({} instead)",
-                options.budget,
+                budget,
                 current_total
             ));
         }
 
         Ok(ProblemOptions {
-            budget: options.budget,
+            budget,
             assets,
             is_buy_only: options.is_buy_only,
         })
@@ -178,7 +187,7 @@ impl TryFrom<JsProblemAsset> for ProblemAsset {
         Ok(ProblemAsset {
             symbol,
             target_weight,
-            current_amount,
+            current_amount: current_amount.round_n(AMOUNT_DECIMALS),
         })
     }
 }
