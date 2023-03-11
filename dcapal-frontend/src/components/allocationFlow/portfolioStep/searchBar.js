@@ -248,7 +248,7 @@ const SearchItemCW = (props) => {
   const isPrice = price ? true : false;
 
   return (
-    <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50">
+    <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer">
       <div
         className="flex items-center justify-between h-10 uppercase"
         onClick={handleResultClick}
@@ -339,7 +339,7 @@ const SearchItemYF = (props) => {
   };
 
   return (
-    <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50">
+    <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer">
       <div
         className="flex items-center justify-between h-10 uppercase"
         onClick={handleResultClick}
