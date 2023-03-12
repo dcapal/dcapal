@@ -34,7 +34,7 @@ const fetchAssetsYF = async (query) => {
         return type === "EQUITY" || type === "ETF" || type === "MUTUALFUND";
       })
       .map((quote) => ({
-        name: quote.longname,
+        name: quote.longname || quote.shortname || "",
         symbol: quote.symbol,
         type: quote.quoteType,
         exchange: quote.exchange,

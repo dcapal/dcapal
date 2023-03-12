@@ -144,7 +144,6 @@ export const AssetCard = ({
                 isValid={isValidTargetWeight}
                 min={0}
                 max={100}
-                step=".000001"
               />
             </div>
             <div className="ml-1">%</div>
