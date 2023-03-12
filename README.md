@@ -1,24 +1,28 @@
-# DcaPal - A smart assistant for your periodic investments
+<p align="center">
+  <img src="https://ik.imagekit.io/dcapal/dcapal-og-bg-white-focused.png" width="800" />
+</p>
 
-TBD
+<p align="center">
+  <a href="https://github.com/leonardoarcari/dcapal/actions/workflows/build-test.yml"><img src="https://github.com/leonardoarcari/dcapal/actions/workflows/build-test.yml/badge.svg?branch=master"/></a>
+</p>
 
-## Run DcaPal locally
+## Build locally
 
-### Start Docker environment
+**Start Docker environment**
 
 ```bash
 $ cd dcapal-backend
 $ docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
 ```
 
-### Run DcaPal backend
+**Run DcaPal backend**
 
 ```bash
 $ cd dcapal-backend
 $ cargo run --release
 ```
 
-### Run DcaPal frontend
+**Run DcaPal frontend**
 
 - Build DcaPal Optimizer
 
@@ -30,7 +34,8 @@ $ wasm-pack build --release
 
 - Install NPM dependencies. Note: this is installing `dcapal-optimizer-wasm` package as well.
 
-```bash
+```bash![badge](https://user-images.githubusercontent.com/811969/224559373-35dc57a9-688d-49c9-a95f-df7d2bef7a47.svg)
+
 $ cd ../dcapal-frontend
 $ npm install # Install dcapal-optimizer-wasm pkg as well
 ```
