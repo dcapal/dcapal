@@ -1,0 +1,126 @@
+{
+  "quoteCcy": "eur",
+  "assets": [
+    {
+      "symbol": "VT",
+      "name": "Vanguard Total World Stock Index Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 82.91213839618005,
+      "qty": 7663,
+      "amount": 635355.7165299278,
+      "weight": 45.30227114204274,
+      "targetWeight": 35.87
+    },
+    {
+      "symbol": "VBR",
+      "name": "Vanguard Small Cap Value Index Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 149.80114108553252,
+      "qty": 400,
+      "amount": 59920.45643421301,
+      "weight": 4.272461384566471,
+      "targetWeight": 5.98
+    },
+    {
+      "symbol": "VSS",
+      "name": "Vanguard FTSE All-World ex-US Small Capital Index Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 100.4563310492777,
+      "qty": 500,
+      "amount": 50228.16552463885,
+      "weight": 3.5813795553650447,
+      "targetWeight": 5.98
+    },
+    {
+      "symbol": "VTV",
+      "name": "Vanguard Value Index Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 127.43867394504097,
+      "qty": 1100,
+      "amount": 140182.54133954507,
+      "weight": 9.995325975548294,
+      "targetWeight": 9.56
+    },
+    {
+      "symbol": "VYM",
+      "name": "Vanguard High Dividend Yield Index Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 97.61260147296642,
+      "qty": 650,
+      "amount": 63448.190957428174,
+      "weight": 4.523996676891664,
+      "targetWeight": 6.38
+    },
+    {
+      "symbol": "VYMI",
+      "name": "Vanguard International High Dividend Yield Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 57.92323604369773,
+      "qty": 4100,
+      "amount": 237485.26777916067,
+      "weight": 16.933226086217783,
+      "targetWeight": 11.16
+    },
+    {
+      "symbol": "SONY",
+      "name": "Sony Group Corporation",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 80.07785843795462,
+      "qty": 100,
+      "amount": 8007.785843795462,
+      "weight": 0.5709728835436481,
+      "targetWeight": 4.77
+    },
+    {
+      "symbol": "BSV",
+      "name": "Vanguard Short-Term Bond Index Fund",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 71.23490439165549,
+      "qty": 1000,
+      "amount": 71234.9043916555,
+      "weight": 5.079206607526068,
+      "targetWeight": 4.06
+    },
+    {
+      "symbol": "AGGS.SW",
+      "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "baseCcy": "chf",
+      "provider": "YF",
+      "price": 4.597832537508098,
+      "qty": 10000,
+      "amount": 45978.32537508098,
+      "weight": 3.2783565310077263,
+      "targetWeight": 6.09
+    },
+    {
+      "symbol": "GHYC.SW",
+      "name": "iShares Global High Yield Corp Bond CHF Hedged UCITS ETF (Dist)",
+      "baseCcy": "chf",
+      "provider": "YF",
+      "price": 74.09358315611607,
+      "qty": 618,
+      "amount": 45789.83439047973,
+      "weight": 3.2649167059300934,
+      "targetWeight": 4.06
+    },
+    {
+      "symbol": "VEMT.AS",
+      "name": "Vanguard USD Emerging Markets Government Bond UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 38.16999816894531,
+      "qty": 1175,
+      "amount": 44849.74784851074,
+      "weight": 3.197886451360473,
+      "targetWeight": 6.09
+    }
+  ]
+}

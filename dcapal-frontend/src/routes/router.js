@@ -3,7 +3,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useRoutes } from "react-router-dom";
 import { App } from "../app";
 import { setAllocationFlowStep, Step } from "../app/appSlice";
+import { DEMO_PF_MR_RIP } from "../app/config";
 import AboutPage from "./aboutPage";
+import DemoPage from "./demoPage";
 import ErrorPage from "./errorPage";
 import NotFoundPage from "./notFoundPage";
 import { Root } from "./root";
@@ -44,6 +46,11 @@ export const Router = () => {
     {
       path: "docs",
       element: <UnderConstructionPage title="Docs" />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: `demo/${DEMO_PF_MR_RIP}`,
+      element: <DemoPage />,
       errorElement: <ErrorPage />,
     },
   ]);
