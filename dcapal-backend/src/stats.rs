@@ -51,8 +51,23 @@ pub async fn requests_stats<B>(
     increment_counter!(REQUESTS_TOTAL, &[("path", path)]);
 
     // Visitors stats
-    let repo = &state.repos.stats;
+    record_visitors_stats(
+        &req,
+        addr,
+        state.repos.stats.clone(),
+        state.providers.ipapi.clone(),
+    )
+    .await?;
 
+    Ok(next.run(req).await)
+}
+
+async fn record_visitors_stats<B>(
+    req: &Request<B>,
+    addr: SocketAddr,
+    repo: Arc<StatsRepository>,
+    _ipapi_provider: Arc<IpApi>,
+) -> Result<()> {
     static IP_HEADERS: [&str; 2] = ["CF-Connecting-IP", "X-Real-IP"];
     let ip = IP_HEADERS
         .iter()
@@ -67,13 +82,13 @@ pub async fn requests_stats<B>(
 
     repo.bump_visit(&ip).await?;
 
-    let repo = repo.clone();
-    let ipapi = state.providers.ipapi.clone();
-    tokio::spawn(async move { fetch_geo_ip(ip, repo, ipapi).await });
+    // Disable Geo IP metrics to reduce Grafana usage
+    // tokio::spawn(async move { fetch_geo_ip(ip, repo, ipapi_provider).await });
 
-    Ok(next.run(req).await)
+    Ok(())
 }
 
+#[allow(dead_code)]
 async fn fetch_geo_ip(ip: String, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) {
     if let Err(e) = fetch_geo_ip_inner(&ip, repo, ipapi).await {
         error!("Error occurred in fetching GeoIP for {}: {:?}", ip, e);
