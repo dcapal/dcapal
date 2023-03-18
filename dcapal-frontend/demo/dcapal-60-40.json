@@ -1,0 +1,27 @@
+{
+  "quoteCcy": "eur",
+  "assets": [
+    {
+      "symbol": "VWCE.MI",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 92.69000244140625,
+      "qty": 54,
+      "amount": 5005.2601318359375,
+      "weight": 50.01399448644559,
+      "targetWeight": 60
+    },
+    {
+      "symbol": "AGGH.MI",
+      "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 4.640500068664551,
+      "qty": 1078,
+      "amount": 5002.459074020386,
+      "weight": 49.98600551355442,
+      "targetWeight": 40
+    }
+  ]
+}

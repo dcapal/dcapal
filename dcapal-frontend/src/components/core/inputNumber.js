@@ -42,7 +42,6 @@ export const InputNumber = ({
       newValue = newValue.substr(1);
     }
 
-    newValue = newValue.replace(/,/g, "");
     if (newValue === "") {
       newValue = null;
     } else if (type === InputNumberType.DECIMAL) {

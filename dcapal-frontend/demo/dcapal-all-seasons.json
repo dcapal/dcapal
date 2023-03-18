@@ -1,0 +1,60 @@
+{
+  "quoteCcy": "eur",
+  "assets": [
+    {
+      "symbol": "VWCE.MI",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 92.69000244140625,
+      "qty": 22,
+      "amount": 2039.1800537109375,
+      "weight": 20.16928173647701,
+      "targetWeight": 30
+    },
+    {
+      "symbol": "AGGH.MI",
+      "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 4.640500068664551,
+      "qty": 431,
+      "amount": 2000.0555295944214,
+      "weight": 19.782305830021098,
+      "targetWeight": 40
+    },
+    {
+      "symbol": "IBGX.MI",
+      "name": "iShares € Govt Bond 3-5yr UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 158.44000244140625,
+      "qty": 13,
+      "amount": 2059.7200317382812,
+      "weight": 20.37244015936401,
+      "targetWeight": 15
+    },
+    {
+      "symbol": "SGLD.MI",
+      "name": "Invesco Physical Gold ETC",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 177.1699981689453,
+      "qty": 11,
+      "amount": 1948.8699798583984,
+      "weight": 19.276035787028295,
+      "targetWeight": 7.5
+    },
+    {
+      "symbol": "CMOD.MI",
+      "name": "Invesco Bloomberg Commodity UCITS ETF",
+      "baseCcy": "eur",
+      "provider": "YF",
+      "price": 20.625,
+      "qty": 100,
+      "amount": 2062.5,
+      "weight": 20.39993648710958,
+      "targetWeight": 7.5
+    }
+  ]
+}

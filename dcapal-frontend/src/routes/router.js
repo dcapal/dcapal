@@ -3,13 +3,19 @@ import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useRoutes } from "react-router-dom";
 import { App } from "../app";
 import { setAllocationFlowStep, Step } from "../app/appSlice";
-import { DEMO_PF_MR_RIP } from "../app/config";
+
 import AboutPage from "./aboutPage";
 import DemoPage from "./demoPage";
 import ErrorPage from "./errorPage";
 import NotFoundPage from "./notFoundPage";
 import { Root } from "./root";
 import UnderConstructionPage from "./underConstruction";
+
+import {
+  DEMO_PF_60_40,
+  DEMO_PF_ALL_SEASONS,
+  DEMO_PF_MR_RIP,
+} from "../app/config";
 
 export const Router = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
@@ -23,7 +29,7 @@ export const Router = () => {
     }
   }, [location]);
 
-  const routes = useRoutes([
+  let routesConfig = [
     {
       path: "*",
       element: <NotFoundPage />,
@@ -48,12 +54,18 @@ export const Router = () => {
       element: <UnderConstructionPage title="Docs" />,
       errorElement: <ErrorPage />,
     },
-    {
-      path: `demo/${DEMO_PF_MR_RIP}`,
+  ];
+
+  const demoRoutes = [DEMO_PF_60_40, DEMO_PF_ALL_SEASONS, DEMO_PF_MR_RIP];
+  for (const route of demoRoutes) {
+    routesConfig.push({
+      path: `demo/${route}`,
       element: <DemoPage />,
       errorElement: <ErrorPage />,
-    },
-  ]);
+    });
+  }
+
+  const routes = useRoutes(routesConfig);
 
   return routes;
 };
