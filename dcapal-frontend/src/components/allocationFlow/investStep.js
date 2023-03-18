@@ -39,6 +39,7 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
             onChange={setCash}
             isValid={true}
             min={0}
+            leadingNone={true}
           />
         </div>
         <div className="ml-2 pb-2 text-2xl font-light uppercase">

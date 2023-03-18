@@ -107,7 +107,7 @@ export const PortfolioStep = ({ ...props }) => {
           Go back
         </span>
       )}
-      {Object.keys(assetStore).length === 1 && (
+      {Object.keys(assetStore).length > 0 && (
         <div
           className={classNames("w-full max-w-[40rem] flex flex-col mt-4", {
             "gap-4": isMobile,
@@ -122,7 +122,10 @@ export const PortfolioStep = ({ ...props }) => {
             />
             <p className="flex-grow font-light">
               Fill <span className="font-normal">Quantity</span> field with the
-              number of <span className="uppercase">{assets[0].symbol}</span>{" "}
+              number of{" "}
+              <span className="uppercase">
+                {assets[assets.length - 1].symbol}
+              </span>{" "}
               you already have in your portfolio (e.g. 10 units)
             </p>
           </div>

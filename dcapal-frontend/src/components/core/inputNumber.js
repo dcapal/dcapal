@@ -1,3 +1,4 @@
+import classNames from "classnames";
 import React, { useEffect, useState } from "react";
 
 export const InputNumberType = Object.freeze({
@@ -19,6 +20,7 @@ export const InputNumber = ({
   max,
   step,
   textSize,
+  leadingNone,
 }) => {
   const [state, setState] = useState(value || value === 0 ? value : "");
 
@@ -31,7 +33,6 @@ export const InputNumber = ({
   };
 
   const handleOnBlur = (e) => {
-    e.preventDefault();
     if (e.target.value < 0) {
       e.preventDefault();
       return;
@@ -60,7 +61,7 @@ export const InputNumber = ({
   const invalidClass = isValid
     ? ""
     : "border-red-300 hover:border-red-500 focus-visible:outline-red-600";
-  const className = `w-full px-2 pt-1 pb-1.5 leading-none border focus-visible:outline-1 rounded-md border-gray-300 hover:border-gray-500 focus-visible:outline-gray-600 ${textAlign} ${invalidClass}`;
+  const className = `w-full px-2 pt-1 pb-1.5 border focus-visible:outline-1 rounded-md border-gray-300 hover:border-gray-500 focus-visible:outline-gray-600 ${textAlign} ${invalidClass}`;
   const placeholder = type === InputNumberType.INTEGRAL ? "0" : "0.0";
 
   return (
@@ -68,7 +69,10 @@ export const InputNumber = ({
       style={{
         fontSize: textSize ? `${textSize}` : "unset",
       }}
-      className={className}
+      className={classNames(className, {
+        "leading-none": leadingNone,
+        "leading-normal": !leadingNone,
+      })}
       placeholder={placeholder}
       type={"number"}
       value={state}
