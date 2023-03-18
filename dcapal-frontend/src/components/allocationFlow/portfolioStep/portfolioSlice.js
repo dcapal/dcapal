@@ -70,7 +70,7 @@ export const portfolioSlice = createSlice({
         ...state.assets,
         [action.payload.symbol]: {
           ...state.assets[action.payload.symbol],
-          qty: action.payload.qty,
+          qty: action.payload.qty || 0,
           amount: newAmount,
         },
       };
@@ -84,7 +84,7 @@ export const portfolioSlice = createSlice({
         ...state.assets,
         [action.payload.symbol]: {
           ...state.assets[action.payload.symbol],
-          targetWeight: action.payload.weight,
+          targetWeight: action.payload.weight || 0,
         },
       };
     },
@@ -98,13 +98,13 @@ export const portfolioSlice = createSlice({
         state.budget = action.payload.budget;
       }
     },
-    clearPortfolio: (state, action) => {
+    clearPortfolio: (state) => {
       state.assets = {};
       state.nextIdx = 0;
       state.totalAmount = 0;
       state.budget = 0;
     },
-    clearBudget: (state, action) => {
+    clearBudget: (state) => {
       state.budget = 0;
     },
   },

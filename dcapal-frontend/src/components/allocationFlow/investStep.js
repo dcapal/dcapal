@@ -32,8 +32,7 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
       <div className="w-full flex justify-center items-end">
         <div className="w-full">
           <InputNumber
-            height="68"
-            textSize="60"
+            textSize="4rem"
             textAlign="text-right"
             type={InputNumberType.DECIMAL}
             value={cash}
