@@ -8,8 +8,20 @@ import { Footer } from "../components/core/footer";
 import { clearPortfolio } from "../components/allocationFlow/portfolioStep/portfolioSlice";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
 
-import { DEMO_PF_MR_RIP } from "../app/config";
+import {
+  DEMO_PF_60_40,
+  DEMO_PF_ALL_SEASONS,
+  DEMO_PF_MR_RIP,
+} from "../app/config";
+import PF_60_40 from "../../demo/dcapal-60-40.json";
+import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
 import PF_MR_RIP from "../../demo/dcapal-mrrip.json";
+
+const demoPortfolios = {
+  [DEMO_PF_60_40]: JSON.stringify(PF_60_40),
+  [DEMO_PF_ALL_SEASONS]: JSON.stringify(PF_ALL_SEASONS),
+  [DEMO_PF_MR_RIP]: JSON.stringify(PF_MR_RIP),
+};
 
 const getPfolioFile = (path) => {
   const demoId = path
@@ -17,7 +29,9 @@ const getPfolioFile = (path) => {
     .filter((e) => e !== "")
     .pop();
 
-  if (demoId === DEMO_PF_MR_RIP) return JSON.stringify(PF_MR_RIP);
+  if (demoId in demoPortfolios) {
+    return demoPortfolios[demoId];
+  }
 
   return "";
 };
