@@ -22,8 +22,8 @@ You can start using [DcaPal](https://dcapal.com) right away. It's free. No regis
 
 **Build** your own portfolio or, if you don't know where to start, explore our **Demo** portfolios:
 
-- 60/40 Portfolio
-- All seasons Portfolio
+- [60/40 Portfolio](https://dcapal.com/demo/60-40)
+- [All-seasons Portfolio](https://dcapal.com/demo/all-seasons)
 
 ## Build Instructions
 
