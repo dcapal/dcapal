@@ -78,7 +78,7 @@ export const PortfolioStep = ({ ...props }) => {
             dispatch(
               setTargetWeight({
                 symbol: a.symbol,
-                weight: Math.round(w * 1e6) / 1e6,
+                weight: w,
               })
             );
           };

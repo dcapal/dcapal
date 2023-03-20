@@ -191,7 +191,7 @@ impl TryFrom<JsProblemAsset> for ProblemAsset {
         Ok(ProblemAsset {
             symbol,
             target_weight,
-            current_amount: current_amount.round_n(AMOUNT_DECIMALS),
+            current_amount,
         })
     }
 }
