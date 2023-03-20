@@ -51,6 +51,12 @@ module.exports = (env, argv) => {
         title: "DcaPal - A smart assistant for your periodic investments",
         template: path.resolve(__dirname, "src", "index.html"),
       }),
+      new CopyWebpackPlugin([
+        {
+          from: path.resolve(__dirname, "static"),
+          to: path.resolve(__dirname, "dist"),
+        },
+      ]),
       new webpack.HotModuleReplacementPlugin(),
       new ThreadsPlugin(),
     ],
