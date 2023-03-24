@@ -3,7 +3,7 @@ mod utils;
 
 use std::{collections::HashMap, sync::Mutex};
 
-use optimize::{ProblemAsset, ProblemOptions};
+use optimize::{refine_solution, ProblemAsset, ProblemOptions};
 use rand::{distributions, Rng};
 use serde::{Deserialize, Serialize};
 use utils::Round;
@@ -14,7 +14,8 @@ use crate::optimize::Problem;
 #[macro_use]
 extern crate lazy_static;
 
-const AMOUNT_DECIMALS: i32 = 4;
+const AMOUNT_DECIMALS: u32 = 4;
+const WEIGHT_DECIMALS: u32 = 6;
 
 lazy_static! {
     static ref PROBLEMS: Mutex<HashMap<String, Problem>> = Mutex::new(HashMap::new());
@@ -28,7 +29,7 @@ pub struct Solver {}
 #[wasm_bindgen]
 impl Solver {
     pub fn build_problem(options: JsValue) -> Result<ProblemHandle, JsValue> {
-        utils::set_panic_hook();
+        utils::require_init();
 
         let options: JsProblemOptions =
             serde_wasm_bindgen::from_value(options).map_err(|e| e.to_string())?;
@@ -41,7 +42,7 @@ impl Solver {
     }
 
     pub fn solve(handle: &ProblemHandle) -> Result<JsValue, JsValue> {
-        utils::set_panic_hook();
+        utils::require_init();
 
         let problems = PROBLEMS.lock().unwrap();
         let problem = problems
@@ -55,6 +56,8 @@ impl Solver {
             .iter()
             .map(|(aid, v)| (aid.clone(), solution[*v]))
             .collect();
+
+        let vars = refine_solution(problem, &vars);
 
         let js_solution = JsSolution { objective, vars };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
