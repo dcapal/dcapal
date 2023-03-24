@@ -57,7 +57,11 @@ impl Solver {
             .map(|(aid, v)| (aid.clone(), solution[*v]))
             .collect();
 
-        let vars = refine_solution(problem, &vars);
+        let vars = if problem.options.is_buy_only {
+            refine_solution(problem, &vars)
+        } else {
+            vars
+        };
 
         let js_solution = JsSolution { objective, vars };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
