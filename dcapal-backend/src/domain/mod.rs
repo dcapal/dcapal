@@ -108,36 +108,40 @@ impl MarketDataService {
         cache.fiats = None;
     }
 
-    pub async fn get_market(&self, id: MarketId) -> Option<Arc<Market>> {
+    pub async fn get_market(&self, id: MarketId) -> Result<Option<Arc<Market>>> {
         // Check market from cache
         if let Some(mkt) = self.mkt_cache.get(&id) {
             if !mkt.is_price_outdated() {
-                return Some(mkt.clone());
+                return Ok(Some(mkt.clone()));
             }
         }
 
         let loader = self
             .mkt_loaders
             .entry(id.clone())
-            .or_insert_with(|| Arc::new(ExpiringOnceCell::default()))
-            .clone();
-
-        loader
-            .get_or_try_init(
-                || async { self.load_market(&id).await },
-                |market| {
+            .or_insert_with(|| {
+                Arc::new(ExpiringOnceCell::new(|market: &Option<Arc<Market>>| {
                     if let Some(ref m) = market {
                         m.is_price_outdated()
                     } else {
                         false
                     }
-                },
-            )
-            .await
-            .unwrap_or_else(|e| {
-                error!("{}", e);
-                None
+                }))
             })
+            .clone();
+
+        let market = loader
+            .get_or_try_init(|| async { self.load_market(&id).await })
+            .await;
+
+        let Err(e) = market else { return market; };
+
+        error!("{:?}", e);
+        if matches!(e, DcaError::PriceNotAvailableId(_)) {
+            Err(e)
+        } else {
+            Ok(None)
+        }
     }
 
     async fn load_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
@@ -154,20 +158,17 @@ impl MarketDataService {
         let mkt = self
             .refresh_mkt_price(mkt.unwrap())
             .await
-            .map(|m| Some(Arc::new(m)))
+            .map(Arc::new)
             .map_err(|e| {
-                error!(mkt = id, "Error occured in fetching price: {}", e);
-                DcaError::MarketNotFound(id.clone())
+                error!(mkt = id, "Error occured in fetching price: {:?}", e);
+                DcaError::PriceNotAvailableId(id.clone())
             })?;
 
-        if let Some(mkt) = mkt {
-            if let Err(e) = self.repo.update_mkt_price(&mkt).await {
-                error!(mkt = id, "Failed to update price: {}", e);
-            }
-            Ok(Some(mkt))
-        } else {
-            Err(DcaError::MarketNotFound(id.clone()))
+        if let Err(e) = self.repo.update_mkt_price(&mkt).await {
+            error!(mkt = id, "Failed to update price: {}", e);
         }
+
+        Ok(Some(mkt))
     }
 
     async fn refresh_mkt_price(&self, mut mkt: Market) -> Result<Market> {
@@ -209,17 +210,30 @@ impl MarketDataService {
         let pricer = self
             .pricers
             .entry(pair.clone())
-            .or_insert_with(|| Arc::new(ExpiringOnceCell::default()))
+            .or_insert_with(|| {
+                Arc::new(ExpiringOnceCell::new(|p: &ExpiringOption<Price>| {
+                    p.is_outdated()
+                }))
+            })
             .clone();
 
         let price = pricer
-            .get_or_try_init(
-                || async { self.compute_conversion_rate(base, quote).await },
-                |p| p.is_outdated(),
-            )
-            .await?;
+            .get_or_try_init(|| async { self.compute_conversion_rate(base, quote).await })
+            .await;
 
-        Ok(price.into())
+        let Err(e) = price else { return price.map(|p| p.into()); };
+
+        if let DcaError::PriceNotAvailableId(ref id) = e {
+            if let Some(p) = pricer.get().await {
+                if p.is_expired {
+                    warn!("Serving outdated price for Market '{id}'");
+                }
+
+                return Ok(p.value.into());
+            }
+        }
+
+        Err(e)
     }
 
     async fn compute_conversion_rate(
@@ -247,7 +261,7 @@ impl MarketDataService {
 
         // Find base/quote market
         let id = format!("{}{}", base, quote);
-        let mkt = self.get_market(id).await;
+        let mkt = self.get_market(id).await?;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
                 return Ok(ExpiringOption::Some(*px));
@@ -256,7 +270,7 @@ impl MarketDataService {
 
         // Find quote/base market
         let id = format!("{}{}", quote, base);
-        let mkt = self.get_market(id).await;
+        let mkt = self.get_market(id).await?;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
                 return Ok(ExpiringOption::Some(Price::new(1. / px.price, px.ts)));
@@ -264,14 +278,14 @@ impl MarketDataService {
         }
 
         // Find alternative markets
-        let Some(base_usd_px )=self.get_base_usd_price(&base, &quote).await else {
+        let Some(base_usd_px) = self.get_base_usd_price(&base, &quote).await? else {
             return Ok(ExpiringOption::None(Instant::now(), Self::DEFAULT_TTL));
         };
 
         let usd_quote_id = format!("{}{}", "usd", quote);
         let quote_usd_id = format!("{}{}", quote, "usd");
 
-        let usd_quote = self.get_market(usd_quote_id.clone()).await;
+        let usd_quote = self.get_market(usd_quote_id.clone()).await?;
         if let Some(usd_quote) = usd_quote {
             if let Some(usd_quote_px) = usd_quote.price() {
                 let price = base_usd_px.price * usd_quote_px.price;
@@ -280,7 +294,7 @@ impl MarketDataService {
             }
         }
 
-        let quote_usd = self.get_market(quote_usd_id.clone()).await;
+        let quote_usd = self.get_market(quote_usd_id.clone()).await?;
         if let Some(quote_usd) = quote_usd {
             if let Some(quote_usd_px) = quote_usd.price() {
                 let price = base_usd_px.price / quote_usd_px.price;
@@ -300,24 +314,24 @@ impl MarketDataService {
         Ok(ExpiringOption::None(Instant::now(), Self::DEFAULT_TTL))
     }
 
-    async fn get_base_usd_price(&self, base: &AssetId, quote: &AssetId) -> Option<Price> {
+    async fn get_base_usd_price(&self, base: &AssetId, quote: &AssetId) -> Result<Option<Price>> {
         let base_usd_id = format!("{}{}", base, "usd");
         let usd_base_id = format!("{}{}", "usd", base);
 
-        let base_usd = self.get_market(base_usd_id.clone()).await;
+        let base_usd = self.get_market(base_usd_id.clone()).await?;
         if let Some(ref m) = base_usd {
             if let Some(px) = m.price() {
-                return Some(*px);
+                return Ok(Some(*px));
             }
         }
 
-        let usd_base = self.get_market(usd_base_id.clone()).await;
+        let usd_base = self.get_market(usd_base_id.clone()).await?;
         if let Some(ref m) = usd_base {
             if let Some(px) = m.price() {
-                return Some(Price {
+                return Ok(Some(Price {
                     price: 1. / px.price,
                     ts: px.ts,
-                });
+                }));
             }
         }
 
@@ -330,7 +344,7 @@ impl MarketDataService {
                     base_usd_id,
                     usd_base_id
                 );
-                None
+                Ok(None)
             }
             (_, _) => {
                 warn!(
@@ -340,7 +354,7 @@ impl MarketDataService {
                     base_usd_id,
                     usd_base_id
                 );
-                None
+                Ok(None)
             }
         }
     }
@@ -388,7 +402,9 @@ impl MarketDataService {
 
         for m in &markets {
             // Trigger market refresh
-            self.get_market(m.id.clone()).await;
+            if let Err(e) = self.get_market(m.id.clone()).await {
+                warn!("{:?}", e);
+            }
             // Please the rate limiter
             tokio::time::sleep(Duration::from_millis(50)).await;
         }

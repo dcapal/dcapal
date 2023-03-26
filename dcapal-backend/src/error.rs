@@ -17,6 +17,8 @@ pub enum DcaError {
     BadRequest(String),
     #[error("Price for market '{0}/{1}' not available")]
     PriceNotAvailable(AssetId, AssetId),
+    #[error("Price for market '{0}' not available")]
+    PriceNotAvailableId(MarketId),
     #[error("Market '{0}' not found")]
     MarketNotFound(MarketId),
     #[error("Failed to store in Repository: {0}")]
