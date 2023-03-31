@@ -19,3 +19,5 @@ server:
   redis:
     hostname: 127.0.0.1
     port: 6379
+    user: dcapal
+    password: dcapal
