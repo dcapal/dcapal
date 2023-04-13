@@ -71,7 +71,7 @@ impl Price {
 impl Expiring for Price {
     fn is_outdated(&self) -> bool {
         let now = Utc::now();
-        if now.time().hour() > self.ts.time().hour() {
+        if now.date_naive() > self.ts.date_naive() || now.time().hour() > self.ts.time().hour() {
             return true;
         }
 

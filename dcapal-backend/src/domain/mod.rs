@@ -32,8 +32,6 @@ pub struct MarketDataService {
     mkt_loaders: DashMap<MarketId, Arc<ExpiringOnceCell<Option<Arc<Market>>>>>,
     pricers: DashMap<(AssetId, AssetId), Arc<ExpiringOnceCell<ExpiringOption<Price>>>>,
     assets_cache: RwLock<AssetsCache>,
-    mkt_cache: DashMap<MarketId, Arc<Market>>,
-    px_cache: DashMap<(AssetId, AssetId), Price>,
 }
 
 impl MarketDataService {
@@ -47,8 +45,6 @@ impl MarketDataService {
         let mkt_loaders = DashMap::new();
         let pricers = DashMap::new();
         let assets_cache = RwLock::new(AssetsCache::new());
-        let mkt_cache = DashMap::new();
-        let px_cache = DashMap::new();
 
         Self {
             config,
@@ -57,8 +53,6 @@ impl MarketDataService {
             mkt_loaders,
             pricers,
             assets_cache,
-            mkt_cache,
-            px_cache,
         }
     }
 
@@ -109,13 +103,6 @@ impl MarketDataService {
     }
 
     pub async fn get_market(&self, id: MarketId) -> Result<Option<Arc<Market>>> {
-        // Check market from cache
-        if let Some(mkt) = self.mkt_cache.get(&id) {
-            if !mkt.is_price_outdated() {
-                return Ok(Some(mkt.clone()));
-            }
-        }
-
         let loader = self
             .mkt_loaders
             .entry(id.clone())
@@ -134,8 +121,11 @@ impl MarketDataService {
             .get_or_try_init(|| async { self.load_market(&id).await })
             .await;
 
-        let Err(e) = market else { return market; };
+        if market.is_ok() {
+            return market;
+        }
 
+        let e = market.unwrap_err();
         error!("{:?}", e);
         if matches!(e, DcaError::PriceNotAvailableId(_)) {
             Err(e)
@@ -200,13 +190,6 @@ impl MarketDataService {
         let (base, quote) = (cmd.base.id(), cmd.quote.id());
         let pair = (base.clone(), quote.clone());
 
-        // Check price from cache
-        if let Some(price) = self.px_cache.get(&pair) {
-            if !price.is_outdated() {
-                return Ok(Some(*price));
-            }
-        }
-
         let pricer = self
             .pricers
             .entry(pair.clone())
@@ -264,7 +247,13 @@ impl MarketDataService {
         let mkt = self.get_market(id).await?;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
-                return Ok(ExpiringOption::Some(*px));
+                let rate = ExpiringOption::Some(*px);
+                info!(
+                    "Computed conversion rate for market {}. Expiring at {}",
+                    m.id,
+                    Utc::now() + rate.time_to_live_chrono()
+                );
+                return Ok(rate);
             }
         }
 
@@ -273,7 +262,13 @@ impl MarketDataService {
         let mkt = self.get_market(id).await?;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
-                return Ok(ExpiringOption::Some(Price::new(1. / px.price, px.ts)));
+                let rate = ExpiringOption::Some(Price::new(1. / px.price, px.ts));
+                info!(
+                    "Computed conversion rate for market {}. Expiring at {}",
+                    m.id,
+                    Utc::now() + rate.time_to_live_chrono()
+                );
+                return Ok(rate);
             }
         }
 
@@ -282,6 +277,7 @@ impl MarketDataService {
             return Ok(ExpiringOption::None(Instant::now(), Self::DEFAULT_TTL));
         };
 
+        let base_quote_id = format!("{}{}", base, quote);
         let usd_quote_id = format!("{}{}", "usd", quote);
         let quote_usd_id = format!("{}{}", quote, "usd");
 
@@ -290,7 +286,15 @@ impl MarketDataService {
             if let Some(usd_quote_px) = usd_quote.price() {
                 let price = base_usd_px.price * usd_quote_px.price;
                 let ts = std::cmp::min(base_usd_px.ts, usd_quote_px.ts);
-                return Ok(ExpiringOption::Some(Price::new(price, ts)));
+                let rate = ExpiringOption::Some(Price::new(price, ts));
+                info!(
+                    "Computed conversion rate for market {} triangulating between markets. Expiring at {} (min of {} and {})",
+                    base_quote_id,
+                    Utc::now() + rate.time_to_live_chrono(),
+                    base_usd_px.ts,
+                    usd_quote_px.ts
+                );
+                return Ok(rate);
             }
         }
 
@@ -299,7 +303,15 @@ impl MarketDataService {
             if let Some(quote_usd_px) = quote_usd.price() {
                 let price = base_usd_px.price / quote_usd_px.price;
                 let ts = std::cmp::min(base_usd_px.ts, quote_usd_px.ts);
-                return Ok(ExpiringOption::Some(Price::new(price, ts)));
+                let rate = ExpiringOption::Some(Price::new(price, ts));
+                info!(
+                    "Computed conversion rate for market {} triangulating between markets. Expiring at {} (min of {} and {})",
+                    base_quote_id,
+                    Utc::now() + rate.time_to_live_chrono(),
+                    base_usd_px.ts,
+                    quote_usd_px.ts
+                );
+                return Ok(rate);
             }
         }
 
@@ -391,8 +403,8 @@ impl MarketDataService {
 
         // Invalidate caches
         self.invalidate_asset_cache();
-        self.mkt_cache.clear();
-        self.px_cache.clear();
+        self.mkt_loaders.clear();
+        self.pricers.clear();
 
         Ok(())
     }

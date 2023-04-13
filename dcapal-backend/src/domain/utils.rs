@@ -91,6 +91,10 @@ where
 pub trait Expiring {
     fn is_outdated(&self) -> bool;
     fn time_to_live(&self) -> Duration;
+
+    fn time_to_live_chrono(&self) -> chrono::Duration {
+        chrono::Duration::from_std(self.time_to_live()).unwrap()
+    }
 }
 
 #[derive(Debug, Clone)]

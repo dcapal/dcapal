@@ -1,2 +1,6 @@
 [workspace]
 members = ["dcapal-backend", "dcapal-optimizer-wasm"]
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
