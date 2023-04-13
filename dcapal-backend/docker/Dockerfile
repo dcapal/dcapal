@@ -9,7 +9,7 @@ FROM chef AS builder
 COPY --from=planner /var/dcapal-backend/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-RUN cargo build --profile=release-with-debug --bin dcapal-backend
+RUN cargo build --release --bin dcapal-backend
 
 FROM debian:bullseye-slim AS runtime
 # Install runtime dependencies
