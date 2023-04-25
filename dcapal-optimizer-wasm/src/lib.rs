@@ -1,15 +1,16 @@
 mod optimize;
 mod utils;
 
-use std::{collections::HashMap, sync::Mutex};
+use optimize::{basic::refine_solution, ProblemAsset, ProblemOptions};
 
-use optimize::{refine_solution, ProblemAsset, ProblemOptions};
 use rand::{distributions, Rng};
+use rust_decimal::{
+    prelude::{FromPrimitive, One},
+    Decimal,
+};
 use serde::{Deserialize, Serialize};
-use utils::Round;
+use std::{collections::HashMap, sync::Mutex};
 use wasm_bindgen::prelude::*;
-
-use crate::optimize::Problem;
 
 #[macro_use]
 extern crate lazy_static;
@@ -18,7 +19,8 @@ const AMOUNT_DECIMALS: u32 = 4;
 const WEIGHT_DECIMALS: u32 = 6;
 
 lazy_static! {
-    static ref PROBLEMS: Mutex<HashMap<String, Problem>> = Mutex::new(HashMap::new());
+    static ref PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
+        Mutex::new(HashMap::new());
     static ref NUMERIC_DIST: distributions::Uniform<u8> =
         distributions::Uniform::new_inclusive(0, 9);
 }
@@ -34,7 +36,7 @@ impl Solver {
         let options: JsProblemOptions =
             serde_wasm_bindgen::from_value(options).map_err(|e| e.to_string())?;
         let options = ProblemOptions::try_from(options)?;
-        let problem = optimize::Problem::new(options);
+        let problem = optimize::basic::Problem::new(options);
         let id = generate_problem_id();
 
         PROBLEMS.lock().unwrap().insert(id.clone(), problem);
@@ -125,24 +127,25 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
             .map(|(aid, a)| ProblemAsset::try_from(a).map(|a| (aid, a)))
             .collect::<Result<HashMap<_, _>, _>>()?;
 
-        let target_total: f64 = assets
+        let target_total = assets
             .values()
             .map(|a| a.target_weight)
-            .sum::<f64>()
-            .round_n(AMOUNT_DECIMALS);
-        if target_total != 1. {
+            .sum::<Decimal>()
+            .round_dp(AMOUNT_DECIMALS);
+
+        if target_total != Decimal::one() {
             return Err(format!(
                 "Invalid target weights. Sum must be equal to 1 ({} instead)",
                 target_total
             ));
         }
 
-        let budget = options.budget.round_n(AMOUNT_DECIMALS);
+        let budget = Decimal::from_f64(options.budget).unwrap();
         let current_total = assets
             .values()
             .map(|a| a.current_amount)
-            .sum::<f64>()
-            .round_n(AMOUNT_DECIMALS);
+            .sum::<Decimal>()
+            .round_dp(AMOUNT_DECIMALS);
 
         if current_total > budget {
             return Err(format!(
@@ -197,8 +200,8 @@ impl TryFrom<JsProblemAsset> for ProblemAsset {
 
         Ok(ProblemAsset {
             symbol,
-            target_weight,
-            current_amount,
+            target_weight: Decimal::from_f64(target_weight).unwrap(),
+            current_amount: Decimal::from_f64(current_amount).unwrap(),
         })
     }
 }
