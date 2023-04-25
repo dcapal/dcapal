@@ -52,7 +52,9 @@ export const EndStep = ({ useTaxEfficient }) => {
   useEffect(() => {
     const launchSolver = async () => {
       const solver = await spawn(
-        new Worker("../../../workers/solver", { name: "wasm-solver-worker" })
+        new Worker(new URL("../../../workers/solver.js", import.meta.url), {
+          name: "wasm-solver-worker",
+        })
       );
       const as = Object.values(assets).reduce(
         (as, a) => ({

@@ -8,7 +8,9 @@ module.exports = (env, argv) =>
     mode: "development",
     devtool: "inline-source-map",
     devServer: {
-      contentBase: path.resolve(__dirname, "./dist"),
+      static: {
+        directory: path.resolve(__dirname, "./dist"),
+      },
       historyApiFallback: true,
       hot: true,
       proxy: {
@@ -23,7 +25,7 @@ module.exports = (env, argv) =>
           changeOrigin: true,
         },
         "/api": {
-          target: "http://localhost:8080",
+          target: "http://0.0.0.0:8080",
           pathRewrite: { "^/api": "" },
           changeOrigin: true,
         },

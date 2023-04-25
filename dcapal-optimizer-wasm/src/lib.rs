@@ -128,7 +128,12 @@ pub enum JsProblemOptions {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct JsAdvancedOptions {}
+pub struct JsAdvancedOptions {
+    budget: f64,
+    pub pfolio_ccy: String,
+    assets: HashMap<String, JsProblemAsset>,
+    is_buy_only: bool,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct JsBasicOptions {

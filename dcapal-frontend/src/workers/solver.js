@@ -1,10 +1,8 @@
-import { import_wasm } from "../wasm/import_wasm";
-import { expose } from "threads";
+import { Solver } from "dcapal-optimizer-wasm";
+import { expose } from "threads/worker";
 
 expose({
   async makeAndSolve(budget, assets, isBuyOnly) {
-    const { Solver } = await import_wasm();
-
     if (!budget || budget < 0) return null;
     if (!assets || Object.keys(assets).length === 0) return null;
 
