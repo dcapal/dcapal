@@ -1,7 +1,7 @@
 mod optimize;
 mod utils;
 
-use optimize::{basic::refine_solution, ProblemAsset, ProblemOptions};
+use optimize::basic;
 
 use rand::{distributions, Rng};
 use rust_decimal::{
@@ -19,7 +19,7 @@ const AMOUNT_DECIMALS: u32 = 4;
 const WEIGHT_DECIMALS: u32 = 6;
 
 lazy_static! {
-    static ref PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
+    static ref BASIC_PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
         Mutex::new(HashMap::new());
     static ref NUMERIC_DIST: distributions::Uniform<u8> =
         distributions::Uniform::new_inclusive(0, 9);
@@ -35,21 +35,38 @@ impl Solver {
 
         let options: JsProblemOptions =
             serde_wasm_bindgen::from_value(options).map_err(|e| e.to_string())?;
-        let options = ProblemOptions::try_from(options)?;
-        let problem = optimize::basic::Problem::new(options);
+
         let id = generate_problem_id();
 
-        PROBLEMS.lock().unwrap().insert(id.clone(), problem);
-        Ok(ProblemHandle { id })
+        match options {
+            JsProblemOptions::Advanced(_) => todo!(),
+            JsProblemOptions::Basic(options) => {
+                let options = basic::ProblemOptions::try_from(options)?;
+                let problem = optimize::basic::Problem::new(options);
+
+                BASIC_PROBLEMS.lock().unwrap().insert(id.clone(), problem);
+                Ok(ProblemHandle {
+                    id,
+                    kind: ProblemKind::Basic,
+                })
+            }
+        }
     }
 
     pub fn solve(handle: &ProblemHandle) -> Result<JsValue, JsValue> {
         utils::require_init();
 
-        let problems = PROBLEMS.lock().unwrap();
+        match handle.kind {
+            ProblemKind::Advanced => todo!(),
+            ProblemKind::Basic => Self::solve_basic(&handle.id),
+        }
+    }
+
+    fn solve_basic(id: &str) -> Result<JsValue, JsValue> {
+        let problems = BASIC_PROBLEMS.lock().unwrap();
         let problem = problems
-            .get(&handle.id)
-            .ok_or_else(|| format!("Invalid problem id {}", &handle.id))?;
+            .get(id)
+            .ok_or_else(|| format!("Invalid problem id {}", id))?;
 
         let solution = problem.problem.solve().map_err(|e| e.to_string())?;
         let objective = solution.objective();
@@ -60,7 +77,7 @@ impl Solver {
             .collect();
 
         let vars = if problem.options.is_buy_only {
-            refine_solution(problem, &vars)
+            basic::refine_solution(problem, &vars)
         } else {
             vars
         };
@@ -71,8 +88,15 @@ impl Solver {
 }
 
 #[wasm_bindgen]
+pub enum ProblemKind {
+    Advanced,
+    Basic,
+}
+
+#[wasm_bindgen]
 pub struct ProblemHandle {
     id: String,
+    kind: ProblemKind,
 }
 
 #[wasm_bindgen]
@@ -97,7 +121,17 @@ pub struct JsSolution {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct JsProblemOptions {
+#[serde(untagged)]
+pub enum JsProblemOptions {
+    Advanced(JsAdvancedOptions),
+    Basic(JsBasicOptions),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JsAdvancedOptions {}
+
+#[derive(Serialize, Deserialize)]
+pub struct JsBasicOptions {
     budget: f64,
     assets: HashMap<String, JsProblemAsset>,
     is_buy_only: bool,
@@ -110,10 +144,10 @@ pub struct JsProblemAsset {
     current_amount: f64,
 }
 
-impl TryFrom<JsProblemOptions> for ProblemOptions {
+impl TryFrom<JsBasicOptions> for basic::ProblemOptions {
     type Error = String;
 
-    fn try_from(options: JsProblemOptions) -> Result<Self, Self::Error> {
+    fn try_from(options: JsBasicOptions) -> Result<Self, Self::Error> {
         if options.budget <= 0. {
             return Err(format!(
                 "Invalid budget ({}). Must be positive",
@@ -124,7 +158,7 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
         let assets = options
             .assets
             .into_iter()
-            .map(|(aid, a)| ProblemAsset::try_from(a).map(|a| (aid, a)))
+            .map(|(aid, a)| basic::ProblemAsset::try_from(a).map(|a| (aid, a)))
             .collect::<Result<HashMap<_, _>, _>>()?;
 
         let target_total = assets
@@ -155,7 +189,7 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
             ));
         }
 
-        Ok(ProblemOptions {
+        Ok(basic::ProblemOptions {
             budget,
             assets,
             is_buy_only: options.is_buy_only,
@@ -163,7 +197,7 @@ impl TryFrom<JsProblemOptions> for ProblemOptions {
     }
 }
 
-impl TryFrom<JsProblemAsset> for ProblemAsset {
+impl TryFrom<JsProblemAsset> for basic::ProblemAsset {
     type Error = String;
 
     fn try_from(asset: JsProblemAsset) -> Result<Self, Self::Error> {
@@ -198,7 +232,7 @@ impl TryFrom<JsProblemAsset> for ProblemAsset {
             ));
         }
 
-        Ok(ProblemAsset {
+        Ok(basic::ProblemAsset {
             symbol,
             target_weight: Decimal::from_f64(target_weight).unwrap(),
             current_amount: Decimal::from_f64(current_amount).unwrap(),
