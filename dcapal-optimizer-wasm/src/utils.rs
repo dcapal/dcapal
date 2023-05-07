@@ -1,6 +1,11 @@
 use std::sync::Once;
 
 use log::Level;
+use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
+
+use crate::AMOUNT_DECIMALS;
+use crate::WEIGHT_DECIMALS;
 
 static INIT: Once = Once::new();
 
@@ -29,4 +34,12 @@ fn set_panic_hook() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
+
+pub fn parse_amount(amount: f64) -> Decimal {
+    Decimal::from_f64(amount).unwrap().round_dp(AMOUNT_DECIMALS)
+}
+
+pub fn parse_weight(weight: f64) -> Decimal {
+    Decimal::from_f64(weight).unwrap().round_dp(WEIGHT_DECIMALS)
 }

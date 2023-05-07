@@ -1,7 +1,7 @@
 mod optimize;
 mod utils;
 
-use optimize::basic;
+use optimize::{advanced, basic};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
@@ -10,6 +10,7 @@ use rust_decimal::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Mutex};
+use utils::{parse_amount, parse_weight};
 use wasm_bindgen::prelude::*;
 
 #[macro_use]
@@ -20,6 +21,8 @@ const WEIGHT_DECIMALS: u32 = 6;
 
 lazy_static! {
     static ref BASIC_PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
+        Mutex::new(HashMap::new());
+    static ref ADVANCED_PROBLEMS: Mutex<HashMap<String, optimize::advanced::Problem>> =
         Mutex::new(HashMap::new());
     static ref NUMERIC_DIST: distributions::Uniform<u8> =
         distributions::Uniform::new_inclusive(0, 9);
@@ -39,12 +42,24 @@ impl Solver {
         let id = generate_problem_id();
 
         match options {
-            JsProblemOptions::Advanced(_) => todo!(),
+            JsProblemOptions::Advanced(options) => {
+                let options = advanced::ProblemOptions::try_from(options)?;
+                let problem = optimize::advanced::Problem::new(options);
+
+                let mut problems = ADVANCED_PROBLEMS.lock().unwrap();
+                problems.insert(id.clone(), problem);
+
+                Ok(ProblemHandle {
+                    id,
+                    kind: ProblemKind::Advanced,
+                })
+            }
             JsProblemOptions::Basic(options) => {
                 let options = basic::ProblemOptions::try_from(options)?;
                 let problem = optimize::basic::Problem::new(options);
 
                 BASIC_PROBLEMS.lock().unwrap().insert(id.clone(), problem);
+
                 Ok(ProblemHandle {
                     id,
                     kind: ProblemKind::Basic,
@@ -131,8 +146,132 @@ pub enum JsProblemOptions {
 pub struct JsAdvancedOptions {
     budget: f64,
     pfolio_ccy: String,
-    assets: HashMap<String, JsProblemAsset>,
+    assets: HashMap<String, JsAdvancedAsset>,
     is_buy_only: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JsAdvancedAsset {
+    symbol: String,
+    shares: f64,
+    price: f64,
+    target_weight: f64,
+    is_whole_shares: bool,
+}
+
+impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
+    type Error = String;
+
+    fn try_from(options: JsAdvancedOptions) -> Result<Self, Self::Error> {
+        if options.budget <= 0. {
+            return Err(format!(
+                "Invalid budget ({}). Must be positive",
+                options.budget
+            ));
+        }
+
+        let assets = options
+            .assets
+            .into_iter()
+            .map(|(aid, a)| advanced::ProblemAsset::try_from(a).map(|a| (aid, a)))
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        let target_total = assets
+            .values()
+            .map(|a| a.target_weight)
+            .sum::<Decimal>()
+            .round_dp(AMOUNT_DECIMALS);
+
+        if target_total != Decimal::one() {
+            return Err(format!(
+                "Invalid target weights. Sum must be equal to 1 ({} instead)",
+                target_total
+            ));
+        }
+
+        let budget = Decimal::from_f64(options.budget).unwrap();
+        let current_total = assets
+            .values()
+            .map(|a| a.price * a.shares)
+            .sum::<Decimal>()
+            .round_dp(AMOUNT_DECIMALS);
+
+        if current_total > budget {
+            return Err(format!(
+                "Invalid current amounts. Sum must be less than or equal to budget: {} ({} instead)",
+                budget,
+                current_total
+            ));
+        }
+
+        Ok(advanced::ProblemOptions {
+            budget,
+            pfolio_ccy: options.pfolio_ccy,
+            assets,
+            total_amount: current_total,
+            is_buy_only: options.is_buy_only,
+        })
+    }
+}
+
+impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
+    type Error = String;
+
+    fn try_from(asset: JsAdvancedAsset) -> Result<Self, Self::Error> {
+        let JsAdvancedAsset {
+            symbol,
+            shares,
+            price,
+            target_weight,
+            is_whole_shares,
+        } = asset;
+
+        if symbol.is_empty() {
+            return Err("Invalid symbol. Must not be empty".to_string());
+        }
+
+        if shares < 0. {
+            return Err(format!(
+                "Invalid shares ({}). Must be zero or positive",
+                shares
+            ));
+        }
+
+        if price < 0. {
+            return Err(format!(
+                "Invalid price ({}). Must be zero or positive",
+                price
+            ));
+        }
+
+        if target_weight < 0. {
+            return Err(format!(
+                "Invalid target weight ({}). Must be zero or positive",
+                target_weight
+            ));
+        }
+
+        if target_weight > 1. {
+            return Err(format!(
+                "Invalid target weight ({}). Must be less then or equal to 1.",
+                target_weight
+            ));
+        }
+
+        let shares = if is_whole_shares {
+            shares.trunc()
+        } else {
+            shares
+        };
+
+        Ok(advanced::ProblemAsset {
+            symbol,
+            shares: parse_amount(shares),
+            price: parse_amount(price),
+            target_weight: parse_weight(target_weight),
+            is_whole_shares,
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -239,8 +378,8 @@ impl TryFrom<JsProblemAsset> for basic::ProblemAsset {
 
         Ok(basic::ProblemAsset {
             symbol,
-            target_weight: Decimal::from_f64(target_weight).unwrap(),
-            current_amount: Decimal::from_f64(current_amount).unwrap(),
+            target_weight: parse_weight(target_weight),
+            current_amount: parse_amount(current_amount),
         })
     }
 }

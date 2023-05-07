@@ -4,7 +4,7 @@ use log::debug;
 use minilp::{ComparisonOp, OptimizationDirection, Variable};
 use rust_decimal::prelude::*;
 
-use crate::{AMOUNT_DECIMALS, WEIGHT_DECIMALS};
+use crate::{utils::parse_amount, AMOUNT_DECIMALS, WEIGHT_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
@@ -241,10 +241,6 @@ fn parse_assets(options: &ProblemOptions, vars: &HashMap<String, f64>) -> HashMa
             )
         })
         .collect()
-}
-
-fn parse_amount(v: f64) -> Decimal {
-    Decimal::from_f64(v).unwrap().round_dp(AMOUNT_DECIMALS)
 }
 
 #[cfg(test)]
