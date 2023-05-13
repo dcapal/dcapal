@@ -65,7 +65,7 @@ jobs:
     - name: Test
       run: |
         cd dcapal-optimizer-wasm
-        cargo test
+        RUST_LOG=dcapal_optimizer_wasm=debug cargo test -- --nocapture
         wasm-pack test --headless --chrome
         
     - name: Build

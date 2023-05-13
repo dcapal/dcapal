@@ -5,7 +5,7 @@ use optimize::{advanced, basic};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
-    prelude::{FromPrimitive, One},
+    prelude::{FromPrimitive, One, ToPrimitive},
     Decimal,
 };
 use serde::{Deserialize, Serialize};
@@ -72,7 +72,7 @@ impl Solver {
         utils::require_init();
 
         match handle.kind {
-            ProblemKind::Advanced => todo!(),
+            ProblemKind::Advanced => Self::solve_advanced(&handle.id),
             ProblemKind::Basic => Self::solve_basic(&handle.id),
         }
     }
@@ -97,6 +97,24 @@ impl Solver {
             vars
         };
 
+        let js_solution = JsSolution { objective, vars };
+        Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
+    }
+
+    fn solve_advanced(id: &str) -> Result<JsValue, JsValue> {
+        let problems = ADVANCED_PROBLEMS.lock().unwrap();
+        let problem = problems
+            .get(id)
+            .ok_or_else(|| format!("Invalid problem id {}", id))?;
+
+        let solution = problem.solve();
+        let vars = solution
+            .assets
+            .iter()
+            .map(|(aid, v)| (aid.clone(), v.amount.to_f64().unwrap()))
+            .collect();
+
+        let objective = 0.0;
         let js_solution = JsSolution { objective, vars };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
@@ -205,10 +223,10 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
         }
 
         Ok(advanced::ProblemOptions {
-            budget,
             pfolio_ccy: options.pfolio_ccy,
+            current_pfolio_amount: current_total,
             assets,
-            total_amount: current_total,
+            budget,
             is_buy_only: options.is_buy_only,
         })
     }

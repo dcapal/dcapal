@@ -32,6 +32,8 @@ rust_decimal_macros = "1.29.0"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
+env_logger = "0.10.0"
+test-log = { version = "0", features = ["log"] }
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

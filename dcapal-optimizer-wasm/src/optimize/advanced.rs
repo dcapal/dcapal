@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 
-use rust_decimal::Decimal;
+use log::debug;
+use rust_decimal::prelude::*;
 
 use crate::{AMOUNT_DECIMALS, WEIGHT_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
-    pub budget: Decimal,
     pub pfolio_ccy: String,
+    pub current_pfolio_amount: Decimal,
     pub assets: HashMap<String, ProblemAsset>,
-    pub total_amount: Decimal,
+    pub budget: Decimal,
     pub is_buy_only: bool,
 }
 
@@ -38,7 +39,7 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn new(asset: ProblemAsset, total_amount: &Decimal, budget: &Decimal) -> Self {
+    pub fn new(asset: ProblemAsset, current_pfolio_amount: Decimal, budget: Decimal) -> Self {
         let ProblemAsset {
             symbol,
             shares,
@@ -47,10 +48,16 @@ impl Asset {
             is_whole_shares,
         } = asset;
 
+        let pfolio_amount = current_pfolio_amount + budget;
+
         let current_shares = shares;
         let current_amount = (price * shares).round_dp(AMOUNT_DECIMALS);
-        let current_weight = (current_amount / total_amount).round_dp(WEIGHT_DECIMALS);
-        let target_amount = (target_weight * budget).round_dp(AMOUNT_DECIMALS);
+        let current_weight = if current_pfolio_amount > Decimal::ZERO {
+            (current_amount / current_pfolio_amount).round_dp(WEIGHT_DECIMALS)
+        } else {
+            Decimal::ZERO
+        };
+        let target_amount = (target_weight * pfolio_amount).round_dp(AMOUNT_DECIMALS);
         let amount = current_amount;
         let weight = current_weight;
 
@@ -72,22 +79,330 @@ impl Asset {
 
 pub struct Problem {
     pub(crate) options: ProblemOptions,
-    pub(crate) solution: HashMap<String, Asset>,
+}
+
+pub struct Solution {
+    pub(crate) is_solved: bool,
+    pub(crate) assets: HashMap<String, Asset>,
+    pub(crate) budget_left: Decimal,
+}
+
+impl Solution {
+    pub fn new(options: ProblemOptions) -> Self {
+        let (pfolio_amount, budget) = (options.current_pfolio_amount, options.budget);
+
+        let assets = options
+            .assets
+            .into_iter()
+            .map(|(aid, asset)| (aid, Asset::new(asset, pfolio_amount, budget)))
+            .collect::<HashMap<_, _>>();
+
+        Self {
+            is_solved: false,
+            assets,
+            budget_left: Decimal::ZERO,
+        }
+    }
 }
 
 impl Problem {
     pub fn new(options: ProblemOptions) -> Self {
-        let solution = options
-            .assets
-            .iter()
-            .map(|(aid, asset)| {
-                (
-                    aid.clone(),
-                    Asset::new(asset.clone(), &options.total_amount, &options.budget),
-                )
-            })
-            .collect::<HashMap<_, _>>();
+        Self { options }
+    }
 
-        Problem { options, solution }
+    pub fn solve(&self) -> Solution {
+        let mut solution = Solution::new(self.options.clone());
+
+        // Budget available to allocate
+        let mut budget_left = self.options.budget;
+
+        // New portfolio amount
+        let pfolio_amount = self.options.current_pfolio_amount + self.options.budget;
+
+        // Get under allocated assets
+        let mut open_assets = under_allocated_view(&mut solution.assets);
+
+        // Rescale target weights for open assets only
+        let mut w_sum: Decimal = open_assets.iter().map(|a| a.target_weight).sum();
+        let mut adjusted_weights = open_assets
+            .iter()
+            .map(|a| (a.target_weight / w_sum).round_dp(WEIGHT_DECIMALS))
+            .collect::<Vec<Decimal>>();
+
+        let mut step = 0;
+        while budget_left > Decimal::ZERO && !open_assets.is_empty() {
+            debug!(
+                "[Step {}] budget_left={} open_assets={:?} w_sum={} adjusted_weights={:?}",
+                step, budget_left, open_assets, w_sum, adjusted_weights
+            );
+
+            let mut budget_left_next = budget_left;
+
+            // Allocate budget depending on target weight
+            let mut is_any_unallocated = false;
+            for (i, asset) in open_assets.iter_mut().enumerate() {
+                let w_i = adjusted_weights[i];
+                let allocated = amount_to_allocate(asset, budget_left, w_i);
+                let allocated_shares = shares_to_allocate(asset, allocated);
+
+                if allocated_shares.is_zero() {
+                    is_any_unallocated = true;
+                }
+
+                // Update allocated amount depending on shares allocated
+                let allocated = (allocated_shares * asset.price).round_dp(AMOUNT_DECIMALS);
+
+                // Update solution values
+                asset.amount += allocated;
+                asset.shares += allocated_shares;
+                asset.weight = (asset.amount / pfolio_amount).round_dp(WEIGHT_DECIMALS);
+                budget_left_next -= allocated;
+            }
+
+            // Update open_assets and rescaled weights
+            check_fully_allocated_assets(&mut open_assets, budget_left_next, is_any_unallocated);
+            budget_left = budget_left_next;
+            w_sum = open_assets.iter().map(|a| a.target_weight).sum();
+            adjusted_weights = open_assets
+                .iter()
+                .map(|a| (a.target_weight / w_sum).round_dp(WEIGHT_DECIMALS))
+                .collect::<Vec<Decimal>>();
+
+            step += 1;
+        }
+
+        debug!(
+            "[Solution] budget_left={} open_assets={:?} w_sum={} adjusted_weights={:?}",
+            budget_left, open_assets, w_sum, adjusted_weights
+        );
+
+        // Reconcile solution weights
+        for asset in solution.assets.values_mut() {
+            asset.weight = (asset.amount / pfolio_amount).round_dp(WEIGHT_DECIMALS);
+        }
+
+        solution.is_solved = true;
+        solution.budget_left = budget_left;
+        solution
+    }
+}
+
+/// Get a view over under allocated assets i.e. assets with `current_weight` less than `target_weight`
+fn under_allocated_view(assets: &mut HashMap<String, Asset>) -> Vec<&mut Asset> {
+    assets
+        .values_mut()
+        .filter_map(|a| (a.current_weight <= a.target_weight).then_some(a))
+        .collect::<Vec<&mut Asset>>()
+}
+
+/// Get amount to allocate
+fn amount_to_allocate(asset: &Asset, budget: Decimal, w_i: Decimal) -> Decimal {
+    Decimal::min(w_i * budget, asset.target_amount - asset.amount)
+}
+
+/// Get number of shares to allocate
+fn shares_to_allocate(asset: &Asset, allocated_amount: Decimal) -> Decimal {
+    let shares = allocated_amount / asset.price;
+
+    if asset.is_whole_shares {
+        shares.trunc()
+    } else {
+        shares.round_dp(AMOUNT_DECIMALS)
+    }
+}
+
+/// Remove fully allocated assets
+fn check_fully_allocated_assets(
+    open_assets: &mut Vec<&mut Asset>,
+    budget_left: Decimal,
+    is_any_unallocated: bool,
+) {
+    {
+        let mut i = 0;
+        while i < open_assets.len() {
+            let to_remove = {
+                let asset = &open_assets[i];
+
+                // Fully allocated
+                let is_fully_allocated = asset.weight >= asset.target_weight;
+
+                // Cannot allocate more -- would cross target weight threshold
+                let no_more_shares =
+                    asset.is_whole_shares && asset.target_amount - asset.amount < asset.price;
+
+                is_fully_allocated || no_more_shares
+            };
+
+            if to_remove {
+                open_assets.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    if is_any_unallocated {
+        let mut not_enough_budget_idx = None;
+        let mut min_target_distance = Decimal::MAX;
+
+        for (i, asset) in open_assets.iter().enumerate() {
+            let target_distance = asset.target_amount - asset.amount;
+            if asset.price > budget_left && target_distance < min_target_distance {
+                // Cannot allocate more to this asset -- not enough budget
+                min_target_distance = target_distance;
+                not_enough_budget_idx = Some(i);
+            }
+        }
+
+        if let Some(idx) = not_enough_budget_idx {
+            open_assets.remove(idx);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::assert_eq;
+
+    use rust_decimal_macros::dec;
+
+    use super::*;
+
+    #[test_log::test]
+    fn it_solves_60_40_portfolio_buy_only() {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_no_allocation(true);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.solve();
+
+        // Expect
+        assert!(solution.is_solved);
+        {
+            let sol = &solution.assets[&vwce];
+            assert_eq!(sol.shares, dec!(11));
+            assert_eq!(sol.amount, dec!(58.3));
+            assert_eq!(sol.weight, dec!(0.583));
+        }
+        {
+            let sol = &solution.assets[&aggh];
+            assert_eq!(sol.shares, dec!(30));
+            assert_eq!(sol.amount, dec!(39));
+            assert_eq!(sol.weight, dec!(0.39));
+        }
+        assert_eq!(solution.budget_left, dec!(2.7));
+    }
+
+    #[test_log::test]
+    fn it_solves_60_40_unbalanced_portfolio_buy_only() {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_unbalanced(true);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.solve();
+
+        // Expect
+        assert!(solution.is_solved);
+        {
+            let sol = &solution.assets[&vwce];
+            assert_eq!(sol.shares, dec!(6));
+            assert_eq!(sol.amount, dec!(63.6));
+            assert_eq!(sol.weight, dec!(0.636));
+        }
+        {
+            let sol = &solution.assets[&aggh];
+            assert_eq!(sol.shares, dec!(28));
+            assert_eq!(sol.amount, dec!(36.4));
+            assert_eq!(sol.weight, dec!(0.364));
+        }
+        assert_eq!(solution.budget_left, Decimal::ZERO);
+    }
+
+    fn build_60_40_portfolio_no_allocation(is_buy_only: bool) -> (Problem, Vec<String>) {
+        let budget = dec!(100.);
+        let vwce = "VWCE".to_string();
+        let aggh = "AGGH".to_string();
+        let assets = HashMap::from([
+            (
+                vwce.clone(),
+                ProblemAsset {
+                    symbol: vwce.clone(),
+                    shares: dec!(0.),
+                    price: dec!(5.3),
+                    target_weight: dec!(0.6),
+                    is_whole_shares: true,
+                },
+            ),
+            (
+                aggh.clone(),
+                ProblemAsset {
+                    symbol: aggh.clone(),
+                    shares: dec!(0.),
+                    price: dec!(1.3),
+                    target_weight: dec!(0.4),
+                    is_whole_shares: true,
+                },
+            ),
+        ]);
+
+        let current_pfolio_amount = assets
+            .values()
+            .map(|a| (a.shares * a.price).round_dp(AMOUNT_DECIMALS))
+            .sum();
+
+        let options = ProblemOptions {
+            pfolio_ccy: "eur".into(),
+            current_pfolio_amount,
+            assets,
+            budget,
+            is_buy_only,
+        };
+
+        (Problem::new(options), vec![vwce, aggh])
+    }
+
+    fn build_60_40_portfolio_unbalanced(is_buy_only: bool) -> (Problem, Vec<String>) {
+        let budget = dec!(10.4);
+        let vwce = "VWCE".to_string();
+        let aggh = "AGGH".to_string();
+        let assets = HashMap::from([
+            (
+                vwce.clone(),
+                ProblemAsset {
+                    symbol: vwce.clone(),
+                    shares: dec!(6),
+                    price: dec!(10.6),
+                    target_weight: dec!(0.6),
+                    is_whole_shares: true,
+                },
+            ),
+            (
+                aggh.clone(),
+                ProblemAsset {
+                    symbol: aggh.clone(),
+                    shares: dec!(20),
+                    price: dec!(1.3),
+                    target_weight: dec!(0.4),
+                    is_whole_shares: true,
+                },
+            ),
+        ]);
+
+        let current_pfolio_amount = assets
+            .values()
+            .map(|a| (a.shares * a.price).round_dp(AMOUNT_DECIMALS))
+            .sum();
+
+        let options = ProblemOptions {
+            pfolio_ccy: "eur".into(),
+            current_pfolio_amount,
+            assets,
+            budget,
+            is_buy_only,
+        };
+
+        (Problem::new(options), vec![vwce, aggh])
     }
 }
