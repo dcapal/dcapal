@@ -32,8 +32,8 @@ DcaPal does not store any user data. But if you are still concerned for your pri
 **Start Docker environment**
 
 ```bash
-$ cd dcapal-backend
-$ docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
+cd dcapal-backend
+docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
 ```
 
 **Run DcaPal backend**
@@ -41,14 +41,14 @@ $ docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
 Prepare `dcapal.yml` config file
 
 ```bash
-$ cd dcapal-backend
-$ cp config/dcapal/dcapal.yml dcapal.yml
+cd dcapal-backend
+cp config/dcapal/dcapal.yml dcapal.yml
 ```
 
 Compile and start backend service
 
 ```bash
-$ cargo run --release
+cargo run --release
 ```
 
 **Run DcaPal frontend**
@@ -56,22 +56,22 @@ $ cargo run --release
 Build DcaPal Optimizer
 
 ```bash
-$ cd dcapal-optimizer-wasm
-$ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-$ wasm-pack build --release
+cd dcapal-optimizer-wasm
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+wasm-pack build --release
 ```
 
 Install NPM dependencies. Note: this is installing `dcapal-optimizer-wasm` package as well.
 
 ```bash
-$ cd ../dcapal-frontend
-$ npm install # Install dcapal-optimizer-wasm pkg as well
+cd ../dcapal-frontend
+npm install # Install dcapal-optimizer-wasm pkg as well
 ```
 
 Run frontend server
 
 ```bash
-$ npm run start
+npm run start
 ```
 ## Architecture
 
