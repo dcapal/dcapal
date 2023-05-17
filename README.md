@@ -73,3 +73,16 @@ Run frontend server
 ```bash
 $ npm run start
 ```
+## Architecture
+
+```mermaid
+flowchart LR
+    Frontend[Frontend] ---|"/api/search?q={query}<br>/api/price?q={query}"|nginx[nginx]
+    subgraph dcapal.com
+        nginx---Yahoo[Yahoo Finance]
+        nginx---Backend[Backend]
+        Backend---Kraken[Kraken REST API]
+        Backend---|"/assets/fiat<br>/assets/crypto<br>/price/{base}?quote={quote}"|Redis[Redis]
+    end
+
+```
