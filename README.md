@@ -84,5 +84,4 @@ flowchart LR
         Backend---Kraken[Kraken REST API]
         Backend---|"/assets/fiat<br>/assets/crypto<br>/price/{base}?quote={quote}"|Redis[Redis]
     end
-
 ```
