@@ -5,6 +5,7 @@ use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 
 use crate::AMOUNT_DECIMALS;
+use crate::SHARES_DECIMALS;
 use crate::WEIGHT_DECIMALS;
 
 static INIT: Once = Once::new();
@@ -42,4 +43,8 @@ pub fn parse_amount(amount: f64) -> Decimal {
 
 pub fn parse_weight(weight: f64) -> Decimal {
     Decimal::from_f64(weight).unwrap().round_dp(WEIGHT_DECIMALS)
+}
+
+pub fn parse_shares(shares: f64) -> Decimal {
+    Decimal::from_f64(shares).unwrap().round_dp(SHARES_DECIMALS)
 }

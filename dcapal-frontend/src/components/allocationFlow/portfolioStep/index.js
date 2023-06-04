@@ -42,6 +42,7 @@ export const PortfolioStep = ({ ...props }) => {
       addAsset({
         symbol: asset.symbol,
         name: asset.name,
+        aclass: asset.aclass,
         price: asset.price,
         baseCcy: asset.baseCcy,
         provider: asset.provider,

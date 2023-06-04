@@ -7,14 +7,15 @@ import { getFetcher } from "../../app/providers";
 import { timeout } from "../../utils";
 import { Spinner } from "../spinner/spinner";
 import {
+  ACLASS,
   addAsset,
   clearPortfolio,
+  parseAClass,
   setQty,
   setQuoteCurrency,
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
-import ImageSvg from "../../../images/import-portfolio.svg";
 import { IKImage } from "imagekitio-react";
 import { IMAGEKIT_URL } from "../../app/config";
 import { HEADER_IMPORT_PORTFOLIO_SVG } from "../../app/images";
@@ -54,6 +55,7 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
       addAsset({
         symbol: a.symbol,
         name: a.name,
+        aclass: a.aclass ? parseAClass(a.aclass) : ACLASS.UNDEFINED,
         baseCcy: a.baseCcy,
         price: price,
         provider: a.provider,

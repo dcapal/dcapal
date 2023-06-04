@@ -5,12 +5,12 @@ use optimize::{advanced, basic};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
-    prelude::{FromPrimitive, One, ToPrimitive},
+    prelude::{One, ToPrimitive},
     Decimal,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Mutex};
-use utils::{parse_amount, parse_weight};
+use utils::{parse_amount, parse_shares, parse_weight};
 use wasm_bindgen::prelude::*;
 
 #[macro_use]
@@ -18,6 +18,7 @@ extern crate lazy_static;
 
 const AMOUNT_DECIMALS: u32 = 4;
 const WEIGHT_DECIMALS: u32 = 6;
+const SHARES_DECIMALS: u32 = 8;
 
 lazy_static! {
     static ref BASIC_PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
@@ -91,13 +92,13 @@ impl Solver {
             .map(|(aid, v)| (aid.clone(), solution[*v]))
             .collect();
 
-        let vars = if problem.options.is_buy_only {
+        let amounts = if problem.options.is_buy_only {
             basic::refine_solution(problem, &vars)
         } else {
             vars
         };
 
-        let js_solution = JsSolution { objective, vars };
+        let js_solution = JsBasicSolution { objective, amounts };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
 
@@ -108,14 +109,31 @@ impl Solver {
             .ok_or_else(|| format!("Invalid problem id {}", id))?;
 
         let solution = problem.solve();
-        let vars = solution
+
+        if !solution.is_solved {
+            let js_solution = JsAdvancedSolution::default();
+            return Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap());
+        }
+
+        let budget_left = solution.budget_left.to_f64().unwrap();
+
+        let amounts = solution
             .assets
             .iter()
             .map(|(aid, v)| (aid.clone(), v.amount.to_f64().unwrap()))
             .collect();
 
-        let objective = 0.0;
-        let js_solution = JsSolution { objective, vars };
+        let shares = solution
+            .assets
+            .iter()
+            .map(|(aid, v)| (aid.clone(), v.shares.to_f64().unwrap()))
+            .collect();
+
+        let js_solution = JsAdvancedSolution {
+            budget_left,
+            amounts,
+            shares,
+        };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
 }
@@ -148,9 +166,16 @@ fn generate_problem_id() -> String {
 }
 
 #[derive(Serialize)]
-pub struct JsSolution {
+pub struct JsBasicSolution {
     pub objective: f64,
-    pub vars: HashMap<String, f64>,
+    pub amounts: HashMap<String, f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct JsAdvancedSolution {
+    pub budget_left: f64,
+    pub amounts: HashMap<String, f64>,
+    pub shares: HashMap<String, f64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -207,20 +232,12 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
             ));
         }
 
-        let budget = Decimal::from_f64(options.budget).unwrap();
+        let budget = parse_amount(options.budget);
         let current_total = assets
             .values()
             .map(|a| a.price * a.shares)
             .sum::<Decimal>()
             .round_dp(AMOUNT_DECIMALS);
-
-        if current_total > budget {
-            return Err(format!(
-                "Invalid current amounts. Sum must be less than or equal to budget: {} ({} instead)",
-                budget,
-                current_total
-            ));
-        }
 
         Ok(advanced::ProblemOptions {
             pfolio_ccy: options.pfolio_ccy,
@@ -284,7 +301,7 @@ impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
 
         Ok(advanced::ProblemAsset {
             symbol,
-            shares: parse_amount(shares),
+            shares: parse_shares(shares),
             price: parse_amount(price),
             target_weight: parse_weight(target_weight),
             is_whole_shares,
@@ -336,7 +353,7 @@ impl TryFrom<JsBasicOptions> for basic::ProblemOptions {
             ));
         }
 
-        let budget = Decimal::from_f64(options.budget).unwrap();
+        let budget = parse_amount(options.budget);
         let current_total = assets
             .values()
             .map(|a| a.current_amount)

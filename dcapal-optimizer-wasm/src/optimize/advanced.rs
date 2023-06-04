@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use log::debug;
 use rust_decimal::prelude::*;
 
-use crate::{AMOUNT_DECIMALS, WEIGHT_DECIMALS};
+use crate::{AMOUNT_DECIMALS, SHARES_DECIMALS, WEIGHT_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
@@ -81,6 +81,7 @@ pub struct Problem {
     pub(crate) options: ProblemOptions,
 }
 
+#[derive(Debug, Clone)]
 pub struct Solution {
     pub(crate) is_solved: bool,
     pub(crate) assets: HashMap<String, Asset>,
@@ -124,6 +125,8 @@ impl Problem {
 
         // Budget available to allocate
         let mut budget_left = self.options.budget + sold_amount;
+
+        debug!("[Init] solution={solution:?} pfolio_amount={pfolio_amount} sold_amount={sold_amount} budget_left={budget_left}");
 
         // Get under allocated assets
         let mut open_assets = under_allocated_view(&mut solution.assets);
@@ -189,6 +192,9 @@ impl Problem {
 
         solution.is_solved = true;
         solution.budget_left = budget_left;
+
+        debug!("[Solution] solution={solution:?}");
+
         solution
     }
 }
@@ -239,7 +245,7 @@ fn shares_to_allocate(asset: &Asset, allocated_amount: Decimal) -> Decimal {
     if asset.is_whole_shares {
         shares.trunc()
     } else {
-        shares.round_dp(AMOUNT_DECIMALS)
+        shares.round_dp(SHARES_DECIMALS)
     }
 }
 

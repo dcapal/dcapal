@@ -12,6 +12,7 @@ export const AllocationFlow = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
 
   const [useTaxEfficient, setUseTaxEfficient] = useState(true);
+  const [useWholeShares, setUseWholeShares] = useState(true);
 
   if (step <= Step.CCY) {
     return <CcyStep />;
@@ -23,10 +24,17 @@ export const AllocationFlow = () => {
     return (
       <InvestStep
         useTaxEfficient={useTaxEfficient}
+        useWholeShares={useWholeShares}
         setUseTaxEfficient={setUseTaxEfficient}
+        setUseWholeShares={setUseWholeShares}
       />
     );
   } else if (step === Step.END) {
-    return <EndStep useTaxEfficient={useTaxEfficient} />;
+    return (
+      <EndStep
+        useTaxEfficient={useTaxEfficient}
+        useWholeShares={useWholeShares}
+      />
+    );
   }
 };

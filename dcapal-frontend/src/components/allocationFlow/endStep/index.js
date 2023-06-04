@@ -2,15 +2,20 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { roundAmount, timeout } from "../../../utils";
+import { roundAmount, roundDecimals, timeout } from "../../../utils";
 import { Spinner } from "../../spinner/spinner";
-import { clearBudget } from "../portfolioStep/portfolioSlice";
+import { clearBudget, isWholeShares } from "../portfolioStep/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 
-const buildCards = (assets, solution) => {
+export const UNALLOCATED_CASH = "Unallocated cash";
+
+const buildCards = (budget, assets, solution, pfolioCcy) => {
   const cards = Object.values(assets).map((a) => ({
     symbol: a.symbol,
     name: a.name,
+    qty: -1,
+    oldQty: a.qty,
+    price: a.price,
     amount: 0,
     oldAmount: a.amount,
     weight: 0,
@@ -18,36 +23,92 @@ const buildCards = (assets, solution) => {
     targetWeight: a.targetWeight,
   }));
 
-  if (!solution?.vars) return cards;
+  if (!solution?.amounts) return cards;
   let totalAmount = 0;
 
-  for (const a of solution.vars.values()) {
+  for (const a of solution.amounts.values()) {
     totalAmount += a;
   }
 
   for (const card of cards) {
-    if (solution.vars.has(card.symbol)) {
-      card.amount = solution.vars.get(card.symbol);
+    if (solution.amounts.has(card.symbol)) {
+      card.amount = solution.amounts.get(card.symbol);
       card.weight = (100 * card.amount) / totalAmount;
     }
+
+    if (solution.shares?.has(card.symbol)) {
+      card.qty = solution.shares.get(card.symbol);
+    }
+  }
+
+  if (solution.budget_left) {
+    cards.push({
+      symbol: pfolioCcy,
+      name: UNALLOCATED_CASH,
+      qty: -1,
+      oldQty: 0,
+      price: 0,
+      amount: solution.budget_left,
+      oldAmount: 0,
+      weight: 0,
+      oldWeight: 0,
+      targetWeight: 0,
+    });
   }
 
   return cards;
 };
 
-export const EndStep = ({ useTaxEfficient }) => {
+const buildProblemInput = (budget, pfolioAmount, assets, useWholeShares) => {
+  if (!useWholeShares) {
+    const problemBudget = budget + pfolioAmount;
+    const as = Object.values(assets).reduce(
+      (as, a) => ({
+        ...as,
+        [a.symbol]: {
+          symbol: a.symbol,
+          target_weight: a.targetWeight / 100,
+          current_amount: a.amount,
+        },
+      }),
+      {}
+    );
+
+    return [problemBudget, as];
+  } else {
+    const as = Object.values(assets).reduce(
+      (as, a) => ({
+        ...as,
+        [a.symbol]: {
+          symbol: a.symbol,
+          shares: a.qty,
+          price: a.price,
+          target_weight: a.targetWeight / 100,
+          is_whole_shares: isWholeShares(a.aclass),
+        },
+      }),
+      {}
+    );
+
+    return [budget, as];
+  }
+};
+
+export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
 
-  const [budget, assets] = useSelector((state) => {
+  const [budget, pfolioAmount, assets, quoteCcy] = useSelector((state) => {
     return [
-      state.pfolio.budget + state.pfolio.totalAmount,
+      state.pfolio.budget,
+      state.pfolio.totalAmount,
       state.pfolio.assets,
+      state.pfolio.quoteCcy,
     ];
   });
 
-  const cards = solution ? buildCards(assets, solution) : [];
+  const cards = solution ? buildCards(budget, assets, solution, quoteCcy) : [];
 
   useEffect(() => {
     const launchSolver = async () => {
@@ -56,19 +117,21 @@ export const EndStep = ({ useTaxEfficient }) => {
           name: "wasm-solver-worker",
         })
       );
-      const as = Object.values(assets).reduce(
-        (as, a) => ({
-          ...as,
-          [a.symbol]: {
-            symbol: a.symbol,
-            target_weight: a.targetWeight / 100,
-            current_amount: a.amount,
-          },
-        }),
-        {}
+
+      const [inputBudget, as] = buildProblemInput(
+        budget,
+        pfolioAmount,
+        assets,
+        useWholeShares
       );
 
-      const sol = await solver.makeAndSolve(budget, as, useTaxEfficient);
+      const sol = await solver.makeAndSolve(
+        inputBudget,
+        as,
+        quoteCcy,
+        useTaxEfficient,
+        useWholeShares
+      );
       await Thread.terminate(solver);
       return sol;
     };
@@ -111,6 +174,9 @@ export const EndStep = ({ useTaxEfficient }) => {
                 key={c.symbol}
                 symbol={c.symbol}
                 name={c.name}
+                qty={c.qty}
+                oldQty={c.oldQty}
+                price={c.price}
                 amount={roundAmount(c.amount)}
                 oldAmount={roundAmount(c.oldAmount)}
                 weight={c.weight}
