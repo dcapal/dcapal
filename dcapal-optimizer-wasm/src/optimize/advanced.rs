@@ -113,11 +113,17 @@ impl Problem {
     pub fn solve(&self) -> Solution {
         let mut solution = Solution::new(self.options.clone());
 
-        // Budget available to allocate
-        let mut budget_left = self.options.budget;
-
         // New portfolio amount
         let pfolio_amount = self.options.current_pfolio_amount + self.options.budget;
+
+        let sold_amount = if self.options.is_buy_only {
+            Decimal::ZERO
+        } else {
+            sell_over_allocated_assets(&mut solution, pfolio_amount)
+        };
+
+        // Budget available to allocate
+        let mut budget_left = self.options.budget + sold_amount;
 
         // Get under allocated assets
         let mut open_assets = under_allocated_view(&mut solution.assets);
@@ -185,6 +191,32 @@ impl Problem {
         solution.budget_left = budget_left;
         solution
     }
+}
+
+fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -> Decimal {
+    let mut sold_amount = Decimal::ZERO;
+    for asset in solution.assets.values_mut() {
+        if asset.current_weight <= asset.target_weight {
+            continue;
+        }
+
+        let overallocated = asset.current_amount - asset.target_amount;
+        let sell_shares = shares_to_allocate(asset, overallocated);
+        if sell_shares.is_zero() {
+            debug!("[Rebalance] Cannot sell over allocated asset: {:?} (overallocated={overallocated}, sell_shares={sell_shares}", asset);
+            continue; // If cannot sell a single share, do nothing -- Better slightly overbalanced
+        }
+
+        let sell_amount = (sell_shares * asset.price).round_dp(AMOUNT_DECIMALS);
+
+        // Update solution values
+        asset.amount -= sell_amount;
+        asset.shares -= sell_shares;
+        asset.weight = (asset.amount / pfolio_amount).round_dp(WEIGHT_DECIMALS);
+        sold_amount += sell_amount;
+    }
+
+    sold_amount.round_dp(AMOUNT_DECIMALS)
 }
 
 /// Get a view over under allocated assets i.e. assets with `current_weight` less than `target_weight`
@@ -295,9 +327,35 @@ mod tests {
     }
 
     #[test_log::test]
+    fn it_solves_60_40_portfolio_buy_and_sell() {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_no_allocation(false);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.solve();
+
+        // Expect
+        assert!(solution.is_solved);
+        {
+            let sol = &solution.assets[&vwce];
+            assert_eq!(sol.shares, dec!(11));
+            assert_eq!(sol.amount, dec!(58.3));
+            assert_eq!(sol.weight, dec!(0.583));
+        }
+        {
+            let sol = &solution.assets[&aggh];
+            assert_eq!(sol.shares, dec!(30));
+            assert_eq!(sol.amount, dec!(39));
+            assert_eq!(sol.weight, dec!(0.39));
+        }
+        assert_eq!(solution.budget_left, dec!(2.7));
+    }
+
+    #[test_log::test]
     fn it_solves_60_40_unbalanced_portfolio_buy_only() {
         // Given
-        let (problem, assets) = build_60_40_portfolio_unbalanced(true);
+        let (problem, assets) = build_60_40_portfolio_unbalanced(true, false);
         let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
@@ -318,6 +376,58 @@ mod tests {
             assert_eq!(sol.weight, dec!(0.364));
         }
         assert_eq!(solution.budget_left, Decimal::ZERO);
+    }
+
+    #[test_log::test]
+    fn it_solves_60_40_unbalanced_portfolio_buy_and_sell_price_too_high_to_sell() {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_unbalanced(false, false);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.solve();
+
+        // Expect
+        assert!(solution.is_solved);
+        {
+            let sol = &solution.assets[&vwce];
+            assert_eq!(sol.shares, dec!(6));
+            assert_eq!(sol.amount, dec!(63.6));
+            assert_eq!(sol.weight, dec!(0.636));
+        }
+        {
+            let sol = &solution.assets[&aggh];
+            assert_eq!(sol.shares, dec!(28));
+            assert_eq!(sol.amount, dec!(36.4));
+            assert_eq!(sol.weight, dec!(0.364));
+        }
+        assert_eq!(solution.budget_left, Decimal::ZERO);
+    }
+
+    #[test_log::test]
+    fn it_solves_60_40_unbalanced_portfolio_buy_and_sell() {
+        // Given
+        let (problem, assets) = build_60_40_portfolio_unbalanced(false, true);
+        let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
+
+        // When
+        let solution = problem.solve();
+
+        // Expect
+        assert!(solution.is_solved);
+        {
+            let sol = &solution.assets[&vwce];
+            assert_eq!(sol.shares, dec!(57));
+            assert_eq!(sol.amount, dec!(60.42));
+            assert_eq!(sol.weight, dec!(0.6042));
+        }
+        {
+            let sol = &solution.assets[&aggh];
+            assert_eq!(sol.shares, dec!(30.));
+            assert_eq!(sol.amount, dec!(39.));
+            assert_eq!(sol.weight, dec!(0.39));
+        }
+        assert_eq!(solution.budget_left, dec!(0.58));
     }
 
     fn build_60_40_portfolio_no_allocation(is_buy_only: bool) -> (Problem, Vec<String>) {
@@ -363,17 +473,27 @@ mod tests {
         (Problem::new(options), vec![vwce, aggh])
     }
 
-    fn build_60_40_portfolio_unbalanced(is_buy_only: bool) -> (Problem, Vec<String>) {
+    fn build_60_40_portfolio_unbalanced(
+        is_buy_only: bool,
+        is_low_price: bool,
+    ) -> (Problem, Vec<String>) {
         let budget = dec!(10.4);
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
+
+        let (vwce_shares, vwce_price) = if is_low_price {
+            (dec!(60), dec!(1.06))
+        } else {
+            (dec!(6), dec!(10.6))
+        };
+
         let assets = HashMap::from([
             (
                 vwce.clone(),
                 ProblemAsset {
                     symbol: vwce.clone(),
-                    shares: dec!(6),
-                    price: dec!(10.6),
+                    shares: vwce_shares,
+                    price: vwce_price,
                     target_weight: dec!(0.6),
                     is_whole_shares: true,
                 },
