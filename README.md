@@ -77,11 +77,11 @@ npm run start
 
 ```mermaid
 flowchart LR
-    Frontend[Frontend] ---|"/api/search?q={query}<br>/api/price?q={query}"|nginx[nginx]
+    Frontend[Frontend] ---|"/api/external/search?q={query}<br>/api/external/chart/${symbol}"|nginx[nginx]
     subgraph dcapal.com
-        nginx---Yahoo[Yahoo Finance]
+        nginx---TradFiProvider[TradFi Provider]
         nginx---Backend[Backend]
-        Backend---Kraken[Kraken REST API]
+        Backend---CryptoProvider[Crypto Provider REST API]
         Backend---|"/assets/fiat<br>/assets/crypto<br>/price/{base}?quote={quote}"|Redis[Redis]
     end
 ```
