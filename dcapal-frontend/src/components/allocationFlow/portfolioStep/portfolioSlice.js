@@ -142,7 +142,7 @@ export const portfolioSlice = createSlice({
     clearPortfolio: (state) => {
       state.assets = {};
       state.nextIdx = 0;
-      state.totalAmount = 0;
+      state.totalAmount == 0;
       state.budget = 0;
     },
     clearBudget: (state) => {

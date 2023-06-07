@@ -97,22 +97,30 @@ export const AllocateCard = ({
           </div>
         </div>
         {qty >= 0 && (
-          <p className="mb-2 px-3 py-2 whitespace-nowrap rounded-md bg-blue-100/50">
-            {qty > oldQty && (
-              <span className="italic">
-                Buy {roundDecimals(qty - oldQty, 6)}{" "}
-                <span className="uppercase">{symbol}</span> @ {price}{" "}
-                <span className="uppercase">{quoteCcy}</span>
-              </span>
-            )}
-            {qty < oldQty && (
-              <span className="italic">
-                Sell {roundDecimals(oldQty - qty, 6)}{" "}
-                <span className="uppercase">{symbol}</span> @ {price}{" "}
-                <span className="uppercase">{quoteCcy}</span>
-              </span>
-            )}
-          </p>
+          <div>
+            <p className="px-3 py-2 mt-[5px] whitespace-nowrap rounded-md bg-blue-100/50">
+              {qty > oldQty && (
+                <span className="font-light">
+                  Buy {roundDecimals(qty - oldQty, 6)}{" "}
+                  <span className="uppercase">{symbol}</span> @ {price}{" "}
+                  <span className="uppercase">{quoteCcy}</span>
+                </span>
+              )}
+              {qty < oldQty && (
+                <span className="font-light">
+                  Sell {roundDecimals(oldQty - qty, 6)}{" "}
+                  <span className="uppercase">{symbol}</span> @ {price}{" "}
+                  <span className="uppercase">{quoteCcy}</span>
+                </span>
+              )}
+              {qty === oldQty && (
+                <span className="font-light italic">
+                  No need to trade this time. Just hold.
+                </span>
+              )}
+            </p>
+            <p className="px-2 my-3 border border-gray-200/50" />
+          </div>
         )}
         {isMobile && (
           <div className="flex flex-col justify-between items-start">

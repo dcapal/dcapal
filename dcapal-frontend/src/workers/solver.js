@@ -36,7 +36,7 @@ expose({
     isBuyOnly,
     isAdvancedAlgorithm
   ) {
-    if (!budget || budget < 0) return null;
+    if (Number.isNaN(budget) || budget < 0) return null;
     if (!assets || Object.keys(assets).length === 0) return null;
 
     const input = buildProblemInput(

@@ -24,10 +24,12 @@
     "axios": "^0.21.1",
     "axios-cache-adapter": "^2.7.3",
     "classnames": "^2.3.2",
+    "dcapal-optimizer-wasm": "file:../dcapal-optimizer-wasm/pkg",
     "fuse.js": "^6.6.2",
     "imagekitio-react": "^2.0.0",
     "localforage": "^1.10.0",
     "react": "^18.2.0",
+    "react-collapsed": "^4.0.2",
     "react-dom": "^18.2.0",
     "react-github-btn": "^1.4.0",
     "react-helmet": "^6.1.0",
@@ -36,8 +38,7 @@
     "redux-persist": "^6.0.0",
     "redux-persist-expire": "^1.1.1",
     "threads": "^1.7.0",
-    "uuid": "^8.3.2",
-    "dcapal-optimizer-wasm": "file:../dcapal-optimizer-wasm/pkg"
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@babel/core": "^7.18.10",
