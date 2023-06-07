@@ -206,7 +206,7 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
     type Error = String;
 
     fn try_from(options: JsAdvancedOptions) -> Result<Self, Self::Error> {
-        if options.budget <= 0. {
+        if options.budget < 0. {
             return Err(format!(
                 "Invalid budget ({}). Must be positive",
                 options.budget
