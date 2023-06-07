@@ -229,7 +229,7 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
 fn under_allocated_view(assets: &mut HashMap<String, Asset>) -> Vec<&mut Asset> {
     assets
         .values_mut()
-        .filter_map(|a| (a.current_weight <= a.target_weight).then_some(a))
+        .filter_map(|a| (a.current_amount <= a.target_amount).then_some(a))
         .collect::<Vec<&mut Asset>>()
 }
 
