@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useMediaQuery } from "@react-hook/media-query";
 
 import { InputNumber, InputNumberType } from "../../core/inputNumber";
-import { removeAsset } from "./portfolioSlice";
+import { isWholeShares, removeAsset } from "./portfolioSlice";
 import { MEDIA_SMALL } from "../../../app/config";
 
 export const AssetCard = ({
   symbol,
   name,
+  aclass,
   price,
   qty,
   weight,
@@ -83,7 +84,11 @@ export const AssetCard = ({
             <div className="grow">
               <InputNumber
                 textAlign={"text-right"}
-                type={InputNumberType.DECIMAL}
+                type={
+                  isWholeShares(aclass)
+                    ? InputNumberType.INTEGRAL
+                    : InputNumberType.DECIMAL
+                }
                 value={qty}
                 onChange={props.setQty}
                 isValid={true}
@@ -117,7 +122,11 @@ export const AssetCard = ({
               <div className="w-40">
                 <InputNumber
                   textAlign={"text-left"}
-                  type={InputNumberType.DECIMAL}
+                  type={
+                    isWholeShares(aclass)
+                      ? InputNumberType.INTEGRAL
+                      : InputNumberType.DECIMAL
+                  }
                   value={qty}
                   onChange={props.setQty}
                   isValid={true}
