@@ -4,7 +4,11 @@ import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 import { roundAmount, roundDecimals, timeout } from "../../../utils";
 import { Spinner } from "../../spinner/spinner";
-import { clearBudget, isWholeShares } from "../portfolioStep/portfolioSlice";
+import {
+  ACLASS,
+  clearBudget,
+  isWholeShares,
+} from "../portfolioStep/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
@@ -13,6 +17,7 @@ const buildCards = (budget, assets, solution, pfolioCcy) => {
   const cards = Object.values(assets).map((a) => ({
     symbol: a.symbol,
     name: a.name,
+    aclass: a.aclass,
     qty: -1,
     oldQty: a.qty,
     price: a.price,
@@ -45,6 +50,7 @@ const buildCards = (budget, assets, solution, pfolioCcy) => {
     cards.push({
       symbol: pfolioCcy,
       name: UNALLOCATED_CASH,
+      aclass: ACLASS.CURRENCY,
       qty: -1,
       oldQty: 0,
       price: 0,
@@ -165,7 +171,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
       {!isLoading && solution && (
         <>
           <div className="mt-2 mb-8 text-3xl font-light">
-            <span className="text-4xl">📈</span> Great Success! Your allocation
+            <span className="text-4xl">📊</span> Great Success! Your allocation
             is ready
           </div>
           <div className="w-full flex flex-col items-center">
@@ -174,6 +180,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
                 key={c.symbol}
                 symbol={c.symbol}
                 name={c.name}
+                aclass={c.aclass}
                 qty={c.qty}
                 oldQty={c.oldQty}
                 price={c.price}

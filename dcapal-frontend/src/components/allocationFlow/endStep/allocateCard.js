@@ -4,10 +4,12 @@ import { useSelector } from "react-redux";
 import { MEDIA_SMALL } from "../../../app/config";
 import { UNALLOCATED_CASH } from ".";
 import { roundDecimals } from "../../../utils";
+import { ACLASS } from "../portfolioStep/portfolioSlice";
 
 export const AllocateCard = ({
   symbol,
   name,
+  aclass,
   qty,
   oldQty,
   price,
@@ -71,7 +73,7 @@ export const AllocateCard = ({
         </div>
         <p className="font-light text-center">
           <span className="italic">
-            This is your budget left. Save it for next time you visit DcaPal
+            This is your budget left. Save it for the next time you visit DcaPal
           </span>{" "}
           💰
         </p>
@@ -101,21 +103,25 @@ export const AllocateCard = ({
             <p className="px-3 py-2 mt-[5px] whitespace-nowrap rounded-md bg-blue-100/50">
               {qty > oldQty && (
                 <span className="font-light">
-                  Buy {roundDecimals(qty - oldQty, 6)}{" "}
+                  📈 Buy {roundDecimals(qty - oldQty, 6)}{" "}
                   <span className="uppercase">{symbol}</span> @ {price}{" "}
                   <span className="uppercase">{quoteCcy}</span>
                 </span>
               )}
               {qty < oldQty && (
                 <span className="font-light">
-                  Sell {roundDecimals(oldQty - qty, 6)}{" "}
+                  📉 Sell {roundDecimals(oldQty - qty, 6)}{" "}
                   <span className="uppercase">{symbol}</span> @ {price}{" "}
                   <span className="uppercase">{quoteCcy}</span>
                 </span>
               )}
               {qty === oldQty && (
-                <span className="font-light italic">
-                  No need to trade this time. Just hold.
+                <span className="font-light">
+                  🏦{" "}
+                  <span className="italic">
+                    Nothing to trade this time. Just{" "}
+                    {aclass === ACLASS.CRYPTO ? "hodl" : "hold"}.
+                  </span>
                 </span>
               )}
             </p>
