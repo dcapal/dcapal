@@ -4,6 +4,7 @@
     {
       "symbol": "VWCE.MI",
       "name": "Vanguard FTSE All-World UCITS ETF",
+      "aclass": "EQUITY",
       "baseCcy": "eur",
       "provider": "YF",
       "price": 92.69000244140625,
@@ -15,6 +16,7 @@
     {
       "symbol": "AGGH.MI",
       "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "aclass": "EQUITY",
       "baseCcy": "eur",
       "provider": "YF",
       "price": 4.640500068664551,
@@ -26,6 +28,7 @@
     {
       "symbol": "IBGX.MI",
       "name": "iShares € Govt Bond 3-5yr UCITS ETF",
+      "aclass": "EQUITY",
       "baseCcy": "eur",
       "provider": "YF",
       "price": 158.44000244140625,
@@ -37,6 +40,7 @@
     {
       "symbol": "SGLD.MI",
       "name": "Invesco Physical Gold ETC",
+      "aclass": "EQUITY",
       "baseCcy": "eur",
       "provider": "YF",
       "price": 177.1699981689453,
@@ -48,6 +52,7 @@
     {
       "symbol": "CMOD.MI",
       "name": "Invesco Bloomberg Commodity UCITS ETF",
+      "aclass": "EQUITY",
       "baseCcy": "eur",
       "provider": "YF",
       "price": 20.625,
