@@ -30,6 +30,7 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
     return false;
   }
 
+  dispatch(clearPortfolio());
   dispatch(setQuoteCurrency({ quoteCcy: pfolio.quoteCcy }));
 
   if (!pfolio.assets || !Array.isArray(pfolio.assets)) {
