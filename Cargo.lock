@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "dcapal-backend"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "dcapal-optimizer-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
