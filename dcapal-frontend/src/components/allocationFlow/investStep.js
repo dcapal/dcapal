@@ -16,6 +16,7 @@ export const InvestStep = ({
   const dispatch = useDispatch();
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const totalAmount = useSelector((state) => state.pfolio.totalAmount);
 
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
@@ -35,6 +36,8 @@ export const InvestStep = ({
     dispatch(setBudget({ budget: cash }));
     dispatch(setAllocationFlowStep({ step: Step.END }));
   };
+
+  const isRunAllocationDisabled = cash + totalAmount <= 0;
 
   return (
     <div className="w-full h-full flex flex-col items-center">
@@ -136,12 +139,13 @@ export const InvestStep = ({
         >
           Go back
         </span>
-        <div
-          className="px-3 py-2 flex justify-center items-center cursor-pointer bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md"
+        <button
+          className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
           onClick={onClickRunAllocation}
+          disabled={isRunAllocationDisabled}
         >
           Run Allocation
-        </div>
+        </button>
       </div>
     </div>
   );

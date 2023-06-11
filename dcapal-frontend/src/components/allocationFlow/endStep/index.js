@@ -29,8 +29,8 @@ const buildCards = (budget, assets, solution, pfolioCcy) => {
   }));
 
   if (!solution?.amounts) return cards;
-  let totalAmount = 0;
 
+  let totalAmount = solution.budget_left || 0;
   for (const a of solution.amounts.values()) {
     totalAmount += a;
   }
@@ -105,14 +105,10 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
 
-  const [budget, pfolioAmount, assets, quoteCcy] = useSelector((state) => {
-    return [
-      state.pfolio.budget,
-      state.pfolio.totalAmount,
-      state.pfolio.assets,
-      state.pfolio.quoteCcy,
-    ];
-  });
+  const budget = useSelector((state) => state.pfolio.budget);
+  const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
+  const assets = useSelector((state) => state.pfolio.assets);
+  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
 
   const cards = solution ? buildCards(budget, assets, solution, quoteCcy) : [];
 
@@ -131,15 +127,20 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
         useWholeShares
       );
 
-      const sol = await solver.makeAndSolve(
-        inputBudget,
-        as,
-        quoteCcy,
-        useTaxEfficient,
-        useWholeShares
-      );
-      await Thread.terminate(solver);
-      return sol;
+      try {
+        const sol = await solver.makeAndSolve(
+          inputBudget,
+          as,
+          quoteCcy,
+          useTaxEfficient,
+          useWholeShares
+        );
+        await Thread.terminate(solver);
+        return sol;
+      } catch (error) {
+        console.error("Unexpected exception in dcapal-optimizer:", error);
+        return null;
+      }
     };
 
     const solve = async () => {
