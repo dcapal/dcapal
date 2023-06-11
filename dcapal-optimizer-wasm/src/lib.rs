@@ -239,6 +239,12 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
             .sum::<Decimal>()
             .round_dp(AMOUNT_DECIMALS);
 
+        if budget + current_total <= Decimal::ZERO {
+            return Err(format!(
+                "Invalid input. Budget + portfolio value must be positive. (budget={budget} portfolio_value={current_total})"
+            ));
+        }
+
         Ok(advanced::ProblemOptions {
             pfolio_ccy: options.pfolio_ccy,
             current_pfolio_amount: current_total,
