@@ -4,11 +4,11 @@ use log::debug;
 use minilp::{ComparisonOp, OptimizationDirection, Variable};
 use rust_decimal::prelude::*;
 
-use crate::{AMOUNT_DECIMALS, WEIGHT_DECIMALS};
+use crate::{utils::parse_amount, AMOUNT_DECIMALS, WEIGHT_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
-    pub budget: f64,
+    pub budget: Decimal,
     pub assets: HashMap<String, ProblemAsset>,
     pub is_buy_only: bool,
 }
@@ -16,8 +16,8 @@ pub struct ProblemOptions {
 #[derive(Debug, Clone)]
 pub struct ProblemAsset {
     pub symbol: String,
-    pub target_weight: f64,
-    pub current_amount: f64,
+    pub target_weight: Decimal,
+    pub current_amount: Decimal,
 }
 
 pub struct Problem {
@@ -36,9 +36,10 @@ impl Problem {
         //    a_i - invested amount for asset i
         //    s_i - slack between solution weight and target weight for asset i
         let mut vars = HashMap::new();
-        let budget_inv = 1. / options.budget;
+        let budget = options.budget.to_f64().unwrap();
+        let budget_inv = 1. / budget;
         for (aid, asset) in &options.assets {
-            let a_i = problem.add_var(0., (0., options.budget));
+            let a_i = problem.add_var(0., (0., budget));
             let s_i_neg = problem.add_var(1., (0., f64::INFINITY));
             let s_i_pos = problem.add_var(1., (0., f64::INFINITY));
 
@@ -48,7 +49,7 @@ impl Problem {
             problem.add_constraint(
                 [(a_i, budget_inv), (s_i_neg, 1.)],
                 ComparisonOp::Ge,
-                asset.target_weight,
+                asset.target_weight.to_f64().unwrap(),
             );
 
             // s_i_pos >= a_i / budget - target_weight
@@ -57,7 +58,7 @@ impl Problem {
             problem.add_constraint(
                 [(a_i, budget_inv), (s_i_pos, -1.)],
                 ComparisonOp::Le,
-                asset.target_weight,
+                asset.target_weight.to_f64().unwrap(),
             );
 
             vars.insert(aid.clone(), a_i);
@@ -68,7 +69,7 @@ impl Problem {
         problem.add_constraint(
             vars.values().copied().map(|a_i| (a_i, 1.0)),
             ComparisonOp::Eq,
-            options.budget,
+            budget,
         );
 
         if options.is_buy_only {
@@ -78,7 +79,13 @@ impl Problem {
                 problem.add_constraint(
                     [(*a_i, 1.0)],
                     ComparisonOp::Ge,
-                    options.assets.get(aid).unwrap().current_amount,
+                    options
+                        .assets
+                        .get(aid)
+                        .unwrap()
+                        .current_amount
+                        .to_f64()
+                        .unwrap(),
                 );
             }
         }
@@ -94,7 +101,7 @@ impl Problem {
 pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMap<String, f64> {
     let options = &problem.options;
 
-    let budget = parse_amount(options.budget);
+    let budget = options.budget;
     let mut assets = parse_assets(options, vars);
 
     debug!("assets = {:?}", assets);
@@ -209,13 +216,13 @@ impl Asset {
 }
 
 fn parse_assets(options: &ProblemOptions, vars: &HashMap<String, f64>) -> HashMap<String, Asset> {
-    let budget = parse_amount(options.budget);
+    let budget = &options.budget;
 
     vars.iter()
         .map(|(aid, solution_amount)| {
             let asset = options.assets.get(aid).unwrap();
-            let current_amount = parse_amount(asset.current_amount);
-            let target_weight = parse_weight(asset.target_weight);
+            let current_amount = asset.current_amount;
+            let target_weight = asset.target_weight;
             let target_amount = (target_weight * budget).round_dp(AMOUNT_DECIMALS);
             let current_weight = (current_amount / budget).round_dp(WEIGHT_DECIMALS);
             let solution_amount = parse_amount(*solution_amount);
@@ -236,20 +243,14 @@ fn parse_assets(options: &ProblemOptions, vars: &HashMap<String, f64>) -> HashMa
         .collect()
 }
 
-fn parse_amount(v: f64) -> Decimal {
-    Decimal::from_f64(v).unwrap().round_dp(AMOUNT_DECIMALS)
-}
-
-fn parse_weight(v: f64) -> Decimal {
-    Decimal::from_f64(v).unwrap().round_dp(WEIGHT_DECIMALS)
-}
-
 #[cfg(test)]
 mod tests {
+    use rust_decimal_macros::dec;
+
     use super::*;
 
     fn build_60_40_portfolio_no_allocation(is_buy_only: bool) -> (Problem, Vec<String>) {
-        let budget = 100.;
+        let budget = dec!(100.);
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
         let assets = HashMap::from([
@@ -257,16 +258,16 @@ mod tests {
                 vwce.clone(),
                 ProblemAsset {
                     symbol: vwce.clone(),
-                    current_amount: 0.,
-                    target_weight: 0.6,
+                    current_amount: dec!(0.),
+                    target_weight: dec!(0.6),
                 },
             ),
             (
                 aggh.clone(),
                 ProblemAsset {
                     symbol: aggh.clone(),
-                    current_amount: 0.,
-                    target_weight: 0.4,
+                    current_amount: dec!(0.),
+                    target_weight: dec!(0.4),
                 },
             ),
         ]);
@@ -311,7 +312,7 @@ mod tests {
     }
 
     fn build_60_40_portfolio_unbalanced(is_buy_only: bool) -> (Problem, Vec<String>) {
-        let budget = 100.;
+        let budget = dec!(100.);
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
         let assets = HashMap::from([
@@ -319,16 +320,16 @@ mod tests {
                 vwce.clone(),
                 ProblemAsset {
                     symbol: vwce.clone(),
-                    current_amount: 65.,
-                    target_weight: 0.6,
+                    current_amount: dec!(65.),
+                    target_weight: dec!(0.6),
                 },
             ),
             (
                 aggh.clone(),
                 ProblemAsset {
                     symbol: aggh.clone(),
-                    current_amount: 25.,
-                    target_weight: 0.4,
+                    current_amount: dec!(25.),
+                    target_weight: dec!(0.4),
                 },
             ),
         ]);
@@ -372,7 +373,7 @@ mod tests {
     }
 
     fn build_three_assets_portfolio(is_buy_only: bool) -> (Problem, Vec<String>) {
-        let budget = 7706.12;
+        let budget = dec!(7706.12);
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
         let reit = "EPRU".to_string();
@@ -381,24 +382,24 @@ mod tests {
                 vwce.clone(),
                 ProblemAsset {
                     symbol: vwce.clone(),
-                    current_amount: 5420.10,
-                    target_weight: 0.8,
+                    current_amount: dec!(5420.10),
+                    target_weight: dec!(0.8),
                 },
             ),
             (
                 aggh.clone(),
                 ProblemAsset {
                     symbol: aggh.clone(),
-                    current_amount: 680.93,
-                    target_weight: 0.1,
+                    current_amount: dec!(680.93),
+                    target_weight: dec!(0.1),
                 },
             ),
             (
                 reit.clone(),
                 ProblemAsset {
                     symbol: reit.clone(),
-                    current_amount: 605.48,
-                    target_weight: 0.1,
+                    current_amount: dec!(605.48),
+                    target_weight: dec!(0.1),
                 },
             ),
         ]);
@@ -445,7 +446,7 @@ mod tests {
 
     #[test]
     fn it_solves_my_problem() -> anyhow::Result<()> {
-        let budget = 17_069.12;
+        let budget = dec!(17_069.12);
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
         let epra = "EPRA".to_string();
@@ -456,40 +457,40 @@ mod tests {
                 vwce.clone(),
                 ProblemAsset {
                     symbol: vwce.clone(),
-                    current_amount: 10_193.68,
-                    target_weight: 0.7,
+                    current_amount: dec!(10_193.68),
+                    target_weight: dec!(0.7),
                 },
             ),
             (
                 aggh.clone(),
                 ProblemAsset {
                     symbol: aggh.clone(),
-                    current_amount: 2_646.31,
-                    target_weight: 0.2,
+                    current_amount: dec!(2_646.31),
+                    target_weight: dec!(0.2),
                 },
             ),
             (
                 epra.clone(),
                 ProblemAsset {
                     symbol: epra.clone(),
-                    current_amount: 775.75,
-                    target_weight: 0.02,
+                    current_amount: dec!(775.75),
+                    target_weight: dec!(0.02),
                 },
             ),
             (
                 btc.clone(),
                 ProblemAsset {
                     symbol: btc.clone(),
-                    current_amount: 920.55,
-                    target_weight: 0.055,
+                    current_amount: dec!(920.55),
+                    target_weight: dec!(0.055),
                 },
             ),
             (
                 eth.clone(),
                 ProblemAsset {
                     symbol: eth.clone(),
-                    current_amount: 532.83,
-                    target_weight: 0.025,
+                    current_amount: dec!(532.83),
+                    target_weight: dec!(0.025),
                 },
             ),
         ]);

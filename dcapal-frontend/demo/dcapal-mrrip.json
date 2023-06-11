@@ -4,6 +4,7 @@
     {
       "symbol": "VT",
       "name": "Vanguard Total World Stock Index Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 82.91213839618005,
@@ -15,6 +16,7 @@
     {
       "symbol": "VBR",
       "name": "Vanguard Small Cap Value Index Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 149.80114108553252,
@@ -26,6 +28,7 @@
     {
       "symbol": "VSS",
       "name": "Vanguard FTSE All-World ex-US Small Capital Index Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 100.4563310492777,
@@ -37,6 +40,7 @@
     {
       "symbol": "VTV",
       "name": "Vanguard Value Index Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 127.43867394504097,
@@ -48,6 +52,7 @@
     {
       "symbol": "VYM",
       "name": "Vanguard High Dividend Yield Index Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 97.61260147296642,
@@ -59,6 +64,7 @@
     {
       "symbol": "VYMI",
       "name": "Vanguard International High Dividend Yield Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 57.92323604369773,
@@ -70,6 +76,7 @@
     {
       "symbol": "SONY",
       "name": "Sony Group Corporation",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 80.07785843795462,
@@ -81,6 +88,7 @@
     {
       "symbol": "BSV",
       "name": "Vanguard Short-Term Bond Index Fund",
+      "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
       "price": 71.23490439165549,
@@ -92,6 +100,7 @@
     {
       "symbol": "AGGS.SW",
       "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "aclass": "EQUITY",
       "baseCcy": "chf",
       "provider": "YF",
       "price": 4.597832537508098,
@@ -103,6 +112,7 @@
     {
       "symbol": "GHYC.SW",
       "name": "iShares Global High Yield Corp Bond CHF Hedged UCITS ETF (Dist)",
+      "aclass": "EQUITY",
       "baseCcy": "chf",
       "provider": "YF",
       "price": 74.09358315611607,
@@ -114,6 +124,7 @@
     {
       "symbol": "VEMT.AS",
       "name": "Vanguard USD Emerging Markets Government Bond UCITS ETF",
+      "aclass": "EQUITY",
       "baseCcy": "eur",
       "provider": "YF",
       "price": 38.16999816894531,

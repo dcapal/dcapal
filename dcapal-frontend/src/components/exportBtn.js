@@ -1,6 +1,7 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import { Step } from "../app/appSlice";
+import { aclassToString } from "./allocationFlow/portfolioStep/portfolioSlice";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 
@@ -8,6 +9,7 @@ const exportPfolio = (pfolio) => {
   const assets = Object.values(pfolio.assets).map((a) => ({
     symbol: a.symbol,
     name: a.name,
+    aclass: aclassToString(a.aclass),
     baseCcy: a.baseCcy,
     provider: a.provider,
     price: a.price,

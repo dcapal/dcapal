@@ -42,6 +42,7 @@ export const PortfolioStep = ({ ...props }) => {
       addAsset({
         symbol: asset.symbol,
         name: asset.name,
+        aclass: asset.aclass,
         price: asset.price,
         baseCcy: asset.baseCcy,
         provider: asset.provider,
@@ -88,6 +89,7 @@ export const PortfolioStep = ({ ...props }) => {
               key={a.symbol}
               symbol={a.symbol}
               name={a.name}
+              aclass={a.aclass}
               price={a.price}
               qty={a.qty}
               setQty={setAssetQty}

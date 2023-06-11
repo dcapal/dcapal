@@ -1,6 +1,12 @@
 use std::sync::Once;
 
 use log::Level;
+use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
+
+use crate::AMOUNT_DECIMALS;
+use crate::SHARES_DECIMALS;
+use crate::WEIGHT_DECIMALS;
 
 static INIT: Once = Once::new();
 
@@ -31,14 +37,14 @@ fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-pub trait Round {
-    fn round_n(&self, decimals: u32) -> Self;
+pub fn parse_amount(amount: f64) -> Decimal {
+    Decimal::from_f64(amount).unwrap().round_dp(AMOUNT_DECIMALS)
 }
 
-impl Round for f64 {
-    fn round_n(&self, decimals: u32) -> Self {
-        let pow = f64::powi(10.0, decimals as i32);
+pub fn parse_weight(weight: f64) -> Decimal {
+    Decimal::from_f64(weight).unwrap().round_dp(WEIGHT_DECIMALS)
+}
 
-        (self * pow).round() / pow
-    }
+pub fn parse_shares(shares: f64) -> Decimal {
+    Decimal::from_f64(shares).unwrap().round_dp(SHARES_DECIMALS)
 }

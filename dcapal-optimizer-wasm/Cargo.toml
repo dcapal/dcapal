@@ -1,6 +1,6 @@
 [package]
 name = "dcapal-optimizer-wasm"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 edition = "2021"
 
@@ -12,26 +12,28 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 # WASM dependencies
-wasm-bindgen = { version = "0.2.63", features = ["serde-serialize"] }
-js-sys = "0"
-wasm-logger = "0.2"
-console_error_panic_hook = { version = "0.1.6", optional = true }
+wasm-bindgen = { version = "0.2.84", features = ["serde-serialize"] }
+js-sys = "0.3.61"
+wasm-logger = "0.2.0"
+console_error_panic_hook = { version = "0.1.7", optional = true }
 # Library dependencies
-log = "0"
-minilp = "0"
+log = "0.4.17"
+minilp = "0.2.2"
 serde = { version = "1", features = ["derive"] }
-serde-wasm-bindgen = "0"
+serde-wasm-bindgen = "0.5.0"
 wasm-bindgen-futures = "0.4.32"
 futures = "0.3.23"
 anyhow = "1.0.62"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 getrandom = { version = "0.2.7", features = ["js"] }
-rust_decimal = "1.29"
-rust_decimal_macros = "1.29"
+rust_decimal = "1.29.0"
+rust_decimal_macros = "1.29.0"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
+env_logger = "0.10.0"
+test-log = { version = "0", features = ["log"] }
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

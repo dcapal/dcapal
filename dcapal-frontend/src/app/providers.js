@@ -1,6 +1,7 @@
 import axios from "axios";
 import { api } from "./api";
 import { DCAPAL_API, DCAPAL_API_CHART } from "./config";
+import { ACLASS } from "../components/allocationFlow/portfolioStep/portfolioSlice";
 
 export const Provider = Object.freeze({
   DCA_PAL: "DCAPal",
@@ -143,9 +144,12 @@ export const fetchAssetsDcaPal = async (type) => {
       return [];
     }
 
+    const aclass = type === "fiat" ? ACLASS.CURRENCY : ACLASS.CRYPTO;
+
     return response.data.map((asset) => ({
       symbol: asset.id,
       name: asset.symbol,
+      aclass: aclass,
     }));
   } catch (error) {
     if (!axios.isCancel(error)) {

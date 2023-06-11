@@ -13,6 +13,7 @@ import {
 } from "../../../app/providers";
 import { DCAPAL_API_SEARCH } from "../../../app/config";
 import { Spinner } from "../../spinner/spinner";
+import { ACLASS } from "./portfolioSlice";
 
 let searchId = undefined;
 
@@ -38,6 +39,7 @@ const fetchAssetsYF = async (query) => {
         symbol: quote.symbol,
         type: quote.quoteType,
         exchange: quote.exchange,
+        aclass: ACLASS.EQUITY,
       }));
   } catch (error) {
     if (!axios.isCancel(error)) {
@@ -238,6 +240,7 @@ const SearchItemCW = (props) => {
     props.addAsset({
       symbol: props.data.symbol,
       name: props.data.name,
+      aclass: props.data.aclass,
       price: price,
       baseCcy: props.data.symbol,
       provider: Provider.DCA_PAL,
@@ -331,6 +334,7 @@ const SearchItemYF = (props) => {
     props.addAsset({
       symbol: props.data.symbol,
       name: props.data.name,
+      aclass: props.data.aclass,
       price: price,
       baseCcy: baseCcy,
       provider: Provider.YF,

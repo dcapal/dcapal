@@ -1,4 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { roundPrice } from "../../../utils";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -8,6 +9,45 @@ const updateWeight = (asset, totalAmount) => {
   const weight = totalAmount > 0 ? amount / totalAmount : 0;
 
   asset.weight = weight * 100;
+};
+
+export const ACLASS = Object.freeze({
+  UNDEFINED: 0,
+  EQUITY: 10,
+  CRYPTO: 20,
+  CURRENCY: 30,
+});
+
+export const isWholeShares = (aclass) => {
+  switch (aclass) {
+    case ACLASS.EQUITY:
+      return true;
+    default:
+      return false;
+  }
+};
+
+export const aclassToString = (aclass) => {
+  switch (aclass) {
+    case ACLASS.UNDEFINED:
+      return "UNDEFINED";
+    case ACLASS.EQUITY:
+      return "EQUITY";
+    case ACLASS.CRYPTO:
+      return "CRYPTO";
+    case ACLASS.CURRENCY:
+      return "CURRENCY";
+    default:
+      return "UNDEFINED";
+  }
+};
+
+export const parseAClass = (aclassStr) => {
+  if (aclassStr === "EQUITY") return ACLASS.EQUITY;
+  if (aclassStr === "CRYPTO") return ACLASS.CRYPTO;
+  if (aclassStr === "CURRENCY") return ACLASS.CURRENCY;
+
+  return ACLASS.UNDEFINED;
 };
 
 export const portfolioSlice = createSlice({
@@ -30,8 +70,9 @@ export const portfolioSlice = createSlice({
           idx: state.nextIdx,
           symbol: action.payload.symbol,
           name: action.payload.name,
+          aclass: action.payload.aclass,
           baseCcy: action.payload.baseCcy,
-          price: action.payload.price || 0,
+          price: roundPrice(action.payload.price) || 0,
           provider: action.payload.provider,
           qty: 0,
           amount: 0,

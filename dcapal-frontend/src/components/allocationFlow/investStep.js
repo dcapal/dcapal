@@ -1,18 +1,30 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
+import classNames from "classnames";
 
-export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
+export const InvestStep = ({
+  useTaxEfficient,
+  useWholeShares,
+  setUseTaxEfficient,
+  setUseWholeShares,
+}) => {
   const [cash, setCash] = useState(0);
   const dispatch = useDispatch();
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
 
+  const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
+
   const onClickTaxEfficient = (e) => {
     setUseTaxEfficient(!useTaxEfficient);
+  };
+
+  const onClickWholeShares = (e) => {
+    setUseWholeShares(!useWholeShares);
   };
 
   const onClickGoBack = () => {
@@ -29,7 +41,7 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
       <div className="mt-2 mb-8 text-3xl font-light">
         How much you would like to allocate?
       </div>
-      <div className="w-full flex justify-center items-end">
+      <div className="w-full flex justify-center items-end mb-20">
         <div className="w-full">
           <InputNumber
             textSize="4rem"
@@ -48,7 +60,7 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
       </div>
       <div className="w-full flex flex-col gap-1 justify-start">
         <div
-          className="w-full mt-20 flex items-center cursor-pointer"
+          className="w-full flex items-center cursor-pointer"
           onClick={onClickTaxEfficient}
         >
           <input
@@ -71,6 +83,51 @@ export const InvestStep = ({ useTaxEfficient, setUseTaxEfficient }) => {
           suggestions. Otherwise, we might suggest to sell part of your
           positions.
         </p>
+      </div>
+      <div className="w-full mt-6 flex flex-col gap-3">
+        <div
+          className="flex gap-1 items-center font-light text-xs"
+          {...getToggleProps()}
+        >
+          <span
+            className={classNames("transition-transform", {
+              "rotate-90": isExpanded,
+            })}
+          >
+            {">"}
+          </span>
+          <span>Advanced</span>
+        </div>
+        <div
+          className="w-full pl-6 flex flex-col gap-1 justify-start text-sm"
+          {...getCollapseProps()}
+        >
+          <div
+            className="w-full flex items-center cursor-pointer"
+            onClick={onClickWholeShares}
+          >
+            <input
+              id="tax-efficient-checkbox"
+              type="checkbox"
+              className="w-4 h-4 accent-neutral-500 cursor-pointer"
+              checked={useWholeShares}
+              onChange={onClickWholeShares}
+            />
+            <label
+              htmlFor="#tax-efficient-checkbox"
+              className="ml-2 cursor-pointer select-none"
+            >
+              <span className="font-medium">Don't split</span> whole shares
+            </label>
+          </div>
+          <p className="text-sm font-light">
+            With <span className="italic">Don't split whole shares</span>{" "}
+            option, we are going to suggest the number of shares to buy or sell
+            for non-fractional assets like Stocks or ETFs. Otherwise, we might
+            suggest theoretically optimal amounts to buy or sell but you will
+            need to figure out how many shares to buy.
+          </p>
+        </div>
       </div>
       <div className="w-full mt-6 flex items-center justify-between">
         <span

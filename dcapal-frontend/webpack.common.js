@@ -3,7 +3,6 @@ const webpack = require("webpack");
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
-const ThreadsPlugin = require("threads-plugin");
 
 module.exports = (env, argv) => {
   const devMode = argv.mode !== "production";
@@ -11,10 +10,8 @@ module.exports = (env, argv) => {
   console.log("  devMode:", devMode);
 
   return {
-    entry: "./src/index.js",
     output: {
-      path: path.resolve(__dirname, "dist"),
-      filename: "bundle.[hash].js",
+      filename: "bundle.[contenthash].js",
       publicPath: "/",
     },
     module: {
@@ -51,14 +48,19 @@ module.exports = (env, argv) => {
         title: "DcaPal - A smart assistant for your periodic investments",
         template: path.resolve(__dirname, "src", "index.html"),
       }),
-      new CopyWebpackPlugin([
-        {
-          from: path.resolve(__dirname, "static"),
-          to: path.resolve(__dirname, "dist"),
-        },
-      ]),
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: path.resolve(__dirname, "static"),
+            to: path.resolve(__dirname, "dist"),
+          },
+        ],
+      }),
       new webpack.HotModuleReplacementPlugin(),
-      new ThreadsPlugin(),
     ],
+    experiments: {
+      asyncWebAssembly: true,
+      syncWebAssembly: true,
+    },
   };
 };
