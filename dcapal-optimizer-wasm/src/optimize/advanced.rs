@@ -148,14 +148,14 @@ impl Problem {
             let mut budget_left_next = budget_left;
 
             // Allocate budget depending on target weight
-            let mut is_any_unallocated = false;
+            let mut is_all_unallocated = true;
             for (i, asset) in open_assets.iter_mut().enumerate() {
                 let w_i = adjusted_weights[i];
                 let allocated = amount_to_allocate(asset, budget_left, w_i);
                 let allocated_shares = shares_to_allocate(asset, allocated);
 
-                if allocated_shares.is_zero() {
-                    is_any_unallocated = true;
+                if allocated_shares > Decimal::ZERO {
+                    is_all_unallocated = false;
                 }
 
                 // Update allocated amount depending on shares allocated
@@ -169,7 +169,11 @@ impl Problem {
             }
 
             // Update open_assets and rescaled weights
-            check_fully_allocated_assets(&mut open_assets, budget_left_next, is_any_unallocated);
+            check_fully_allocated_assets(&mut open_assets);
+            if is_all_unallocated {
+                unblock_ties(&mut open_assets, budget_left);
+            }
+
             budget_left = budget_left_next;
             w_sum = open_assets.iter().map(|a| a.target_weight).sum();
             adjusted_weights = open_assets
@@ -250,11 +254,7 @@ fn shares_to_allocate(asset: &Asset, allocated_amount: Decimal) -> Decimal {
 }
 
 /// Remove fully allocated assets
-fn check_fully_allocated_assets(
-    open_assets: &mut Vec<&mut Asset>,
-    budget_left: Decimal,
-    is_any_unallocated: bool,
-) {
+fn check_fully_allocated_assets(open_assets: &mut Vec<&mut Asset>) {
     // Remove fully-allocated assets
     let mut i = 0;
     while i < open_assets.len() {
@@ -277,40 +277,40 @@ fn check_fully_allocated_assets(
             i += 1;
         }
     }
+}
 
-    if is_any_unallocated {
-        let mut not_enough_budget_idx = None;
-        let mut min_target_distance = Decimal::MAX;
+fn unblock_ties(open_assets: &mut Vec<&mut Asset>, budget_left: Decimal) {
+    let mut not_enough_budget_idx = None;
+    let mut min_target_distance = Decimal::MAX;
 
-        // Find asset closest to target allocation we don't have budget for
-        for (i, asset) in open_assets.iter().enumerate() {
-            let target_distance = asset.target_amount - asset.amount;
-            if asset.price > budget_left && target_distance < min_target_distance {
-                // Cannot allocate more to this asset -- not enough budget
-                min_target_distance = target_distance;
-                not_enough_budget_idx = Some(i);
-            }
+    // Find asset closest to target allocation we don't have budget for
+    for (i, asset) in open_assets.iter().enumerate() {
+        let target_distance = asset.target_amount - asset.amount;
+        if asset.price > budget_left && target_distance < min_target_distance {
+            // Cannot allocate more to this asset -- not enough budget
+            min_target_distance = target_distance;
+            not_enough_budget_idx = Some(i);
         }
+    }
 
-        if let Some(idx) = not_enough_budget_idx {
-            open_assets.remove(idx);
-            return;
-        }
+    if let Some(idx) = not_enough_budget_idx {
+        open_assets.remove(idx);
+        return;
+    }
 
-        // Otherwise, just find the asset closest to target allocation to remove
-        min_target_distance = Decimal::MAX;
-        for (i, asset) in open_assets.iter().enumerate() {
-            let target_distance = asset.target_amount - asset.amount;
-            if target_distance < min_target_distance {
-                // Cannot allocate more to this asset -- not enough budget
-                min_target_distance = target_distance;
-                not_enough_budget_idx = Some(i);
-            }
+    // Otherwise, just find the asset closest to target allocation to remove
+    min_target_distance = Decimal::MAX;
+    for (i, asset) in open_assets.iter().enumerate() {
+        let target_distance = asset.target_amount - asset.amount;
+        if target_distance < min_target_distance {
+            // Cannot allocate more to this asset -- not enough budget
+            min_target_distance = target_distance;
+            not_enough_budget_idx = Some(i);
         }
+    }
 
-        if let Some(idx) = not_enough_budget_idx {
-            open_assets.remove(idx);
-        }
+    if let Some(idx) = not_enough_budget_idx {
+        open_assets.remove(idx);
     }
 }
 
