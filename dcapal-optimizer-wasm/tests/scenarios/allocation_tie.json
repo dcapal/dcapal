@@ -1,0 +1,116 @@
+{
+    "algorithm": "advanced",
+    "budget": 2000,
+    "isBuyOnly": true,
+    "portfolio": {
+        "quoteCcy": "eur",
+        "assets": [
+            {
+                "symbol": "VWCE.DE",
+                "name": "Vanguard FTSE All-World UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 100.26,
+                "qty": 162,
+                "amount": 16242.12,
+                "weight": 64.10671700055684,
+                "targetWeight": 56
+            },
+            {
+                "symbol": "ZPRV.DE",
+                "name": "SPDR MSCI USA Small Cap Value Weighted UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 49.45,
+                "qty": 36,
+                "amount": 1780.2,
+                "weight": 7.026347398270133,
+                "targetWeight": 7.2
+            },
+            {
+                "symbol": "ZPRX.DE",
+                "name": "SPDR MSCI Europe Small Cap Value Weighted UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 43.755,
+                "qty": 27,
+                "amount": 1181.385,
+                "weight": 4.662858904114909,
+                "targetWeight": 4.8
+            },
+            {
+                "symbol": "EUNA.DE",
+                "name": "iShares Core Global Aggregate Bond UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 4.6074,
+                "qty": 797,
+                "amount": 3672.0978,
+                "weight": 14.49355961309037,
+                "targetWeight": 12
+            },
+            {
+                "symbol": "EPRA.PA",
+                "name": "Amundi Index Solutions - Amundi Index FTSE EPRA NAREIT Global",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 57.067,
+                "qty": 14,
+                "amount": 798.938,
+                "weight": 3.1533625085266506,
+                "targetWeight": 3
+            },
+            {
+                "symbol": "btc",
+                "name": "Bitcoin",
+                "aclass": "CRYPTO",
+                "baseCcy": "btc",
+                "provider": "DCAPal",
+                "price": 25010.918,
+                "qty": 0.04474,
+                "amount": 1118.9884713200001,
+                "weight": 4.4165833806053,
+                "targetWeight": 3.5
+            },
+            {
+                "symbol": "eth",
+                "name": "Ethereum",
+                "aclass": "CRYPTO",
+                "baseCcy": "eth",
+                "provider": "DCAPal",
+                "price": 1597.2214,
+                "qty": 0.33955,
+                "amount": 542.33652637,
+                "weight": 2.140571194835811,
+                "targetWeight": 1.5
+            },
+            {
+                "symbol": "IS3R.DE",
+                "name": "iShares Edge MSCI World Momentum Factor UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 51.53,
+                "qty": 0,
+                "amount": 0,
+                "weight": 0,
+                "targetWeight": 12
+            }
+        ]
+    },
+    "expect": {
+        "result": "solved",
+        "solution": {
+            "VWCE.DE": {
+                "shares": 0,
+                "amount": 0,
+                "weight": 0
+            }
+        }
+    }
+}
