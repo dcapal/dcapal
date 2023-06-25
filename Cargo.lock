@@ -541,6 +541,7 @@ dependencies = [
  "env_logger",
  "futures",
  "getrandom",
+ "glob",
  "js-sys",
  "lazy_static",
  "log",
@@ -550,6 +551,7 @@ dependencies = [
  "rust_decimal_macros",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "test-log",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -810,6 +812,12 @@ dependencies = [
  "wasi",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "h2"

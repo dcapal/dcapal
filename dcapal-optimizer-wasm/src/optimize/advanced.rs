@@ -83,9 +83,9 @@ pub struct Problem {
 
 #[derive(Debug, Clone)]
 pub struct Solution {
-    pub(crate) is_solved: bool,
-    pub(crate) assets: HashMap<String, Asset>,
-    pub(crate) budget_left: Decimal,
+    pub is_solved: bool,
+    pub assets: HashMap<String, Asset>,
+    pub budget_left: Decimal,
 }
 
 impl Solution {

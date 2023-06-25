@@ -1,4 +1,4 @@
-mod optimize;
+pub mod optimize;
 mod utils;
 
 use optimize::{advanced, basic};
@@ -187,19 +187,19 @@ pub enum JsProblemOptions {
 
 #[derive(Serialize, Deserialize)]
 pub struct JsAdvancedOptions {
-    budget: f64,
-    pfolio_ccy: String,
-    assets: HashMap<String, JsAdvancedAsset>,
-    is_buy_only: bool,
+    pub budget: f64,
+    pub pfolio_ccy: String,
+    pub assets: HashMap<String, JsAdvancedAsset>,
+    pub is_buy_only: bool,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct JsAdvancedAsset {
-    symbol: String,
-    shares: f64,
-    price: f64,
-    target_weight: f64,
-    is_whole_shares: bool,
+    pub symbol: String,
+    pub shares: f64,
+    pub price: f64,
+    pub target_weight: f64,
+    pub is_whole_shares: bool,
 }
 
 impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
