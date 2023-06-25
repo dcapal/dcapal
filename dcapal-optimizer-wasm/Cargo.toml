@@ -27,13 +27,15 @@ anyhow = "1.0.62"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 getrandom = { version = "0.2.7", features = ["js"] }
-rust_decimal = "1.29.0"
+rust_decimal = { version = "1.29.0", features = ["serde-with-float"] }
 rust_decimal_macros = "1.29.0"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
 env_logger = "0.10.0"
 test-log = { version = "0", features = ["log"] }
+glob = "0.3.1"
+serde_json = "1"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
