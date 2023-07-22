@@ -169,7 +169,7 @@ impl Problem {
             }
 
             // Update open_assets and rescaled weights
-            check_fully_allocated_assets(&mut open_assets);
+            check_fully_allocated_assets(&mut open_assets, budget_left);
             if is_all_unallocated {
                 unblock_ties(&mut open_assets, budget_left);
             }
@@ -254,7 +254,7 @@ fn shares_to_allocate(asset: &Asset, allocated_amount: Decimal) -> Decimal {
 }
 
 /// Remove fully allocated assets
-fn check_fully_allocated_assets(open_assets: &mut Vec<&mut Asset>) {
+fn check_fully_allocated_assets(open_assets: &mut Vec<&mut Asset>, budget_left: Decimal) {
     // Remove fully-allocated assets
     let mut i = 0;
     while i < open_assets.len() {
@@ -264,9 +264,8 @@ fn check_fully_allocated_assets(open_assets: &mut Vec<&mut Asset>) {
             // Fully allocated
             let is_fully_allocated = asset.amount >= asset.target_amount;
 
-            // Cannot allocate more -- would cross target weight threshold
-            let no_more_shares =
-                asset.is_whole_shares && asset.target_amount - asset.amount < asset.price;
+            // Cannot allocate more -- Budget left higher than asset price
+            let no_more_shares = asset.is_whole_shares && asset.price > budget_left;
 
             is_fully_allocated || no_more_shares
         };
