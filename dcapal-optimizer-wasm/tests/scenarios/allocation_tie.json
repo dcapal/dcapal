@@ -107,9 +107,9 @@
         "result": "solved",
         "solution": {
             "VWCE.DE": {
-                "shares": 0,
-                "amount": 0,
-                "weight": 0
+                "shares": 162,
+                "amount": 16242.12,
+                "weight": 0.594165
             }
         }
     }

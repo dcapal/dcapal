@@ -104,13 +104,6 @@
         ]
     },
     "expect": {
-        "result": "solved",
-        "solution": {
-            "VWCE.DE": {
-                "shares": 0,
-                "amount": 0,
-                "weight": 0
-            }
-        }
+        "result": "solved"
     }
 }

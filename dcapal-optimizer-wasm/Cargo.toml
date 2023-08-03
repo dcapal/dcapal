@@ -24,6 +24,7 @@ serde-wasm-bindgen = "0.5.0"
 wasm-bindgen-futures = "0.4.32"
 futures = "0.3.23"
 anyhow = "1.0.62"
+thiserror = "1"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 getrandom = { version = "0.2.7", features = ["js"] }

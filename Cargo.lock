@@ -553,6 +553,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "test-log",
+ "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",

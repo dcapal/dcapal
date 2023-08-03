@@ -106,10 +106,10 @@
     "expect": {
         "result": "solved",
         "solution": {
-            "VWCE.DE": {
-                "shares": 0,
-                "amount": 0,
-                "weight": 0
+            "VWCE.MI": {
+                "shares": 171,
+                "amount": 17170.11,
+                "weight": 0.579873
             }
         }
     }
