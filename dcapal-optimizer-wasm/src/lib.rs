@@ -1,7 +1,10 @@
 pub mod optimize;
 mod utils;
 
-use optimize::{advanced, basic};
+use optimize::{
+    advanced::{self, TheoreticalAllocation},
+    basic, FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
+};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
@@ -10,14 +13,14 @@ use rust_decimal::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Mutex};
-use utils::{parse_amount, parse_shares, parse_weight};
+use utils::{parse_amount, parse_percentage, parse_shares};
 use wasm_bindgen::prelude::*;
 
 #[macro_use]
 extern crate lazy_static;
 
 const AMOUNT_DECIMALS: u32 = 4;
-const WEIGHT_DECIMALS: u32 = 6;
+const PERCENTAGE_DECIMALS: u32 = 6;
 const SHARES_DECIMALS: u32 = 8;
 
 lazy_static! {
@@ -129,10 +132,17 @@ impl Solver {
             .map(|(aid, v)| (aid.clone(), v.shares.to_f64().unwrap()))
             .collect();
 
+        let theo_allocs = solution
+            .assets
+            .iter()
+            .filter_map(|(aid, v)| v.theo_alloc.clone().map(|t| (aid.clone(), t.into())))
+            .collect();
+
         let js_solution = JsAdvancedSolution {
             budget_left,
             amounts,
             shares,
+            theo_allocs,
         };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
@@ -176,10 +186,28 @@ pub struct JsAdvancedSolution {
     pub budget_left: f64,
     pub amounts: HashMap<String, f64>,
     pub shares: HashMap<String, f64>,
+    pub theo_allocs: HashMap<String, JsTheoreticalAllocation>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct JsTheoreticalAllocation {
+    pub shares: f64,
+    pub amount: f64,
+    pub fees: f64,
+}
+
+impl From<TheoreticalAllocation> for JsTheoreticalAllocation {
+    fn from(value: TheoreticalAllocation) -> Self {
+        Self {
+            shares: value.shares.to_f64().unwrap(),
+            amount: value.amount.to_f64().unwrap(),
+            fees: value.fees.to_f64().unwrap(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum JsProblemOptions {
     Advanced(JsAdvancedOptions),
     Basic(JsBasicOptions),
@@ -191,6 +219,7 @@ pub struct JsAdvancedOptions {
     pub pfolio_ccy: String,
     pub assets: HashMap<String, JsAdvancedAsset>,
     pub is_buy_only: bool,
+    pub fees: Option<JsTransactionFees>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -200,6 +229,37 @@ pub struct JsAdvancedAsset {
     pub price: f64,
     pub target_weight: f64,
     pub is_whole_shares: bool,
+    pub fees: Option<JsTransactionFees>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsTransactionFees {
+    /// Maximum acceptable fee impact (as a rate, in [0..1] range)
+    pub max_fee_impact: Option<f64>,
+    pub fee_structure: JsFeeStructure,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum JsFeeStructure {
+    ZeroFee,
+    Fixed(JsFeeStructureFixed),
+    Variable(JsFeeStructureVariable),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsFeeStructureFixed {
+    pub fee_amount: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsFeeStructureVariable {
+    pub min_fee: Option<f64>,
+    pub max_fee: Option<f64>,
+    pub fee_rate: Option<f64>,
 }
 
 impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
@@ -245,12 +305,19 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
             ));
         }
 
+        let fees = options
+            .fees
+            .map(TransactionFees::try_from)
+            .transpose()?
+            .unwrap_or_default();
+
         Ok(advanced::ProblemOptions {
             pfolio_ccy: options.pfolio_ccy,
             current_pfolio_amount: current_total,
             assets,
             budget,
             is_buy_only: options.is_buy_only,
+            fees,
         })
     }
 }
@@ -265,6 +332,7 @@ impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
             price,
             target_weight,
             is_whole_shares,
+            fees,
         } = asset;
 
         if symbol.is_empty() {
@@ -305,12 +373,92 @@ impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
             shares
         };
 
+        let fees = fees.map(TransactionFees::try_from).transpose()?;
+
         Ok(advanced::ProblemAsset {
             symbol,
             shares: parse_shares(shares),
             price: parse_amount(price),
-            target_weight: parse_weight(target_weight),
+            target_weight: parse_percentage(target_weight),
             is_whole_shares,
+            fees,
+        })
+    }
+}
+
+impl TryFrom<JsTransactionFees> for TransactionFees {
+    type Error = String;
+
+    fn try_from(value: JsTransactionFees) -> Result<Self, Self::Error> {
+        if let Some(max) = value.max_fee_impact {
+            if !(0. ..=1.).contains(&max) {
+                return Err(format!(
+                    "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
+                ));
+            }
+        }
+
+        let max_fee_impact = value
+            .max_fee_impact
+            .map(parse_percentage)
+            .unwrap_or_else(TransactionFees::default_max_fee_impact);
+
+        Ok(Self {
+            max_fee_impact,
+            fee_structure: value.fee_structure.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<JsFeeStructure> for FeeStructure {
+    type Error = String;
+
+    fn try_from(value: JsFeeStructure) -> Result<Self, Self::Error> {
+        Ok(match value {
+            JsFeeStructure::ZeroFee => Self::default(),
+            JsFeeStructure::Fixed(fee) => FeeStructure::Fixed(fee.try_into()?),
+            JsFeeStructure::Variable(fee) => FeeStructure::Variable(fee.try_into()?),
+        })
+    }
+}
+
+impl TryFrom<JsFeeStructureFixed> for FeeStructureFixed {
+    type Error = String;
+
+    fn try_from(value: JsFeeStructureFixed) -> Result<Self, Self::Error> {
+        if let Some(amount) = value.fee_amount {
+            if amount < 0. {
+                return Err(format!("Invalid fee_amount ({amount}). Must be positive"));
+            }
+        }
+
+        let fee_amount = value.fee_amount.map(parse_amount).unwrap_or(Decimal::ZERO);
+
+        Ok(Self { fee_amount })
+    }
+}
+
+impl TryFrom<JsFeeStructureVariable> for FeeStructureVariable {
+    type Error = String;
+
+    fn try_from(value: JsFeeStructureVariable) -> Result<Self, Self::Error> {
+        if let Some(rate) = value.fee_rate {
+            if !(0. ..=1.).contains(&rate) {
+                return Err(format!(
+                    "Invalid fee_rate ({rate}). Must be in [0, 1] range"
+                ));
+            }
+        }
+
+        let fee_rate = value
+            .fee_rate
+            .map(parse_percentage)
+            .unwrap_or(Decimal::ZERO);
+
+        Ok(Self {
+            min_fee: value.min_fee.map(parse_amount),
+            max_fee: value.max_fee.map(parse_amount),
+            fee_rate,
         })
     }
 }
@@ -419,7 +567,7 @@ impl TryFrom<JsProblemAsset> for basic::ProblemAsset {
 
         Ok(basic::ProblemAsset {
             symbol,
-            target_weight: parse_weight(target_weight),
+            target_weight: parse_percentage(target_weight),
             current_amount: parse_amount(current_amount),
         })
     }

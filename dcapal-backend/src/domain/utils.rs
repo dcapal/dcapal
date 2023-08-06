@@ -63,7 +63,9 @@ where
 
     pub async fn get(&self) -> Option<ExpiringOnceCellValue<T>> {
         let lock = self.cell.read().await;
-        let Some(v) = lock.get() else { return None; };
+        let Some(v) = lock.get() else {
+            return None;
+        };
 
         if (self.is_expired)(v) {
             Some(ExpiringOnceCellValue {
