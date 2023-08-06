@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use dcapal_optimizer_wasm::{JsAdvancedAsset, JsAdvancedOptions, JsProblemOptions};
+use dcapal_optimizer_wasm::{
+    JsAdvancedAsset, JsAdvancedOptions, JsProblemOptions, JsTransactionFees,
+};
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +38,7 @@ impl Scenario {
                     pfolio_ccy,
                     assets,
                     is_buy_only,
+                    fees: self.portfolio.fees,
                 })
             }
         };
@@ -56,6 +59,7 @@ pub enum Algorithm {
 pub struct Portfolio {
     pub quote_ccy: String,
     pub assets: Vec<Asset>,
+    pub fees: Option<JsTransactionFees>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,6 +74,7 @@ pub struct Asset {
     pub qty: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
     pub target_weight: Decimal,
+    pub fees: Option<JsTransactionFees>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -118,6 +123,7 @@ impl From<Asset> for JsAdvancedAsset {
             price: value.price.to_f64().unwrap(),
             target_weight: value.target_weight.to_f64().unwrap() / 100.,
             is_whole_shares: value.aclass.is_whole_shares(),
+            fees: value.fees,
         }
     }
 }

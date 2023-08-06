@@ -4,7 +4,7 @@ use log::debug;
 use minilp::{ComparisonOp, OptimizationDirection, Variable};
 use rust_decimal::prelude::*;
 
-use crate::{utils::parse_amount, AMOUNT_DECIMALS, WEIGHT_DECIMALS};
+use crate::{utils::parse_amount, AMOUNT_DECIMALS, PERCENTAGE_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
@@ -128,7 +128,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
         let mut w_sum: Decimal = under_allocated.iter().map(|a| a.target_weight).sum();
         let mut adjusted_weights = under_allocated
             .iter()
-            .map(|a| (a.target_weight / w_sum).round_dp(WEIGHT_DECIMALS))
+            .map(|a| (a.target_weight / w_sum).round_dp(PERCENTAGE_DECIMALS))
             .collect::<Vec<Decimal>>();
 
         debug!(
@@ -145,7 +145,8 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
                         .round_dp(AMOUNT_DECIMALS);
 
                 asset.current_amount += allocated_amount;
-                asset.current_weight = (asset.current_amount / budget).round_dp(WEIGHT_DECIMALS);
+                asset.current_weight =
+                    (asset.current_amount / budget).round_dp(PERCENTAGE_DECIMALS);
                 leftover_next += w_i * leftover - allocated_amount;
             }
 
@@ -167,7 +168,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
             w_sum = under_allocated.iter().map(|a| a.target_weight).sum();
             adjusted_weights = under_allocated
                 .iter()
-                .map(|a| (a.target_weight / w_sum).round_dp(WEIGHT_DECIMALS))
+                .map(|a| (a.target_weight / w_sum).round_dp(PERCENTAGE_DECIMALS))
                 .collect::<Vec<Decimal>>();
 
             debug!(
@@ -224,9 +225,9 @@ fn parse_assets(options: &ProblemOptions, vars: &HashMap<String, f64>) -> HashMa
             let current_amount = asset.current_amount;
             let target_weight = asset.target_weight;
             let target_amount = (target_weight * budget).round_dp(AMOUNT_DECIMALS);
-            let current_weight = (current_amount / budget).round_dp(WEIGHT_DECIMALS);
+            let current_weight = (current_amount / budget).round_dp(PERCENTAGE_DECIMALS);
             let solution_amount = parse_amount(*solution_amount);
-            let solution_weight = (solution_amount / budget).round_dp(WEIGHT_DECIMALS);
+            let solution_weight = (solution_amount / budget).round_dp(PERCENTAGE_DECIMALS);
 
             (
                 aid.clone(),
