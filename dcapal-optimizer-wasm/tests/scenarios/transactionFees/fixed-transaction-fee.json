@@ -1,0 +1,128 @@
+{
+    "algorithm": "advanced",
+    "budget": 2300,
+    "isBuyOnly": true,
+    "portfolio": {
+        "quoteCcy": "eur",
+        "fees": {
+            "maxFeeImpact": 0.005,
+            "feeStructure": {
+                "type": "fixed",
+                "feeAmount": 2.95
+            }
+        },
+        "assets": [
+            {
+                "symbol": "VWCE.MI",
+                "name": "Vanguard FTSE All-World UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 101.49,
+                "qty": 162,
+                "amount": 16441.379999999997,
+                "weight": 59.11647752073499,
+                "targetWeight": 58
+            },
+            {
+                "symbol": "IWMO.MI",
+                "name": "iShares Edge MSCI World Momentum Factor UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 51.79,
+                "qty": 39,
+                "amount": 2019.81,
+                "weight": 7.26241060428965,
+                "targetWeight": 12
+            },
+            {
+                "symbol": "ZPRV.DU",
+                "name": "SPDR MSCI US.S.C.V.W.UETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 51.9,
+                "qty": 36,
+                "amount": 1868.3999999999999,
+                "weight": 6.718002174984172,
+                "targetWeight": 7.2
+            },
+            {
+                "symbol": "ZPRX.DU",
+                "name": "SPDR MSCI EUR.SM.CA.VALUE",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 44.625,
+                "qty": 27,
+                "amount": 1204.875,
+                "weight": 4.332237674258218,
+                "targetWeight": 4.8
+            },
+            {
+                "symbol": "AGGH.MI",
+                "name": "iShares Core Global Aggregate Bond UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 4.61,
+                "qty": 797,
+                "amount": 3674.17,
+                "weight": 13.210812487294795,
+                "targetWeight": 10
+            },
+            {
+                "symbol": "EPRA.PA",
+                "name": "Amundi Index Solutions - Amundi Index FTSE EPRA NAREIT Global",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 58.748,
+                "qty": 14,
+                "amount": 822.472,
+                "weight": 2.9572728991990913,
+                "targetWeight": 0
+            },
+            {
+                "symbol": "btc",
+                "name": "Bitcoin",
+                "aclass": "CRYPTO",
+                "baseCcy": "btc",
+                "provider": "DCAPal",
+                "price": 26898.1621,
+                "qty": 0.04474,
+                "amount": 1203.4237723540002,
+                "weight": 4.327019653233693,
+                "targetWeight": 5.6
+            },
+            {
+                "symbol": "eth",
+                "name": "Ethereum",
+                "aclass": "CRYPTO",
+                "baseCcy": "eth",
+                "provider": "DCAPal",
+                "price": 1700.2179,
+                "qty": 0.33955,
+                "amount": 577.308987945,
+                "weight": 2.0757669860053634,
+                "targetWeight": 2.4
+            }
+        ]
+    },
+    "expect": {
+        "result": "solved",
+        "solution": {
+            "ZPRV.DU": {
+                "shares": 36,
+                "amount": 1868.40,
+                "weight": 0.062049
+            },
+            "ZPRX.DU": {
+                "shares": 27,
+                "amount": 1204.875,
+                "weight": 0.040013
+            }
+        }
+    }
+}

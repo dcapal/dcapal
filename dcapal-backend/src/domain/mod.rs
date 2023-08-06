@@ -204,7 +204,9 @@ impl MarketDataService {
             .get_or_try_init(|| async { self.compute_conversion_rate(base, quote).await })
             .await;
 
-        let Err(e) = price else { return price.map(|p| p.into()); };
+        let Err(e) = price else {
+            return price.map(|p| p.into());
+        };
 
         if let DcaError::PriceNotAvailableId(ref id) = e {
             if let Some(p) = pricer.get().await {

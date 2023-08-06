@@ -79,7 +79,9 @@ fn build_solve_advanced(options: JsAdvancedOptions) -> Result<TestSolution> {
 fn check_expect_advanced(expected: &ExpectedSolution, sol: &Solution) {
     assert!(sol.is_solved, "Expected solved problem: sol={sol:?}");
 
-    let Some(ref expected) = expected.solution else { return; };
+    let Some(ref expected) = expected.solution else {
+        return;
+    };
 
     for (id, exp) in expected {
         let asset = sol.assets.get(id);
