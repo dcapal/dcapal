@@ -59,11 +59,10 @@ jobs:
           context: ./dcapal-backend
           file: ./dcapal-backend/docker/Dockerfile
           push: true
-          tags: ${{ env.DOCKER_REPO }}:latest,${{ env.DOCKER_REPO }}:${{ env.VERSION }} 
+          tags: ${{ env.DOCKER_REPO }}:latest,${{ env.DOCKER_REPO }}:${{ env.VERSION }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-      -
-        # Temp fix
+      - # Temp fix
         # https://github.com/docker/build-push-action/issues/252
         # https://github.com/moby/buildkit/issues/1896
         name: Move cache
@@ -74,64 +73,64 @@ jobs:
   optimizer-build:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: 1.65.0
-    - uses: Swatinem/rust-cache@v2
-    
-    - name: Install wasm-pack
-      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-    
-    - name: Toolchain info
-      run: |
-        cargo --version --verbose
-        rustc --version    
-        
-    - name: Build
-      run: |
-        cd dcapal-optimizer-wasm
-        wasm-pack build --release
-        
-    - name: Archive dcapal-optimizer-wasm pkg
-      uses: actions/upload-artifact@v3
-      with:
-        name: dcapal-optimizer-wasm-pkg
-        path: dcapal-optimizer-wasm/pkg
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Toolchain info
+        run: |
+          cargo --version --verbose
+          rustc --version
+
+      - name: Build
+        run: |
+          cd dcapal-optimizer-wasm
+          wasm-pack build --release
+
+      - name: Archive dcapal-optimizer-wasm pkg
+        uses: actions/upload-artifact@v3
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
 
   frontend-build:
     runs-on: ubuntu-22.04
     needs: optimizer-build
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 18
-        cache: 'npm'
-        cache-dependency-path: dcapal-frontend/package-lock.json
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: dcapal-frontend/package-lock.json
 
-    - name: Download dcapal-optimizer-wasm pkg
-      uses: actions/download-artifact@v3
-      with:
-        name: dcapal-optimizer-wasm-pkg
-        path: dcapal-optimizer-wasm/pkg
-    
-    - name: Install dependencies
-      run: |
-        cd dcapal-frontend
-        npm ci
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v3
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
 
-    - name: Build
-      run: |
-        cd dcapal-frontend
-        npm run build
+      - name: Install dependencies
+        run: |
+          cd dcapal-frontend
+          npm ci
 
-    - name: Archive dcapal-frontend
-      uses: actions/upload-artifact@v3
-      with:
-        name: dcapal-frontend-dist
-        path: dcapal-frontend/dist
-  
+      - name: Build
+        run: |
+          cd dcapal-frontend
+          npm run build
+
+      - name: Archive dcapal-frontend
+        uses: actions/upload-artifact@v3
+        with:
+          name: dcapal-frontend-dist
+          path: dcapal-frontend/dist
+
   deploy:
     runs-on: ubuntu-22.04
     needs: [build-docker-image, frontend-build]
@@ -142,7 +141,7 @@ jobs:
         with:
           name: dcapal-frontend-dist
           path: dcapal-frontend/dist
-      
+
       - name: Deploy dcapal-frontend
         uses: appleboy/scp-action@master
         with:
@@ -153,7 +152,7 @@ jobs:
           source: dcapal-frontend/dist
           target: ${{ secrets.WEB_DIR }}
           strip_components: 2
-      
+
       - name: Configure docker-compose.yml
         env:
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
@@ -260,7 +259,7 @@ jobs:
               user: ${REDIS_USER}
               password: ${REDIS_PASSWORD}
           EOF
-      
+
       - name: Deploy dcapal-backend config
         uses: appleboy/scp-action@master
         with:
