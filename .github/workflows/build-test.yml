@@ -79,9 +79,26 @@ jobs:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
 
-  frontend-build-test:
+  frontend-check:
     runs-on: ubuntu-22.04
     needs: optimizer-build-test
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: dcapal-frontend/package-lock.json
+    
+      - name: Check formatting
+        run: |
+          cd dcapal-frontend
+          npm ci
+          npm run check
+
+  frontend-build-test:
+    runs-on: ubuntu-22.04
+    needs: [frontend-check, optimizer-build-test] 
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
