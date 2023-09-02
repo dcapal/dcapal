@@ -14,7 +14,7 @@ export const Footer = () => {
         <Link to={"/about"}>About</Link>
         <a href="https://github.com/leonardoarcari/dcapal">Github</a>
       </div>
-      <p className="text-xs text-white/50">© 2023 Leonardo Arcari</p>
+      <p className="text-xs text-white/60">© 2023 Leonardo Arcari</p>
     </footer>
   );
 };
