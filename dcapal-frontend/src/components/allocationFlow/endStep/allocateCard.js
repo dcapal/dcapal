@@ -100,7 +100,7 @@ export const AllocateCard = ({
         </div>
         {qty >= 0 && (
           <div>
-            <p className="px-3 py-2 mt-[5px] whitespace-nowrap rounded-md bg-blue-100/50">
+            <p className="px-3 py-2 mt-[5px] rounded-md bg-blue-100/50">
               {qty > oldQty && (
                 <span className="font-light">
                   📈 Buy {roundDecimals(qty - oldQty, 6)}{" "}
