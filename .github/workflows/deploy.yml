@@ -56,7 +56,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          context: ./dcapal-backend
+          context: .
           file: ./dcapal-backend/docker/Dockerfile
           push: true
           tags: ${{ env.DOCKER_REPO }}:latest,${{ env.DOCKER_REPO }}:${{ env.VERSION }}
@@ -90,7 +90,7 @@ jobs:
       - name: Build
         run: |
           cd dcapal-optimizer-wasm
-          wasm-pack build --release
+          wasm-pack build --dev -- --profile release-wasm
 
       - name: Archive dcapal-optimizer-wasm pkg
         uses: actions/upload-artifact@v3

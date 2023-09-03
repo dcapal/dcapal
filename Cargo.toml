@@ -1,6 +1,16 @@
 [workspace]
+resolver = "2"
 members = ["dcapal-backend", "dcapal-optimizer-wasm"]
+
+[workspace.package]
+version = "0.2.2"
+authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 
 [profile.release-with-debug]
 inherits = "release"
 debug = true
+
+[profile.release-wasm]
+inherits = "release"
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
