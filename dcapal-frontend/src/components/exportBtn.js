@@ -1,9 +1,24 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import { Step } from "../app/appSlice";
-import { aclassToString } from "./allocationFlow/portfolioStep/portfolioSlice";
+import {
+  aclassToString,
+  feeTypeToString,
+} from "./allocationFlow/portfolioStep/portfolioSlice";
 
 const pad = (n) => `${n}`.padStart(2, "0");
+
+const toExportedFees = (fees) => {
+  if (!fees) return null;
+
+  return {
+    ...fees,
+    feeStructure: {
+      ...fees.feeStructure,
+      type: feeTypeToString(fees.feeStructure.type),
+    },
+  };
+};
 
 const exportPfolio = (pfolio) => {
   const assets = Object.values(pfolio.assets).map((a) => ({
@@ -17,9 +32,10 @@ const exportPfolio = (pfolio) => {
     amount: a.amount,
     weight: a.weight,
     targetWeight: a.targetWeight,
+    fees: a.fees != null ? toExportedFees(a.fees) : undefined,
   }));
 
-  const data = { quoteCcy: pfolio.quoteCcy, assets: assets };
+  const data = { quoteCcy: pfolio.quoteCcy, fees: pfolio.fees, assets: assets };
   const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
     JSON.stringify(data, null, 2)
   )}`;
@@ -40,10 +56,17 @@ const exportPfolio = (pfolio) => {
 export const ExportBtn = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
 
-  const pfolio = useSelector((state) => ({
-    assets: state.pfolio.assets,
-    quoteCcy: state.pfolio.quoteCcy,
-  }));
+  const assets = useSelector((state) => state.pfolio.assets);
+  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const fees = useSelector((state) => state.pfolio.fees);
+
+  const exportedFees = toExportedFees(fees);
+
+  const pfolio = {
+    assets: assets,
+    quoteCcy: quoteCcy,
+    fees: exportedFees,
+  };
 
   const isDisplay =
     step && step === Step.PORTFOLIO && Object.keys(pfolio.assets).length > 0;
