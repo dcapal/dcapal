@@ -17,9 +17,11 @@ import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 import { IKImage } from "imagekitio-react";
 import { IMAGEKIT_URL, MEDIA_SMALL } from "../../../app/config";
 import { ICON_BAG_SVG, ICON_PIECHART_SVG } from "../../../app/images";
+import { TransactionFees } from "./transactionFees";
 
 export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
+  const [isShowFees, setShowFees] = useState(false);
   const assetStore = useSelector((state) => state.pfolio.assets);
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const dispatch = useDispatch();
@@ -60,15 +62,46 @@ export const PortfolioStep = ({ ...props }) => {
     dispatch(setAllocationFlowStep({ step: Step.INVEST }));
   };
 
+  const onClickTransactionFees = () => {
+    isShowFees ? setShowFees(false) : setShowFees(true);
+  };
+
+  const feeBtnClass = classNames(
+    "px-3 pt-1.5 pb-2 z-30 flex justify-center items-center text-2xl font-medium rounded-md shadow-md border border-gray-300",
+    {
+      "bg-white hover:bg-neutral-600 hover:text-white hover:border-gray-600 active:bg-neutral-800":
+        !isShowFees,
+      "bg-neutral-600 text-white": isShowFees,
+    }
+  );
+
   return (
     <div className="w-full h-full flex flex-col pt-2 items-center">
-      <div className="w-full mt-2 mb-6">
+      <div className="w-full my-2">
         <SearchBar
           text={searchText}
           setText={setSearchText}
           addAsset={addAssetToPortfolio}
         />
       </div>
+      {assets && assets.length > 0 && (
+        <div className="relative w-full flex flex-col items-end justify-center mt-2">
+          <button className={feeBtnClass} onClick={onClickTransactionFees}>
+            ⚙️
+          </button>
+          {isShowFees && (
+            <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
+              <p className="font-light text-2xl">💸 Transaction fees</p>
+              <TransactionFees />
+            </div>
+          )}
+        </div>
+      )}
+      {assets && assets.length > 0 && (
+        <div className="w-full flex items-center mb-3 pl-3 font-light text-2xl">
+          Portfolio assets
+        </div>
+      )}
       <div className="w-full flex flex-col items-center">
         {assets.map((a, idx) => {
           const setAssetQty = (qty) => {
@@ -103,7 +136,7 @@ export const PortfolioStep = ({ ...props }) => {
       </div>
       {Object.keys(assetStore).length === 0 && (
         <span
-          className="font-medium underline cursor-pointer"
+          className="mt-2 font-medium underline cursor-pointer"
           onClick={onClickDiscard}
         >
           Go back

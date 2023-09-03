@@ -148,17 +148,17 @@ export const SearchBar = (props) => {
         onChange={handleAddAssetInputChange}
       />
       {isLoading && (
-        <div className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10 flex items-center justify-center font-light italic">
+        <div className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
           <Spinner width="2.5rem" height="2.5rem" />
         </div>
       )}
       {results && isEmptyResult && (
-        <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10 flex items-center justify-center font-light italic">
+        <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
           No asset found for '{props.text.toUpperCase()}'
         </div>
       )}
       {results && !isEmptyResult && (
-        <ul className="w-[calc(100%-2rem)] max-h-72 min-h-[10rem] overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-10">
+        <ul className="w-[calc(100%-2rem)] max-h-72 min-h-[10rem] overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40">
           {results.fiat.length > 0 && <SearchHeader text="cash" />}
           {results.fiat.map((r) => (
             <SearchItemCW

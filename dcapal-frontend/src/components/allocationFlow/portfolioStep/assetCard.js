@@ -5,6 +5,9 @@ import { useMediaQuery } from "@react-hook/media-query";
 import { InputNumber, InputNumberType } from "../../core/inputNumber";
 import { isWholeShares, removeAsset } from "./portfolioSlice";
 import { MEDIA_SMALL } from "../../../app/config";
+import { useCollapse } from "react-collapsed";
+import classNames from "classnames";
+import { TransactionFees } from "./transactionFees";
 
 export const AssetCard = ({
   symbol,
@@ -20,6 +23,7 @@ export const AssetCard = ({
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const dispatch = useDispatch();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
+  const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
   const priceFmt = {
     minimumFractionDigits: 2,
@@ -160,6 +164,27 @@ export const AssetCard = ({
           </div>
         </div>
       )}
+      <div className="w-full mt-4 flex flex-col gap-3">
+        <div
+          className="flex gap-1 items-center font-light text-xs"
+          {...getToggleProps()}
+        >
+          <span
+            className={classNames("transition-transform", {
+              "rotate-90": isExpanded,
+            })}
+          >
+            {">"}
+          </span>
+          <span>Transaction fees</span>
+        </div>
+        <div
+          className="w-full flex flex-col gap-1 justify-start text-sm"
+          {...getCollapseProps()}
+        >
+          <TransactionFees asset={symbol} />
+        </div>
+      </div>
     </div>
   );
 };

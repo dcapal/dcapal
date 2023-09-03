@@ -2,18 +2,20 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { roundAmount, roundDecimals, timeout } from "../../../utils";
+import { replacer, roundAmount, roundDecimals, timeout } from "../../../utils";
 import { Spinner } from "../../spinner/spinner";
 import {
   ACLASS,
+  FeeType,
   clearBudget,
+  feeTypeToString,
   isWholeShares,
 } from "../portfolioStep/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
-const buildCards = (budget, assets, solution, pfolioCcy) => {
+const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
   const cards = Object.values(assets).map((a) => ({
     symbol: a.symbol,
     name: a.name,
@@ -26,6 +28,8 @@ const buildCards = (budget, assets, solution, pfolioCcy) => {
     weight: 0,
     oldWeight: a.weight,
     targetWeight: a.targetWeight,
+    fees: a.fees ? a.fees : pfolioFees,
+    theoAlloc: null,
   }));
 
   if (!solution?.amounts) return cards;
@@ -41,8 +45,12 @@ const buildCards = (budget, assets, solution, pfolioCcy) => {
       card.weight = (100 * card.amount) / totalAmount;
     }
 
-    if (solution.shares?.has(card.symbol)) {
+    if (solution?.shares?.has(card.symbol)) {
       card.qty = solution.shares.get(card.symbol);
+    }
+
+    if (solution?.theo_allocs?.has(card.symbol)) {
+      card.theoAlloc = solution.theo_allocs.get(card.symbol);
     }
   }
 
@@ -59,13 +67,49 @@ const buildCards = (budget, assets, solution, pfolioCcy) => {
       weight: 0,
       oldWeight: 0,
       targetWeight: 0,
+      fees: null,
+      theo_alloc: null,
     });
   }
 
   return cards;
 };
 
-const buildProblemInput = (budget, pfolioAmount, assets, useWholeShares) => {
+const buildFeesInput = (fees) => {
+  if (!fees) {
+    return null;
+  }
+
+  let input = {
+    ...fees,
+    feeStructure: {
+      ...fees.feeStructure,
+      type: feeTypeToString(fees.feeStructure.type),
+    },
+  };
+
+  if (input.maxFeeImpact == null) {
+    delete input.maxFeeImpact;
+  } else if (input.maxFeeImpact) {
+    input.maxFeeImpact /= 100;
+  }
+
+  if (input.feeStructure.feeRate == null) {
+    delete input.feeStructure.feeRate;
+  } else if (input.feeStructure.feeRate) {
+    input.feeStructure.feeRate /= 100;
+  }
+
+  return input;
+};
+
+const buildProblemInput = (
+  budget,
+  pfolioAmount,
+  assets,
+  fees,
+  useWholeShares
+) => {
   if (!useWholeShares) {
     const problemBudget = budget + pfolioAmount;
     const as = Object.values(assets).reduce(
@@ -80,7 +124,7 @@ const buildProblemInput = (budget, pfolioAmount, assets, useWholeShares) => {
       {}
     );
 
-    return [problemBudget, as];
+    return [problemBudget, as, buildFeesInput(fees)];
   } else {
     const as = Object.values(assets).reduce(
       (as, a) => ({
@@ -91,12 +135,13 @@ const buildProblemInput = (budget, pfolioAmount, assets, useWholeShares) => {
           price: a.price,
           target_weight: a.targetWeight / 100,
           is_whole_shares: isWholeShares(a.aclass),
+          fees: buildFeesInput(a.fees),
         },
       }),
       {}
     );
 
-    return [budget, as];
+    return [budget, as, buildFeesInput(fees)];
   }
 };
 
@@ -109,8 +154,9 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
   const assets = useSelector((state) => state.pfolio.assets);
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const fees = useSelector((state) => state.pfolio.fees);
 
-  const cards = solution ? buildCards(budget, assets, solution, quoteCcy) : [];
+  const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
   useEffect(() => {
     const launchSolver = async () => {
@@ -120,11 +166,20 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
         })
       );
 
-      const [inputBudget, as] = buildProblemInput(
+      const [inputBudget, as, inputFees] = buildProblemInput(
         budget,
         pfolioAmount,
         assets,
+        fees,
         useWholeShares
+      );
+
+      console.debug(
+        `inputBudget=${inputBudget} as=${JSON.stringify(
+          as
+        )} quoteCcy=${quoteCcy} useTaxEfficient=${useTaxEfficient} useWholeShares=${useWholeShares} inputFees=${JSON.stringify(
+          inputFees
+        )}`
       );
 
       try {
@@ -133,9 +188,14 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
           as,
           quoteCcy,
           useTaxEfficient,
-          useWholeShares
+          useWholeShares,
+          inputFees
         );
+
         await Thread.terminate(solver);
+
+        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
+
         return sol;
       } catch (error) {
         console.error("Unexpected exception in dcapal-optimizer:", error);
@@ -190,6 +250,8 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
                 weight={c.weight}
                 oldWeight={c.oldWeight}
                 targetWeight={c.targetWeight}
+                fees={c.fees}
+                theoAlloc={c.theoAlloc}
               />
             ))}
           </div>

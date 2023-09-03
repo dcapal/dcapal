@@ -14,7 +14,9 @@ export const Footer = () => {
         <Link to={"/about"}>About</Link>
         <a href="https://github.com/leonardoarcari/dcapal">Github</a>
       </div>
-      <p className="text-xs text-white/70">© { new Date().getFullYear().toString() } Leonardo Arcari</p>
+      <p className="text-xs text-white/70">
+        © {new Date().getFullYear().toString()} Leonardo Arcari
+      </p>
     </footer>
   );
 };

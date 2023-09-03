@@ -50,6 +50,65 @@ export const parseAClass = (aclassStr) => {
   return ACLASS.UNDEFINED;
 };
 
+export const FeeType = Object.freeze({
+  ZERO_FEE: 10,
+  FIXED: 20,
+  VARIABLE: 30,
+});
+
+export const feeTypeToString = (type) => {
+  switch (type) {
+    case FeeType.ZERO_FEE:
+      return "zeroFee";
+    case FeeType.FIXED:
+      return "fixed";
+    case FeeType.VARIABLE:
+      return "variable";
+    default:
+      return "undefined";
+  }
+};
+
+export const parseFeeType = (typeStr) => {
+  if (typeStr === "zeroFee") return FeeType.ZERO_FEE;
+  if (typeStr === "fixed") return FeeType.FIXED;
+  if (typeStr === "variable") return FeeType.VARIABLE;
+
+  return null;
+};
+
+export const getDefaultFees = (type) => {
+  if (!type) {
+    return null;
+  }
+
+  if (type == FeeType.ZERO_FEE) {
+    return {
+      feeStructure: {
+        type: FeeType.ZERO_FEE,
+      },
+    };
+  } else if (type === FeeType.FIXED) {
+    return {
+      maxFeeImpact: null,
+      feeStructure: {
+        type: FeeType.FIXED,
+        feeAmount: 0,
+      },
+    };
+  } else {
+    return {
+      maxFeeImpact: null,
+      feeStructure: {
+        type: FeeType.VARIABLE,
+        feeRate: 0,
+        minFee: 0,
+        maxFee: null,
+      },
+    };
+  }
+};
+
 export const portfolioSlice = createSlice({
   name: "portfolio",
   initialState: {
@@ -58,6 +117,7 @@ export const portfolioSlice = createSlice({
     nextIdx: 0,
     totalAmount: 0,
     budget: 0,
+    fees: getDefaultFees(FeeType.ZERO_FEE),
   },
   reducers: {
     addAsset: (state, action) => {
@@ -78,6 +138,7 @@ export const portfolioSlice = createSlice({
           amount: 0,
           weight: 0,
           targetWeight: 0,
+          fees: null,
         },
       };
       state.nextIdx += 1;
@@ -139,11 +200,146 @@ export const portfolioSlice = createSlice({
         state.budget = action.payload.budget;
       }
     },
+    setFees: (state, action) => {
+      if (action.payload.fees) {
+        state.fees = action.payload.fees;
+      }
+    },
+    setFeesAsset: (state, action) => {
+      const { fees, symbol } = action.payload;
+      if (!symbol || !(symbol in state.assets)) {
+        return;
+      }
+
+      state.assets[symbol].fees = fees;
+    },
+    setFeeType: (state, action) => {
+      if (!action.payload.type) {
+        state.fees = getDefaultFees(FeeType.ZERO_FEE);
+        return;
+      }
+
+      if (!state.fees?.feeStructure?.type) {
+        state.fees = getDefaultFees(action.payload.type);
+        return;
+      }
+
+      if (action.payload.type !== state.fees.feeStructure.type) {
+        state.fees = {
+          ...state.fees,
+          feeStructure: getDefaultFees(action.payload.type).feeStructure,
+        };
+      }
+    },
+    setFeeTypeAsset: (state, action) => {
+      const { type, symbol } = action.payload;
+      if (!symbol || !(symbol in state.assets)) {
+        return;
+      }
+
+      if (!type) {
+        state.assets[symbol].fees = null;
+        return;
+      }
+
+      const asset = state.assets[symbol];
+
+      if (!asset.fees?.feeStructure.type) {
+        asset.fees = getDefaultFees(type);
+        return;
+      }
+
+      if (type !== asset.fees.feeStructure.type) {
+        asset.fees = {
+          ...asset.fees,
+          feeStructure: getDefaultFees(type).feeStructure,
+        };
+      }
+    },
+    setMaxFeeImpact: (state, action) => {
+      if (state.fees) {
+        state.fees = {
+          ...state.fees,
+          maxFeeImpact: action.payload.value,
+        };
+      }
+    },
+    setMaxFeeImpactAsset: (state, action) => {
+      const { value, symbol } = action.payload;
+      if (!symbol || !(symbol in state.assets)) {
+        return;
+      }
+
+      const fees = state.assets[symbol].fees;
+      if (fees) {
+        state.assets[symbol].fees = {
+          ...fees,
+          maxFeeImpact: value,
+        };
+      }
+    },
+    setFixedFeeAmount: (state, action) => {
+      if (state.fees && state.fees.feeStructure?.type === FeeType.FIXED) {
+        state.fees = {
+          ...state.fees,
+          feeStructure: {
+            ...state.fees.feeStructure,
+            feeAmount: action.payload.value,
+          },
+        };
+      }
+    },
+    setFixedFeeAmountAsset: (state, action) => {
+      const { value, symbol } = action.payload;
+      if (!symbol || !(symbol in state.assets)) {
+        return;
+      }
+
+      const fees = state.assets[symbol].fees;
+      if (fees && fees.feeStructure.type === FeeType.FIXED) {
+        state.assets[symbol].fees = {
+          ...fees,
+          feeStructure: {
+            ...fees.feeStructure,
+            feeAmount: value,
+          },
+        };
+      }
+    },
+    setVariableFee: (state, action) => {
+      if (state.fees && state.fees.feeStructure?.type === FeeType.VARIABLE) {
+        state.fees = {
+          ...state.fees,
+          feeStructure: {
+            ...state.fees.feeStructure,
+            ...action.payload,
+          },
+        };
+      }
+    },
+    setVariableFeeAsset: (state, action) => {
+      const { symbol, ...rest } = action.payload;
+      if (!symbol || !(symbol in state.assets)) {
+        return;
+      }
+
+      const fees = state.assets[symbol].fees;
+      if (fees && fees.feeStructure.type === FeeType.VARIABLE) {
+        state.assets[symbol].fees = {
+          ...fees,
+          feeStructure: {
+            ...fees.feeStructure,
+            ...rest,
+          },
+        };
+      }
+    },
     clearPortfolio: (state) => {
       state.assets = {};
       state.nextIdx = 0;
       state.totalAmount = 0;
       state.budget = 0;
+      state.fees = getDefaultFees(FeeType.ZERO_FEE);
     },
     clearBudget: (state) => {
       state.budget = 0;
@@ -157,8 +353,18 @@ export const {
   setQty,
   setTargetWeight,
   setQuoteCurrency,
-  clearPortfolio,
   setBudget,
+  setFees,
+  setFeesAsset,
+  setFeeType,
+  setFeeTypeAsset,
+  setMaxFeeImpact,
+  setMaxFeeImpactAsset,
+  setFixedFeeAmount,
+  setFixedFeeAmountAsset,
+  setVariableFee,
+  setVariableFeeAsset,
+  clearPortfolio,
   clearBudget,
 } = portfolioSlice.actions;
 
