@@ -118,6 +118,7 @@ export const portfolioSlice = createSlice({
     totalAmount: 0,
     budget: 0,
     fees: getDefaultFees(FeeType.ZERO_FEE),
+    lastPriceRefresh: Date.now(),
   },
   reducers: {
     addAsset: (state, action) => {
@@ -142,6 +143,10 @@ export const portfolioSlice = createSlice({
         },
       };
       state.nextIdx += 1;
+
+      if (Object.keys(state.assets).length === 1) {
+        state.lastPriceRefresh = new Date();
+      }
     },
     removeAsset: (state, action) => {
       const symbol = action.payload.symbol;
@@ -181,6 +186,28 @@ export const portfolioSlice = createSlice({
         updateWeight(asset, state.totalAmount);
       });
     },
+    setPrice: (state, action) => {
+      const { symbol, price } = action.payload;
+      if (!symbol || !(symbol in state.assets)) {
+        return;
+      }
+
+      const asset = state.assets[action.payload.symbol];
+
+      // Refresh amounts
+      const newAmount = (asset.qty || 0) * price;
+      state.totalAmount -= asset.qty * price;
+      state.totalAmount += newAmount;
+      state.totalAmount = state.totalAmount;
+
+      // Update asset info
+      asset.price = price;
+      asset.amount = newAmount;
+
+      Object.values(state.assets).forEach((asset) => {
+        updateWeight(asset, state.totalAmount);
+      });
+    },
     setTargetWeight: (state, action) => {
       state.assets = {
         ...state.assets,
@@ -189,6 +216,11 @@ export const portfolioSlice = createSlice({
           targetWeight: action.payload.weight || 0,
         },
       };
+    },
+    setRefreshTime: (state, action) => {
+      if (action.payload.time) {
+        state.lastPriceRefresh = action.payload.time;
+      }
     },
     setQuoteCurrency: (state, action) => {
       if (action.payload.quoteCcy && action.payload.quoteCcy.length > 0) {
@@ -340,6 +372,7 @@ export const portfolioSlice = createSlice({
       state.totalAmount = 0;
       state.budget = 0;
       state.fees = getDefaultFees(FeeType.ZERO_FEE);
+      state.lastPriceRefresh = Date.now();
     },
     clearBudget: (state) => {
       state.budget = 0;
@@ -351,7 +384,9 @@ export const {
   addAsset,
   removeAsset,
   setQty,
+  setPrice,
   setTargetWeight,
+  setRefreshTime,
   setQuoteCurrency,
   setBudget,
   setFees,

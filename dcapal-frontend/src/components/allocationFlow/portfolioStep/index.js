@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
+import toast from "react-hot-toast";
 
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
@@ -9,22 +10,85 @@ import { AssetCard } from "./assetCard";
 import {
   addAsset,
   clearPortfolio,
+  setPrice,
   setQty,
+  setRefreshTime,
   setTargetWeight,
 } from "./portfolioSlice";
 
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 import { IKImage } from "imagekitio-react";
-import { IMAGEKIT_URL, MEDIA_SMALL } from "../../../app/config";
+import {
+  IMAGEKIT_URL,
+  MEDIA_SMALL,
+  REFRESH_PRICE_INTERVAL_SEC,
+} from "../../../app/config";
 import { ICON_BAG_SVG, ICON_PIECHART_SVG } from "../../../app/images";
 import { TransactionFees } from "./transactionFees";
+import { getFetcher } from "../../../app/providers";
+
+const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
+  console.debug("Refreshing prices (", new Date(), ")");
+
+  if (Object.keys(assets) < 1) {
+    dispatch(setRefreshTime({ time: Date.now() }));
+    return;
+  }
+
+  Object.values(assets).forEach(async (a) => {
+    const price = await getFetcher(a.provider, validCcys)(a.symbol, quoteCcy);
+    if (!price) {
+      console.warn(
+        "[ImportStep] Failed to fetch price for",
+        a.symbol,
+        `(provider: ${quoteCcy})`
+      );
+      return;
+    }
+    dispatch(setPrice({ symbol: a.symbol, price: price }));
+  });
+
+  toast.success("Refreshed prices!");
+  dispatch(setRefreshTime({ time: Date.now() }));
+};
 
 export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
   const [isShowFees, setShowFees] = useState(false);
+
   const assetStore = useSelector((state) => state.pfolio.assets);
+  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const validCcys = useSelector((state) => state.app.currencies);
+  const lastRefreshTime = useSelector((state) => state.pfolio.lastPriceRefresh);
+
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    let timeout = null;
+
+    const refreshPrices = async () => {
+      const now = new Date();
+      const nextRefresh = new Date(
+        lastRefreshTime + REFRESH_PRICE_INTERVAL_SEC * 1000
+      );
+
+      if (now > nextRefresh) {
+        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch);
+        return;
+      }
+
+      timeout = setTimeout(async () => {
+        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch);
+      }, nextRefresh - now);
+    };
+
+    refreshPrices().catch(console.error);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [lastRefreshTime]);
 
   const assets = Object.values(assetStore).sort((a, b) => a.idx - b.idx);
   let cumWeight = 0;
@@ -193,21 +257,27 @@ export const PortfolioStep = ({ ...props }) => {
           </div>
         )}
       {Object.keys(assetStore).length > 0 && (
-        <div className="w-full mt-6 flex justify-between items-center">
-          <span
-            className="font-medium underline cursor-pointer"
-            onClick={onClickDiscard}
-          >
-            Discard
-          </span>
-          <button
-            className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
-            onClick={onClickAddLiquidity}
-            disabled={!isAllAllocated}
-          >
-            Next
-          </button>
-        </div>
+        <>
+          <p className="mt-6 font-thin text-xs">
+            Prices last fetched at{" "}
+            {new Date(lastRefreshTime).toLocaleString("en-US")}
+          </p>
+          <div className="w-full mt-6 flex justify-between items-center">
+            <span
+              className="font-medium underline cursor-pointer"
+              onClick={onClickDiscard}
+            >
+              Discard
+            </span>
+            <button
+              className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
+              onClick={onClickAddLiquidity}
+              disabled={!isAllAllocated}
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
