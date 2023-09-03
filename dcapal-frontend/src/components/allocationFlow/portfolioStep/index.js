@@ -7,6 +7,8 @@ import toast from "react-hot-toast";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 
+import SettingsSvg from "../../../../images/icons/settings.svg";
+
 import {
   addAsset,
   clearPortfolio,
@@ -151,7 +153,7 @@ export const PortfolioStep = ({ ...props }) => {
       {assets && assets.length > 0 && (
         <div className="relative w-full flex flex-col items-end justify-center mt-2">
           <button className={feeBtnClass} onClick={onClickTransactionFees}>
-            ⚙️
+            <img src={SettingsSvg} className="w-full max-w-[32px] pt-1" />
           </button>
           {isShowFees && (
             <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
