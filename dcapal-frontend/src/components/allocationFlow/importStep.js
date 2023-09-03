@@ -8,9 +8,14 @@ import { timeout } from "../../utils";
 import { Spinner } from "../spinner/spinner";
 import {
   ACLASS,
+  FeeType,
   addAsset,
   clearPortfolio,
+  getDefaultFees,
   parseAClass,
+  parseFeeType,
+  setFees,
+  setFeesAsset,
   setQty,
   setQuoteCurrency,
   setTargetWeight,
@@ -19,6 +24,24 @@ import {
 import { IKImage } from "imagekitio-react";
 import { IMAGEKIT_URL } from "../../app/config";
 import { HEADER_IMPORT_PORTFOLIO_SVG } from "../../app/images";
+
+const parseFees = (fees) => {
+  if (!fees) return null;
+
+  const parsed = {
+    ...fees,
+    feeStructure: {
+      ...fees.feeStructure,
+      type: parseFeeType(fees.feeStructure.type),
+    },
+  };
+
+  if (!parsed.feeStructure.type) {
+    return null;
+  }
+
+  return parsed;
+};
 
 const importPfolio = async (pfolio, validCcys, dispatch) => {
   const stopWithError = (...args) => {
@@ -33,10 +56,20 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
   dispatch(clearPortfolio());
   dispatch(setQuoteCurrency({ quoteCcy: pfolio.quoteCcy }));
 
+  const fees = (() => {
+    if (pfolio.fees != null && typeof pfolio.fees === "object") {
+      return parseFees(pfolio.fees) || getDefaultFees(FeeType.ZERO_FEE);
+    } else {
+      return getDefaultFees(FeeType.ZERO_FEE);
+    }
+  })();
+
   if (!pfolio.assets || !Array.isArray(pfolio.assets)) {
     stopWithError("[ImportStep] Missing 'assets' property");
     return false;
   }
+
+  dispatch(setFees({ fees: fees }));
 
   for (const a of pfolio.assets) {
     const price = await getFetcher(a.provider, validCcys)(
@@ -65,6 +98,16 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
 
     dispatch(setQty({ symbol: a.symbol, qty: a.qty }));
     dispatch(setTargetWeight({ symbol: a.symbol, weight: a.targetWeight }));
+
+    const assetFees = (() => {
+      if (a.fees != null && typeof a.fees === "object") {
+        return parseFees(a.fees);
+      } else {
+        return null;
+      }
+    })();
+
+    dispatch(setFeesAsset({ symbol: a.symbol, fees: assetFees }));
   }
 
   return true;

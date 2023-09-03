@@ -6,19 +6,23 @@ const buildProblemInput = (
   assets,
   pfolioCcy,
   isBuyOnly,
-  isAdvancedAlgorithm
+  isAdvancedAlgorithm,
+  fees
 ) => {
   if (isAdvancedAlgorithm) {
     return {
+      type: "advanced",
       budget: budget,
       pfolio_ccy: pfolioCcy,
       assets: {
         ...assets,
       },
       is_buy_only: isBuyOnly,
+      fees: fees,
     };
   } else {
     return {
+      type: "basic",
       budget: budget,
       assets: {
         ...assets,
@@ -34,7 +38,8 @@ expose({
     assets,
     pfolioCcy,
     isBuyOnly,
-    isAdvancedAlgorithm
+    isAdvancedAlgorithm,
+    fees
   ) {
     if (Number.isNaN(budget) || budget < 0) return null;
     if (!assets || Object.keys(assets).length === 0) return null;
@@ -44,7 +49,8 @@ expose({
       assets,
       pfolioCcy,
       isBuyOnly,
-      isAdvancedAlgorithm
+      isAdvancedAlgorithm,
+      fees
     );
 
     const handle = Solver.build_problem(input);

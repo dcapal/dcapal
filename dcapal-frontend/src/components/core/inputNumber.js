@@ -33,11 +33,6 @@ export const InputNumber = ({
   };
 
   const handleOnBlur = (e) => {
-    if (e.target.value < 0) {
-      e.preventDefault();
-      return;
-    }
-
     let newValue = e.target.value;
     if (type === InputNumberType.INTEGRAL && newValue.startsWith("0")) {
       newValue = newValue.substr(1);
@@ -51,17 +46,14 @@ export const InputNumber = ({
       newValue = parseInt(newValue);
     }
 
-    if (newValue === NaN) {
+    if (newValue === NaN || newValue < min || newValue > max) {
       newValue = null;
     }
 
     onChange(newValue);
   };
 
-  const invalidClass = isValid
-    ? ""
-    : "border-red-300 hover:border-red-500 focus-visible:outline-red-600";
-  const className = `w-full px-2 pt-1 pb-1.5 border focus-visible:outline-1 rounded-md border-gray-300 hover:border-gray-500 focus-visible:outline-gray-600 ${textAlign} ${invalidClass}`;
+  const className = `w-full px-2 pt-1 pb-1.5 border focus-visible:outline-1 rounded-md ${textAlign}`;
   const placeholder = type === InputNumberType.INTEGRAL ? "0" : "0.0";
 
   return (
@@ -70,6 +62,10 @@ export const InputNumber = ({
         fontSize: textSize ? `${textSize}` : "unset",
       }}
       className={classNames(className, {
+        "border-gray-300 hover:border-gray-500 focus-visible:outline-gray-600":
+          isValid,
+        "border-2 border-red-400 hover:border-red-500 focus-visible:outline-red-600 ":
+          !isValid,
         "leading-none": leadingNone,
         "leading-normal": !leadingNone,
       })}

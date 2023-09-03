@@ -1,5 +1,8 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import portfolioReducer from "../components/allocationFlow/portfolioStep/portfolioSlice";
+import portfolioReducer, {
+  FeeType,
+  getDefaultFees,
+} from "../components/allocationFlow/portfolioStep/portfolioSlice";
 import appReducer from "./appSlice";
 import storage from "redux-persist/lib/storage";
 import {
@@ -12,15 +15,14 @@ import {
   PURGE,
   REGISTER,
 } from "redux-persist";
+import createMigrate from "redux-persist/es/createMigrate";
+import { mapValues } from "../utils";
 
-const rootConfig = {
-  key: "root",
-  version: 1,
-  storage,
-  migrate: (state) => {
+const migrations = {
+  0: (state) => {
     const assets = state?.pfolio?.assets;
     if (!assets || Object.keys(assets).length === 0) {
-      return Promise.resolve(state);
+      return state;
     }
 
     const anyAsset = Object.values(assets)[0];
@@ -28,11 +30,28 @@ const rootConfig = {
       console.log(
         "Old 'pfolio' persisted state version, missing 'aclass' property. Purging state"
       );
-      return Promise.resolve({});
+      return {};
     }
 
-    return Promise.resolve(state);
+    return state;
   },
+  2: (state) => {
+    return {
+      ...state,
+      pfolio: {
+        ...state.pfolio,
+        fees: getDefaultFees(FeeType.ZERO_FEE),
+        assets: mapValues(state.pfolio.assets, (a) => ({ ...a, fees: null })),
+      },
+    };
+  },
+};
+
+const rootConfig = {
+  key: "root",
+  version: 2,
+  storage,
+  migrate: createMigrate(migrations, { debug: false }),
 };
 
 const rootReducer = combineReducers({
