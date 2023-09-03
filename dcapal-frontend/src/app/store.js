@@ -45,11 +45,20 @@ const migrations = {
       },
     };
   },
+  3: (state) => {
+    return {
+      ...state,
+      pfolio: {
+        ...state.pfolio,
+        lastPriceRefresh: Date.now(),
+      },
+    };
+  },
 };
 
 const rootConfig = {
   key: "root",
-  version: 2,
+  version: 3,
   storage,
   migrate: createMigrate(migrations, { debug: false }),
 };
