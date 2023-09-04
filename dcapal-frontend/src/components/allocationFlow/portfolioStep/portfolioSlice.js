@@ -145,7 +145,7 @@ export const portfolioSlice = createSlice({
       state.nextIdx += 1;
 
       if (Object.keys(state.assets).length === 1) {
-        state.lastPriceRefresh = new Date();
+        state.lastPriceRefresh = Date.now();
       }
     },
     removeAsset: (state, action) => {
