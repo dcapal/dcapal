@@ -3,7 +3,7 @@ resolver = "2"
 members = ["dcapal-backend", "dcapal-optimizer-wasm"]
 
 [workspace.package]
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 
 [profile.release-with-debug]

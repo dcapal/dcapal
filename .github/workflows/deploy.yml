@@ -89,8 +89,7 @@ jobs:
 
       - name: Build
         run: |
-          cd dcapal-optimizer-wasm
-          wasm-pack build --dev -- --profile release-wasm
+          wasm-pack build --release dcapal-optimizer-wasm
 
       - name: Archive dcapal-optimizer-wasm pkg
         uses: actions/upload-artifact@v3
