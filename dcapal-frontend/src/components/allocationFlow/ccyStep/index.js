@@ -26,7 +26,7 @@ const sortCcy = (a, b) => {
 
 export const CcyStep = ({ ...props }) => {
   const portfolioState = useSelector((state) => state.pfolio);
-  const [selected, setSelected] = useState(portfolioState.quoteCcy??"");
+  const [selected, setSelected] = useState(portfolioState.quoteCcy ?? "");
   const ccys = useSelector((state) => state.app.currencies);
   const dispatch = useDispatch();
   const navigate = useNavigate();
