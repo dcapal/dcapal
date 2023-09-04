@@ -133,7 +133,7 @@ export const PortfolioStep = ({ ...props }) => {
   };
 
   const feeBtnClass = classNames(
-    "px-3 pt-1.5 pb-2 z-30 flex justify-center items-center text-2xl font-medium rounded-md shadow-md border border-gray-300",
+    "p-3 z-30 flex justify-center items-center text-2xl font-medium rounded-md shadow-md border border-gray-300",
     {
       "bg-white hover:bg-neutral-600 hover:text-white hover:border-gray-600 active:bg-neutral-800":
         !isShowFees,
@@ -153,7 +153,7 @@ export const PortfolioStep = ({ ...props }) => {
       {assets && assets.length > 0 && (
         <div className="relative w-full flex flex-col items-end justify-center mt-2">
           <button className={feeBtnClass} onClick={onClickTransactionFees}>
-            <img src={SettingsSvg} className="w-full max-w-[32px] pt-1" />
+            <img src={SettingsSvg} className="w-full max-w-[20px]" />
           </button>
           {isShowFees && (
             <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">

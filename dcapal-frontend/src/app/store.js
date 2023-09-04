@@ -17,6 +17,7 @@ import {
 } from "redux-persist";
 import createMigrate from "redux-persist/es/createMigrate";
 import { mapValues } from "../utils";
+import { REFRESH_PRICE_INTERVAL_SEC } from "./config";
 
 const migrations = {
   0: (state) => {
@@ -50,7 +51,7 @@ const migrations = {
       ...state,
       pfolio: {
         ...state.pfolio,
-        lastPriceRefresh: Date.now(),
+        lastPriceRefresh: Date.now() - (REFRESH_PRICE_INTERVAL_SEC + 1) * 1000,
       },
     };
   },
