@@ -200,7 +200,7 @@ impl Problem {
             let mut budget_left_next = budget_left;
             let mut is_all_unallocated = true;
 
-            if !is_negiglible(&budget_left) {
+            if !is_negligible(&budget_left) {
                 // Allocate budget depending on target weight
                 for (i, asset) in open_assets.iter_mut().enumerate() {
                     let w_i = adjusted_weights[i];
@@ -230,14 +230,14 @@ impl Problem {
             // Otherwise, try to break ties or exit
             if freed_budget == Decimal::ZERO {
                 // Unblock ties if necessary
-                if !is_negiglible(&budget_left) && is_all_unallocated {
+                if !is_negligible(&budget_left) && is_all_unallocated {
                     freed_budget += unblock_ties(&mut open_assets, pfolio_fees);
                 }
 
                 // Check remaining budget
-                let was_negligible = is_negiglible(&budget_left);
+                let was_negligible = is_negligible(&budget_left);
                 budget_left = budget_left_next + freed_budget;
-                if was_negligible && is_negiglible(&budget_left) {
+                if was_negligible && is_negligible(&budget_left) {
                     // Check fee impact for open assets
                     freed_budget = Decimal::ZERO;
                     for asset in &mut open_assets {
@@ -247,7 +247,7 @@ impl Problem {
                     }
 
                     budget_left += freed_budget;
-                    if is_negiglible(&budget_left) {
+                    if is_negligible(&budget_left) {
                         for asset in &mut open_assets {
                             asset.state = SolutionState::FullyAllocated;
                         }
@@ -300,7 +300,7 @@ impl Problem {
     }
 }
 
-fn is_negiglible(budget: &Decimal) -> bool {
+fn is_negligible(budget: &Decimal) -> bool {
     *budget < dec!(0.01)
 }
 
