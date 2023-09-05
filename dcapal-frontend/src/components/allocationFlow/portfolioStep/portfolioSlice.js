@@ -187,12 +187,13 @@ export const portfolioSlice = createSlice({
       });
     },
     setPrice: (state, action) => {
-      const { symbol, price } = action.payload;
+      let { symbol, price } = action.payload;
       if (!symbol || !(symbol in state.assets)) {
         return;
       }
 
       const asset = state.assets[action.payload.symbol];
+      price = roundPrice(price);
 
       // Refresh amounts
       const newAmount = (asset.qty || 0) * price;
