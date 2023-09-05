@@ -2,15 +2,16 @@ version: "3.9"
 services:
   dcapal:
     build:
-      context: .
-      dockerfile: ./docker/Dockerfile
+      context: ..
+      dockerfile: ./dcapal-backend/docker/Dockerfile
     ports:
       - 8080:8080
       - 9000:9000
     networks:
       - dcapalnetwork
     volumes:
-      - ./dcapal.yml:/var/dcapal-backend/dcapal.yml
+      - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
+      - ./data/dcapal:/var/dcapal/dcapal-backend/data/dcapal
     depends_on:
       redis:
         condition: service_healthy
