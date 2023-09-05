@@ -3,7 +3,7 @@ import React from "react";
 import { useSelector } from "react-redux";
 import { MEDIA_SMALL } from "../../../app/config";
 import { UNALLOCATED_CASH } from ".";
-import { roundDecimals } from "../../../utils";
+import { roundAmount, roundDecimals } from "../../../utils";
 import { ACLASS, FeeType } from "../portfolioStep/portfolioSlice";
 
 const feeAmount = (fees, amount) => {
@@ -45,9 +45,13 @@ export const AllocateCard = ({
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const isMobile = !useMediaQuery(MEDIA_SMALL);
 
-  const priceFmt = {
+  const amtFmt = {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  };
+  const priceFmt = {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
   };
   const weightFmt = {
     minimumFractionDigits: 1,
@@ -76,6 +80,7 @@ export const AllocateCard = ({
       diffQty: diffQty,
       action: action,
       fees: theoAlloc.fees,
+      amount: theoAlloc.amount,
       feeImpact: feeImpact,
     };
   })();
@@ -178,7 +183,7 @@ export const AllocateCard = ({
                   Current amount
                 </div>
                 <p className="uppercase">
-                  {oldAmount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+                  {oldAmount.toLocaleString("en-US", amtFmt)} {quoteCcy}
                 </p>
               </div>
               <div className="w-full flex items-center justify-between">
@@ -186,7 +191,7 @@ export const AllocateCard = ({
                   New amount
                 </div>
                 <p className="uppercase">
-                  {amount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+                  {amount.toLocaleString("en-US", amtFmt)} {quoteCcy}
                 </p>
               </div>
               <div className="w-full flex items-center justify-between">
@@ -237,7 +242,7 @@ export const AllocateCard = ({
                     Current amount
                   </div>
                   <span className="uppercase">
-                    {oldAmount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+                    {oldAmount.toLocaleString("en-US", amtFmt)} {quoteCcy}
                   </span>
                 </div>
                 <div className="flex items-center">
@@ -271,7 +276,7 @@ export const AllocateCard = ({
                     New amount
                   </div>
                   <span className="grow uppercase text-right">
-                    {amount.toLocaleString("en-US", priceFmt)} {quoteCcy}
+                    {amount.toLocaleString("en-US", amtFmt)} {quoteCcy}
                   </span>
                 </div>
                 <div className="flex items-center mr-2">
@@ -298,8 +303,11 @@ export const AllocateCard = ({
               <span>ℹ️</span>
               <span className="font-light italic">
                 Should have {theo.action} {roundDecimals(theo.diffQty, 6)}{" "}
-                <span className="uppercase">{symbol}</span> @ {price}{" "}
-                <span className="uppercase">{quoteCcy}</span> but would have
+                <span className="uppercase">{symbol}</span> @{" "}
+                {price.toLocaleString("en-US", priceFmt)}{" "}
+                <span className="uppercase">{quoteCcy}</span> (
+                {roundAmount(theo.amount).toLocaleString("en-US", amtFmt)}{" "}
+                <span className="uppercase">{quoteCcy}</span>) but would have
                 paid {theo.fees.toLocaleString("en-US", priceFmt)}{" "}
                 <span className="uppercase">{quoteCcy}</span> worth of fees (
                 {theo.feeImpact.toLocaleString("en-US", weightFmt)}% impact)
