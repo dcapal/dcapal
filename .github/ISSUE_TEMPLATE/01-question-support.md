@@ -1,3 +1,12 @@
+--- 
+name: ❓ Question or Support Request
+about: Use this template to ask something about the project or propose something.
+title: "[Question]: Title"
+labels: []
+assignees: ''
+---
+
+
 # **❓ Question or Support Request**
 
 ## **Describe your question or ask for support.**
