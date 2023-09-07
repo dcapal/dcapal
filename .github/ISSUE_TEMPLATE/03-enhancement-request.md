@@ -1,3 +1,11 @@
+--- 
+name: 🚀 Enhancement Request
+about: Use this template for issues related to application improvements.
+title: "[Enhancement]: Title"
+labels: []
+assignees: ''
+---
+
 # **🚀 Enhancement Request**
 
 ## **Is your enhancement request related to a problem? Please describe.**

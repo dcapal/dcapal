@@ -1,3 +1,11 @@
+--- 
+name: ⚠️ Security Report
+about: Use this template for issues related to application security.
+title: "[Security]: Title"
+labels: []
+assignees: ''
+---
+
 <!--📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛📛
 
 Oh, hi there! 😄
