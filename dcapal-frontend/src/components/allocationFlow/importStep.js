@@ -21,6 +21,8 @@ import {
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
+import {useTranslation} from "react-i18next";
+
 import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 
 const parseFees = (fees) => {
@@ -116,6 +118,7 @@ export const ImportStep = () => {
   const [error, setError] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+const {t} = useTranslation()
 
   const pfolioFile = useSelector((state) => state.app.pfolioFile);
   const validCcys = useSelector((state) => state.app.currencies);
@@ -165,24 +168,24 @@ export const ImportStep = () => {
         />
         {isLoading && (
           <>
-            <h1 className="text-3xl font-bold">Import Portfolio</h1>
+            <h1 className="text-3xl font-bold">{t('importStep.importPortfolio')}</h1>
             <span className="flex flex-col gap-y-2 items-center font-light">
-              <p>Just a sec! Fetching fresh data for your portfolio...</p>
+              <p>{t('importStep.fetchData')}...</p>
             </span>
             <Spinner />
           </>
         )}
         {!isLoading && error && (
           <>
-            <h1 className="text-3xl font-bold">Import Portfolio</h1>
+            <h1 className="text-3xl font-bold">{t('importStep.importPortfolio')}</h1>
             <span className="flex flex-col gap-y-2 items-center font-light">
-              <span className="text-4xl">⚠️</span> Oops! This is embarassing...
+              <span className="text-4xl">⚠️</span>{t('importStep.ops')}...
             </span>
             <span
               className="font-medium underline cursor-pointer"
               onClick={onClickGoBack}
             >
-              Go back
+              {t('importStep.goBack')}
             </span>
           </>
         )}

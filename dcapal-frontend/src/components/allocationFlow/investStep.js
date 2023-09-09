@@ -5,6 +5,7 @@ import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
+import {Trans} from "react-i18next";
 
 export const InvestStep = ({
   useTaxEfficient,
@@ -42,7 +43,7 @@ export const InvestStep = ({
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
-        How much you would like to allocate?
+        {t('investStep.howMuchAllocate')}
       </div>
       <div className="w-full flex justify-center items-end mb-20">
         <div className="w-full">
@@ -77,14 +78,21 @@ export const InvestStep = ({
             htmlFor="#tax-efficient-checkbox"
             className="ml-2 cursor-pointer select-none"
           >
-            Use <span className="font-medium">Tax Efficient</span> algorithm
+            <Trans i18nKey="investStep.taxEfficientAlgorithm" values={{
+              tax: t('investStep.taxEfficient'),
+
+            }}
+                   components={[<span className="font-medium"/>]}
+            />
           </label>
         </div>
         <p className="text-sm font-light">
-          With <span className="italic">Tax Efficient</span> option, we do our
-          best to rebalance your portfolio using your liquidity, with buy-only
-          suggestions. Otherwise, we might suggest to sell part of your
-          positions.
+          <Trans i18nKey="investStep.taxEfficientInfo" values={{
+            tax: t('investStep.taxEfficient'),
+
+          }}
+                 components={[<span className="italic"/>]}
+          />
         </p>
       </div>
       <div className="w-full mt-6 flex flex-col gap-3">
@@ -99,7 +107,7 @@ export const InvestStep = ({
           >
             {">"}
           </span>
-          <span>Advanced</span>
+          <span>{t('investStep.advanced')}</span>
         </div>
         <div
           className="w-full pl-6 flex flex-col gap-1 justify-start text-sm"
@@ -120,15 +128,16 @@ export const InvestStep = ({
               htmlFor="#tax-efficient-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
-              <span className="font-medium">Don't split</span> whole shares
+
+              <span className="font-medium">{t('investStep.doNotSplit')}</span> {t('investStep.wholeShares')}
             </label>
           </div>
           <p className="text-sm font-light">
-            With <span className="italic">Don't split whole shares</span>{" "}
-            option, we are going to suggest the number of shares to buy or sell
-            for non-fractional assets like Stocks or ETFs. Otherwise, we might
-            suggest theoretically optimal amounts to buy or sell but you will
-            need to figure out how many shares to buy.
+            <Trans i18nKey="investStep.doNotSplitInfo" values={{
+              message: t('investStep.dontSplit') + ' ' +  t('investStep.wholeShares'),
+            }}
+                   components={[<span className="italic"/>]}
+            />
           </p>
         </div>
       </div>
@@ -137,15 +146,13 @@ export const InvestStep = ({
           className="font-medium underline cursor-pointer"
           onClick={onClickGoBack}
         >
-          Go back
-        </span>
+{t('investStep.goBack')}        </span>
         <button
           className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
           onClick={onClickRunAllocation}
           disabled={isRunAllocationDisabled}
         >
-          Run Allocation
-        </button>
+          {t('investStep.runAllocation')}        </button>
       </div>
     </div>
   );

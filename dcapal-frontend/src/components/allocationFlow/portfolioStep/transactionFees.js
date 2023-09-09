@@ -13,10 +13,12 @@ import {
 } from "./portfolioSlice";
 import classNames from "classnames";
 import { InputNumber, InputNumberType } from "../../core/inputNumber";
+import {Trans, useTranslation} from "react-i18next";
 
 export const TransactionFees = ({ asset }) => {
   const dispatch = useDispatch();
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const {t} = useTranslation()
 
   const fees = useSelector((state) => {
     return asset && asset in state.pfolio.assets
@@ -101,40 +103,43 @@ export const TransactionFees = ({ asset }) => {
   );
 };
 
-const FeeGroup = ({ selected, setSelected, asset }) => (
-  <div className="flex w-full">
+const FeeGroup = ({ selected, setSelected, asset }) => {
+
+  const {t} = useTranslation()
+
+  return (<div className="flex w-full">
     {asset && (
-      <FeeRadio
-        key="default"
-        type={null}
-        label="Default"
-        selected={selected}
-        setSelected={setSelected}
-      />
+        <FeeRadio
+            key="default"
+            type={null}
+            label={t('transactionFee.default')}
+            selected={selected}
+            setSelected={setSelected}
+        />
     )}
     <FeeRadio
-      key="zeroFees"
-      type={FeeType.ZERO_FEE}
-      label="No fees"
-      selected={selected}
-      setSelected={setSelected}
+        key="zeroFees"
+        type={FeeType.ZERO_FEE}
+        label={t('transactionFee.noFees')}
+        selected={selected}
+        setSelected={setSelected}
     />
     <FeeRadio
-      key="fixed"
-      type={FeeType.FIXED}
-      label="Fixed"
-      selected={selected}
-      setSelected={setSelected}
+        key="fixed"
+        type={FeeType.FIXED}
+        label={t('transactionFee.fixed')}
+        selected={selected}
+        setSelected={setSelected}
     />
     <FeeRadio
-      key="variable"
-      type={FeeType.VARIABLE}
-      label="Variable"
-      selected={selected}
-      setSelected={setSelected}
+        key="variable"
+        type={FeeType.VARIABLE}
+        label={t('transactionFee.variable')}
+        selected={selected}
+        setSelected={setSelected}
     />
-  </div>
-);
+  </div>)
+}
 
 const FeeRadio = ({ type, label, selected, setSelected }) => {
   const isSelected = selected === type;
@@ -162,11 +167,12 @@ const FeeRadio = ({ type, label, selected, setSelected }) => {
 };
 
 const NoFeesForm = () => {
+  const {t} = useTranslation()
   return (
     <p className="font-light text-center self-center">
       💰{" "}
       <span className="italic">
-        Enjoy your zero-fee trading life, lucky bastard
+        {t('transactionFee.zeroFee')}
       </span>
     </p>
   );
@@ -179,6 +185,7 @@ const FixedFeeForm = ({
   feeAmount,
   onChangeFeeAmount,
 }) => {
+  const {t} = useTranslation()
   return (
     <div className="w-full flex flex-col justify-center gap-1">
       <MaxFeeImpactInput
@@ -187,7 +194,7 @@ const FixedFeeForm = ({
         onChangeMaxFeeImpact={onChangeMaxFeeImpact}
       />
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">Fee amount</label>
+        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.feeAmount')}</label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -214,7 +221,7 @@ const VariableFeeForm = ({
   onChangeVariableFee,
 }) => {
   const { feeRate, minFee, maxFee } = variableFee;
-
+  const {t} = useTranslation()
   const onChangeFeeRate = (value) => {
     onChangeVariableFee({
       feeRate: value,
@@ -249,7 +256,7 @@ const VariableFeeForm = ({
         onChangeMaxFeeImpact={onChangeMaxFeeImpact}
       />
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">Fee percentage</label>
+        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.feePercentage')}</label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -264,7 +271,7 @@ const VariableFeeForm = ({
         <label className="text-start min-w-[2rem] ml-2 uppercase">%</label>
       </div>
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">Min fee</label>
+        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.minFee')}</label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -280,7 +287,7 @@ const VariableFeeForm = ({
         </label>
       </div>
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">Max fee</label>
+        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.maxFee')}</label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -297,8 +304,12 @@ const VariableFeeForm = ({
       </div>
       {!isMinFeeValid && (
         <div className="mt-2 font-light text-red-500 text-center">
-          Review your <span className="font-normal">Min fee</span>. Must be less
-          than or equal to max fee.
+          <Trans i18nKey="transactionFee.reviewFee" values={{
+            fee: t('transactionFee.minFee'),
+          }}
+                 components={[<span className="font-normal"/>]}
+          />
+
         </div>
       )}
     </div>
@@ -306,9 +317,10 @@ const VariableFeeForm = ({
 };
 
 const MaxFeeImpactInput = ({ maxFeeImpact, onChangeMaxFeeImpact }) => {
+  const {t} = useTranslation()
   return (
     <div className="w-full flex items-center">
-      <label className="min-w-[8rem] mr-2 font-light">Max fee impact</label>
+      <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.maxFeeImpact')}</label>
       <div className="grow">
         <InputNumber
           textAlign="text-right"

@@ -25,6 +25,7 @@ import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "../../../app/providers";
+import {Trans, useTranslation} from "react-i18next";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
   console.debug("Refreshing prices (", new Date(), ")");
@@ -55,6 +56,7 @@ export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
   const [isShowFees, setShowFees] = useState(false);
 
+  const {t} = useTranslation()
   const assetStore = useSelector((state) => state.pfolio.assets);
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
@@ -154,7 +156,7 @@ export const PortfolioStep = ({ ...props }) => {
           </button>
           {isShowFees && (
             <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
-              <p className="font-light text-2xl">💸 Transaction fees</p>
+              <p className="font-light text-2xl">💸 {t('portfolioStep.transactionFees')}</p>
               <TransactionFees />
             </div>
           )}
@@ -162,7 +164,7 @@ export const PortfolioStep = ({ ...props }) => {
       )}
       {assets && assets.length > 0 && (
         <div className="w-full flex items-center mb-3 pl-3 font-light text-2xl">
-          Portfolio assets
+          {t('portfolioStep.portfolioAssets')}
         </div>
       )}
       <div className="w-full flex flex-col items-center">
@@ -202,7 +204,7 @@ export const PortfolioStep = ({ ...props }) => {
           className="mt-2 font-medium underline cursor-pointer"
           onClick={onClickDiscard}
         >
-          Go back
+          {t('portfolioStep.goBack')}
         </span>
       )}
       {Object.keys(assetStore).length > 0 && (
@@ -219,12 +221,14 @@ export const PortfolioStep = ({ ...props }) => {
               src={BAG}
             />
             <p className="flex-grow font-light">
-              Fill <span className="font-normal">Quantity</span> field with the
-              number of{" "}
-              <span className="uppercase">
-                {assets[assets.length - 1].symbol}
-              </span>{" "}
-              you already have in your portfolio (e.g. 10 units)
+              <Trans i18nKey="portfolioStep.fillWithNumber" values={{
+                field: t('portfolioStep.quantity'),
+                symbol: assets[assets.length - 1].symbol
+
+              }}
+                     components={[<span className="font-normal"/>, <span className="uppercase"/>]}
+              />
+
             </p>
           </div>
           <div className="w-full flex items-center justify-start">
@@ -234,31 +238,38 @@ export const PortfolioStep = ({ ...props }) => {
               src={PIECHART}
             />
             <p className="flex-grow font-light">
-              Define your desired asset allocation in{" "}
-              <span className="font-normal">Target weight</span> field (e.g.{" "}
-              <span className="italic">20%</span> of total portfolio value)
+              <Trans i18nKey="portfolioStep.defineTargetWeight" values={{
+                  targetWeight: t('portfolioStep.targetWeight'),
+                percentage: '20%'
+
+              }}
+                     components={[<span className="font-normal"/>, <span className="italic"/>]}
+              />
+
+
             </p>
           </div>
         </div>
       )}
       {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
         !isAllAllocated && (
+
           <div className="mt-6 font-light text-red-500">
-            Review your <span className="font-normal">Target Weights</span>.
-            They must sum up to 100% (currently{" "}
-            <span className="font-normal">
-              {cumWeight.toLocaleString("en-US", {
+            <Trans i18nKey="portfolioStep.reviewYourWeight" values={{
+              targetWeights: t('portfolioStep.targetWeights'),
+              actualWeight: cumWeight.toLocaleString("en-US", {
                 maximumFractionDigits: 12,
-              })}
-              %
-            </span>
-            )
+              })
+
+            }}
+                   components={[<span className="font-normal"/>, <span className="font-normal"/>]}
+            />
           </div>
         )}
       {Object.keys(assetStore).length > 0 && (
         <>
           <p className="mt-6 font-thin text-xs">
-            Prices last fetched at{" "}
+            {t('portfolioStep.lastFetch')}{" "}
             {new Date(lastRefreshTime).toLocaleString("en-US")}
           </p>
           <div className="w-full mt-6 flex justify-between items-center">
@@ -266,14 +277,14 @@ export const PortfolioStep = ({ ...props }) => {
               className="font-medium underline cursor-pointer"
               onClick={onClickDiscard}
             >
-              Discard
+              {t('portfolioStep.discard')}
             </span>
             <button
               className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
               onClick={onClickAddLiquidity}
               disabled={!isAllAllocated}
             >
-              Next
+              {t('portfolioStep.next')}
             </button>
           </div>
         </>
