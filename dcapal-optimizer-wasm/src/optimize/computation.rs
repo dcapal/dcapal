@@ -1,5 +1,5 @@
-use rust_decimal::Decimal;
 use nalgebra::{DMatrix, DVector};
+use rust_decimal::Decimal;
 
 pub struct ProblemAsset {
     pub symbol: String,
@@ -14,8 +14,10 @@ pub struct ProblemAsset {
 
 fn void() {
     let mut dm = DMatrix::<f64>::zeros(2, 2);
-    dm.row_mut(0).copy_from_slice(&[0.8 * 102.72 - 102.72, 27.99 * 0.8]);
-    dm.row_mut(1).copy_from_slice(&[102.72 * 0.1, 0.1 * 27.99 - 27.99]);
+    dm.row_mut(0)
+        .copy_from_slice(&[0.8 * 102.72 - 102.72, 27.99 * 0.8]);
+    dm.row_mut(1)
+        .copy_from_slice(&[102.72 * 0.1, 0.1 * 27.99 - 27.99]);
 
     let mut b = DVector::<f64>::zeros(2);
     b.copy_from_slice(&[
