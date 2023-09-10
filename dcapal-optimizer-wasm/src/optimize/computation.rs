@@ -56,18 +56,20 @@ fn main() {
         current_weight: 0.849,
         target_weight: 0.1,
     };
-    compute_the_amount_to_reach_target_allocation(&vec![etf1, etf2, etf3]);
+    compute_the_amount_to_reach_target_allocation(vec![etf1, etf2, etf3]);
 }
 
-pub fn compute_the_amount_to_reach_target_allocation(pa: &Vec<ProblemAsset>) {
-    let filtered = pa.iter().filter(|a| a.current_weight < a.target_weight).collect::<Vec<_>>();
-    let n = filtered.len();
+pub fn compute_the_amount_to_reach_target_allocation(pa: Vec<ProblemAsset>) {
+    let (buy, keep): (Vec<_>, Vec<_>) = pa.iter().partition(|a| a.current_weight < a.target_weight);
+    let n = buy.len();
     let mut dm = DMatrix::<f64>::zeros(n, n);
     let mut b = DVector::<f64>::zeros(n);
 
-    for (i, outer_a) in filtered.iter().enumerate() {
+    let buy_and_keep: Vec<_> = buy.iter().chain(keep.iter()).cloned().collect();
+
+    for (i, outer_a) in buy.iter().enumerate() {
         b[i] = outer_a.price * outer_a.qty;
-        for (j, pa) in pa.iter().enumerate() {
+        for (j, pa) in buy_and_keep.iter().enumerate() {
             if pa.current_weight < pa.target_weight {
                 if i == j {
                     dm[(i, j)] = pa.price * pa.target_weight - pa.price;
@@ -81,7 +83,7 @@ pub fn compute_the_amount_to_reach_target_allocation(pa: &Vec<ProblemAsset>) {
     let decomp = dm.lu();
     let x = decomp.solve(&b).expect("Linear resolution failed.");
     println!("Solution: {:?}", x);
-    let sum_product = filtered.iter().zip(x.iter()).fold(0.0, |acc, (a, x)| {
+    let sum_product = buy.iter().zip(x.iter()).fold(0.0, |acc, (a, x)| {
         acc + (a.price * x)
     });
     println!("Sum: {}", sum_product);
