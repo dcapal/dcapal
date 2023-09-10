@@ -56,14 +56,10 @@ fn main() {
         current_weight: 0.849,
         target_weight: 0.1,
     };
-    let sum = compute_sum(&vec![etf1, etf2, etf3]);
-
-    let decomp = sum.0.lu();
-    let x = decomp.solve(&sum.1).expect("Linear resolution failed.");
-    println!("Solution: {:?}", x);
+    compute_the_amount_to_reach_target_allocation(&vec![etf1, etf2, etf3]);
 }
 
-pub fn compute_sum(pa: &Vec<ProblemAsset>) -> (OMatrix<f64, Dyn, Dyn>, OMatrix<f64, Dyn, U1>) {
+pub fn compute_the_amount_to_reach_target_allocation(pa: &Vec<ProblemAsset>) {
     let filtered = pa.iter().filter(|a| a.current_weight < a.target_weight).collect::<Vec<_>>();
     let n = filtered.len();
     let mut dm = DMatrix::<f64>::zeros(n, n);
@@ -82,7 +78,11 @@ pub fn compute_sum(pa: &Vec<ProblemAsset>) -> (OMatrix<f64, Dyn, Dyn>, OMatrix<f
             b[i] -= pa.price * pa.qty * outer_a.target_weight;
         }
     }
-    println!("dm: {:?}", dm);
-    println!("b: {:?}", b);
-    return (dm, b);
+    let decomp = dm.lu();
+    let x = decomp.solve(&b).expect("Linear resolution failed.");
+    println!("Solution: {:?}", x);
+    let sum_product = filtered.iter().zip(x.iter()).fold(0.0, |acc, (a, x)| {
+        acc + (a.price * x)
+    });
+    println!("Sum: {}", sum_product);
 }
