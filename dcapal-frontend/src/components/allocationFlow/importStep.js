@@ -118,7 +118,7 @@ export const ImportStep = () => {
   const [error, setError] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-const {t} = useTranslation()
+  const { t } = useTranslation();
 
   const pfolioFile = useSelector((state) => state.app.pfolioFile);
   const validCcys = useSelector((state) => state.app.currencies);
@@ -168,24 +168,29 @@ const {t} = useTranslation()
         />
         {isLoading && (
           <>
-            <h1 className="text-3xl font-bold">{t('importStep.importPortfolio')}</h1>
+            <h1 className="text-3xl font-bold">
+              {t("importStep.importPortfolio")}
+            </h1>
             <span className="flex flex-col gap-y-2 items-center font-light">
-              <p>{t('importStep.fetchData')}...</p>
+              <p>{t("importStep.fetchData")}...</p>
             </span>
             <Spinner />
           </>
         )}
         {!isLoading && error && (
           <>
-            <h1 className="text-3xl font-bold">{t('importStep.importPortfolio')}</h1>
+            <h1 className="text-3xl font-bold">
+              {t("importStep.importPortfolio")}
+            </h1>
             <span className="flex flex-col gap-y-2 items-center font-light">
-              <span className="text-4xl">⚠️</span>{t('importStep.ops')}...
+              <span className="text-4xl">⚠️</span>
+              {t("importStep.ops")}...
             </span>
             <span
               className="font-medium underline cursor-pointer"
               onClick={onClickGoBack}
             >
-              {t('importStep.goBack')}
+              {t("importStep.goBack")}
             </span>
           </>
         )}

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 import { setQuoteCurrency } from "../portfolioStep/portfolioSlice";
 import { CcyGroup } from "./ccyGroup";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 const priority = {
   usd: 10,
@@ -31,7 +31,7 @@ export const CcyStep = ({ ...props }) => {
   const ccys = useSelector((state) => state.app.currencies);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const {t } = useTranslation()
+  const { t } = useTranslation();
   const onClickBack = () => {
     navigate("/");
   };
@@ -46,7 +46,7 @@ export const CcyStep = ({ ...props }) => {
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
-        {t('currencyStep.chooseCurrency')}
+        {t("currencyStep.chooseCurrency")}
       </div>
       <div>
         <CcyGroup
@@ -60,14 +60,14 @@ export const CcyStep = ({ ...props }) => {
           className="font-medium underline cursor-pointer"
           onClick={onClickBack}
         >
-        {t('currencyStep.goBack')}
+          {t("currencyStep.goBack")}
         </span>
         <button
           className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
           onClick={onClickNext}
           disabled={selected.length === 0}
         >
-          {t('currencyStep.next')}
+          {t("currencyStep.next")}
         </button>
       </div>
     </div>

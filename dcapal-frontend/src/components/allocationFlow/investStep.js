@@ -5,7 +5,7 @@ import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
-import {Trans} from "react-i18next";
+import { Trans } from "react-i18next";
 
 export const InvestStep = ({
   useTaxEfficient,
@@ -43,7 +43,7 @@ export const InvestStep = ({
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
-        {t('investStep.howMuchAllocate')}
+        {t("investStep.howMuchAllocate")}
       </div>
       <div className="w-full flex justify-center items-end mb-20">
         <div className="w-full">
@@ -78,20 +78,22 @@ export const InvestStep = ({
             htmlFor="#tax-efficient-checkbox"
             className="ml-2 cursor-pointer select-none"
           >
-            <Trans i18nKey="investStep.taxEfficientAlgorithm" values={{
-              tax: t('investStep.taxEfficient'),
-
-            }}
-                   components={[<span className="font-medium"/>]}
+            <Trans
+              i18nKey="investStep.taxEfficientAlgorithm"
+              values={{
+                tax: t("investStep.taxEfficient"),
+              }}
+              components={[<span className="font-medium" />]}
             />
           </label>
         </div>
         <p className="text-sm font-light">
-          <Trans i18nKey="investStep.taxEfficientInfo" values={{
-            tax: t('investStep.taxEfficient'),
-
-          }}
-                 components={[<span className="italic"/>]}
+          <Trans
+            i18nKey="investStep.taxEfficientInfo"
+            values={{
+              tax: t("investStep.taxEfficient"),
+            }}
+            components={[<span className="italic" />]}
           />
         </p>
       </div>
@@ -107,7 +109,7 @@ export const InvestStep = ({
           >
             {">"}
           </span>
-          <span>{t('investStep.advanced')}</span>
+          <span>{t("investStep.advanced")}</span>
         </div>
         <div
           className="w-full pl-6 flex flex-col gap-1 justify-start text-sm"
@@ -128,15 +130,18 @@ export const InvestStep = ({
               htmlFor="#tax-efficient-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
-
-              <span className="font-medium">{t('investStep.doNotSplit')}</span> {t('investStep.wholeShares')}
+              <span className="font-medium">{t("investStep.doNotSplit")}</span>{" "}
+              {t("investStep.wholeShares")}
             </label>
           </div>
           <p className="text-sm font-light">
-            <Trans i18nKey="investStep.doNotSplitInfo" values={{
-              message: t('investStep.dontSplit') + ' ' +  t('investStep.wholeShares'),
-            }}
-                   components={[<span className="italic"/>]}
+            <Trans
+              i18nKey="investStep.doNotSplitInfo"
+              values={{
+                message:
+                  t("investStep.dontSplit") + " " + t("investStep.wholeShares"),
+              }}
+              components={[<span className="italic" />]}
             />
           </p>
         </div>
@@ -146,13 +151,15 @@ export const InvestStep = ({
           className="font-medium underline cursor-pointer"
           onClick={onClickGoBack}
         >
-{t('investStep.goBack')}        </span>
+          {t("investStep.goBack")}{" "}
+        </span>
         <button
           className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
           onClick={onClickRunAllocation}
           disabled={isRunAllocationDisabled}
         >
-          {t('investStep.runAllocation')}        </button>
+          {t("investStep.runAllocation")}{" "}
+        </button>
       </div>
     </div>
   );

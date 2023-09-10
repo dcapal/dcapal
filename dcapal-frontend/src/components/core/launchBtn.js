@@ -3,13 +3,13 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice";
 import { clearPortfolio } from "../allocationFlow/portfolioStep/portfolioSlice";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 export const LaunchBtn = () => {
   const inputPfolio = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-const {t} = useTranslation()
+  const { t } = useTranslation();
   const onClickUpload = () => {
     if (inputPfolio.current) {
       inputPfolio.current.click();
@@ -43,7 +43,7 @@ const {t} = useTranslation()
           className="w-full px-3 py-2 flex justify-center items-center border border-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-black hover:text-white text-lg rounded"
           onClick={onClickUpload}
         >
-          {t('importStep.importPortfolio')}
+          {t("importStep.importPortfolio")}
         </button>
         <input
           style={{ display: "none" }}
@@ -57,7 +57,7 @@ const {t} = useTranslation()
         className="min-w-full sm:min-w-0 px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded"
         onClick={onClickStart}
       >
-        {t('importStep.allocateYourSavings')}
+        {t("importStep.allocateYourSavings")}
       </button>
     </div>
   );

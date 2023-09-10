@@ -1,13 +1,13 @@
 import React, { useRef } from "react";
 import { useDispatch } from "react-redux";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 export const InitStep = () => {
   const inputPfolio = useRef(null);
   const dispatch = useDispatch();
 
-  const {t}= useTranslation()
+  const { t } = useTranslation();
   const nextStep = () => {
     dispatch(setAllocationFlowStep({ step: Step.CCY }));
   };
@@ -37,16 +37,16 @@ export const InitStep = () => {
         className="py-2 px-3 mt-6 mb-4 flex justify-center items-center cursor-pointer bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-2xl rounded shadow-md"
         onClick={nextStep}
       >
-        {t('initStep.newPortfolio')}
+        {t("initStep.newPortfolio")}
       </div>
       <div className="text-lg">
         <span className="text-2xl">📤</span>
-        {t('initStep.loadYourPortfolio')}{" "}
+        {t("initStep.loadYourPortfolio")}{" "}
         <span
           className="font-medium underline text-[blue] cursor-pointer"
           onClick={onClickUpload}
         >
-          {t('initStep.fromFile')}
+          {t("initStep.fromFile")}
         </span>
         <input
           style={{ display: "none" }}

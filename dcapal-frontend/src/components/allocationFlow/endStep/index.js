@@ -12,7 +12,7 @@ import {
   isWholeShares,
 } from "../portfolioStep/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -151,7 +151,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
 
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   const budget = useSelector((state) => state.pfolio.budget);
   const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
   const assets = useSelector((state) => state.pfolio.assets);
@@ -226,7 +226,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
       {isLoading && (
         <>
           <div className="mt-2 mb-8 text-3xl font-light">
-            {t('endStep.budgetAllocated')}
+            {t("endStep.budgetAllocated")}
           </div>
           <Spinner />
         </>
@@ -234,7 +234,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
       {!isLoading && solution && (
         <>
           <div className="mt-2 mb-8 text-3xl font-light">
-            <span className="text-4xl">📊</span>  {t('endStep.allocationReady')}
+            <span className="text-4xl">📊</span> {t("endStep.allocationReady")}
           </div>
           <div className="w-full flex flex-col items-center">
             {cards.map((c) => (
@@ -260,21 +260,21 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
             className="mt-6 font-medium underline cursor-pointer"
             onClick={onClickGoBack}
           >
-            {t('endStep.backToPortfolio')}
+            {t("endStep.backToPortfolio")}
           </span>
         </>
       )}
       {!isLoading && !solution && (
         <>
           <div className="mt-2 mb-8 text-3xl font-light">
-            <span className="text-4xl">⚠️</span> {t('endStep.opsBadHappened')}
-            {t('endStep.reviewPortfolio')}
+            <span className="text-4xl">⚠️</span> {t("endStep.opsBadHappened")}
+            {t("endStep.reviewPortfolio")}
           </div>
           <span
             className="mt-6 font-medium underline cursor-pointer"
             onClick={onClickGoBack}
           >
-            {t('endStep.backToPortfolio')}
+            {t("endStep.backToPortfolio")}
           </span>
         </>
       )}

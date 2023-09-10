@@ -8,7 +8,7 @@ import { MEDIA_SMALL } from "../../../app/config";
 import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
 import { TransactionFees } from "./transactionFees";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 export const AssetCard = ({
   symbol,
@@ -21,7 +21,7 @@ export const AssetCard = ({
   isValidTargetWeight,
   ...props
 }) => {
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const dispatch = useDispatch();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
@@ -79,14 +79,18 @@ export const AssetCard = ({
             </div>
           </div>
           <div className="flex items-center py-2">
-            <div className="min-w-[6rem] mr-2 font-light text-xs">{t('assetCard.price')}</div>
+            <div className="min-w-[6rem] mr-2 font-light text-xs">
+              {t("assetCard.price")}
+            </div>
             <div className="uppercase text-sm">{quoteCcy}</div>
             <div className="ml-1 text-sm">
               {price.toLocaleString("en-US", priceFmt)}
             </div>
           </div>
           <div className="flex items-center h-12">
-            <div className="min-w-[6rem] mr-2 font-light text-xs">{t('assetCard.quantity')}</div>
+            <div className="min-w-[6rem] mr-2 font-light text-xs">
+              {t("assetCard.quantity")}
+            </div>
             <div className="grow">
               <InputNumber
                 textAlign={"text-right"}
@@ -104,7 +108,7 @@ export const AssetCard = ({
           </div>
           <div className="flex items-center h-12">
             <div className="min-w-[6rem] font-light text-xs">
-              {t('assetCard.targetWeight')} (%)
+              {t("assetCard.targetWeight")} (%)
             </div>
             <div className="grow ml-2">
               <InputNumber
@@ -124,7 +128,9 @@ export const AssetCard = ({
         <div className="flex justify-between items-start">
           <div className="flex flex-col">
             <div className="flex items-center h-12">
-              <div className="w-12 mr-2 font-light text-xs">{t('assetCard.quantity')}</div>
+              <div className="w-12 mr-2 font-light text-xs">
+                {t("assetCard.quantity")}
+              </div>
               <div className="w-40">
                 <InputNumber
                   textAlign={"text-left"}
@@ -149,7 +155,9 @@ export const AssetCard = ({
             </div>
           </div>
           <div className="flex items-center mr-2 h-12">
-            <div className="font-light text-xs">{t('assetCard.targetWeight')}</div>
+            <div className="font-light text-xs">
+              {t("assetCard.targetWeight")}
+            </div>
             <div className="w-28 ml-2">
               <InputNumber
                 textAlign={"text-right"}
@@ -178,7 +186,7 @@ export const AssetCard = ({
           >
             {">"}
           </span>
-          <span>{t('assetCard.transactionFees')}</span>
+          <span>{t("assetCard.transactionFees")}</span>
         </div>
         <div
           className="w-full flex flex-col gap-1 justify-start text-sm"

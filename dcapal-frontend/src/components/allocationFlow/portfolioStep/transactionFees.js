@@ -13,12 +13,12 @@ import {
 } from "./portfolioSlice";
 import classNames from "classnames";
 import { InputNumber, InputNumberType } from "../../core/inputNumber";
-import {Trans, useTranslation} from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 export const TransactionFees = ({ asset }) => {
   const dispatch = useDispatch();
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
-  const {t} = useTranslation()
+  const { t } = useTranslation();
 
   const fees = useSelector((state) => {
     return asset && asset in state.pfolio.assets
@@ -104,42 +104,43 @@ export const TransactionFees = ({ asset }) => {
 };
 
 const FeeGroup = ({ selected, setSelected, asset }) => {
+  const { t } = useTranslation();
 
-  const {t} = useTranslation()
-
-  return (<div className="flex w-full">
-    {asset && (
+  return (
+    <div className="flex w-full">
+      {asset && (
         <FeeRadio
-            key="default"
-            type={null}
-            label={t('transactionFee.default')}
-            selected={selected}
-            setSelected={setSelected}
+          key="default"
+          type={null}
+          label={t("transactionFee.default")}
+          selected={selected}
+          setSelected={setSelected}
         />
-    )}
-    <FeeRadio
+      )}
+      <FeeRadio
         key="zeroFees"
         type={FeeType.ZERO_FEE}
-        label={t('transactionFee.noFees')}
+        label={t("transactionFee.noFees")}
         selected={selected}
         setSelected={setSelected}
-    />
-    <FeeRadio
+      />
+      <FeeRadio
         key="fixed"
         type={FeeType.FIXED}
-        label={t('transactionFee.fixed')}
+        label={t("transactionFee.fixed")}
         selected={selected}
         setSelected={setSelected}
-    />
-    <FeeRadio
+      />
+      <FeeRadio
         key="variable"
         type={FeeType.VARIABLE}
-        label={t('transactionFee.variable')}
+        label={t("transactionFee.variable")}
         selected={selected}
         setSelected={setSelected}
-    />
-  </div>)
-}
+      />
+    </div>
+  );
+};
 
 const FeeRadio = ({ type, label, selected, setSelected }) => {
   const isSelected = selected === type;
@@ -167,13 +168,10 @@ const FeeRadio = ({ type, label, selected, setSelected }) => {
 };
 
 const NoFeesForm = () => {
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   return (
     <p className="font-light text-center self-center">
-      💰{" "}
-      <span className="italic">
-        {t('transactionFee.zeroFee')}
-      </span>
+      💰 <span className="italic">{t("transactionFee.zeroFee")}</span>
     </p>
   );
 };
@@ -185,7 +183,7 @@ const FixedFeeForm = ({
   feeAmount,
   onChangeFeeAmount,
 }) => {
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   return (
     <div className="w-full flex flex-col justify-center gap-1">
       <MaxFeeImpactInput
@@ -194,7 +192,9 @@ const FixedFeeForm = ({
         onChangeMaxFeeImpact={onChangeMaxFeeImpact}
       />
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.feeAmount')}</label>
+        <label className="min-w-[8rem] mr-2 font-light">
+          {t("transactionFee.feeAmount")}
+        </label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -221,7 +221,7 @@ const VariableFeeForm = ({
   onChangeVariableFee,
 }) => {
   const { feeRate, minFee, maxFee } = variableFee;
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   const onChangeFeeRate = (value) => {
     onChangeVariableFee({
       feeRate: value,
@@ -256,7 +256,9 @@ const VariableFeeForm = ({
         onChangeMaxFeeImpact={onChangeMaxFeeImpact}
       />
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.feePercentage')}</label>
+        <label className="min-w-[8rem] mr-2 font-light">
+          {t("transactionFee.feePercentage")}
+        </label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -271,7 +273,9 @@ const VariableFeeForm = ({
         <label className="text-start min-w-[2rem] ml-2 uppercase">%</label>
       </div>
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.minFee')}</label>
+        <label className="min-w-[8rem] mr-2 font-light">
+          {t("transactionFee.minFee")}
+        </label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -287,7 +291,9 @@ const VariableFeeForm = ({
         </label>
       </div>
       <div className="w-full flex items-center">
-        <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.maxFee')}</label>
+        <label className="min-w-[8rem] mr-2 font-light">
+          {t("transactionFee.maxFee")}
+        </label>
         <div className="grow">
           <InputNumber
             textAlign="text-right"
@@ -304,12 +310,13 @@ const VariableFeeForm = ({
       </div>
       {!isMinFeeValid && (
         <div className="mt-2 font-light text-red-500 text-center">
-          <Trans i18nKey="transactionFee.reviewFee" values={{
-            fee: t('transactionFee.minFee'),
-          }}
-                 components={[<span className="font-normal"/>]}
+          <Trans
+            i18nKey="transactionFee.reviewFee"
+            values={{
+              fee: t("transactionFee.minFee"),
+            }}
+            components={[<span className="font-normal" />]}
           />
-
         </div>
       )}
     </div>
@@ -317,10 +324,12 @@ const VariableFeeForm = ({
 };
 
 const MaxFeeImpactInput = ({ maxFeeImpact, onChangeMaxFeeImpact }) => {
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   return (
     <div className="w-full flex items-center">
-      <label className="min-w-[8rem] mr-2 font-light">{t('transactionFee.maxFeeImpact')}</label>
+      <label className="min-w-[8rem] mr-2 font-light">
+        {t("transactionFee.maxFeeImpact")}
+      </label>
       <div className="grow">
         <InputNumber
           textAlign="text-right"

@@ -5,7 +5,7 @@ import { MEDIA_SMALL } from "../../../app/config";
 import { UNALLOCATED_CASH } from ".";
 import { roundAmount, roundDecimals } from "../../../utils";
 import { ACLASS, FeeType } from "../portfolioStep/portfolioSlice";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 const feeAmount = (fees, amount) => {
   if (!fees) return 0;
@@ -43,7 +43,7 @@ export const AllocateCard = ({
   fees,
   theoAlloc,
 }) => {
-  const {t} = useTranslation()
+  const { t } = useTranslation();
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const isMobile = !useMediaQuery(MEDIA_SMALL);
 
@@ -123,10 +123,7 @@ export const AllocateCard = ({
           </div>
         </div>
         <p className="font-light text-center">
-          💰{" "}
-          <span className="italic">
-            {t('endStep.leftBudget')}
-          </span>
+          💰 <span className="italic">{t("endStep.leftBudget")}</span>
         </p>
       </div>
     );
@@ -155,21 +152,24 @@ export const AllocateCard = ({
               <span>{actionIcon}</span>
               {qty > oldQty && (
                 <span className="font-light">
-                  {t('endStep.buy')} {roundDecimals(qty - oldQty, 6)}{" "}
+                  {t("endStep.buy")} {roundDecimals(qty - oldQty, 6)}{" "}
                   <span className="uppercase">{symbol}</span> @ {price}{" "}
                   <span className="uppercase">{quoteCcy}</span>
                 </span>
               )}
               {qty < oldQty && (
                 <span className="font-light">
-                  {t('endStep.sell')} {roundDecimals(oldQty - qty, 6)}{" "}
+                  {t("endStep.sell")} {roundDecimals(oldQty - qty, 6)}{" "}
                   <span className="uppercase">{symbol}</span> @ {price}{" "}
                   <span className="uppercase">{quoteCcy}</span>
                 </span>
               )}
               {qty === oldQty && (
                 <span className="font-light italic">
-                  {aclass === ACLASS.CRYPTO ? t('endStep.nothingToTradeHodl') : t('endStep.nothingToTradeHold')}.
+                  {aclass === ACLASS.CRYPTO
+                    ? t("endStep.nothingToTradeHodl")
+                    : t("endStep.nothingToTradeHold")}
+                  .
                 </span>
               )}
             </div>
@@ -181,7 +181,7 @@ export const AllocateCard = ({
             <div className="flex flex-col justify-between items-start">
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.currentAmount')}
+                  {t("endStep.currentAmount")}
                 </div>
                 <p className="uppercase">
                   {oldAmount.toLocaleString("en-US", amtFmt)} {quoteCcy}
@@ -189,7 +189,7 @@ export const AllocateCard = ({
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.newAmount')}
+                  {t("endStep.newAmount")}
                 </div>
                 <p className="uppercase">
                   {amount.toLocaleString("en-US", amtFmt)} {quoteCcy}
@@ -197,25 +197,25 @@ export const AllocateCard = ({
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.currentWeight')}
+                  {t("endStep.currentWeight")}
                 </div>
                 <p>{oldWeight.toLocaleString("en-US", weightFmt)} %</p>
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.newWeight')}
+                  {t("endStep.newWeight")}
                 </div>
                 <p>{weight.toLocaleString("en-US", weightFmt)} %</p>
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.targetWeight')}
+                  {t("endStep.targetWeight")}
                 </div>
                 <p>{targetWeight.toLocaleString("en-US", weightFmt)} %</p>
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.fees')}
+                  {t("endStep.fees")}
                 </div>
                 <p className="uppercase">
                   {amountFees.toLocaleString("en-US", priceFmt)} {quoteCcy}
@@ -223,7 +223,7 @@ export const AllocateCard = ({
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                  {t('endStep.feeImpact')}
+                  {t("endStep.feeImpact")}
                 </div>
                 <p>{feeImpact.toLocaleString("en-US", weightFmt)} %</p>
               </div>
@@ -234,13 +234,13 @@ export const AllocateCard = ({
               <div className="flex flex-col">
                 <div className="flex items-center">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.currentWeight')}
+                    {t("endStep.currentWeight")}
                   </div>
                   <span>{oldWeight.toLocaleString("en-US", weightFmt)} %</span>
                 </div>
                 <div className="flex items-center">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.currentAmount')}
+                    {t("endStep.currentAmount")}
                   </div>
                   <span className="uppercase">
                     {oldAmount.toLocaleString("en-US", amtFmt)} {quoteCcy}
@@ -248,13 +248,13 @@ export const AllocateCard = ({
                 </div>
                 <div className="flex items-center">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.targetWeight')}
+                    {t("endStep.targetWeight")}
                   </div>
                   <div>{targetWeight.toLocaleString("en-US", weightFmt)} %</div>
                 </div>
                 <div className="flex items-center">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.fees')}
+                    {t("endStep.fees")}
                   </div>
                   <span className="uppercase">
                     <div>
@@ -266,7 +266,7 @@ export const AllocateCard = ({
               <div className="flex flex-col">
                 <div className="flex items-center mr-2">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.newWeight')}
+                    {t("endStep.newWeight")}
                   </div>
                   <span className="grow text-right">
                     {weight.toLocaleString("en-US", weightFmt)} %
@@ -274,7 +274,7 @@ export const AllocateCard = ({
                 </div>
                 <div className="flex items-center mr-2">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.newAmount')}
+                    {t("endStep.newAmount")}
                   </div>
                   <span className="grow uppercase text-right">
                     {amount.toLocaleString("en-US", amtFmt)} {quoteCcy}
@@ -282,15 +282,15 @@ export const AllocateCard = ({
                 </div>
                 <div className="flex items-center mr-2">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs text-white/0">
-                    {t('endStep.spacer')}
+                    {t("endStep.spacer")}
                   </div>
                   <span className="grow uppercase text-right text-white/0">
-                    {t('endStep.spacer')}
+                    {t("endStep.spacer")}
                   </span>
                 </div>
                 <div className="flex items-center mr-2">
                   <div className="min-w-[5.5rem] mr-2 font-light text-xs">
-                    {t('endStep.feeImpact')}
+                    {t("endStep.feeImpact")}
                   </div>
                   <span className="grow text-right">
                     {feeImpact.toLocaleString("en-US", weightFmt)} %
@@ -303,15 +303,19 @@ export const AllocateCard = ({
             <div className="flex gap-1 px-3 py-2 mt-[5px] rounded-md bg-gray-200/50">
               <span>ℹ️</span>
               <span className="font-light italic">
-                {t('endStep.shouldHave')} {theo?.action} {roundDecimals(theo?.diffQty, 6)}{" "}
+                {t("endStep.shouldHave")} {theo?.action}{" "}
+                {roundDecimals(theo?.diffQty, 6)}{" "}
                 <span className="uppercase">{symbol}</span> @{" "}
                 {price.toLocaleString("en-US", priceFmt)}{" "}
                 <span className="uppercase">{quoteCcy}</span> (
                 {roundAmount(theo?.amount).toLocaleString("en-US", amtFmt)}{" "}
-                <span className="uppercase">{quoteCcy}</span>) {t('endStep.butWouldHavePaid')}
+                <span className="uppercase">{quoteCcy}</span>){" "}
+                {t("endStep.butWouldHavePaid")}
                 {theo?.fees.toLocaleString("en-US", priceFmt)}{" "}
-                <span className="uppercase">{quoteCcy}</span> {t('endStep.worthOfFees')} (
-                {theo?.feeImpact.toLocaleString("en-US", weightFmt)}% {t('endStep.impact')})
+                <span className="uppercase">{quoteCcy}</span>{" "}
+                {t("endStep.worthOfFees")} (
+                {theo?.feeImpact.toLocaleString("en-US", weightFmt)}%{" "}
+                {t("endStep.impact")})
               </span>
             </div>
           )}

@@ -15,8 +15,8 @@ export default function ErrorPage() {
       <div className="w-full h-screen flex flex-col">
         <NavBar />
         <div className="flex flex-col grow justify-center items-center gap-10 text-center">
-          <h1 className="text-4xl font-bold">Oops!</h1>
-          <p>Sorry, an unexpected error has occurred.</p>
+          <h1 className="text-4xl font-bold">{t("page.error.ops")}</h1>
+          <p>{t("page.error.errorHasOccurred")}</p>
           <p className="font-light">
             <i>{error.statusText || error.message}</i>
           </p>

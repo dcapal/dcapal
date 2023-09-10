@@ -6,6 +6,8 @@ import { Link } from "react-router-dom";
 import UNDER_CONSTRUCTION from "@images/headers/under-construction.svg";
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
+import GitHubButton from "react-github-btn";
+import { Trans } from "react-i18next";
 
 export default function UnderConstructionPage({ title }) {
   return (
@@ -19,18 +21,22 @@ export default function UnderConstructionPage({ title }) {
             alt="Under construction"
             src={UNDER_CONSTRUCTION}
           />
-          <h1 className="text-3xl font-bold">
-            Under construction. Stay tuned!
-          </h1>
-          <span className="flex flex-col gap-y-2 items-center font-light">
-            <p>Our engineers are working hard to get this page out soon.</p>
-            <p>
-              In the meantime,{" "}
-              <span className="underline">
-                <Link to={"/"}>enjoy our app!</Link>
-              </span>
-            </p>
-          </span>
+          <Trans
+            i18nKey="page.underConstruction.title"
+            components={[<h1 className="text-3xl font-bold" />]}
+          />
+          <Trans
+            i18nKey="page.underConstruction.message"
+            components={{
+              container: (
+                <span className="flex flex-col gap-y-2 items-center font-light" />
+              ),
+              p1: <p />,
+              p2: <p />,
+              underlineLink: <span className="underline" />,
+              linkHome: <Link to={"/"} />,
+            }}
+          />
         </div>
         <Footer />
       </div>
