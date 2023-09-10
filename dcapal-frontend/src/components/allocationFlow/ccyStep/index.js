@@ -60,14 +60,14 @@ export const CcyStep = ({ ...props }) => {
           className="font-medium underline cursor-pointer"
           onClick={onClickBack}
         >
-          {t("currencyStep.goBack")}
+          {t("common.goBack")}
         </span>
         <button
           className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
           onClick={onClickNext}
           disabled={selected.length === 0}
         >
-          {t("currencyStep.next")}
+          {t("common.next")}
         </button>
       </div>
     </div>

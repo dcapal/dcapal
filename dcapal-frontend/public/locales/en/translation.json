@@ -1,6 +1,11 @@
 {
   "translation": {
-    "refreshedPrices": "Refreshed prices!",
+    "common":{
+      "refreshedPrices": "Refreshed prices!",
+      "goBack": "Go back",
+      "next": "Next",
+      "discard": "Discard"
+    },
     "navbar": {
       "getStarted": "Get Started",
       "about": "About",
@@ -8,9 +13,7 @@
       "exportPortfolio": "Export Portfolio"
     },
     "currencyStep": {
-      "chooseCurrency": "Choose your portfolio currency",
-      "goBack": "Go back",
-      "next": "Next"
+      "chooseCurrency": "Choose your portfolio currency"
     },
     "endStep": {
       "leftBudget": "This is your budget left. Save it for the next time you visit DcaPal",
@@ -45,16 +48,13 @@
     "portfolioStep": {
       "transactionFees": "Transaction fees",
       "portfolioAssets": "Portfolio assets",
-      "goBack": "Go back",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
       "targetWeights": "Target weights",
       "fillWithNumber": "Fill <0>{{field}}</0> field with the number of <1>{{symbol}}</1> you already have in your portfolio (e.g. 10 units)",
       "defineTargetWeight": "Define your desired asset allocation in <0>{{targetWeight}}</0> field (e.g. <1>{{percentage}}</1> of total portfolio value)",
       "reviewYourWeight": "Review your <0>{{targetWeights}}</0> They must sum up to 100% (currently <1>{{actualWeight}} %</1>)",
-      "lastFetch": "Prices last fetched at",
-      "discard": "Discard",
-      "next": "Next"
+      "lastFetch": "Prices last fetched at"
     },
     "searchBar": {
       "placeholder": "Search Crypto, ETF and much more",
@@ -78,7 +78,6 @@
       "fetchData": "Just a sec! Fetching fresh data for your portfolio",
       "importPortfolio": "Import Portfolio",
       "ops": "Oops! This is embarassing",
-      "goBack": "Go back",
       "allocateYourSavings": "Allocate your savings"
     },
     "initStep": {
@@ -95,7 +94,6 @@
       "doNotSplit": "Don't split",
       "doNotSplitInfo": "With <0>{{message}}</0> option, we are going to suggest the number of shares to buy or sell for non-fractional assets like Stocks or ETFs. Otherwise, we might suggest theoretically optimal amounts to buy or sell but you will need to figure out how many shares to buy.",
       "wholeShares": "whole shares",
-      "goBack": "Go back",
       "runAllocation": "Run Allocation"
     },
     "about": {

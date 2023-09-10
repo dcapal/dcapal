@@ -207,7 +207,7 @@ export const PortfolioStep = ({ ...props }) => {
           className="mt-2 font-medium underline cursor-pointer"
           onClick={onClickDiscard}
         >
-          {t("portfolioStep.goBack")}
+          {t("common.goBack")}
         </span>
       )}
       {Object.keys(assetStore).length > 0 && (
@@ -288,14 +288,14 @@ export const PortfolioStep = ({ ...props }) => {
               className="font-medium underline cursor-pointer"
               onClick={onClickDiscard}
             >
-              {t("portfolioStep.discard")}
+              {t("common.discard")}
             </span>
             <button
               className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
               onClick={onClickAddLiquidity}
               disabled={!isAllAllocated}
             >
-              {t("portfolioStep.next")}
+              {t("common.next")}
             </button>
           </div>
         </>

@@ -190,7 +190,7 @@ export const ImportStep = () => {
               className="font-medium underline cursor-pointer"
               onClick={onClickGoBack}
             >
-              {t("importStep.goBack")}
+              {t("common.goBack")}
             </span>
           </>
         )}
