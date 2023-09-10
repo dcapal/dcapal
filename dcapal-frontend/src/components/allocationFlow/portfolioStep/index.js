@@ -28,6 +28,7 @@ import { getFetcher } from "../../../app/providers";
 import { Trans, useTranslation } from "react-i18next";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
+  const { t } = useTranslation();
   console.debug("Refreshing prices (", new Date(), ")");
 
   if (Object.keys(assets) < 1) {
@@ -48,7 +49,7 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
     dispatch(setPrice({ symbol: a.symbol, price: price }));
   });
 
-  toast.success("Refreshed prices!");
+  toast.success(t("refreshedPrices"));
   dispatch(setRefreshTime({ time: Date.now() }));
 };
 
