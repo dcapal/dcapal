@@ -12,21 +12,21 @@ pub struct ProblemAsset {
 
 fn main() {
     let etf1 = ProblemAsset {
-        symbol: "AAPL".to_string(),
+        symbol: "VWCE".to_string(),
         qty: 1.00,
         price: 102.72,
         current_weight: 0.064,
         target_weight: 0.8,
     };
     let etf2 = ProblemAsset {
-        symbol: "MSFT".to_string(),
+        symbol: "AGGH".to_string(),
         qty: 5.00,
         price: 27.99,
         current_weight: 0.087,
         target_weight: 0.1,
     };
     let etf3 = ProblemAsset {
-        symbol: "AMZN".to_string(),
+        symbol: "IWMO".to_string(),
         qty: 300.00,
         price: 4.56,
         current_weight: 0.849,
@@ -73,5 +73,5 @@ pub fn calculate_allocation_amount(assets: Vec<ProblemAsset>) {
         acc + (asset.price * x)
     });
 
-    println!("Total Investment for 'buy' assets: {}", sum_product);
+    println!("You need to invest: {} to reach your target allocation", sum_product);
 }
