@@ -28,7 +28,7 @@ module.exports = (env, argv) => {
           use: ["style-loader", "css-loader", "postcss-loader"],
         },
         {
-          test: /\.svg$/,
+          test: /\.(svg|jpg)$/,
           type: "asset/resource",
         },
       ],
