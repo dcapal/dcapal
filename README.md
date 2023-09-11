@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://dcapal.com"><img src="https://ik.imagekit.io/dcapal/dcapal-og-bg-white-focused.png" width="800" /></a>
+  <a href="https://dcapal.com"><img src="dcapal-frontend/images/dcapal-og-bg-white-focused.jpg" width="800" /></a>
 </p>
 
 <p align="center">
