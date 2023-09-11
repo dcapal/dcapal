@@ -2,20 +2,20 @@ import { useMediaQuery } from "@react-hook/media-query";
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { IMAGEKIT_URL, MEDIA_SMALL } from "../../app/config";
+import { MEDIA_SMALL } from "../../app/config";
 import { ExportBtn } from "../exportBtn";
 
 import classNames from "classnames";
-import { IKImage } from "imagekitio-react";
-import { ICON_BURGER_MENU_SVG, ICON_CLOSE_MENU_SVG } from "../../app/images";
+import HAMBURGER_MENU from '@images/icons/hamburger-menu.svg'
+import CLOSE_MENU from '@images/icons/close-menu.svg'
 
 const CloseBtn = ({ onClick }) => {
   return (
     <div className="cursor-pointer" onClick={onClick}>
-      <IKImage
+      <img
         className="w-full max-w-[32px]"
-        urlEndpoint={IMAGEKIT_URL}
-        path={ICON_CLOSE_MENU_SVG}
+        alt='Close menu'
+        src={CLOSE_MENU}
       />
     </div>
   );
@@ -62,10 +62,10 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
 const MenuBtn = ({ onClick }) => {
   return (
     <div className="cursor-pointer" onClick={onClick}>
-      <IKImage
+      <img
         className="w-full max-w-[32px]"
-        urlEndpoint={IMAGEKIT_URL}
-        path={ICON_BURGER_MENU_SVG}
+        alt='Hamburger'
+        src={HAMBURGER_MENU}
       />
     </div>
   );
