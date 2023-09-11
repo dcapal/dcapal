@@ -1,4 +1,3 @@
-export const HEADER_NOT_FOUND_SVG = "headers/not-found.svg";
 export const HEADER_UNDER_CONSTRUCTION_SVG = "headers/under-construction.svg";
 export const HEADER_IMPORT_PORTFOLIO_SVG = "headers/import-portfolio.svg";
 export const ICON_BURGER_MENU_SVG = "icons/hamburger-menu.svg";
