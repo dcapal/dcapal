@@ -7,7 +7,6 @@ import toast from "react-hot-toast";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 
-
 import {
   addAsset,
   clearPortfolio,
@@ -19,14 +18,11 @@ import {
 
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
 
-import {
-  MEDIA_SMALL,
-  REFRESH_PRICE_INTERVAL_SEC,
-} from "../../../app/config";
+import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "../../../app/config";
 
 import SETTINGS from "@images/icons/settings.svg";
-import BAG from '@images/icons/bag.svg'
-import PIECHART from '@images/icons/piechart.svg'
+import BAG from "@images/icons/bag.svg";
+import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "../../../app/providers";
 

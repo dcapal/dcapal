@@ -6,17 +6,13 @@ import { MEDIA_SMALL } from "../../app/config";
 import { ExportBtn } from "../exportBtn";
 
 import classNames from "classnames";
-import HAMBURGER_MENU from '@images/icons/hamburger-menu.svg'
-import CLOSE_MENU from '@images/icons/close-menu.svg'
+import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
+import CLOSE_MENU from "@images/icons/close-menu.svg";
 
 const CloseBtn = ({ onClick }) => {
   return (
     <div className="cursor-pointer" onClick={onClick}>
-      <img
-        className="w-full max-w-[32px]"
-        alt='Close menu'
-        src={CLOSE_MENU}
-      />
+      <img className="w-full max-w-[32px]" alt="Close menu" src={CLOSE_MENU} />
     </div>
   );
 };
@@ -64,7 +60,7 @@ const MenuBtn = ({ onClick }) => {
     <div className="cursor-pointer" onClick={onClick}>
       <img
         className="w-full max-w-[32px]"
-        alt='Hamburger'
+        alt="Hamburger"
         src={HAMBURGER_MENU}
       />
     </div>

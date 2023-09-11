@@ -2,7 +2,7 @@ import React from "react";
 
 import { NavBar } from "../components/core/navBar";
 
-import NOT_FOUND from '@images/headers/not-found.svg'
+import NOT_FOUND from "@images/headers/not-found.svg";
 
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";

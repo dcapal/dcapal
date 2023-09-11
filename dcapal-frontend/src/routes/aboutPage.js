@@ -5,12 +5,12 @@ import { NavBar } from "../components/core/navBar";
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
 
-import ME from '@images/headers/me.jpg'
-import GITHUB from '@images/social/github.svg'
-import LINKEDIN from '@images/social/linkedin.svg'
-import TELEGRAM from '@images/social/telegram.svg'
-import TWITTER from '@images/social/twitter.svg'
-import YOUTUBE from '@images/social/youtube.svg'
+import ME from "@images/headers/me.jpg";
+import GITHUB from "@images/social/github.svg";
+import LINKEDIN from "@images/social/linkedin.svg";
+import TELEGRAM from "@images/social/telegram.svg";
+import TWITTER from "@images/social/twitter.svg";
+import YOUTUBE from "@images/social/youtube.svg";
 
 const SocialBar = () => {
   return (
@@ -30,18 +30,10 @@ const SocialBar = () => {
         />
       </a>
       <a href="https://twitter.com/arcari_leonardo">
-        <img
-          className="w-full max-w-[2rem]"
-          alt="Twitter logo"
-          src={TWITTER}
-        />
+        <img className="w-full max-w-[2rem]" alt="Twitter logo" src={TWITTER} />
       </a>
       <a href="https://www.youtube.com/@leonardoarcari3011">
-        <img
-          className="w-full max-w-[2rem]"
-          alt="Youtube logo"
-          src={YOUTUBE}
-        />
+        <img className="w-full max-w-[2rem]" alt="Youtube logo" src={YOUTUBE} />
       </a>
       <a href="https://t.me/leonardoarcari">
         <img

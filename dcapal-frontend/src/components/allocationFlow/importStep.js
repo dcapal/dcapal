@@ -160,7 +160,7 @@ export const ImportStep = () => {
       <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
-          alt='Import Portfolio'
+          alt="Import Portfolio"
           src={IMPORT_PORTFOLIO}
         />
         {isLoading && (
