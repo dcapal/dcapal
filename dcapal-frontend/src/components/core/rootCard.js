@@ -1,6 +1,4 @@
-import { IKImage } from "imagekitio-react";
 import React from "react";
-import { IMAGEKIT_URL } from "../../app/config";
 
 export const RootCard = ({ id, imgSrc, text, ...props }) => {
   return (
