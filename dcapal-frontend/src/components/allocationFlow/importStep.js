@@ -21,9 +21,7 @@ import {
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
-import { IKImage } from "imagekitio-react";
-import { IMAGEKIT_URL } from "../../app/config";
-import { HEADER_IMPORT_PORTFOLIO_SVG } from "../../app/images";
+import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 
 const parseFees = (fees) => {
   if (!fees) return null;
@@ -160,10 +158,10 @@ export const ImportStep = () => {
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
-        <IKImage
+        <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
-          urlEndpoint={IMAGEKIT_URL}
-          path={HEADER_IMPORT_PORTFOLIO_SVG}
+          alt='Import Portfolio'
+          src={IMPORT_PORTFOLIO}
         />
         {isLoading && (
           <>
