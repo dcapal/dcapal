@@ -1,5 +1,9 @@
 {
   "translation": {
+    "language": {
+      "en": "Inglese",
+      "it": "Italiano"
+    },
     "common": {
       "refreshedPrices": "Prezzi aggiornati!",
       "goBack": "Indietro",

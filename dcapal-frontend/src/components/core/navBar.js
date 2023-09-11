@@ -7,6 +7,7 @@ import { ExportBtn } from "../exportBtn";
 
 import classNames from "classnames";
 import {useTranslation} from "react-i18next";
+import LanguageSwitcher from "../languageSwitcher";
 
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
@@ -43,6 +44,7 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
         <CloseBtn onClick={toggleMenu} />
       </div>
       <div className="flex flex-col px-8 py-3 gap-y-6">
+        <LanguageSwitcher></LanguageSwitcher>
         <Link to={"/allocate"} onClick={toggleMenu}>
           <div className="w-full text-2xl font-light text-white">
             {t("navbar.getStarted")}
@@ -123,6 +125,8 @@ export const NavBar = () => {
         )}
       </div>
       <div className="flex gap-x-2 items-center">
+        {!isMobile && <LanguageSwitcher></LanguageSwitcher>}
+
         {isAllocate && <ExportBtn />}
         {isMobile && <MenuBtn onClick={toggleMenuVisible} />}
       </div>
