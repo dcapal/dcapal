@@ -35,6 +35,9 @@ module.exports = (env, argv) => {
     },
     resolve: {
       extensions: ["*", ".js", ".jsx"],
+      alias: {
+        "@images": path.resolve(__dirname, 'images/'),
+      }
     },
     plugins: [
       new HtmlWebpackPlugin({
