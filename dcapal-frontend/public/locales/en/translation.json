@@ -144,7 +144,7 @@
         "fellowDev": "<alignSuper1>If you are a fellow Dev, don't forget to</alignSuper1> <githubStar>Star</githubStar> <alignSuper2>DcaPal on <githubLink>Github</githubLink> if you like it or drop me an</alignSuper2> <githubIssue>Issue</githubIssue> <alignSuper3>if you want to help.</alignSuper3>"
       },
       "underConstruction": {
-        "title": "<0>Under construction. Stay tuned!</0>",
+        "title": "Under construction. Stay tuned!",
         "message": "<container><p1>Our engineers are working hard to get this page out soon.</p1><p2>In the meantime, <underlineLink><linkHome>enjoy our app!</linkHome></underlineLink></p2></container>"
       },
       "root": {

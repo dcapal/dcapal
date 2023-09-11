@@ -144,7 +144,7 @@
         "fellowDev": "<alignSuper1>Se sei un collega sviluppatore, non dimenticare di</alignSuper1> <githubStar>Mettere una stella</githubStar> <alignSuper2>a DcaPal su <githubLink>Github</githubLink> se ti piace o inviarmi una</alignSuper2> <githubIssue>Segnalazione</githubIssue> <alignSuper3>se vuoi aiutare.</alignSuper3>"
       },
       "underConstruction": {
-        "title": "<0>In costruzione. Rimanete sintonizzati!</0>",
+        "title": "In costruzione. Rimanete sintonizzati!",
         "message": "<container><p1>I nostri ingegneri stanno lavorando duramente per pubblicare questa pagina al più presto.</p1><p2>Nel frattempo, <underlineLink><linkHome>godetevi la nostra app!</linkHome></underlineLink></p2></container>"
       },
       "root": {

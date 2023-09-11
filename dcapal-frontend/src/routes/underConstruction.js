@@ -6,10 +6,10 @@ import { Link } from "react-router-dom";
 import UNDER_CONSTRUCTION from "@images/headers/under-construction.svg";
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
-import GitHubButton from "react-github-btn";
-import { Trans } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 export default function UnderConstructionPage({ title }) {
+  const { t } = useTranslation();
   return (
     <>
       <DcaPalHelmet title={title} />
@@ -21,10 +21,9 @@ export default function UnderConstructionPage({ title }) {
             alt="Under construction"
             src={UNDER_CONSTRUCTION}
           />
-          <Trans
-            i18nKey="page.underConstruction.title"
-            components={[<h1 className="text-3xl font-bold" />]}
-          />
+          <h1 className="text-3xl font-bold">
+            {t("page.underConstruction.title")}
+          </h1>
           <Trans
             i18nKey="page.underConstruction.message"
             components={{
