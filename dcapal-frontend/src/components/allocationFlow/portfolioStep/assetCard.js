@@ -147,7 +147,7 @@ export const AssetCard = ({
               </div>
             </div>
             <div className="flex items-center h-6">
-              <div className="w-12 mr-2 font-light text-xs">Price</div>
+              <div className="w-12 mr-2 font-light text-xs">{t("assetCard.price")}</div>
               <div className="uppercase text-sm">{quoteCcy}</div>
               <div className="ml-1 text-sm">
                 {price.toLocaleString("en-US", priceFmt)}
