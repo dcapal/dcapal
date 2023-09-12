@@ -43,8 +43,7 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
         </div>
         <CloseBtn onClick={toggleMenu} />
       </div>
-      <div className="flex flex-col px-8 py-3 gap-y-6">
-        <LanguageSwitcher></LanguageSwitcher>
+      <div className="flex flex-1 flex-col px-8 py-3 gap-y-6">
         <Link to={"/allocate"} onClick={toggleMenu}>
           <div className="w-full text-2xl font-light text-white">
             {t("navbar.getStarted")}
@@ -62,6 +61,9 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
             {t("navbar.docs")}
           </div>
         </Link>
+        <div className="flex-grow flex justify-center items-end pb-2">
+          <LanguageSwitcher></LanguageSwitcher>
+        </div>
       </div>
     </div>
   );
