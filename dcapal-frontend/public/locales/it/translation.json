@@ -57,7 +57,7 @@
       "targetWeights": "Pesi Obiettivo",
       "fillWithNumber": "Compila il campo <0>{{field}}</0> con il numero di <1>{{symbol}}</1> che hai già nel tuo portafoglio (es. 10 unità)",
       "defineTargetWeight": "Definisci la tua allocazione desiderata dell'asset nel campo <0>{{targetWeight}}</0> (ad es. <1>{{percentage}}</1> del valore totale del portafoglio)",
-      "reviewYourWeight": "Rivedi i tuoi <0>{{targetWeights}}</0>. Devono sommare al 100% (attualmente <1>{{actualWeight}} %</1>)",
+      "reviewYourWeight": "Rivedi i tuoi <0>{{targetWeights}}</0>. La somma deve essere pari al 100% (attualmente <1>{{actualWeight}} %</1>)",
       "lastFetch": "Ultimo aggiornamento dei prezzi alle"
     },
     "searchBar": {
