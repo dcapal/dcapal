@@ -15,7 +15,7 @@ export const appSlice = createSlice({
     allocationFlowStep: Step.CCY,
     currencies: [],
     pfolioFile: "",
-    language: "en",
+    language: null,
   },
   reducers: {
     setAllocationFlowStep: (state, action) => {
