@@ -1,20 +1,16 @@
 import React from "react";
 import { NavBar } from "../components/core/navBar";
-import { IKImage } from "imagekitio-react";
-
 import { LaunchBtn } from "../components/core/launchBtn";
 import { RootCard } from "../components/core/rootCard";
 
-import { IMAGEKIT_URL } from "../app/config";
-import {
-  HEADER_INVESTING_FRONT_SVG,
-  ICON_AMOUNT_SVG,
-  ICON_MARKET_SVG,
-  ICON_PORTFOLIO_SVG,
-  ICON_REBALANCE_SVG,
-} from "../app/images";
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
+
+import INVESTING_FRONT from "@images/headers/investing_front.svg";
+import ICON_AMOUNT from "@images/icons/amount.svg";
+import ICON_MARKET from "@images/icons/market.svg";
+import ICON_PORTFOLIO from "@images/icons/portfolio.svg";
+import ICON_REBALANCE from "@images/icons/rebalance.svg";
 
 export const Root = () => {
   return (
@@ -36,10 +32,10 @@ export const Root = () => {
                   tax-efficient suggestions for your monthly investments.
                 </p>
               </div>
-              <IKImage
+              <img
                 className="w-full px-4 sm:max-w-[26rem]"
-                urlEndpoint={IMAGEKIT_URL}
-                path={HEADER_INVESTING_FRONT_SVG}
+                alt="Investing front"
+                src={INVESTING_FRONT}
               />
               <LaunchBtn />
             </div>
@@ -65,7 +61,7 @@ export const Root = () => {
             className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-6"
           >
             <RootCard
-              imgSrc={ICON_PORTFOLIO_SVG}
+              imgSrc={ICON_PORTFOLIO}
               text={
                 <p>
                   <span className="font-normal">Build your portfolio</span> and
@@ -74,7 +70,7 @@ export const Root = () => {
               }
             />
             <RootCard
-              imgSrc={ICON_AMOUNT_SVG}
+              imgSrc={ICON_AMOUNT}
               text={
                 <p>
                   Tell us <span className="font-normal">your budget</span> for
@@ -84,7 +80,7 @@ export const Root = () => {
             />
             <RootCard
               id={"tax-efficient"}
-              imgSrc={ICON_REBALANCE_SVG}
+              imgSrc={ICON_REBALANCE}
               text={
                 <p>
                   Choose
@@ -95,7 +91,7 @@ export const Root = () => {
               }
             />
             <RootCard
-              imgSrc={ICON_MARKET_SVG}
+              imgSrc={ICON_MARKET}
               text={
                 <p>
                   Discover{" "}
