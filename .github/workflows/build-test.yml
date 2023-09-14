@@ -132,11 +132,11 @@ jobs:
         with:
           node-version: 19
       - name: Install dependencies
-        run: npm ci
+        run: cd dcapal-frontend && npm ci
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: cd dcapal-frontend && npx playwright install --with-deps
       - name: Run Playwright tests
-        run: npx playwright test
+        run: cd dcapal-frontend &&npx playwright test
       - uses: actions/upload-artifact@v3
         if: always()
         with:
