@@ -33,7 +33,6 @@ Report a bug by [opening a new issue](https://github.com/leonardoarcari/dcapal/i
 
 
 ## Write bug reports with detail, background, and sample code
-[This is an example](http://stackoverflow.com/q/12488905/180626) of a bug report I wrote, and I think it's not a bad model. Here's [another example from Craig Hockenberry](http://www.openradar.me/11905408), an app developer whom I greatly respect.
 
 **Great Bug Reports** tend to have:
 
