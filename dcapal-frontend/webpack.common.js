@@ -28,13 +28,16 @@ module.exports = (env, argv) => {
           use: ["style-loader", "css-loader", "postcss-loader"],
         },
         {
-          test: /\.svg$/,
+          test: /\.(svg|jpg)$/,
           type: "asset/resource",
         },
       ],
     },
     resolve: {
       extensions: ["*", ".js", ".jsx"],
+      alias: {
+        "@images": path.resolve(__dirname, 'images/'),
+      }
     },
     plugins: [
       new HtmlWebpackPlugin({

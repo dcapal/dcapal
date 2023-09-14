@@ -7,8 +7,6 @@ import toast from "react-hot-toast";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 
-import SettingsSvg from "../../../../images/icons/settings.svg";
-
 import {
   addAsset,
   clearPortfolio,
@@ -19,13 +17,12 @@ import {
 } from "./portfolioSlice";
 
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { IKImage } from "imagekitio-react";
-import {
-  IMAGEKIT_URL,
-  MEDIA_SMALL,
-  REFRESH_PRICE_INTERVAL_SEC,
-} from "../../../app/config";
-import { ICON_BAG_SVG, ICON_PIECHART_SVG } from "../../../app/images";
+
+import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "../../../app/config";
+
+import SETTINGS from "@images/icons/settings.svg";
+import BAG from "@images/icons/bag.svg";
+import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "../../../app/providers";
 
@@ -153,7 +150,7 @@ export const PortfolioStep = ({ ...props }) => {
       {assets && assets.length > 0 && (
         <div className="relative w-full flex flex-col items-end justify-center mt-2">
           <button className={feeBtnClass} onClick={onClickTransactionFees}>
-            <img src={SettingsSvg} className="w-full max-w-[20px]" />
+            <img src={SETTINGS} className="w-full max-w-[20px]" />
           </button>
           {isShowFees && (
             <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
@@ -216,10 +213,10 @@ export const PortfolioStep = ({ ...props }) => {
           })}
         >
           <div className="w-full flex items-center justify-start">
-            <IKImage
+            <img
               className="w-full max-w-[3rem] p-1 self-start"
-              urlEndpoint={IMAGEKIT_URL}
-              path={ICON_BAG_SVG}
+              alt="Bag"
+              src={BAG}
             />
             <p className="flex-grow font-light">
               Fill <span className="font-normal">Quantity</span> field with the
@@ -231,10 +228,10 @@ export const PortfolioStep = ({ ...props }) => {
             </p>
           </div>
           <div className="w-full flex items-center justify-start">
-            <IKImage
+            <img
               className="w-full max-w-[3rem] p-1 self-start"
-              urlEndpoint={IMAGEKIT_URL}
-              path={ICON_PIECHART_SVG}
+              alt="Piechart"
+              src={PIECHART}
             />
             <p className="flex-grow font-light">
               Define your desired asset allocation in{" "}
