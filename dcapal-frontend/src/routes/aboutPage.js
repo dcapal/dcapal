@@ -2,56 +2,44 @@ import React from "react";
 import GitHubButton from "react-github-btn";
 
 import { NavBar } from "../components/core/navBar";
-
-import { IMAGEKIT_URL } from "../app/config";
-import { IKImage } from "imagekitio-react";
-import {
-  HEADER_ME_JPG,
-  SOCIAL_GITHUB_SVG,
-  SOCIAL_LINKEDIN_SVG,
-  SOCIAL_TELEGRAM_SVG,
-  SOCIAL_TWITTER_SVG,
-  SOCIAL_YOUTUBE_SVG,
-} from "../app/images";
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
+
+import ME from "@images/headers/me.jpg";
+import GITHUB from "@images/social/github.svg";
+import LINKEDIN from "@images/social/linkedin.svg";
+import TELEGRAM from "@images/social/telegram.svg";
+import TWITTER from "@images/social/twitter.svg";
+import YOUTUBE from "@images/social/youtube.svg";
 
 const SocialBar = () => {
   return (
     <div className="flex gap-1 items-center justify-center">
       <a href="https://github.com/leonardoarcari">
-        <IKImage
+        <img
           className="w-full max-w-[1.75rem] mr-[2px]"
-          urlEndpoint={IMAGEKIT_URL}
-          path={SOCIAL_GITHUB_SVG}
+          alt="Github logo"
+          src={GITHUB}
         />
       </a>
       <a href="https://www.linkedin.com/in/leonardoarcari/">
-        <IKImage
+        <img
           className="w-full max-w-[2rem]"
-          urlEndpoint={IMAGEKIT_URL}
-          path={SOCIAL_LINKEDIN_SVG}
+          alt="Linkedin logo"
+          src={LINKEDIN}
         />
       </a>
       <a href="https://twitter.com/arcari_leonardo">
-        <IKImage
-          className="w-full max-w-[2rem]"
-          urlEndpoint={IMAGEKIT_URL}
-          path={SOCIAL_TWITTER_SVG}
-        />
+        <img className="w-full max-w-[2rem]" alt="Twitter logo" src={TWITTER} />
       </a>
       <a href="https://www.youtube.com/@leonardoarcari3011">
-        <IKImage
-          className="w-full max-w-[2rem]"
-          urlEndpoint={IMAGEKIT_URL}
-          path={SOCIAL_YOUTUBE_SVG}
-        />
+        <img className="w-full max-w-[2rem]" alt="Youtube logo" src={YOUTUBE} />
       </a>
       <a href="https://t.me/leonardoarcari">
-        <IKImage
+        <img
           className="w-full max-w-[2rem]"
-          urlEndpoint={IMAGEKIT_URL}
-          path={SOCIAL_TELEGRAM_SVG}
+          alt="Telegram logo"
+          src={TELEGRAM}
         />
       </a>
     </div>
@@ -69,11 +57,10 @@ export default function AboutPage() {
         <NavBar />
         <div className="w-full flex flex-col items-center gap-4 px-6 py-6 bg-[#ededed]">
           <h1 className="mb-8 text-3xl sm:text-4xl font-bold">About</h1>
-          <IKImage
+          <img
             className="w-full max-w-[15rem] rounded-full border border-neutral-700/20 shadow-md"
-            urlEndpoint={IMAGEKIT_URL}
-            path={HEADER_ME_JPG}
-            lqip={{ active: true }}
+            alt="Social logo"
+            src={ME}
           />
           <SocialBar />
         </div>
