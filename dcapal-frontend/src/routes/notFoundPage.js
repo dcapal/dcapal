@@ -2,9 +2,8 @@ import React from "react";
 
 import { NavBar } from "../components/core/navBar";
 
-import { IKImage } from "imagekitio-react";
-import { HEADER_NOT_FOUND_SVG } from "../app/images";
-import { IMAGEKIT_URL } from "../app/config";
+import NOT_FOUND from "@images/headers/not-found.svg";
+
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
 
@@ -15,10 +14,10 @@ export default function NotFoundPage() {
       <div className="w-full h-screen flex flex-col">
         <NavBar />
         <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
-          <IKImage
+          <img
             className="w-full px-4 sm:max-w-[35rem] pb-2"
-            urlEndpoint={IMAGEKIT_URL}
-            path={HEADER_NOT_FOUND_SVG}
+            alt="Not found"
+            src={NOT_FOUND}
           />
           <h1 className="text-3xl font-bold">Page not found</h1>
           <span className="flex flex-col gap-y-2 items-center font-light">
