@@ -43,5 +43,6 @@ Report a bug by [opening a new issue](https://github.com/leonardoarcari/dcapal/i
 - What you expected would happen
 - What actually happens
 - Notes (possibly including why you think this might be happening, or stuff you tried that didn't work)
+If you don't know where to start, take a look at these great bug reports as an example: \[[1](http://stackoverflow.com/q/12488905/180626)]\], \[[2](http://www.openradar.me/11905408)]\]
 
 For any questions contact [@leonardoarcari](https://github.com/leonardoarcari)
