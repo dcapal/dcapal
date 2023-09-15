@@ -10,7 +10,7 @@ services:
       - dcapalnetwork
     volumes:
       - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
-      - ./data/dcapal:/var/dcapal/dcapal-backend/data
+      - ./data/dcapal:/var/dcapal/dcapal-backend/data/dcapal
     depends_on:
       redis:
         condition: service_healthy
