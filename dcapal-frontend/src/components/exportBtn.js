@@ -5,6 +5,7 @@ import {
   aclassToString,
   feeTypeToString,
 } from "./allocationFlow/portfolioStep/portfolioSlice";
+import { useTranslation } from "react-i18next";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 
@@ -54,6 +55,8 @@ const exportPfolio = (pfolio) => {
 };
 
 export const ExportBtn = () => {
+  const { t } = useTranslation();
+
   const step = useSelector((state) => state.app.allocationFlowStep);
 
   const assets = useSelector((state) => state.pfolio.assets);
@@ -81,7 +84,7 @@ export const ExportBtn = () => {
       className="px-3 py-2 flex justify-center items-center whitespace-nowrap bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
       onClick={onClick}
     >
-      Export Portfolio
+      {t("navbar.exportPortfolio")}
     </button>
   );
 };

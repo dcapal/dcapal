@@ -6,6 +6,9 @@ import { MEDIA_SMALL } from "../../app/config";
 import { ExportBtn } from "../exportBtn";
 
 import classNames from "classnames";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "../languageSwitcher";
+
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
 
@@ -18,6 +21,8 @@ const CloseBtn = ({ onClick }) => {
 };
 
 const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
+  const { t } = useTranslation();
+
   const className = classNames(
     "absolute z-50 w-screen h-screen inset-0 flex flex-col bg-[#333333]",
     {
@@ -38,18 +43,27 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
         </div>
         <CloseBtn onClick={toggleMenu} />
       </div>
-      <div className="flex flex-col px-8 py-3 gap-y-6">
+      <div className="flex flex-1 flex-col px-8 py-3 gap-y-6">
         <Link to={"/allocate"} onClick={toggleMenu}>
           <div className="w-full text-2xl font-light text-white">
-            Get Started
+            {t("navbar.getStarted")}
           </div>
         </Link>
         <Link to={"/about"} onClick={toggleMenu}>
-          <div className="w-full text-2xl font-light text-white">About</div>
+          <div className="w-full text-2xl font-light text-white">
+            {" "}
+            {t("navbar.about")}
+          </div>
         </Link>
         <Link to={"/docs"} onClick={toggleMenu}>
-          <div className="w-full text-2xl font-light text-white">Docs</div>
+          <div className="w-full text-2xl font-light text-white">
+            {" "}
+            {t("navbar.docs")}
+          </div>
         </Link>
+        <div className="flex-grow flex justify-center items-end pb-2">
+          <LanguageSwitcher></LanguageSwitcher>
+        </div>
       </div>
     </div>
   );
@@ -70,6 +84,7 @@ const MenuBtn = ({ onClick }) => {
 export const NavBar = () => {
   const [menuVisible, setMenuVisible] = useState(false);
 
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
@@ -93,13 +108,13 @@ export const NavBar = () => {
         {!isMobile && (
           <div className="flex gap-x-5">
             <div className="text-lg font-light text-white">
-              <Link to={"/allocate"}>Get Started</Link>
+              <Link to={"/allocate"}>{t("navbar.getStarted")}</Link>
             </div>
             <div className="text-lg font-light text-white">
-              <Link to={"/about"}>About</Link>
+              <Link to={"/about"}>{t("navbar.about")}</Link>
             </div>
             <div className="text-lg font-light text-white">
-              <Link to={"/docs"}>Docs</Link>
+              <Link to={"/docs"}>{t("navbar.docs")}</Link>
             </div>
           </div>
         )}
@@ -112,6 +127,8 @@ export const NavBar = () => {
         )}
       </div>
       <div className="flex gap-x-2 items-center">
+        {!isMobile && <LanguageSwitcher></LanguageSwitcher>}
+
         {isAllocate && <ExportBtn />}
         {isMobile && <MenuBtn onClick={toggleMenuVisible} />}
       </div>
