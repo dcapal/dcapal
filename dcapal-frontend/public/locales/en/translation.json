@@ -4,7 +4,7 @@
       "en": "English",
       "it": "Italian"
     },
-    "common":{
+    "common": {
       "refreshedPrices": "Refreshed prices!",
       "goBack": "Go back",
       "next": "Next",
@@ -23,6 +23,8 @@
       "leftBudget": "This is your budget left. Save it for the next time you visit DcaPal",
       "buy": "Buy",
       "sell": "Sell",
+      "bought": "bought",
+      "sold": "sold",
       "nothingToTradeHold": "Nothing to trade. Just hold",
       "nothingToTradeHodl": "Nothing to trade. Just hodl",
       "currentAmount": "Current amount",
@@ -45,6 +47,7 @@
     },
     "assetCard": {
       "price": "Price",
+      "amount": "Amount",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
       "transactionFees": "Transaction fees"
@@ -97,7 +100,7 @@
       "advanced": "Advanced",
       "doNotSplit": "Don't split",
       "doNotSplitInfo": "With <0>{{message}}</0> option, we are going to suggest the number of shares to buy or sell for non-fractional assets like Stocks or ETFs. Otherwise, we might suggest theoretically optimal amounts to buy or sell but you will need to figure out how many shares to buy.",
-      "wholeShares": "whole shares",
+      "wholeShares": " whole shares",
       "runAllocation": "Run Allocation"
     },
     "about": {
