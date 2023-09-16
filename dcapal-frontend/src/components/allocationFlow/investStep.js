@@ -5,7 +5,7 @@ import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
 import { setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
-import { Trans } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 export const InvestStep = ({
   useTaxEfficient,
@@ -15,6 +15,7 @@ export const InvestStep = ({
 }) => {
   const [cash, setCash] = useState(0);
   const dispatch = useDispatch();
+  const { t } = useTranslation();
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const totalAmount = useSelector((state) => state.pfolio.totalAmount);

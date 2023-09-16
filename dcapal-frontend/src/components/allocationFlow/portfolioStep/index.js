@@ -27,8 +27,7 @@ import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "../../../app/providers";
 import { Trans, useTranslation } from "react-i18next";
 
-const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
-  const { t } = useTranslation();
+const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
 
   if (Object.keys(assets) < 1) {
@@ -76,12 +75,12 @@ export const PortfolioStep = ({ ...props }) => {
       );
 
       if (now > nextRefresh) {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch);
+        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
         return;
       }
 
       timeout = setTimeout(async () => {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch);
+        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
       }, nextRefresh - now);
     };
 
