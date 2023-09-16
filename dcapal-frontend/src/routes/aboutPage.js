@@ -58,7 +58,7 @@ export default function AboutPage() {
       >
         <NavBar />
         <div className="w-full flex flex-col items-center gap-4 px-6 py-6 bg-[#ededed]">
-        <h1 className="mb-8 text-3xl sm:text-4xl font-bold">
+          <h1 className="mb-8 text-3xl sm:text-4xl font-bold">
             {t("page.about.title")}
           </h1>
           <img

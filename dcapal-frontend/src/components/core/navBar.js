@@ -6,7 +6,7 @@ import { MEDIA_SMALL } from "../../app/config";
 import { ExportBtn } from "../exportBtn";
 
 import classNames from "classnames";
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "../languageSwitcher";
 
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";

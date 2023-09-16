@@ -21,7 +21,7 @@ import {
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 
