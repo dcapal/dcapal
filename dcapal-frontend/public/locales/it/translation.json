@@ -1,0 +1,166 @@
+{
+  "translation": {
+    "language": {
+      "en": "Inglese",
+      "it": "Italiano"
+    },
+    "common": {
+      "refreshedPrices": "Prezzi aggiornati!",
+      "goBack": "Indietro",
+      "next": "Avanti",
+      "discard": "Cancella"
+    },
+    "navbar": {
+      "getStarted": "Inizia qui",
+      "about": "Chi siamo",
+      "docs": "Documentazione",
+      "exportPortfolio": "Esporta Portafoglio"
+    },
+    "currencyStep": {
+      "chooseCurrency": "Seleziona la valuta del tuo portafoglio"
+    },
+    "endStep": {
+      "leftBudget": "Questo è il tuo budget residuo. Tienilo per la prossima volta che vieni su DcaPal",
+      "buy": "Acquista",
+      "sell": "Vendi",
+      "bought": "comprare",
+      "sold": "vendere",
+      "nothingToTradeHold": "Nulla da scambiare. Tieni e basta.",
+      "nothingToTradeHodl": "Nulla da scambiare. HODL!",
+      "currentAmount": "Importo attuale",
+      "newAmount": "Nuovo importo",
+      "currentWeight": "Peso attuale",
+      "newWeight": "Nuovo peso",
+      "targetWeight": "Allocazione target",
+      "fees": "Commissioni",
+      "feeImpact": "Impatto delle commissioni",
+      "spacer": "Spaziatore",
+      "shouldHave": "Avresti dovuto",
+      "butWouldHavePaid": "ma avresti pagato",
+      "worthOfFees": "in commissioni",
+      "impact": "impatto",
+      "budgetAllocated": "Un momento. Stiamo allocando il tuo budget",
+      "allocationReady": "Fatto! La tua allocazione è pronta",
+      "backToPortfolio": "Torna al Portafoglio",
+      "opsBadHappened": "Oops! Qualcosa è andato storto.",
+      "reviewPortfolio": "Per favore, rivedi il tuo portafoglio."
+    },
+    "assetCard": {
+      "price": "Prezzo",
+      "amount": "Valore",
+      "quantity": "Quantità",
+      "targetWeight": "Allocazione Target",
+      "transactionFees": "Costi di transazione"
+    },
+    "portfolioStep": {
+      "transactionFees": "Costi di transazione",
+      "portfolioAssets": "Asset in portafoglio",
+      "quantity": "Quantità",
+      "targetWeight": "Allocazione Target",
+      "targetWeights": "Pesi Obiettivo",
+      "fillWithNumber": "Compila il campo <0>{{field}}</0> con il numero di <1>{{symbol}}</1> che hai già nel tuo portafoglio (es. 10 unità)",
+      "defineTargetWeight": "Definisci la tua allocazione desiderata dell'asset nel campo <0>{{targetWeight}}</0> (ad es. <1>{{percentage}}</1> del valore totale del portafoglio)",
+      "reviewYourWeight": "Rivedi i tuoi <0>{{targetWeights}}</0>. La somma deve essere pari al 100% (attualmente <1>{{actualWeight}} %</1>)",
+      "lastFetch": "Ultimo aggiornamento dei prezzi alle"
+    },
+    "searchBar": {
+      "placeholder": "Cerca Crypto, ETF e altro",
+      "noAssetFoundFor": "Nessun asset trovato per ",
+      "loading": "Caricamento"
+    },
+    "transactionFee": {
+      "default": "Predefinito",
+      "noFees": "Zero",
+      "fixed": "Fissa",
+      "variable": "Variabile",
+      "zeroFee": "Goditi la tua vita senza commissioni, fortunato bast***o",
+      "feeAmount": "Importo",
+      "feePercentage": "Percentuale",
+      "minFee": "Minimo",
+      "maxFee": "Massimo",
+      "reviewFee": "Rivedi la tua <0>{{fee}}</0>. Deve essere inferiore o uguale alla commissione massima.",
+      "maxFeeImpact": "Impatto massimo"
+    },
+    "importStep": {
+      "fetchData": "Un attimo! Recupero dati freschi per il tuo portafoglio",
+      "importPortfolio": "Importa Portafoglio",
+      "ops": "Ops! Questo è imbarazzante",
+      "allocateYourSavings": "Alloca i tuoi risparmi"
+    },
+    "initStep": {
+      "newPortfolio": "Nuovo portafoglio",
+      "loadYourPortfolio": "O carica il tuo portafoglio",
+      "fromFile": "da file"
+    },
+    "investStep": {
+      "howMuchAllocate": "Quanto desideri allocare?",
+      "taxEfficient": "fiscalmente efficiente",
+      "taxEfficientAlgorithm": "Algoritmo <0>{{tax}}</0>",
+      "taxEfficientInfo": "Con l'opzione <0>{{tax}}</0>, facciamo del nostro meglio per ribilanciare il tuo portafoglio utilizzando la tua liquidità, solo con suggerimenti di acquisto. Altrimenti, potremmo suggerire di vendere parte delle tue posizioni.",
+      "advanced": "Avanzato",
+      "doNotSplit": "Quote intere",
+      "doNotSplitInfo": "Con l'opzione <0>{{message}}</0>, suggeriamo il numero di quote da acquistare o vendere per asset non frazionari come azioni o ETF. In caso contrario, potremmo suggerire importi teoricamente ottimali da acquistare o vendere, ma dovrai calcolare tu quante quote acquistare.",
+      "wholeShares": "",
+      "runAllocation": "Alloca Budget"
+    },
+    "about": {
+      "terms": "Termini",
+      "privacy": "Privacy",
+      "contacts": "Contatti",
+      "docs": "Documenti",
+      "about": "Chi siamo"
+    },
+    "page": {
+      "notFound": {
+        "title": "Pagina non trovata",
+        "quote1": "Ma dato che siamo qui, goditi una citazione gratuita di Warren Buffett:",
+        "quote2": "“Se non sei disposto a possedere un'azione per 10 anni, non pensarci nemmeno per 10 minuti”"
+      },
+      "error": {
+        "ops": "Ops!",
+        "errorHasOccurred": "Spiacenti, si è verificato un errore imprevisto."
+      },
+      "demo": {
+        "loadingDemo": "Caricamento del portafoglio demo"
+      },
+      "about": {
+        "title": "Chi siamo",
+        "iAmLeo": "Ciao, sono Leo!",
+        "pragmaticTool": "strumento pragmatico",
+        "presentation1": "<0>{{person}}</0> 👋 Sono un Ingegnere del Software nel settore finanziario, lavoro su sistemi backend a bassa latenza, principalmente in C++ e Rust🦀. Lo so, lo so, ma ci sono cose peggiori che potrei fare.",
+        "presentation2": "Ho progettato DcaPal come uno <0>{{tool}}</0> per investitori passivi come me: persone con una cultura finanziaria che gestiscono il proprio portafoglio in autonomia, investendo in asset che replicano i principali indici mondiali.",
+        "commonProblem": "Mi trovavo di fronte a un problema comune: è quel giorno del mese, ho dei risparmi da investire e devo suddividerli tra i miei asset in portafoglio.",
+        "questionPresentation": "Come diavolo posso farlo in modo che il mio portafoglio rimanga bilanciato?",
+        "motivation": "Ecco perché DcaPal. Vieni qui ogni settimana/mese/trimestre, costruisci il tuo portafoglio, definisci l'allocazione degli asset in percentuale, inserisci quanto vuoi investire e <0>{{algorithm}}</0>",
+        "letTheAlgorithmDoTheSplittingForYou": "lascia che l'algoritmo faccia i calcoli per te",
+        "exportPortfolio": "Puoi anche esportare il tuo portafoglio e importarlo la prossima volta per risparmiare tempo prezioso.",
+        "privacyPolicyTitle": "Informativa sulla privacy",
+        "privacyPolicyMessage1": "Ecco la nostra politica sulla privacy: conserviamo il tuo indirizzo IP per scopi statistici. Basta. Niente di più.",
+        "privacyPolicyMessage2": "Poiché DcaPal è un servizio senza registrazione, non effettuiamo il tracciamento degli utenti. Non conserviamo dati degli utenti: asset del portafoglio, importi investiti, niente esce mai dal tuo browser.",
+        "privacyPolicyMessage3": "Questo potrebbe cambiare in futuro. Fino ad allora, lunga vita al Far West.",
+        "privacyPolicyMessageTotal": "<0>{{part1}}</0><1>{{part2}}</1><2>{{part3}}</2>",
+        "feedback": "Feedback",
+        "feedbackMessage": "Se riscontri problemi, desideri richiedere nuove funzionalità o semplicemente lasciare un feedback, non esitare a contattarmi su uno qualsiasi dei miei <1>{{socialProfiles}}</1>.",
+        "feelFreeReachOut": "sentiti libero di contattarmi",
+        "socialProfiles": "miei profili social",
+        "everyContribution": "Ogni contributo è molto apprezzato!",
+        "fellowDev": "<alignSuper1>Se sei un collega sviluppatore, non dimenticare di</alignSuper1> <githubStar>Mettere una stella</githubStar> <alignSuper2>a DcaPal su <githubLink>Github</githubLink> se ti piace o inviarmi una</alignSuper2> <githubIssue>Segnalazione</githubIssue> <alignSuper3>se vuoi aiutare.</alignSuper3>"
+      },
+      "underConstruction": {
+        "title": "In costruzione. Rimanete sintonizzati!",
+        "message": "<container><p1>I nostri ingegneri stanno lavorando duramente per pubblicare questa pagina al più presto.</p1><p2>Nel frattempo, <underlineLink><linkHome>godetevi la nostra app!</linkHome></underlineLink></p2></container>"
+      },
+      "root": {
+        "title1": "PAC mensile reso facile",
+        "subtitle1": "DcaPal ti aiuta a tenere il tuo portafoglio bilanciato con suggerimenti fiscalmente efficienti per i tuoi investimenti periodici.",
+        "title2": "Il tuo assistente intelligente per l'allocazione dei tuoi risparmi mensili",
+        "subtitle2": "<p1>Mantenere il tuo portafoglio bilanciato è difficile. <it>Lo sappiamo</it>.</p1><p2>Imposti la tua asset allocation il giorno uno, il mercato sale e scende e finisce che non sai più come suddividere i tuoi risparmi mensili.</p2><p3>Ci pensa DcaPal.</p3>",
+        "cardStep1": "<p1><bold>Costruisci il tuo portafoglio</bold> e definisci l'allocazione degli asset</p1>",
+        "cardStep2": "<p1>Inserisci <bold>il tuo budget</bold> per questo mese</p1>",
+        "cardStep3": "<p1>Scegli<bold1> ribilanciamento efficiente </bold1> (solo acquisti) o <bold2>standard</bold2></p1>",
+        "cardStep4": "<p1>Scopri <bold>quanto investire </bold> su ciascun asset e vai a mercato</p1>",
+        "getStart": "<p1>Inizia ora. È gratuito!</p1><p2>Abbiamo creato DcaPal come uno strumento rapido per gli investitori passivi. Alloca il tuo budget in pochi minuti.</p2><p3>Non è richiesta alcuna registrazione!</p3>"
+      }
+    }
+  }
+}

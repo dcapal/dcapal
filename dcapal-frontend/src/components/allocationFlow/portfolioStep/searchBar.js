@@ -14,6 +14,7 @@ import {
 import { DCAPAL_API_SEARCH } from "../../../app/config";
 import { Spinner } from "../../spinner/spinner";
 import { ACLASS } from "./portfolioSlice";
+import { useTranslation } from "react-i18next";
 
 let searchId = undefined;
 
@@ -52,6 +53,8 @@ const fetchAssetsYF = async (query) => {
 export const SearchBar = (props) => {
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { t } = useTranslation();
 
   const searchOptions = {
     shouldSort: true,
@@ -144,7 +147,7 @@ export const SearchBar = (props) => {
       <input
         className="w-full h-12 px-6 pb-px border-2 rounded-3xl border-neutral-500/40 focus:border-neutral-500 focus-visible:outline-none uppercase placeholder:normal-case z-20"
         value={props.text}
-        placeholder={"Search Crypto, ETF and much more"}
+        placeholder={t("searchBar.placeholder")}
         onChange={handleAddAssetInputChange}
       />
       {isLoading && (
@@ -154,7 +157,7 @@ export const SearchBar = (props) => {
       )}
       {results && isEmptyResult && (
         <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
-          No asset found for '{props.text.toUpperCase()}'
+          {t("searchBar.noAssetFoundFor")} '{props.text.toUpperCase()}'
         </div>
       )}
       {results && !isEmptyResult && (
@@ -292,6 +295,7 @@ const SearchItemCW = (props) => {
 const SearchItemYF = (props) => {
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
+  const { t } = useTranslation();
 
   const [price, setPrice] = useState(null);
   const [baseCcy, setBaseCcy] = useState("");
@@ -371,7 +375,11 @@ const SearchItemYF = (props) => {
             )}
           </div>
           <div>
-            {!price && <div className="text-base font-medium">Loading...</div>}
+            {!price && (
+              <div className="text-base font-medium">
+                {t("searchBar.loading")}...
+              </div>
+            )}
           </div>
         </div>
       </div>

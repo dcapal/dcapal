@@ -62,7 +62,7 @@ export default function DemoPage() {
       <div className="w-full h-screen flex flex-col">
         <NavBar />
         <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
-          <h1 className="text-3xl font-bold">Loading demo portfolio</h1>
+          <h1 className="text-3xl font-bold">{t("page.demo.loadingDemo")}</h1>
         </div>
         <Footer />
       </div>
