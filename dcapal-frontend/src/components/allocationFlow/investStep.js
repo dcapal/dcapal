@@ -130,7 +130,7 @@ export const InvestStep = ({
               htmlFor="#tax-efficient-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
-              <span className="font-medium">{t("investStep.doNotSplit")}</span>{" "}
+              <span className="font-medium">{t("investStep.doNotSplit")}</span>
               {t("investStep.wholeShares")}
             </label>
           </div>
@@ -139,7 +139,7 @@ export const InvestStep = ({
               i18nKey="investStep.doNotSplitInfo"
               values={{
                 message:
-                  t("investStep.dontSplit") + " " + t("investStep.wholeShares"),
+                  t("investStep.doNotSplit") + t("investStep.wholeShares"),
               }}
               components={[<span className="italic" />]}
             />

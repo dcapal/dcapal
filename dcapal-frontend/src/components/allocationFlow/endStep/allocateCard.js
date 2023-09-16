@@ -74,7 +74,8 @@ export const AllocateCard = ({
     if (!theoAlloc || theoAlloc.shares === oldQty) return null;
 
     const diffQty = Math.abs(theoAlloc.shares - oldQty);
-    const action = theoAlloc.shares > oldQty ? "bought" : "sold";
+    const action =
+      theoAlloc.shares > oldQty ? "endStep.bought" : "endStep.sold";
     const feeImpact =
       (theoAlloc.fees / Math.abs(theoAlloc.amount - (oldAmount || 0))) * 100;
 
@@ -169,7 +170,6 @@ export const AllocateCard = ({
                   {aclass === ACLASS.CRYPTO
                     ? t("endStep.nothingToTradeHodl")
                     : t("endStep.nothingToTradeHold")}
-                  .
                 </span>
               )}
             </div>
@@ -303,14 +303,14 @@ export const AllocateCard = ({
             <div className="flex gap-1 px-3 py-2 mt-[5px] rounded-md bg-gray-200/50">
               <span>ℹ️</span>
               <span className="font-light italic">
-                {t("endStep.shouldHave")} {theo?.action}{" "}
+                {t("endStep.shouldHave")} {t(theo?.action)}{" "}
                 {roundDecimals(theo?.diffQty, 6)}{" "}
                 <span className="uppercase">{symbol}</span> @{" "}
                 {price.toLocaleString("en-US", priceFmt)}{" "}
                 <span className="uppercase">{quoteCcy}</span> (
                 {roundAmount(theo?.amount).toLocaleString("en-US", amtFmt)}{" "}
                 <span className="uppercase">{quoteCcy}</span>){" "}
-                {t("endStep.butWouldHavePaid")}
+                {t("endStep.butWouldHavePaid")}{" "}
                 {theo?.fees.toLocaleString("en-US", priceFmt)}{" "}
                 <span className="uppercase">{quoteCcy}</span>{" "}
                 {t("endStep.worthOfFees")} (

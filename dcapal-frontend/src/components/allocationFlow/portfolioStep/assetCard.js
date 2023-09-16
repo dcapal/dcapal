@@ -72,14 +72,16 @@ export const AssetCard = ({
       {isMobile && (
         <div className="flex flex-col">
           <div className="flex items-center py-2">
-            <div className="min-w-[6rem] mr-2 font-light text-xs">Amount</div>
+            <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs">
+              {t("assetCard.amount")}
+            </div>
             <div className="uppercase text-sm">{quoteCcy}</div>
             <div className="ml-1 text-sm">
               {(price * qty).toLocaleString("en-US", priceFmt)}
             </div>
           </div>
           <div className="flex items-center py-2">
-            <div className="min-w-[6rem] mr-2 font-light text-xs">
+            <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs">
               {t("assetCard.price")}
             </div>
             <div className="uppercase text-sm">{quoteCcy}</div>
@@ -88,7 +90,7 @@ export const AssetCard = ({
             </div>
           </div>
           <div className="flex items-center h-12">
-            <div className="min-w-[6rem] mr-2 font-light text-xs">
+            <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs">
               {t("assetCard.quantity")}
             </div>
             <div className="grow">
@@ -107,7 +109,7 @@ export const AssetCard = ({
             </div>
           </div>
           <div className="flex items-center h-12">
-            <div className="min-w-[6rem] font-light text-xs">
+            <div className="min-w-[6rem] max-w-[6rem] font-light text-xs">
               {t("assetCard.targetWeight")} (%)
             </div>
             <div className="grow ml-2">

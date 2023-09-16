@@ -49,7 +49,7 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
     dispatch(setPrice({ symbol: a.symbol, price: price }));
   });
 
-  toast.success(t("refreshedPrices"));
+  toast.success(t("common.refreshedPrices"));
   dispatch(setRefreshTime({ time: Date.now() }));
 };
 
