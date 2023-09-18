@@ -85,3 +85,6 @@ flowchart LR
         Backend---|"/assets/fiat<br>/assets/crypto<br>/price/{base}?quote={quote}"|Redis[Redis]
     end
 ```
+
+# Contributing
+Contributions and suggestions about how to improve this project are welcome! Please follow our [contribution guidelines](CONTRIBUTING.md).
