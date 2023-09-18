@@ -12,7 +12,7 @@ use crate::{
     error::{DcaError, Result},
 };
 
-use adapter::{CryptoWatchProvider, IpApi, YahooProvider};
+use adapter::{CryptoWatchProvider, IpApi, KrakenProvider, YahooProvider};
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get, Router,
 };
@@ -65,6 +65,7 @@ struct Repository {
 #[derive(Clone)]
 pub struct Provider {
     pub cw: Arc<CryptoWatchProvider>,
+    pub kraken: Arc<KrakenProvider>,
     pub yahoo: Arc<YahooProvider>,
     pub ipapi: Arc<IpApi>,
 }
@@ -100,6 +101,7 @@ impl DcaServer {
                 http.clone(),
                 &config.app.providers,
             )),
+            kraken: Arc::new(KrakenProvider::new(http.clone(), &config.app.providers)),
             yahoo: Arc::new(YahooProvider::new(http.clone())),
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
