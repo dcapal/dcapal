@@ -39,13 +39,17 @@ pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
             continue;
         }
 
-        info!("Updating CW market data");
-        if let Err(e) = mkt_data.update_cw_data().await {
-            error!("Failed to update CW Assets and Markets data: {:?}", e);
+        let mut _is_err = false;
+
+        info!("Updating Kraken market data");
+        if let Err(e) = mkt_data.update_kraken_data().await {
+            error!("Failed to update Kraken Assets and Markets data: {:?}", e);
+            _is_err = true;
         }
 
         if let Err(e) = mkt_data.update_market_prices().await {
             error!("Failed to update Market prices: {:?}", e);
+            _is_err = true;
         }
 
         let now = Utc::now();
