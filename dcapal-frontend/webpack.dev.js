@@ -11,6 +11,8 @@ module.exports = (env, argv) =>
       static: {
         directory: path.resolve(__dirname, "./dist"),
       },
+      compress: true,
+      port: 3000,
       historyApiFallback: true,
       hot: true,
       proxy: {
