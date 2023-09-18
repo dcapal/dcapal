@@ -172,6 +172,7 @@ impl MarketDataService {
         let now = Utc::now();
         let price = match self.config.app.providers.price_provider {
             PriceProvider::CryptoWatch => self.providers.cw.fetch_market_price(&mkt, now).await?,
+            PriceProvider::Kraken => self.providers.kraken.fetch_market_price(&mkt, now).await?,
             PriceProvider::Yahoo => self.providers.yahoo.fetch_market_price(&mkt, now).await?,
         };
         if let Some(px) = price {
@@ -411,19 +412,63 @@ impl MarketDataService {
         Ok(())
     }
 
+    pub async fn update_kraken_data(&self) -> Result<()> {
+        // Collect assets and markets from Kraken
+        let (assets, markets) = self.providers.kraken.fetch_assets(&self.repo).await?;
+
+        // Store assets in repository
+        for a in assets {
+            info!("Storing asset '{}'", a.id());
+            self.repo.store_asset(&a).await.unwrap_or_else(|e| {
+                error!(
+                    "Failed to store asset '{}': {} ({})",
+                    a.id(),
+                    e,
+                    serde_json::to_string(&a).unwrap()
+                );
+            })
+        }
+
+        // Store markets in repository
+        for m in &markets {
+            info!("Storing market '{}'", m.id);
+            self.repo.store_market(m).await.unwrap_or_else(|e| {
+                error!(
+                    "Failed to store market '{}': {} ({})",
+                    m.id,
+                    e,
+                    serde_json::to_string(m).unwrap()
+                );
+            })
+        }
+
+        // Invalidate caches
+        self.invalidate_asset_cache();
+        self.mkt_loaders.clear();
+        self.pricers.clear();
+
+        Ok(())
+    }
+
     pub async fn update_market_prices(&self) -> Result<()> {
         let markets = self.repo.load_markets().await?;
 
+        let mut failed_id = None;
         for m in &markets {
             // Trigger market refresh
             if let Err(e) = self.get_market(m.id.clone()).await {
                 warn!("{:?}", e);
+                failed_id = Some(m.id.clone());
             }
             // Please the rate limiter
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
 
-        Ok(())
+        if let Some(id) = failed_id {
+            Err(DcaError::PriceNotAvailableId(id))
+        } else {
+            Ok(())
+        }
     }
 }
 

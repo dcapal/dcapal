@@ -29,28 +29,21 @@ pub trait RedisAsset {
 impl RedisAsset for Asset {
     async fn store(&self, conn: &mut impl redis::AsyncCommands) -> Result<bool> {
         let json = serde_json::to_string(self).unwrap();
-        let (n_records, n_index): (i32, i32) = redis::pipe()
+        redis::pipe()
             .atomic()
             .hset(ASSET_KEY, self.id(), &json)
             .zadd(self.kind().as_index(), self.id(), 0)
             .query_async(conn)
             .await?;
 
-        if n_records > 0 && n_index > 0 {
-            debug!(
-                "Successfully stored '{} {}': {}",
-                ASSET_KEY,
-                self.id(),
-                json
-            );
-            Ok(true)
-        } else {
-            debug!(
-                "Not stored '{ASSET_KEY} {}': n_records={n_records} n_index={n_index}",
-                self.id()
-            );
-            Ok(false)
-        }
+        debug!(
+            "Successfully stored '{} {}': {}",
+            ASSET_KEY,
+            self.id(),
+            json
+        );
+
+        Ok(true)
     }
 
     async fn find_by_id(
