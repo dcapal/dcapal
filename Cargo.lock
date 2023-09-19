@@ -551,6 +551,7 @@ dependencies = [
  "const_format",
  "dashmap",
  "deadpool-redis",
+ "failsafe",
  "futures",
  "hyper",
  "itertools",
@@ -700,6 +701,18 @@ checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "failsafe"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60888d0f510699b3ef8734a045b0d28f4279283d7665acacc68cd7e8ac18e683"
+dependencies = [
+ "futures-core",
+ "parking_lot",
+ "pin-project",
+ "rand",
 ]
 
 [[package]]
