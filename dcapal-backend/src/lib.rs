@@ -85,7 +85,7 @@ impl DcaServer {
         let http = reqwest::Client::builder()
             .gzip(true)
             .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(300))
+            .timeout(Duration::from_secs(10))
             .build()?;
 
         let redis = build_redis_pool(&config.server.redis)?;

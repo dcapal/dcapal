@@ -14,10 +14,23 @@ pub struct Crypto {
     pub symbol: String,
 }
 
+impl Crypto {
+    pub fn new_with_id(id: AssetId) -> Self {
+        let symbol = id.to_uppercase();
+        Self { id, symbol }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Fiat {
     pub id: AssetId,
     pub symbol: String,
+}
+
+impl Fiat {
+    pub fn new(id: AssetId, symbol: String) -> Self {
+        Self { id, symbol }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
