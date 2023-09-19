@@ -1,3 +1,4 @@
+use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -16,17 +17,25 @@ use crate::{
     DateTime,
 };
 
+use super::DefaultCircuitBreaker;
+
 #[derive(Clone)]
 pub struct KrakenProvider {
     http: reqwest::Client,
     cmc_api_key: Option<String>,
+    kraken_circuit_breaker: DefaultCircuitBreaker,
+    cmc_circuit_breaker: DefaultCircuitBreaker,
 }
 
 impl KrakenProvider {
     pub fn new(http: reqwest::Client, config: &config::Providers) -> Self {
+        let kraken_circuit_breaker = failsafe::Config::new().build();
+        let cmc_circuit_breaker = failsafe::Config::new().build();
         Self {
             http,
             cmc_api_key: config.cmc_api_key.clone(),
+            kraken_circuit_breaker,
+            cmc_circuit_breaker,
         }
     }
 
@@ -37,8 +46,11 @@ impl KrakenProvider {
         static URL: &str = "https://api.kraken.com/0/public/AssetPairs";
 
         // Fetch Kraken markets
-        debug!(url = URL, "Fetching markets from CW");
-        let res: AssetPairsResponse = self.fetch_kraken_api(URL).await?;
+        debug!(url = URL, "Fetching markets from Kraken");
+        let Some(res) = self.fetch_kraken_api::<AssetPairsResponse>(URL).await? else {
+            return Err(DcaError::Generic("AssetPairs not found".to_string()));
+        };
+
         if !res.error.is_empty() {
             error!("Error occurred while fetching asset pairs: {:?}", res.error);
             return Err(DcaError::Generic(format!("{:?}", res.error)));
@@ -98,7 +110,10 @@ impl KrakenProvider {
             "Fetching {freq} OHLC candlestick for market '{id}' since {r_lo}"
         );
 
-        let mut res: OHLCResult = self.fetch_kraken_api(&url).await?;
+        let Some(mut res) = self.fetch_kraken_api::<OHLCResult>(&url).await? else {
+            return Ok(None);
+        };
+
         if !res.error.is_empty() {
             error!("Error occurred while fetching '{id}': {:?}", res.error);
             return Err(DcaError::Generic(format!("{:?}", res.error)));
@@ -141,7 +156,27 @@ impl KrakenProvider {
         Ok(Some(close_px))
     }
 
-    async fn fetch_kraken_api<T: DeserializeOwned + Debug>(&self, url: &str) -> Result<T> {
+    async fn fetch_kraken_api<T: DeserializeOwned + Debug>(&self, url: &str) -> Result<Option<T>> {
+        self.kraken_circuit_breaker
+            .call(self.fetch_kraken_api_inner::<T>(url))
+            .await
+            .map_err(|e| DcaError::from_failsafe(e, "KrakenProvider"))
+    }
+
+    async fn fetch_kraken_api_inner<T: DeserializeOwned + Debug>(
+        &self,
+        url: &str,
+    ) -> Result<Option<T>> {
+        let res = self.http.get(url).send().await?;
+
+        if res.status().is_success() {
+            Ok(Some(res.json::<T>().await?))
+        } else if let StatusCode::NOT_FOUND = res.status() {
+            Ok(None)
+        } else {
+            Err(res.error_for_status().unwrap_err().into())
+        }
+    }
         let res = self
             .http
             .get(url)
@@ -175,7 +210,7 @@ async fn resolve_assets_data_kraken_only(
 ) -> (Vec<Market>, Vec<Asset>) {
     let pairs = get_new_markets(market_symbols, repo).await;
     let ccys = get_unique_ccys(&pairs);
-    let assets_map = get_assets(&ccys, repo).await;
+    let assets_map = fetch_assets(&ccys, repo).await;
 
     let markets = pairs
         .into_iter()
@@ -235,15 +270,15 @@ async fn get_new_markets(
         .await
 }
 
-fn get_unique_ccys(market_pairs: &[MarketPair]) -> HashSet<String> {
+fn get_unique_ccys(market_pairs: &[MarketPair]) -> HashSet<AssetId> {
     market_pairs
         .iter()
         .flat_map(|(base, quote)| [base.clone(), quote.clone()])
         .collect::<_>()
 }
 
-async fn get_assets(
-    ccys: &HashSet<String>,
+async fn fetch_assets(
+    ccys: &HashSet<AssetId>,
     repo: &MarketDataRepository,
 ) -> BTreeMap<String, Asset> {
     let mut assets = BTreeMap::new();
@@ -253,16 +288,12 @@ async fn get_assets(
                 if let Some(a) = asset {
                     assets.insert(a.id().clone(), a);
                 } else {
-                    let is_fiat = is_fiat(ccy);
-                    let a = match is_fiat {
+                    let a = match fiat::is_fiat(ccy) {
                         true => Asset::Fiat(Fiat {
                             id: ccy.to_string(),
-                            symbol: ccy.to_uppercase(),
+                            symbol: fiat::get_name(ccy).to_string(),
                         }),
-                        false => Asset::Crypto(Crypto {
-                            id: ccy.to_string(),
-                            symbol: ccy.to_uppercase(),
-                        }),
+                        false => Asset::Crypto(Crypto::new_with_id(ccy.clone())),
                     };
                     assets.insert(ccy.clone(), a);
                 }
@@ -276,13 +307,30 @@ async fn get_assets(
     assets
 }
 
-fn is_fiat(id: &str) -> bool {
+mod fiat {
+    use lazy_static::lazy_static;
+    use std::collections::HashMap;
+
     lazy_static! {
-        static ref FIAT_IDS: HashSet<&'static str> =
-            HashSet::from(["aed", "aud", "cad", "chf", "eur", "gbp", "jpy", "usd"]);
+        static ref FIAT_IDS: HashMap<&'static str, &'static str> = HashMap::from([
+            ("aed", "United Arab Emirates Dirham"),
+            ("aud", "Australian Dollar"),
+            ("cad", "Canadian Dollar"),
+            ("chf", "Swiss franc"),
+            ("eur", "Euro"),
+            ("gbp", "British Pound"),
+            ("jpy", "Japanese Yen"),
+            ("usd", "United States Dollar")
+        ]);
     }
 
-    FIAT_IDS.contains(id)
+    pub fn is_fiat(id: &str) -> bool {
+        FIAT_IDS.contains_key(id)
+    }
+
+    pub fn get_name(id: &str) -> &'static str {
+        FIAT_IDS.get(id).unwrap()
+    }
 }
 
 async fn is_new_market(id: MarketId, repo: &MarketDataRepository) -> bool {
