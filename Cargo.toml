@@ -5,6 +5,8 @@ members = ["dcapal-backend", "dcapal-optimizer-wasm"]
 [workspace.package]
 version = "0.3.1"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
+edition = "2021"
+rust-version = "1.72"
 
 [profile.release-with-debug]
 inherits = "release"
