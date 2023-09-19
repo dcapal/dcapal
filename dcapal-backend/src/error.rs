@@ -23,6 +23,8 @@ pub enum DcaError {
     MarketNotFound(MarketId),
     #[error("Failed to store in Repository: {0}")]
     RepositoryStoreFailure(String),
+    #[error("External service died: {0}")]
+    ExternalServiceDied(String),
     #[error("{0}")]
     StartupFailure(String, #[source] anyhow::Error),
     #[error("Failed to parse config")]
@@ -57,6 +59,13 @@ impl DcaError {
     pub fn iter_sources(&self) -> ErrorIter {
         ErrorIter {
             current: (self as &dyn std::error::Error).source(),
+        }
+    }
+
+    pub fn from_failsafe(e: failsafe::Error<DcaError>, service: &str) -> Self {
+        match e {
+            failsafe::Error::Inner(e) => e,
+            failsafe::Error::Rejected => DcaError::ExternalServiceDied(service.to_string()),
         }
     }
 }
