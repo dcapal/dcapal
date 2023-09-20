@@ -1,23 +1,24 @@
-pub mod optimize;
-mod utils;
+#[macro_use]
+extern crate lazy_static;
+
+use std::{collections::HashMap, sync::Mutex};
+
+use rand::{distributions, Rng};
+use rust_decimal::{
+    Decimal,
+    prelude::{One, ToPrimitive},
+};
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 use optimize::{
     advanced::{self, TheoreticalAllocation},
     basic, FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
 };
-
-use rand::{distributions, Rng};
-use rust_decimal::{
-    prelude::{One, ToPrimitive},
-    Decimal,
-};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Mutex};
 use utils::{parse_amount, parse_percentage, parse_shares};
-use wasm_bindgen::prelude::*;
 
-#[macro_use]
-extern crate lazy_static;
+pub mod optimize;
+mod utils;
 
 const AMOUNT_DECIMALS: u32 = 4;
 const PERCENTAGE_DECIMALS: u32 = 6;
@@ -145,6 +146,47 @@ impl Solver {
             theo_allocs,
         };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
+    }
+}
+
+#[wasm_bindgen]
+pub struct Analyzer {}
+
+#[wasm_bindgen]
+impl Analyzer {
+    pub fn build_problem(options: JsValue) -> Result<ProblemHandle, JsValue> {
+        utils::require_init();
+
+        let options: JsProblemOptions =
+            serde_wasm_bindgen::from_value(options).map_err(|e| e.to_string())?;
+
+        let id = generate_problem_id();
+
+        match options {
+            JsProblemOptions::Advanced(options) => {
+                let options = advanced::ProblemOptions::try_from(options)?;
+                let problem = optimize::advanced::Problem::new(options);
+
+                let mut problems = ADVANCED_PROBLEMS.lock().unwrap();
+                problems.insert(id.clone(), problem);
+
+                Ok(ProblemHandle {
+                    id,
+                    kind: ProblemKind::Advanced,
+                })
+            }
+            JsProblemOptions::Basic(options) => {
+                let options = basic::ProblemOptions::try_from(options)?;
+                let problem = optimize::basic::Problem::new(options);
+
+                BASIC_PROBLEMS.lock().unwrap().insert(id.clone(), problem);
+
+                Ok(ProblemHandle {
+                    id,
+                    kind: ProblemKind::Basic,
+                })
+            }
+        }
     }
 }
 
@@ -391,7 +433,7 @@ impl TryFrom<JsTransactionFees> for TransactionFees {
 
     fn try_from(value: JsTransactionFees) -> Result<Self, Self::Error> {
         if let Some(max) = value.max_fee_impact {
-            if !(0. ..=1.).contains(&max) {
+            if !(0...=1.).contains(&max) {
                 return Err(format!(
                     "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
                 ));
@@ -443,7 +485,7 @@ impl TryFrom<JsFeeStructureVariable> for FeeStructureVariable {
 
     fn try_from(value: JsFeeStructureVariable) -> Result<Self, Self::Error> {
         if let Some(rate) = value.fee_rate {
-            if !(0. ..=1.).contains(&rate) {
+            if !(0...=1.).contains(&rate) {
                 return Err(format!(
                     "Invalid fee_rate ({rate}). Must be in [0, 1] range"
                 ));
