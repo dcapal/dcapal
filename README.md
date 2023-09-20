@@ -35,6 +35,7 @@ DcaPal does not store any user data. But if you are still concerned for your pri
 cd dcapal-backend
 docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
 ```
+(note: if you're using a Mac with an ARM processor replace in the docker-compose dev file cadvisor's image version with gcr.io/cadvisor/cadvisor:v0.47.1 and set platform: linux/aarch64)
 
 **Run DcaPal backend**
 
