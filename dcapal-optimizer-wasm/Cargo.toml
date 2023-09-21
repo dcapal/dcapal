@@ -12,28 +12,28 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 # WASM dependencies
-wasm-bindgen = { version = "0.2.84", features = ["serde-serialize"] }
+wasm-bindgen = { version = "0.2.87", features = ["serde-serialize"] }
 js-sys = "0.3.61"
 wasm-logger = "0.2.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 # Library dependencies
-log = "0.4.17"
+log = "0.4.20"
 minilp = "0.2.2"
 serde = { version = "1", features = ["derive"] }
-serde-wasm-bindgen = "0.5.0"
+serde-wasm-bindgen = "0.6.0"
 wasm-bindgen-futures = "0.4.32"
 futures = "0.3.23"
 anyhow = "1.0.62"
 thiserror = "1"
 lazy_static = "1.4.0"
 rand = "0.8.5"
-getrandom = { version = "0.2.7", features = ["js"] }
+getrandom = { version = "0.2.10", features = ["js"] }
 rust_decimal = { version = "1.32.0", features = ["serde-with-float"] }
 rust_decimal_macros = "1.32.0"
 nalgebra = "0.32.3"
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.13"
+wasm-bindgen-test = "0.3.34"
 env_logger = "0.10.0"
 test-log = { version = "0", features = ["log"] }
 glob = "0.3.1"
