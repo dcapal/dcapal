@@ -17,7 +17,7 @@ js-sys = "0.3.61"
 wasm-logger = "0.2.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 # Library dependencies
-log = "0.4.17"
+log = "0.4.20"
 minilp = "0.2.2"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.5.0"
