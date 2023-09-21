@@ -7,13 +7,7 @@ version: 2
 updates:
    # Enable version updates for cargo
   - package-ecosystem: "cargo"
-    directory: "/dcapal-backend"
-    schedule:
-      interval: "weekly"
-
-   # Enable version updates for cargo
-  - package-ecosystem: "cargo" 
-    directory: "/dcapal-optimizer-wasm"
+    directory: "/"
     schedule:
       interval: "weekly"
 
