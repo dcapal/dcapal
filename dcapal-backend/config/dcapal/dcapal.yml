@@ -3,6 +3,7 @@ app:
     priceProvider: yahoo
     cwApiKey: CW_API_KEY
     ipApiKey: IP_API_KEY
+    # cmcApiKey: CMC_API_KEY
 
   log:
     level: dcapal_backend=info,tower_http=debug
