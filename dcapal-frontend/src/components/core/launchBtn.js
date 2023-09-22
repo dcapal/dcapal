@@ -54,6 +54,7 @@ export const LaunchBtn = () => {
         />
       </div>
       <button
+        data-testid="importStep.allocateYourSavings"
         className="min-w-full sm:min-w-0 px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded"
         onClick={onClickStart}
       >
