@@ -26,7 +26,8 @@ RUN apt-get update
 RUN apt-get install -qq \
     ca-certificates \
     curl \
-    libssl3
+    libssl3 \
+    jq
 # Prepare binary
 WORKDIR /var/dcapal/dcapal-backend
 RUN mkdir bin
