@@ -5,6 +5,10 @@ app:
     ipApiKey: IP_API_KEY
     # cmcApiKey: CMC_API_KEY
 
+  # services:
+  #   ip:
+  #     dbPath: PATH_TO_IP2LOCATION_BIN
+
   log:
     level: dcapal_backend=info,tower_http=debug
     file: dcapal.log

@@ -38,9 +38,22 @@ pub struct Providers {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IpService {
+    pub db_path: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Services {
+    pub ip: Option<IpService>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Application {
     pub log: Log,
     pub providers: Providers,
+    pub services: Option<Services>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

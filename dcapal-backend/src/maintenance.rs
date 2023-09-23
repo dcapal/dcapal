@@ -14,7 +14,7 @@ async fn should_stop(stop_rx: &mut watch::Receiver<bool>) {
 }
 
 pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
-    let mkt_data = &ctx.service;
+    let mkt_data = &ctx.services.mkt_data;
 
     let mut is_running = true;
     while is_running {
