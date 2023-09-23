@@ -21,9 +21,9 @@ import {
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
-import { IKImage } from "imagekitio-react";
-import { IMAGEKIT_URL } from "../../app/config";
-import { HEADER_IMPORT_PORTFOLIO_SVG } from "../../app/images";
+import { useTranslation } from "react-i18next";
+
+import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 
 const parseFees = (fees) => {
   if (!fees) return null;
@@ -118,6 +118,7 @@ export const ImportStep = () => {
   const [error, setError] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const pfolioFile = useSelector((state) => state.app.pfolioFile);
   const validCcys = useSelector((state) => state.app.currencies);
@@ -160,31 +161,36 @@ export const ImportStep = () => {
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
-        <IKImage
+        <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
-          urlEndpoint={IMAGEKIT_URL}
-          path={HEADER_IMPORT_PORTFOLIO_SVG}
+          alt="Import Portfolio"
+          src={IMPORT_PORTFOLIO}
         />
         {isLoading && (
           <>
-            <h1 className="text-3xl font-bold">Import Portfolio</h1>
+            <h1 className="text-3xl font-bold">
+              {t("importStep.importPortfolio")}
+            </h1>
             <span className="flex flex-col gap-y-2 items-center font-light">
-              <p>Just a sec! Fetching fresh data for your portfolio...</p>
+              <p>{t("importStep.fetchData")}...</p>
             </span>
             <Spinner />
           </>
         )}
         {!isLoading && error && (
           <>
-            <h1 className="text-3xl font-bold">Import Portfolio</h1>
+            <h1 className="text-3xl font-bold">
+              {t("importStep.importPortfolio")}
+            </h1>
             <span className="flex flex-col gap-y-2 items-center font-light">
-              <span className="text-4xl">⚠️</span> Oops! This is embarassing...
+              <span className="text-4xl">⚠️</span>
+              {t("importStep.ops")}...
             </span>
             <span
               className="font-medium underline cursor-pointer"
               onClick={onClickGoBack}
             >
-              Go back
+              {t("common.goBack")}
             </span>
           </>
         )}

@@ -20,7 +20,7 @@ export const CcyRadio = ({ ccy, selected, setSelected, ...props }) => {
   });
 
   return (
-    <div className={className} onClick={onClick}>
+    <div data-testid="ccyRadio" className={className} onClick={onClick}>
       {ccy}
     </div>
   );

@@ -7,8 +7,6 @@ import toast from "react-hot-toast";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 
-import SettingsSvg from "../../../../images/icons/settings.svg";
-
 import {
   addAsset,
   clearPortfolio,
@@ -19,17 +17,17 @@ import {
 } from "./portfolioSlice";
 
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { IKImage } from "imagekitio-react";
-import {
-  IMAGEKIT_URL,
-  MEDIA_SMALL,
-  REFRESH_PRICE_INTERVAL_SEC,
-} from "../../../app/config";
-import { ICON_BAG_SVG, ICON_PIECHART_SVG } from "../../../app/images";
+
+import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "../../../app/config";
+
+import SETTINGS from "@images/icons/settings.svg";
+import BAG from "@images/icons/bag.svg";
+import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "../../../app/providers";
+import { Trans, useTranslation } from "react-i18next";
 
-const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
+const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
 
   if (Object.keys(assets) < 1) {
@@ -50,7 +48,7 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch) => {
     dispatch(setPrice({ symbol: a.symbol, price: price }));
   });
 
-  toast.success("Refreshed prices!");
+  toast.success(t("common.refreshedPrices"));
   dispatch(setRefreshTime({ time: Date.now() }));
 };
 
@@ -58,6 +56,7 @@ export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
   const [isShowFees, setShowFees] = useState(false);
 
+  const { t } = useTranslation();
   const assetStore = useSelector((state) => state.pfolio.assets);
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
@@ -76,12 +75,12 @@ export const PortfolioStep = ({ ...props }) => {
       );
 
       if (now > nextRefresh) {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch);
+        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
         return;
       }
 
       timeout = setTimeout(async () => {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch);
+        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
       }, nextRefresh - now);
     };
 
@@ -153,11 +152,13 @@ export const PortfolioStep = ({ ...props }) => {
       {assets && assets.length > 0 && (
         <div className="relative w-full flex flex-col items-end justify-center mt-2">
           <button className={feeBtnClass} onClick={onClickTransactionFees}>
-            <img src={SettingsSvg} className="w-full max-w-[20px]" />
+            <img src={SETTINGS} className="w-full max-w-[20px]" />
           </button>
           {isShowFees && (
             <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
-              <p className="font-light text-2xl">💸 Transaction fees</p>
+              <p className="font-light text-2xl">
+                💸 {t("portfolioStep.transactionFees")}
+              </p>
               <TransactionFees />
             </div>
           )}
@@ -165,7 +166,7 @@ export const PortfolioStep = ({ ...props }) => {
       )}
       {assets && assets.length > 0 && (
         <div className="w-full flex items-center mb-3 pl-3 font-light text-2xl">
-          Portfolio assets
+          {t("portfolioStep.portfolioAssets")}
         </div>
       )}
       <div className="w-full flex flex-col items-center">
@@ -205,7 +206,7 @@ export const PortfolioStep = ({ ...props }) => {
           className="mt-2 font-medium underline cursor-pointer"
           onClick={onClickDiscard}
         >
-          Go back
+          {t("common.goBack")}
         </span>
       )}
       {Object.keys(assetStore).length > 0 && (
@@ -216,30 +217,43 @@ export const PortfolioStep = ({ ...props }) => {
           })}
         >
           <div className="w-full flex items-center justify-start">
-            <IKImage
+            <img
               className="w-full max-w-[3rem] p-1 self-start"
-              urlEndpoint={IMAGEKIT_URL}
-              path={ICON_BAG_SVG}
+              alt="Bag"
+              src={BAG}
             />
             <p className="flex-grow font-light">
-              Fill <span className="font-normal">Quantity</span> field with the
-              number of{" "}
-              <span className="uppercase">
-                {assets[assets.length - 1].symbol}
-              </span>{" "}
-              you already have in your portfolio (e.g. 10 units)
+              <Trans
+                i18nKey="portfolioStep.fillWithNumber"
+                values={{
+                  field: t("portfolioStep.quantity"),
+                  symbol: assets[assets.length - 1].symbol,
+                }}
+                components={[
+                  <span className="font-normal" />,
+                  <span className="uppercase" />,
+                ]}
+              />
             </p>
           </div>
           <div className="w-full flex items-center justify-start">
-            <IKImage
+            <img
               className="w-full max-w-[3rem] p-1 self-start"
-              urlEndpoint={IMAGEKIT_URL}
-              path={ICON_PIECHART_SVG}
+              alt="Piechart"
+              src={PIECHART}
             />
             <p className="flex-grow font-light">
-              Define your desired asset allocation in{" "}
-              <span className="font-normal">Target weight</span> field (e.g.{" "}
-              <span className="italic">20%</span> of total portfolio value)
+              <Trans
+                i18nKey="portfolioStep.defineTargetWeight"
+                values={{
+                  targetWeight: t("portfolioStep.targetWeight"),
+                  percentage: "20%",
+                }}
+                components={[
+                  <span className="font-normal" />,
+                  <span className="italic" />,
+                ]}
+              />
             </p>
           </div>
         </div>
@@ -247,21 +261,25 @@ export const PortfolioStep = ({ ...props }) => {
       {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
         !isAllAllocated && (
           <div className="mt-6 font-light text-red-500">
-            Review your <span className="font-normal">Target Weights</span>.
-            They must sum up to 100% (currently{" "}
-            <span className="font-normal">
-              {cumWeight.toLocaleString("en-US", {
-                maximumFractionDigits: 12,
-              })}
-              %
-            </span>
-            )
+            <Trans
+              i18nKey="portfolioStep.reviewYourWeight"
+              values={{
+                targetWeights: t("portfolioStep.targetWeights"),
+                actualWeight: cumWeight.toLocaleString("en-US", {
+                  maximumFractionDigits: 12,
+                }),
+              }}
+              components={[
+                <span className="font-normal" />,
+                <span className="font-normal" />,
+              ]}
+            />
           </div>
         )}
       {Object.keys(assetStore).length > 0 && (
         <>
           <p className="mt-6 font-thin text-xs">
-            Prices last fetched at{" "}
+            {t("portfolioStep.lastFetch")}{" "}
             {new Date(lastRefreshTime).toLocaleString("en-US")}
           </p>
           <div className="w-full mt-6 flex justify-between items-center">
@@ -269,14 +287,14 @@ export const PortfolioStep = ({ ...props }) => {
               className="font-medium underline cursor-pointer"
               onClick={onClickDiscard}
             >
-              Discard
+              {t("common.discard")}
             </span>
             <button
               className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
               onClick={onClickAddLiquidity}
               disabled={!isAllAllocated}
             >
-              Next
+              {t("common.next")}
             </button>
           </div>
         </>
