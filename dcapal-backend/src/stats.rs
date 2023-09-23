@@ -1,4 +1,8 @@
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+    time::Instant,
+};
 
 use axum::{
     extract::{ConnectInfo, State},
@@ -9,7 +13,9 @@ use hyper::Request;
 use metrics::{histogram, increment_counter};
 use tracing::log::error;
 
-use crate::{adapter::IpApi, error::Result, repository::StatsRepository, AppContext};
+use crate::{
+    domain::ip2location::Ip2LocationService, error::Result, repository::StatsRepository, AppContext,
+};
 
 const BASE: &str = "dcapal";
 
@@ -55,7 +61,7 @@ pub async fn requests_stats<B>(
         &req,
         addr,
         state.repos.stats.clone(),
-        state.providers.ipapi.clone(),
+        state.services.ip2location.clone(),
     )
     .await?;
 
@@ -66,43 +72,56 @@ async fn record_visitors_stats<B>(
     req: &Request<B>,
     addr: SocketAddr,
     repo: Arc<StatsRepository>,
-    _ipapi_provider: Arc<IpApi>,
+    ip_service: Option<Arc<Ip2LocationService>>,
 ) -> Result<()> {
     static IP_HEADERS: [&str; 2] = ["CF-Connecting-IP", "X-Real-IP"];
+    static FALLBACK_IP: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
+
     let ip = IP_HEADERS
         .iter()
         .find_map(|header| {
             req.headers().get(*header).map(|h| {
                 h.to_str()
-                    .map(|h| h.to_string())
-                    .unwrap_or_else(|_| addr.ip().to_string())
+                    .map(|h| h.parse::<IpAddr>().unwrap_or(FALLBACK_IP))
+                    .unwrap_or(FALLBACK_IP)
             })
         })
-        .unwrap_or_else(|| addr.ip().to_string());
+        .unwrap_or(addr.ip());
 
-    repo.bump_visit(&ip).await?;
+    if ip.is_loopback() {
+        return Ok(());
+    }
 
-    // Disable Geo IP metrics to reduce Grafana usage
-    // tokio::spawn(async move { fetch_geo_ip(ip, repo, ipapi_provider).await });
+    let ip_str = ip.to_string();
+    repo.bump_visit(&ip_str).await?;
+
+    let Some(ip_service) = ip_service else {
+        return Ok(());
+    };
+
+    tokio::spawn(async move { fetch_geo_ip(ip, repo, ip_service).await });
 
     Ok(())
 }
 
 #[allow(dead_code)]
-async fn fetch_geo_ip(ip: String, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) {
-    if let Err(e) = fetch_geo_ip_inner(&ip, repo, ipapi).await {
+async fn fetch_geo_ip(ip: IpAddr, repo: Arc<StatsRepository>, ip_service: Arc<Ip2LocationService>) {
+    if let Err(e) = fetch_geo_ip_inner(ip, repo, ip_service).await {
         error!("Error occurred in fetching GeoIP for {}: {:?}", ip, e);
     }
 }
 
-async fn fetch_geo_ip_inner(ip: &str, repo: Arc<StatsRepository>, ipapi: Arc<IpApi>) -> Result<()> {
-    static IGNORED_IP: [&str; 3] = ["127.0.0.1", "0.0.0.0", "localhost"];
-
-    if IGNORED_IP.iter().any(|ignored| ip == *ignored) {
+async fn fetch_geo_ip_inner(
+    ip: IpAddr,
+    repo: Arc<StatsRepository>,
+    ip_service: Arc<Ip2LocationService>,
+) -> Result<()> {
+    if ip.is_loopback() {
         return Ok(());
     }
 
-    if let Some(geo) = repo.find_visitor_ip(ip).await? {
+    let ip_str = ip.to_string();
+    if let Some(geo) = repo.find_visitor_ip(&ip_str).await? {
         increment_counter!(
             VISITORS_TOTAL,
             &[
@@ -114,8 +133,8 @@ async fn fetch_geo_ip_inner(ip: &str, repo: Arc<StatsRepository>, ipapi: Arc<IpA
         return Ok(());
     }
 
-    let Some(geo) = ipapi.fetch_geo(ip).await? else {
-        error!("Failed to fetch visitor ip ({}) from IpApi", ip);
+    let Some(geo) = ip_service.lookup(ip) else {
+        error!("Visitor IP not found ({ip})");
         return Ok(());
     };
 
@@ -128,7 +147,7 @@ async fn fetch_geo_ip_inner(ip: &str, repo: Arc<StatsRepository>, ipapi: Arc<IpA
         ]
     );
 
-    let is_stored = repo.store_visitor_ip(ip, &geo).await?;
+    let is_stored = repo.store_visitor_ip(&ip_str, &geo).await?;
     if !is_stored {
         error!("Failed to store visitor ip ({}) from IpApi", ip);
     }
