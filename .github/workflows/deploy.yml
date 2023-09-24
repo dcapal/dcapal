@@ -5,6 +5,7 @@ on: workflow_dispatch
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
+  IP2LOCATION_FILENAME: IP2LOCATION-LITE-DB5.IPV6.BIN
 
 jobs:
   optimizer-build:
@@ -88,6 +89,44 @@ jobs:
           source: dcapal-frontend/dist
           target: ${{ secrets.WEB_DIR }}
           strip_components: 2
+
+      - name: Download IP2Location database
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_R2_API_TOKEN }}
+          accountId: ${{ secrets.CF_R2_ACCOUNT_ID }}
+          workingDirectory: dcapal-backend/data/dcapal
+          command: r2 object get ip2location-db/${{ env.IP2LOCATION_FILENAME }}.zip
+      
+      - name: Deploy IP2Location database
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          source: dcapal-backend/data/dcapal
+          target: ${{ secrets.DCAPAL_DIR }}
+          strip_components: 1
+
+      - name: Unpack IP2Location database
+        uses: appleboy/ssh-action@master
+        env:
+          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: DCAPAL_DIR,IP2LOCATION_FILENAME
+          script: |
+            cd ${DCAPAL_DIR}/data/dcapal
+            ls -la
+            unzip ${IP2LOCATION_FILENAME}.zip -d ip2location
+            mv ip2location/${IP2LOCATION_FILENAME} .
+            rm -rf ip2location
+            rm ${IP2LOCATION_FILENAME}.zip
+            ls -la
 
       - name: Configure docker-compose.yml
         env:
@@ -177,6 +216,10 @@ jobs:
               cwApiKey: ${DCAPAL_CW_API_KEY}
               ipApiKey: ${DCAPAL_IP_API_KEY}
               cmcApiKey: ${DCAPAL_CMC_API_KEY}
+
+            services:
+              ip:
+                dbPath: data/${IP2LOCATION_FILENAME}
 
             log:
               level: dcapal_backend=info,tower_http=debug
