@@ -50,7 +50,7 @@
     "@babel/core": "^7.18.10",
     "@babel/preset-env": "^7.22.20",
     "@babel/preset-react": "^7.22.15",
-    "@playwright/test": "^1.38.0",
+    "@playwright/test": "^1.38.1",
     "@types/node": "^20.6.0",
     "autoprefixer": "^10.4.8",
     "babel-loader": "^9.1.3",
