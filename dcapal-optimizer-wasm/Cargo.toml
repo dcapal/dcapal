@@ -33,7 +33,7 @@ rust_decimal = { version = "1.32.0", features = ["serde-with-float"] }
 rust_decimal_macros = "1.32.0"
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.37"
 env_logger = "0.10.0"
 test-log = { version = "0", features = ["log"] }
 glob = "0.3.1"
