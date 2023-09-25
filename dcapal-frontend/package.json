@@ -22,7 +22,7 @@
   "homepage": "https://dcapal.com/",
   "dependencies": {
     "@react-hook/media-query": "^1.1.1",
-    "@reduxjs/toolkit": "^1.9.5",
+    "@reduxjs/toolkit": "^1.9.6",
     "axios": "^0.21.1",
     "axios-cache-adapter": "^2.7.3",
     "classnames": "^2.3.2",
