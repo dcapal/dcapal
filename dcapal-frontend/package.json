@@ -33,7 +33,7 @@
     "localforage": "^1.10.0",
     "playwright": "^1.38.1",
     "react": "^18.2.0",
-    "react-collapsed": "^4.0.2",
+    "react-collapsed": "^4.0.4",
     "react-dom": "^18.2.0",
     "react-github-btn": "^1.4.0",
     "react-helmet": "^6.1.0",
