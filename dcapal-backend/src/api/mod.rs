@@ -20,7 +20,7 @@ lazy_static! {
 }
 
 pub async fn get_assets_fiat(State(ctx): State<AppContext>) -> Result<Response> {
-    let service = &ctx.service;
+    let service = &ctx.services.mkt_data;
 
     let assets = service.get_assets_by_type(AssetKind::Fiat).await;
 
@@ -33,7 +33,7 @@ pub async fn get_assets_fiat(State(ctx): State<AppContext>) -> Result<Response> 
 }
 
 pub async fn get_assets_crypto(State(ctx): State<AppContext>) -> Result<Response> {
-    let service = &ctx.service;
+    let service = &ctx.services.mkt_data;
 
     let assets = service.get_assets_by_type(AssetKind::Crypto).await;
 
@@ -56,7 +56,7 @@ pub async fn get_price(
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let repo = &ctx.repos.mkt_data;
-    let service = &ctx.service;
+    let service = &ctx.services.mkt_data;
 
     let cmd = ConversionRateQuery::try_new(&asset, &query.quote, repo).await?;
     let (base, quote) = (cmd.base.id().clone(), cmd.quote.id().clone());

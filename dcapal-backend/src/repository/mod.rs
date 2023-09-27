@@ -4,7 +4,7 @@ pub mod market_data;
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
 
-use crate::{adapter::GeoData, error::Result, DateTime};
+use crate::{domain::ip2location::GeoData, error::Result, DateTime};
 
 const REDIS_BASE: &str = "dcapal:be";
 

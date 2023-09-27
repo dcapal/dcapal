@@ -41,6 +41,8 @@ pub enum DcaError {
     Redis(#[from] RedisError),
     #[error("Third-party API reqwest failed")]
     Reqwest(#[from] reqwest::Error),
+    #[error("IP2Location internal error: {0:?}")]
+    Ip2Location(ip2location::error::Error),
 }
 
 impl Debug for DcaError {
@@ -99,5 +101,11 @@ impl<'a> Iterator for ErrorIter<'a> {
         let current = self.current;
         self.current = self.current.and_then(std::error::Error::source);
         current
+    }
+}
+
+impl From<ip2location::error::Error> for DcaError {
+    fn from(e: ip2location::error::Error) -> Self {
+        DcaError::Ip2Location(e)
     }
 }

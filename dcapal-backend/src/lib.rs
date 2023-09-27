@@ -18,7 +18,7 @@ use axum::{
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
-use domain::MarketDataService;
+use domain::{ip2location::Ip2LocationService, MarketDataService};
 use futures::future::BoxFuture;
 use hyper::Body;
 use metrics::{describe_counter, Unit};
@@ -48,12 +48,18 @@ pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
     redis: Pool,
-    service: Arc<MarketDataService>,
+    services: Services,
     repos: Arc<Repository>,
     providers: Arc<Provider>,
 }
 
 pub type AppContext = Arc<AppContextInner>;
+
+#[derive(Clone)]
+struct Services {
+    mkt_data: Arc<MarketDataService>,
+    ip2location: Option<Arc<Ip2LocationService>>,
+}
 
 #[derive(Clone)]
 struct Repository {
@@ -106,17 +112,32 @@ impl DcaServer {
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
-        let service = Arc::new(MarketDataService::new(
-            config.clone(),
-            repos.mkt_data.clone(),
-            providers.clone(),
-        ));
+        let ip2location = {
+            if let Some(ref service_config) = config.app.services {
+                if let Some(ref ip_config) = service_config.ip {
+                    Some(Arc::new(Ip2LocationService::try_new(&ip_config.db_path)?))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        let services = Services {
+            mkt_data: Arc::new(MarketDataService::new(
+                config.clone(),
+                repos.mkt_data.clone(),
+                providers.clone(),
+            )),
+            ip2location,
+        };
 
         let ctx = Arc::new(AppContextInner {
             config: config.clone(),
             http,
             redis,
-            service,
+            services,
             repos,
             providers,
         });
