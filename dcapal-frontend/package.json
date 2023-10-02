@@ -57,7 +57,7 @@
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^6.8.1",
     "html-webpack-plugin": "^5.5.3",
-    "postcss": "^8.4.30",
+    "postcss": "^8.4.31",
     "postcss-loader": "^7.3.3",
     "postcss-preset-env": "^9.1.4",
     "prettier": "3.0.3",
