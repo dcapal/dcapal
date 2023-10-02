@@ -11,7 +11,7 @@ rust-version.workspace = true
 anyhow = "1.0.75"
 axum = { version = "0.6.20", features = ["macros", "headers"] }
 hyper = { version = "0.14.27", features = ["full"] }
-deadpool-redis = { version = "0.12.0", features = ["serde"] }
+deadpool-redis = { version = "0.13.0", features = ["serde"] }
 redis = { version = "0.23.3", features = ["tokio-comp"] }
 reqwest = { version = "0.11.20", features = ["gzip", "json"] }
 serde = "1.0.188"
