@@ -3,3 +3,4 @@ dcapal.yml
 **/*.log*
 
 !data/.gitkeep
+!data/dcapal/.gitkeep

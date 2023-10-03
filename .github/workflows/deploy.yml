@@ -73,6 +73,10 @@ jobs:
     needs: frontend-build
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
       - name: Download dcapal-frontend
         uses: actions/download-artifact@v3
         with:
@@ -93,6 +97,7 @@ jobs:
       - name: Download IP2Location database
         uses: cloudflare/wrangler-action@v3
         with:
+          packageManager: "npm"
           apiToken: ${{ secrets.CF_R2_API_TOKEN }}
           accountId: ${{ secrets.CF_R2_ACCOUNT_ID }}
           workingDirectory: dcapal-backend/data/dcapal
