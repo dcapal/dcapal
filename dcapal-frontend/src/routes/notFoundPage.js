@@ -6,8 +6,11 @@ import NOT_FOUND from "@images/headers/not-found.svg";
 
 import { DcaPalHelmet } from "./helmet";
 import { Footer } from "../components/core/footer";
+import { useTranslation } from "react-i18next";
 
 export default function NotFoundPage() {
+  const { t } = useTranslation();
+
   return (
     <>
       <DcaPalHelmet title="Not Found" />
