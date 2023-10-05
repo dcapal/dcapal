@@ -4,8 +4,10 @@ import { useRouteError } from "react-router-dom";
 import { Footer } from "../components/core/footer";
 import { NavBar } from "../components/core/navBar";
 import { DcaPalHelmet } from "./helmet";
+import { useTranslation } from "react-i18next";
 
 export default function ErrorPage() {
+  const { t } = useTranslation();
   const error = useRouteError();
   console.error(error);
 
