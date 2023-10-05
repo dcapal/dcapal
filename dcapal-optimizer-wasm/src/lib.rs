@@ -70,6 +70,18 @@ impl Solver {
                     kind: ProblemKind::Basic,
                 })
             }
+            JsProblemOptions::Analyze(options) => {
+                let options = advanced::ProblemOptions::try_from(options)?;
+                let problem = optimize::advanced::Problem::new(options);
+
+                let mut problems = ADVANCED_PROBLEMS.lock().unwrap();
+                problems.insert(id.clone(), problem);
+
+                Ok(ProblemHandle {
+                    id,
+                    kind: ProblemKind::Analyze,
+                })
+            }
         }
     }
 
@@ -79,6 +91,7 @@ impl Solver {
         match handle.kind {
             ProblemKind::Advanced => Self::solve_advanced(&handle.id),
             ProblemKind::Basic => Self::solve_basic(&handle.id),
+            ProblemKind::Analyze => Self::analyze_assets(&handle.id),
         }
     }
 
@@ -147,46 +160,16 @@ impl Solver {
         };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
-}
 
-#[wasm_bindgen]
-pub struct Analyzer {}
+    fn analyze_assets(id: &str) -> Result<JsValue, JsValue> {
+        let problems = ADVANCED_PROBLEMS.lock().unwrap();
+        let problem = problems
+            .get(id)
+            .ok_or_else(|| format!("Invalid problem id {}", id))?;
 
-#[wasm_bindgen]
-impl Analyzer {
-    pub fn build_problem(options: JsValue) -> Result<ProblemHandle, JsValue> {
-        utils::require_init();
+        let solution = problem.suggest_invest_amount();
 
-        let options: JsProblemOptions =
-            serde_wasm_bindgen::from_value(options).map_err(|e| e.to_string())?;
-
-        let id = generate_problem_id();
-
-        match options {
-            JsProblemOptions::Advanced(options) => {
-                let options = advanced::ProblemOptions::try_from(options)?;
-                let problem = optimize::advanced::Problem::new(options);
-
-                let mut problems = ADVANCED_PROBLEMS.lock().unwrap();
-                problems.insert(id.clone(), problem);
-
-                Ok(ProblemHandle {
-                    id,
-                    kind: ProblemKind::Advanced,
-                })
-            }
-            JsProblemOptions::Basic(options) => {
-                let options = basic::ProblemOptions::try_from(options)?;
-                let problem = optimize::basic::Problem::new(options);
-
-                BASIC_PROBLEMS.lock().unwrap().insert(id.clone(), problem);
-
-                Ok(ProblemHandle {
-                    id,
-                    kind: ProblemKind::Basic,
-                })
-            }
-        }
+        Ok(serde_wasm_bindgen::to_value(&solution).unwrap())
     }
 }
 
@@ -194,6 +177,7 @@ impl Analyzer {
 pub enum ProblemKind {
     Advanced,
     Basic,
+    Analyze,
 }
 
 #[wasm_bindgen]
@@ -253,6 +237,7 @@ impl From<TheoreticalAllocation> for JsTheoreticalAllocation {
 pub enum JsProblemOptions {
     Advanced(JsAdvancedOptions),
     Basic(JsBasicOptions),
+    Analyze(JsAdvancedOptions),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -262,6 +247,11 @@ pub struct JsAdvancedOptions {
     pub assets: HashMap<String, JsAdvancedAsset>,
     pub is_buy_only: bool,
     pub fees: Option<JsTransactionFees>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JsAnalyzeOptions {
+    pub assets: HashMap<String, JsAdvancedAsset>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -433,7 +423,7 @@ impl TryFrom<JsTransactionFees> for TransactionFees {
 
     fn try_from(value: JsTransactionFees) -> Result<Self, Self::Error> {
         if let Some(max) = value.max_fee_impact {
-            if !(0...=1.).contains(&max) {
+            if !(0... = 1.).contains(&max) {
                 return Err(format!(
                     "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
                 ));
@@ -485,7 +475,7 @@ impl TryFrom<JsFeeStructureVariable> for FeeStructureVariable {
 
     fn try_from(value: JsFeeStructureVariable) -> Result<Self, Self::Error> {
         if let Some(rate) = value.fee_rate {
-            if !(0...=1.).contains(&rate) {
+            if !(0... = 1.).contains(&rate) {
                 return Err(format!(
                     "Invalid fee_rate ({rate}). Must be in [0, 1] range"
                 ));

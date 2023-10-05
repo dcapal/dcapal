@@ -298,6 +298,14 @@ impl Problem {
 
         solution
     }
+
+    pub fn suggest_invest_amount(&self) -> Decimal {
+        let mut solution = Solution::new(self.options.clone());
+
+
+        //find max current weight in the solution's assets
+        Decimal::ZERO
+    }
 }
 
 fn is_negligible(budget: &Decimal) -> bool {
@@ -314,7 +322,7 @@ fn refresh_open_assets<'a>(
             a.state == SolutionState::Open
                 || a.state == SolutionState::TieBreaker
                 || (a.state == SolutionState::PriceTooHigh
-                    && (!a.is_whole_shares || a.price <= *budget_left))
+                && (!a.is_whole_shares || a.price <= *budget_left))
         })
         .map(|a| {
             a.state = SolutionState::Open;
@@ -491,8 +499,6 @@ fn deallocate_asset_fee_too_high(asset: &mut Asset, general_fees: &TransactionFe
 
 #[cfg(test)]
 mod tests {
-    use std::assert_eq;
-
     use rust_decimal_macros::dec;
 
     use super::*;
