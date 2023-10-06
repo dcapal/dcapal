@@ -151,9 +151,9 @@
         "message": "<container><p1>I nostri ingegneri stanno lavorando duramente per pubblicare questa pagina al più presto.</p1><p2>Nel frattempo, <underlineLink><linkHome>godetevi la nostra app!</linkHome></underlineLink></p2></container>"
       },
       "root": {
-        "title1": "PAC mensile reso facile",
+        "title1": "Il tuo PAC mensile semplificato",
         "subtitle1": "DcaPal ti aiuta a tenere il tuo portafoglio bilanciato con suggerimenti fiscalmente efficienti per i tuoi investimenti periodici.",
-        "title2": "Il tuo assistente intelligente per l'allocazione dei tuoi risparmi mensili",
+        "title2": "Un assistente intelligente per l'allocazione dei tuoi risparmi mensili",
         "subtitle2": "<p1>Mantenere il tuo portafoglio bilanciato è difficile. <it>Lo sappiamo</it>.</p1><p2>Imposti la tua asset allocation il giorno uno, il mercato sale e scende e finisce che non sai più come suddividere i tuoi risparmi mensili.</p2><p3>Ci pensa DcaPal.</p3>",
         "cardStep1": "<p1><bold>Costruisci il tuo portafoglio</bold> e definisci l'allocazione degli asset</p1>",
         "cardStep2": "<p1>Inserisci <bold>il tuo budget</bold> per questo mese</p1>",
