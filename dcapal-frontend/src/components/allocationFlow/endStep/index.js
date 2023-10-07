@@ -6,7 +6,6 @@ import { replacer, roundAmount, roundDecimals, timeout } from "../../../utils";
 import { Spinner } from "../../spinner/spinner";
 import {
   ACLASS,
-  FeeType,
   clearBudget,
   feeTypeToString,
   isWholeShares,
@@ -35,18 +34,24 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
 
   if (!solution?.amounts) return cards;
 
-  let totalAmount = solution.budget_left || 0;
+  const budgetLeft = solution.budget_left || 0;
+  const hasCashPosition = pfolioCcy in assets;
+
+  let totalAmount = hasCashPosition ? budgetLeft : 0;
   for (const a of solution.amounts.values()) {
     totalAmount += a;
   }
 
   for (const card of cards) {
+    const isCashAsset = hasCashPosition && card.symbol === pfolioCcy;
+
     if (solution.amounts.has(card.symbol)) {
       card.amount = solution.amounts.get(card.symbol);
+      card.amount += isCashAsset ? budgetLeft : 0;
       card.weight = (100 * card.amount) / totalAmount;
     }
 
-    if (solution?.shares?.has(card.symbol)) {
+    if (solution?.shares?.has(card.symbol) && !isCashAsset) {
       card.qty = solution.shares.get(card.symbol);
     }
 
@@ -55,7 +60,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
     }
   }
 
-  if (solution.budget_left) {
+  if (budgetLeft && !hasCashPosition) {
     cards.push({
       symbol: pfolioCcy,
       name: UNALLOCATED_CASH,
@@ -63,7 +68,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
       qty: -1,
       oldQty: 0,
       price: 0,
-      amount: solution.budget_left,
+      amount: budgetLeft,
       oldAmount: 0,
       weight: 0,
       oldWeight: 0,
