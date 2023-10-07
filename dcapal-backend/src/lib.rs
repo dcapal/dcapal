@@ -18,7 +18,7 @@ use axum::{
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
-use domain::{ip2location::Ip2LocationService, MarketDataService};
+use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
 use hyper::Body;
 use metrics::{describe_counter, Unit};
