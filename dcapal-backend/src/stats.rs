@@ -11,7 +11,7 @@ use axum::{
 };
 use hyper::Request;
 use metrics::{histogram, increment_counter};
-use tracing::log::error;
+use tracing::{info, log::error};
 
 use crate::{
     domain::ip2location::Ip2LocationService, error::Result, repository::StatsRepository, AppContext,
@@ -149,7 +149,7 @@ async fn fetch_geo_ip_inner(
 
     let is_stored = repo.store_visitor_ip(&ip_str, &geo).await?;
     if !is_stored {
-        error!("Failed to store visitor ip ({}) from IpApi", ip);
+        info!("Visitor ip ({ip}) already exists");
     }
 
     Ok(())

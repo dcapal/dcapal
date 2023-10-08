@@ -155,15 +155,15 @@ async fn resolve_market(market: MarketDto, repo: &MarketDataRepository) -> Resul
         repo.find_asset(&market.quote)
     );
 
-    let (base, quote) = (base?, quote?);
-    if base.is_none() {
-        error!(mkt = market.id, "Base asset not found: {}", &market.base);
-        Ok(None)
-    } else if quote.is_none() {
-        error!(mkt = market.id, "Quote asset not found: {}", &market.quote);
-        Ok(None)
-    } else {
-        let (base, quote) = (base.unwrap(), quote.unwrap());
-        Ok(Some(Market::new(market.id, base, quote)))
+    match (base?, quote?) {
+        (None, _) => {
+            error!(mkt = market.id, "Base asset not found: {}", &market.base);
+            Ok(None)
+        }
+        (_, None) => {
+            error!(mkt = market.id, "Quote asset not found: {}", &market.quote);
+            Ok(None)
+        }
+        (Some(b), Some(q)) => Ok(Some(Market::new(market.id, b, q))),
     }
 }

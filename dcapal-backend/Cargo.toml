@@ -11,12 +11,12 @@ rust-version.workspace = true
 anyhow = "1.0.75"
 axum = { version = "0.6.20", features = ["macros", "headers"] }
 hyper = { version = "0.14.27", features = ["full"] }
-deadpool-redis = { version = "0.12.0", features = ["serde"] }
+deadpool-redis = { version = "0.13.0", features = ["serde"] }
 redis = { version = "0.23.3", features = ["tokio-comp"] }
-reqwest = { version = "0.11.20", features = ["gzip", "json"] }
+reqwest = { version = "0.11.22", features = ["gzip", "json"] }
 serde = "1.0.188"
 serde_json = "1.0.107"
-thiserror = "1.0.48"
+thiserror = "1.0.49"
 tokio = { version = "1.32.0", features = ["full"] }
 tower = "0.4.13"
 tower-http = { version = "0.4.4", features = ["trace"] }
@@ -35,7 +35,7 @@ dashmap = "5.5.3"
 metrics = "0.21.1"
 metrics-exporter-prometheus = "0.12.1"
 tracing-appender = "0.2.2"
-regex = "1.9.5"
+regex = "1.9.6"
 itertools = "0.11.0"
 failsafe = "1.2.0"
 ip2location = "0.4.2"

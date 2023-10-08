@@ -16,6 +16,7 @@ import {
 import PF_60_40 from "../../demo/dcapal-60-40.json";
 import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
 import PF_MR_RIP from "../../demo/dcapal-mrrip.json";
+import { useTranslation } from "react-i18next";
 
 const demoPortfolios = {
   [DEMO_PF_60_40]: JSON.stringify(PF_60_40),
@@ -40,6 +41,7 @@ export default function DemoPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const pfolioFile = getPfolioFile(location.pathname);
 

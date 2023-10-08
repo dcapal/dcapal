@@ -62,7 +62,8 @@ impl KrakenProvider {
         let market_symbols = res
             .result
             .values()
-            .filter_map(|p| (p.status == "online").then(|| normalize_symbol(&p.wsname)))
+            .filter(|&p| (p.status == "online"))
+            .map(|p| normalize_symbol(&p.wsname))
             .collect::<Vec<String>>();
 
         let (markets, assets) = if self.cmc_api_key.is_some() {

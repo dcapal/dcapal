@@ -47,7 +47,7 @@ fn init_tracing(config: &dcapal_backend::config::Log) -> anyhow::Result<Option<W
             .map_err(|e| DcaError::InvalidLogPath2(file_path.clone(), e))?;
 
         if !directory.is_dir() {
-            return Err(DcaError::InvalidLogPath(file_path.clone()))?;
+            Err(DcaError::InvalidLogPath(file_path.clone()))?
         }
 
         let file_appender = tracing_appender::rolling::hourly(directory, file_name_prefix);
