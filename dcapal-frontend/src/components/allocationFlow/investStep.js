@@ -19,8 +19,33 @@ export const InvestStep = ({
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const totalAmount = useSelector((state) => state.pfolio.totalAmount);
+  const assets = useSelector((state) => state.pfolio.assets);
+  //get max oldWeight
+  const cards = Object.values(assets).map((a) => ({
+    symbol: a.symbol,
+    name: a.name,
+    aclass: a.aclass,
+    qty: -1,
+    oldQty: a.qty,
+    price: a.price,
+    amount: 0,
+    oldAmount: a.amount,
+    weight: 0,
+    oldWeight: a.weight,
+    targetWeight: a.targetWeight,
+    theoAlloc: null,
+  }));
 
-  const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
+    const indexWithMaxOldWeight = cards.reduce((maxIndex, currentCard, currentIndex) => {
+        return (currentCard.oldWeight > cards[maxIndex].oldWeight) ? currentIndex : maxIndex;
+    }, 0);
+
+    const cardWithMaxOldWeight = cards[indexWithMaxOldWeight];
+
+    const suggestedAmount = Math.trunc((cardWithMaxOldWeight.oldAmount * (100 / cardWithMaxOldWeight.oldWeight))*100)/100;
+
+
+    const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
   const onClickTaxEfficient = (e) => {
     setUseTaxEfficient(!useTaxEfficient);
@@ -46,7 +71,7 @@ export const InvestStep = ({
       <div className="mt-2 mb-8 text-3xl font-light">
         {t("investStep.howMuchAllocate")}
       </div>
-      <div className="w-full flex justify-center items-end mb-20">
+      <div className="w-full flex justify-center items-end">
         <div className="w-full">
           <InputNumber
             textSize="4rem"
@@ -62,6 +87,9 @@ export const InvestStep = ({
         <div className="ml-2 pb-2 text-2xl font-light uppercase">
           {quoteCcy}
         </div>
+      </div>
+      <div className="mt-2 mb-20 text-xl font-normal">
+        You should allocate at least {suggestedAmount} {quoteCcy} to reach your target allocation
       </div>
       <div className="w-full flex flex-col gap-1 justify-start">
         <div
