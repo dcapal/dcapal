@@ -36,16 +36,25 @@ export const InvestStep = ({
     theoAlloc: null,
   }));
 
-    const indexWithMaxOldWeight = cards.reduce((maxIndex, currentCard, currentIndex) => {
-        return (currentCard.oldWeight > cards[maxIndex].oldWeight) ? currentIndex : maxIndex;
-    }, 0);
+  const indexWithMaxOldWeight = cards.reduce(
+    (maxIndex, currentCard, currentIndex) => {
+      return currentCard.oldWeight > cards[maxIndex].oldWeight
+        ? currentIndex
+        : maxIndex;
+    },
+    0
+  );
 
-    const cardWithMaxOldWeight = cards[indexWithMaxOldWeight];
+  const cardWithMaxOldWeight = cards[indexWithMaxOldWeight];
 
-    const suggestedAmount = Math.trunc((cardWithMaxOldWeight.oldAmount * (100 / cardWithMaxOldWeight.oldWeight))*100)/100;
+  const suggestedAmount =
+    Math.trunc(
+      cardWithMaxOldWeight.oldAmount *
+        (100 / cardWithMaxOldWeight.oldWeight) *
+        100
+    ) / 100;
 
-
-    const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
+  const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
   const onClickTaxEfficient = (e) => {
     setUseTaxEfficient(!useTaxEfficient);
@@ -89,7 +98,8 @@ export const InvestStep = ({
         </div>
       </div>
       <div className="mt-2 mb-20 text-xl font-normal">
-        You should allocate at least {suggestedAmount} {quoteCcy} to reach your target allocation
+        You should allocate at least {suggestedAmount} {quoteCcy} to reach your
+        target allocation
       </div>
       <div className="w-full flex flex-col gap-1 justify-start">
         <div
