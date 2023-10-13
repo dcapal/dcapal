@@ -16,6 +16,7 @@ import {
   DEMO_PF_ALL_SEASONS,
   DEMO_PF_MR_RIP,
 } from "../app/config";
+import { ContainerPage } from "./containerPage";
 
 export const Router = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
@@ -51,7 +52,7 @@ export const Router = () => {
     },
     {
       path: "docs",
-      element: <UnderConstructionPage title="Docs" />,
+      element: <UnderConstructionPage />,
       errorElement: <ErrorPage />,
     },
   ];
@@ -65,7 +66,5 @@ export const Router = () => {
     });
   }
 
-  const routes = useRoutes(routesConfig);
-
-  return routes;
+  return useRoutes(routesConfig);
 };

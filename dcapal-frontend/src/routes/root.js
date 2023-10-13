@@ -1,11 +1,9 @@
 import React from "react";
-import { NavBar } from "../components/core/navBar";
+
 import { LaunchBtn } from "../components/core/launchBtn";
 import { RootCard } from "../components/core/rootCard";
-
-import { DcaPalHelmet } from "./helmet";
-import { Footer } from "../components/core/footer";
 import { Trans, useTranslation } from "react-i18next";
+import { ContainerPage } from "./containerPage";
 
 import INVESTING_FRONT from "@images/headers/investing_front.svg";
 import ICON_AMOUNT from "@images/icons/amount.svg";
@@ -16,13 +14,10 @@ import ICON_REBALANCE from "@images/icons/rebalance.svg";
 export const Root = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <DcaPalHelmet
-        title={"DcaPal - A smart assistant for your periodic investments"}
-      />
-      <div className="w-full h-screen">
-        <div className="flex flex-col h-full items-center">
-          <NavBar />
+    <ContainerPage
+      title={"DcaPal - A smart assistant for your periodic investments"}
+      content={
+        <>
           <div className="w-full px-6 py-8 mb-8 bg-[#ededed]">
             <div className="flex flex-col items-center gap-y-7">
               <div className="w-full max-w-[35rem] flex flex-col items-start gap-y-7">
@@ -127,9 +122,8 @@ export const Root = () => {
               <LaunchBtn />
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    </>
+        </>
+      }
+    ></ContainerPage>
   );
 };
