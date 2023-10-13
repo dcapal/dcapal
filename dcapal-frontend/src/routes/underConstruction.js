@@ -1,20 +1,17 @@
 import React from "react";
 
-import { NavBar } from "../components/core/navBar";
+import UNDER_CONSTRUCTION from "@images/headers/under-construction.svg";
 
 import { Link } from "react-router-dom";
-import UNDER_CONSTRUCTION from "@images/headers/under-construction.svg";
-import { DcaPalHelmet } from "./helmet";
-import { Footer } from "../components/core/footer";
 import { Trans, useTranslation } from "react-i18next";
+import { ContainerPage } from "./containerPage";
 
-export default function UnderConstructionPage({ title }) {
+export default function UnderConstructionPage() {
   const { t } = useTranslation();
   return (
-    <>
-      <DcaPalHelmet title={title} />
-      <div className="w-full h-screen flex flex-col">
-        <NavBar />
+    <ContainerPage
+      title={"Docs"}
+      content={
         <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
           <img
             className="w-full px-4 sm:max-w-[35rem] pb-2"
@@ -37,8 +34,7 @@ export default function UnderConstructionPage({ title }) {
             }}
           />
         </div>
-        <Footer />
-      </div>
-    </>
+      }
+    />
   );
 }

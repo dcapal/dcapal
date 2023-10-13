@@ -2,9 +2,6 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { DcaPalHelmet } from "./helmet";
-import { NavBar } from "../components/core/navBar";
-import { Footer } from "../components/core/footer";
 import { clearPortfolio } from "../components/allocationFlow/portfolioStep/portfolioSlice";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
 
@@ -17,6 +14,7 @@ import PF_60_40 from "../../demo/dcapal-60-40.json";
 import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
 import PF_MR_RIP from "../../demo/dcapal-mrrip.json";
 import { useTranslation } from "react-i18next";
+import { ContainerPage } from "./containerPage";
 
 const demoPortfolios = {
   [DEMO_PF_60_40]: JSON.stringify(PF_60_40),
@@ -59,15 +57,8 @@ export default function DemoPage() {
   }, [pfolioFile]);
 
   return (
-    <>
-      <DcaPalHelmet title="Demo - Mr. Rip" />
-      <div className="w-full h-screen flex flex-col">
-        <NavBar />
-        <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
-          <h1 className="text-3xl font-bold">{t("page.demo.loadingDemo")}</h1>
-        </div>
-        <Footer />
-      </div>
-    </>
+    <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
+      <h1 className="text-3xl font-bold">{t("page.demo.loadingDemo")}</h1>
+    </div>
   );
 }
