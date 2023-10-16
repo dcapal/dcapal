@@ -1,5 +1,6 @@
 const path = require("path");
 const webpack = require("webpack");
+const Dotenv = require('dotenv-webpack');
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
@@ -39,6 +40,9 @@ module.exports = (env, argv) => {
       },
     },
     plugins: [
+      new Dotenv({
+        path: `./.env.${env === "production" ? "production" : "development"}`,
+      }),
       new HtmlWebpackPlugin({
         title: "DcaPal - A smart assistant for your periodic investments",
         template: path.resolve(__dirname, "src", "index.html"),
