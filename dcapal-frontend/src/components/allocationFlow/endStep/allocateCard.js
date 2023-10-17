@@ -148,34 +148,38 @@ export const AllocateCard = ({
           </div>
         </div>
         {qty >= 0 && (
-          <div>
-            <div className="flex gap-1 px-3 py-2 mt-[5px] rounded-md bg-blue-100/50">
-              <span>{actionIcon}</span>
-              {qty > oldQty && (
-                <span className="font-light">
-                  {t("endStep.buy")} {roundDecimals(qty - oldQty, 6)}{" "}
-                  <span className="uppercase">{symbol}</span> @ {price}{" "}
-                  <span className="uppercase">{quoteCcy}</span>
-                </span>
-              )}
-              {qty < oldQty && (
-                <span className="font-light">
-                  {t("endStep.sell")} {roundDecimals(oldQty - qty, 6)}{" "}
-                  <span className="uppercase">{symbol}</span> @ {price}{" "}
-                  <span className="uppercase">{quoteCcy}</span>
-                </span>
-              )}
-              {qty === oldQty && (
-                <span className="font-light italic">
-                  {aclass === ACLASS.CRYPTO
-                    ? t("endStep.nothingToTradeHodl")
-                    : t("endStep.nothingToTradeHold")}
-                </span>
-              )}
-            </div>
-            <p className="px-2 my-3 border border-gray-200/50" />
+          <div className="flex gap-1 px-3 py-2 mt-[5px] rounded-md bg-blue-100/50">
+            <span>{actionIcon}</span>
+            {qty > oldQty && (
+              <span className="font-light">
+                {t("endStep.buy")} {roundDecimals(qty - oldQty, 6)}{" "}
+                <span className="uppercase">{symbol}</span> @ {price}{" "}
+                <span className="uppercase">{quoteCcy}</span>
+              </span>
+            )}
+            {qty < oldQty && (
+              <span className="font-light">
+                {t("endStep.sell")} {roundDecimals(oldQty - qty, 6)}{" "}
+                <span className="uppercase">{symbol}</span> @ {price}{" "}
+                <span className="uppercase">{quoteCcy}</span>
+              </span>
+            )}
+            {qty === oldQty && (
+              <span className="font-light italic">
+                {aclass === ACLASS.CRYPTO
+                  ? t("endStep.nothingToTradeHodl")
+                  : t("endStep.nothingToTradeHold")}
+              </span>
+            )}
           </div>
         )}
+        {qty < 0 && symbol === quoteCcy && (
+          <div className="flex gap-1 px-3 py-2 mt-[5px] rounded-md bg-blue-100/50">
+            <span>💰</span>
+            <span className="font-light italic">{t("endStep.leftBudget")}</span>
+          </div>
+        )}
+        <p className="px-2 my-3 border border-gray-200/50" />
         <div className="flex flex-col gap-1">
           {isMobile && (
             <div className="flex flex-col justify-between items-start">
