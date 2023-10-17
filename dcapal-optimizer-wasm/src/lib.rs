@@ -423,7 +423,7 @@ impl TryFrom<JsTransactionFees> for TransactionFees {
 
     fn try_from(value: JsTransactionFees) -> Result<Self, Self::Error> {
         if let Some(max) = value.max_fee_impact {
-            if !(0... = 1.).contains(&max) {
+            if !(0.0..=1.0).contains(&max) {
                 return Err(format!(
                     "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
                 ));
@@ -475,7 +475,7 @@ impl TryFrom<JsFeeStructureVariable> for FeeStructureVariable {
 
     fn try_from(value: JsFeeStructureVariable) -> Result<Self, Self::Error> {
         if let Some(rate) = value.fee_rate {
-            if !(0... = 1.).contains(&rate) {
+            if !(0.0..=1.0).contains(&rate) {
                 return Err(format!(
                     "Invalid fee_rate ({rate}). Must be in [0, 1] range"
                 ));

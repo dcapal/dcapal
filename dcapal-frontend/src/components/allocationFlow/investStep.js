@@ -21,20 +21,8 @@ export const InvestStep = ({
   const totalAmount = useSelector((state) => state.pfolio.totalAmount);
   const assets = useSelector((state) => state.pfolio.assets);
   //get max oldWeight
-  const cards = Object.values(assets).map((a) => ({
-    symbol: a.symbol,
-    name: a.name,
-    aclass: a.aclass,
-    qty: -1,
-    oldQty: a.qty,
-    price: a.price,
-    amount: 0,
-    oldAmount: a.amount,
-    weight: 0,
-    oldWeight: a.weight,
-    targetWeight: a.targetWeight,
-    theoAlloc: null,
-  }));
+  const cards = Object.values(assets);
+  console.log(cards);
 
   const indexWithMaxOldWeight = cards.reduce(
     (maxIndex, currentCard, currentIndex) => {
@@ -47,12 +35,12 @@ export const InvestStep = ({
 
   const cardWithMaxOldWeight = cards[indexWithMaxOldWeight];
 
-  const suggestedAmount =
-    Math.trunc(
-      cardWithMaxOldWeight.oldAmount *
-        (100 / cardWithMaxOldWeight.oldWeight) *
-        100
-    ) / 100;
+  const totalSuggestedAmount =
+    cardWithMaxOldWeight.oldAmount * (100 / cardWithMaxOldWeight.targetWeight);
+
+  const sub = totalSuggestedAmount * (cardWithMaxOldWeight.targetWeight / 100);
+
+  const suggestedAmount = totalSuggestedAmount - sub;
 
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
