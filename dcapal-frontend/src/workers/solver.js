@@ -11,7 +11,7 @@ const buildProblemInput = (
 ) => {
   if (isAdvancedAlgorithm) {
     return {
-      type: "advanced",
+      type: "analyze",
       budget: budget,
       pfolio_ccy: pfolioCcy,
       assets: {
@@ -22,7 +22,7 @@ const buildProblemInput = (
     };
   } else {
     return {
-      type: "basic",
+      type: "analyze",
       budget: budget,
       assets: {
         ...assets,

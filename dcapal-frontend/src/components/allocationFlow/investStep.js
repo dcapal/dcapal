@@ -1,11 +1,89 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
-import { setBudget } from "./portfolioStep/portfolioSlice";
+import {
+  ACLASS,
+  feeTypeToString,
+  isWholeShares,
+  setBudget,
+} from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
+import { spawn, Thread, Worker } from "threads";
+import { replacer, timeout } from "../../utils";
+import { UNALLOCATED_CASH } from "./endStep";
+
+const buildFeesInput = (fees) => {
+  if (!fees) {
+    return null;
+  }
+
+  let input = {
+    ...fees,
+    feeStructure: {
+      ...fees.feeStructure,
+      type: feeTypeToString(fees.feeStructure.type),
+    },
+  };
+
+  if (input.maxFeeImpact == null) {
+    delete input.maxFeeImpact;
+  } else if (input.maxFeeImpact) {
+    input.maxFeeImpact /= 100;
+  }
+
+  if (input.feeStructure.feeRate == null) {
+    delete input.feeStructure.feeRate;
+  } else if (input.feeStructure.feeRate) {
+    input.feeStructure.feeRate /= 100;
+  }
+
+  return input;
+};
+
+const buildProblemInput = (
+  budget,
+  pfolioAmount,
+  assets,
+  fees,
+  useWholeShares
+) => {
+  if (!useWholeShares) {
+    const problemBudget = budget + pfolioAmount;
+    const as = Object.values(assets).reduce(
+      (as, a) => ({
+        ...as,
+        [a.symbol]: {
+          symbol: a.symbol,
+          target_weight: a.targetWeight / 100,
+          current_amount: a.amount,
+        },
+      }),
+      {}
+    );
+
+    return [problemBudget, as, buildFeesInput(fees)];
+  } else {
+    const as = Object.values(assets).reduce(
+      (as, a) => ({
+        ...as,
+        [a.symbol]: {
+          symbol: a.symbol,
+          shares: a.qty,
+          price: a.price,
+          target_weight: a.targetWeight / 100,
+          is_whole_shares: isWholeShares(a.aclass),
+          fees: buildFeesInput(a.fees),
+        },
+      }),
+      {}
+    );
+
+    return [budget, as, buildFeesInput(fees)];
+  }
+};
 
 export const InvestStep = ({
   useTaxEfficient,
@@ -21,26 +99,68 @@ export const InvestStep = ({
   const totalAmount = useSelector((state) => state.pfolio.totalAmount);
   const assets = useSelector((state) => state.pfolio.assets);
   //get max oldWeight
-  const cards = Object.values(assets);
-  console.log(cards);
+  const [solution, setSolution] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const indexWithMaxOldWeight = cards.reduce(
-    (maxIndex, currentCard, currentIndex) => {
-      return currentCard.oldWeight > cards[maxIndex].oldWeight
-        ? currentIndex
-        : maxIndex;
-    },
-    0
-  );
+  const budget = useSelector((state) => state.pfolio.budget);
+  const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
+  const fees = useSelector((state) => state.pfolio.fees);
 
-  const cardWithMaxOldWeight = cards[indexWithMaxOldWeight];
+  useEffect(() => {
+    const launchSolver = async () => {
+      const solver = await spawn(
+        new Worker(new URL("../../workers/solver.js", import.meta.url), {
+          name: "wasm-solver-worker",
+        })
+      );
 
-  const totalSuggestedAmount =
-    cardWithMaxOldWeight.oldAmount * (100 / cardWithMaxOldWeight.targetWeight);
+      const [inputBudget, as, inputFees] = buildProblemInput(
+        budget,
+        pfolioAmount,
+        assets,
+        fees,
+        useWholeShares
+      );
 
-  const sub = totalSuggestedAmount * (cardWithMaxOldWeight.targetWeight / 100);
+      console.debug(
+        `inputBudget=${inputBudget} as=${JSON.stringify(
+          as
+        )} quoteCcy=${quoteCcy} useTaxEfficient=${useTaxEfficient} useWholeShares=${useWholeShares} inputFees=${JSON.stringify(
+          inputFees
+        )}`
+      );
 
-  const suggestedAmount = totalSuggestedAmount - sub;
+      try {
+        const sol = await solver.makeAndSolve(
+          inputBudget,
+          as,
+          quoteCcy,
+          useTaxEfficient,
+          useWholeShares,
+          inputFees
+        );
+
+        await Thread.terminate(solver);
+
+        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
+
+        return sol;
+      } catch (error) {
+        console.error("Unexpected exception in dcapal-optimizer:", error);
+        return null;
+      }
+    };
+
+    const solve = async () => {
+      const [sol] = await Promise.all([launchSolver(), timeout(1000)]);
+      setIsLoading(false);
+      if (sol) {
+        setSolution(sol);
+      }
+    };
+
+    solve();
+  }, []);
 
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
@@ -86,8 +206,8 @@ export const InvestStep = ({
         </div>
       </div>
       <div className="mt-2 mb-20 text-xl font-normal">
-        You should allocate at least {suggestedAmount} {quoteCcy} to reach your
-        target allocation
+        You should allocate at least {solution} {quoteCcy} to reach your target
+        allocation
       </div>
       <div className="w-full flex flex-col gap-1 justify-start">
         <div

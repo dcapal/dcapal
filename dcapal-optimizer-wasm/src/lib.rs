@@ -5,8 +5,8 @@ use std::{collections::HashMap, sync::Mutex};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
-    Decimal,
     prelude::{One, ToPrimitive},
+    Decimal,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
