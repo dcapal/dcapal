@@ -167,7 +167,7 @@ impl Solver {
             .get(id)
             .ok_or_else(|| format!("Invalid problem id {}", id))?;
 
-        let solution = problem.suggest_invest_amount();
+        let solution = problem.suggest_invest_amount().round_dp(AMOUNT_DECIMALS);
 
         Ok(serde_wasm_bindgen::to_value(&solution).unwrap())
     }
