@@ -5,8 +5,8 @@ use std::{collections::HashMap, sync::Mutex};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
-    prelude::{One, ToPrimitive},
     Decimal,
+    prelude::{One, ToPrimitive},
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -28,6 +28,8 @@ lazy_static! {
     static ref BASIC_PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
         Mutex::new(HashMap::new());
     static ref ADVANCED_PROBLEMS: Mutex<HashMap<String, optimize::advanced::Problem>> =
+        Mutex::new(HashMap::new());
+    static ref SUGGESTION_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::Problem>> =
         Mutex::new(HashMap::new());
     static ref NUMERIC_DIST: distributions::Uniform<u8> =
         distributions::Uniform::new_inclusive(0, 9);
@@ -162,7 +164,7 @@ impl Solver {
     }
 
     fn suggest_amount_to_invest(id: &str) -> Result<JsValue, JsValue> {
-        let problems = ADVANCED_PROBLEMS.lock().unwrap();
+        let problems = SUGGESTION_PROBLEMS.lock().unwrap();
         let problem = problems
             .get(id)
             .ok_or_else(|| format!("Invalid problem id {}", id))?;
