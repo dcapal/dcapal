@@ -91,7 +91,7 @@ impl Solver {
         match handle.kind {
             ProblemKind::Advanced => Self::solve_advanced(&handle.id),
             ProblemKind::Basic => Self::solve_basic(&handle.id),
-            ProblemKind::Analyze => Self::analyze_assets(&handle.id),
+            ProblemKind::Analyze => Self::suggest_amount_to_invest(&handle.id),
         }
     }
 
@@ -161,7 +161,7 @@ impl Solver {
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
 
-    fn analyze_assets(id: &str) -> Result<JsValue, JsValue> {
+    fn suggest_amount_to_invest(id: &str) -> Result<JsValue, JsValue> {
         let problems = ADVANCED_PROBLEMS.lock().unwrap();
         let problem = problems
             .get(id)

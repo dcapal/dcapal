@@ -196,7 +196,8 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
           quoteCcy,
           useTaxEfficient,
           useWholeShares,
-          inputFees
+          inputFees,
+          false
         );
 
         await Thread.terminate(solver);

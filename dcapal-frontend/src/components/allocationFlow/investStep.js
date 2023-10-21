@@ -102,6 +102,10 @@ export const InvestStep = ({
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const handleButtonClick = () => {
+    setCash(Number(solution));
+  };
+
   const budget = useSelector((state) => state.pfolio.budget);
   const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
   const fees = useSelector((state) => state.pfolio.fees);
@@ -137,7 +141,8 @@ export const InvestStep = ({
           quoteCcy,
           useTaxEfficient,
           useWholeShares,
-          inputFees
+          inputFees,
+          true
         );
 
         await Thread.terminate(solver);
@@ -207,8 +212,12 @@ export const InvestStep = ({
       </div>
       <div className="mt-2 mb-20 text-xl font-normal">
         You should allocate at least {solution} {quoteCcy} to reach your target
-        allocation
+        allocation.{" "}
+        <button onClick={handleButtonClick}>
+          Click here to insert suggested amount.
+        </button>
       </div>
+
       <div className="w-full flex flex-col gap-1 justify-start">
         <div
           className="w-full flex items-center cursor-pointer"
