@@ -55,7 +55,6 @@ export const InvestStep = ({
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const totalAmount = useSelector((state) => state.pfolio.totalAmount);
   const assets = useSelector((state) => state.pfolio.assets);
-  //get max oldWeight
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
