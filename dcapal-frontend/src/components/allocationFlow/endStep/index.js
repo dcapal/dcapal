@@ -181,6 +181,8 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
         useWholeShares
       );
 
+      console.log("as2", as);
+
       console.debug(
         `inputBudget=${inputBudget} as=${JSON.stringify(
           as

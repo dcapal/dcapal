@@ -13,13 +13,9 @@ const buildProblemInput = (
   if (isSuggestionRequested) {
     return {
       type: "analyze",
-      budget: budget,
-      pfolio_ccy: pfolioCcy,
       assets: {
         ...assets,
       },
-      is_buy_only: isBuyOnly,
-      fees: fees,
     };
   } else if (isAdvancedAlgorithm) {
     return {

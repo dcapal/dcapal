@@ -3,56 +3,15 @@ import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
-import {
-  ACLASS,
-  feeTypeToString,
-  isWholeShares,
-  setBudget,
-} from "./portfolioStep/portfolioSlice";
+import { isWholeShares, setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
 import { replacer, timeout } from "../../utils";
-import { UNALLOCATED_CASH } from "./endStep";
 
-const buildFeesInput = (fees) => {
-  if (!fees) {
-    return null;
-  }
-
-  let input = {
-    ...fees,
-    feeStructure: {
-      ...fees.feeStructure,
-      type: feeTypeToString(fees.feeStructure.type),
-    },
-  };
-
-  if (input.maxFeeImpact == null) {
-    delete input.maxFeeImpact;
-  } else if (input.maxFeeImpact) {
-    input.maxFeeImpact /= 100;
-  }
-
-  if (input.feeStructure.feeRate == null) {
-    delete input.feeStructure.feeRate;
-  } else if (input.feeStructure.feeRate) {
-    input.feeStructure.feeRate /= 100;
-  }
-
-  return input;
-};
-
-const buildProblemInput = (
-  budget,
-  pfolioAmount,
-  assets,
-  fees,
-  useWholeShares
-) => {
+const buildProblemInput = (assets, useWholeShares) => {
   if (!useWholeShares) {
-    const problemBudget = budget + pfolioAmount;
-    const as = Object.values(assets).reduce(
+    return Object.values(assets).reduce(
       (as, a) => ({
         ...as,
         [a.symbol]: {
@@ -63,10 +22,8 @@ const buildProblemInput = (
       }),
       {}
     );
-
-    return [problemBudget, as, buildFeesInput(fees)];
   } else {
-    const as = Object.values(assets).reduce(
+    return Object.values(assets).reduce(
       (as, a) => ({
         ...as,
         [a.symbol]: {
@@ -75,16 +32,12 @@ const buildProblemInput = (
           price: a.price,
           target_weight: a.targetWeight / 100,
           is_whole_shares: isWholeShares(a.aclass),
-          fees: buildFeesInput(a.fees),
         },
       }),
       {}
     );
-
-    return [budget, as, buildFeesInput(fees)];
   }
 };
-
 export const InvestStep = ({
   useTaxEfficient,
   useWholeShares,
@@ -106,44 +59,21 @@ export const InvestStep = ({
     setCash(Number(solution));
   };
 
-  const budget = useSelector((state) => state.pfolio.budget);
   const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
-  const fees = useSelector((state) => state.pfolio.fees);
 
   useEffect(() => {
     const launchSolver = async () => {
       const solver = await spawn(
-        new Worker(new URL("../../workers/solver.js", import.meta.url), {
-          name: "wasm-solver-worker",
+        new Worker(new URL("../../workers/analyzer.js", import.meta.url), {
+          name: "wasm-analyzer-worker",
         })
       );
 
-      const [inputBudget, as, inputFees] = buildProblemInput(
-        budget,
-        pfolioAmount,
-        assets,
-        fees,
-        useWholeShares
-      );
-
-      console.debug(
-        `inputBudget=${inputBudget} as=${JSON.stringify(
-          as
-        )} quoteCcy=${quoteCcy} useTaxEfficient=${useTaxEfficient} useWholeShares=${useWholeShares} inputFees=${JSON.stringify(
-          inputFees
-        )}`
-      );
+      const as = buildProblemInput(assets, useWholeShares);
+      console.log("as", as);
 
       try {
-        const sol = await solver.makeAndSolve(
-          inputBudget,
-          as,
-          quoteCcy,
-          useTaxEfficient,
-          useWholeShares,
-          inputFees,
-          true
-        );
+        const sol = await solver.analyzeAndSolve(as);
 
         await Thread.terminate(solver);
 
