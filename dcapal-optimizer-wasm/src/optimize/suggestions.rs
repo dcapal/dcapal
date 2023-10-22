@@ -1,5 +1,3 @@
-extern crate nalgebra as na;
-
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
