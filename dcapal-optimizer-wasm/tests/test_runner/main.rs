@@ -37,6 +37,7 @@ fn test_runner() -> anyhow::Result<()> {
         let res = match options {
             JsProblemOptions::Advanced(o) => build_solve_advanced(o),
             JsProblemOptions::Basic(_) => todo!(),
+            JsProblemOptions::Analyze(_) => todo!("Analyze not implemented"),
         };
 
         info!("==> 🔬  Checking expectations");
