@@ -146,3 +146,64 @@ pub fn calculate_allocation_amount(assets: Vec<&mut Asset>) -> Decimal {
         None => Decimal::ZERO,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use rust_decimal_macros::dec;
+
+    use crate::optimize::suggestions::{Problem, ProblemAsset, ProblemOptions};
+    use crate::AMOUNT_DECIMALS;
+
+    #[test_log::test]
+    fn it_solves_60_40_portfolio_buy_only() {
+        // Given
+        let (problem, _assets) = build_60_40_portfolio_no_allocation();
+
+        // When
+        let solution = problem.suggest_invest_amount();
+
+        // Expect
+        assert_eq!(solution, dec!(72.5));
+    }
+
+    fn build_60_40_portfolio_no_allocation() -> (Problem, Vec<String>) {
+        let vwce = "VWCE".to_string();
+        let aggh = "AGGH".to_string();
+        let assets = HashMap::from([
+            (
+                vwce.clone(),
+                ProblemAsset {
+                    symbol: vwce.clone(),
+                    shares: dec!(1.0),
+                    price: dec!(100.0),
+                    target_weight: dec!(0.6),
+                    is_whole_shares: true,
+                },
+            ),
+            (
+                aggh.clone(),
+                ProblemAsset {
+                    symbol: aggh.clone(),
+                    shares: dec!(23.0),
+                    price: dec!(5.0),
+                    target_weight: dec!(0.4),
+                    is_whole_shares: true,
+                },
+            ),
+        ]);
+
+        let current_pfolio_amount = assets
+            .values()
+            .map(|a| (a.shares * a.price).round_dp(AMOUNT_DECIMALS))
+            .sum();
+
+        let options = ProblemOptions {
+            current_pfolio_amount,
+            assets,
+        };
+
+        (Problem::new(options), vec![vwce, aggh])
+    }
+}
