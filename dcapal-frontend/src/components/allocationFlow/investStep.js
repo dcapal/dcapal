@@ -3,7 +3,11 @@ import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
-import { isWholeShares, setBudget } from "./portfolioStep/portfolioSlice";
+import {
+  ACLASS,
+  isWholeShares,
+  setBudget,
+} from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
@@ -68,7 +72,6 @@ export const InvestStep = ({
       );
 
       const as = buildProblemInput(assets, useWholeShares);
-      console.log("as", as);
 
       try {
         const sol = await solver.analyzeAndSolve(as);
@@ -139,11 +142,23 @@ export const InvestStep = ({
         </div>
       </div>
       <div className="mt-2 mb-20 text-xl font-normal">
-        You should allocate at least {solution} {quoteCcy} to reach your target
-        allocation.{" "}
-        <button onClick={handleButtonClick}>
-          Click here to insert suggested amount.
-        </button>
+        <Trans
+          i18nKey={
+            Number(solution) === 0
+              ? "investStep.youAlreadyReachedTargetAllocation"
+              : "investStep.youShouldAllocateAmount"
+          }
+          values={{
+            solution: solution,
+            quoteCcy: String(quoteCcy),
+          }}
+          components={[<span className="font-medium" />]}
+        />
+        {Number(solution) !== 0 ? (
+          <button onClick={handleButtonClick}>
+            {t("investStep.clickHereToInsertAmount")}
+          </button>
+        ) : null}
       </div>
 
       <div className="w-full flex flex-col gap-1 justify-start">
