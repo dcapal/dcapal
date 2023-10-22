@@ -15,6 +15,8 @@ import { useTranslation } from "react-i18next";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
+const USE_ADVANCED_ALGORITHM = true;
+
 const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
   const cards = Object.values(assets).map((a) => ({
     symbol: a.symbol,
@@ -109,46 +111,23 @@ const buildFeesInput = (fees) => {
   return input;
 };
 
-const buildProblemInput = (
-  budget,
-  pfolioAmount,
-  assets,
-  fees,
-  useWholeShares
-) => {
-  if (!useWholeShares) {
-    const problemBudget = budget + pfolioAmount;
-    const as = Object.values(assets).reduce(
-      (as, a) => ({
-        ...as,
-        [a.symbol]: {
-          symbol: a.symbol,
-          target_weight: a.targetWeight / 100,
-          current_amount: a.amount,
-        },
-      }),
-      {}
-    );
+const buildProblemInput = (budget, assets, fees, useWholeShares) => {
+  const as = Object.values(assets).reduce(
+    (as, a) => ({
+      ...as,
+      [a.symbol]: {
+        symbol: a.symbol,
+        shares: a.qty,
+        price: a.price,
+        target_weight: a.targetWeight / 100,
+        is_whole_shares: useWholeShares ? isWholeShares(a.aclass) : false,
+        fees: buildFeesInput(a.fees),
+      },
+    }),
+    {}
+  );
 
-    return [problemBudget, as, buildFeesInput(fees)];
-  } else {
-    const as = Object.values(assets).reduce(
-      (as, a) => ({
-        ...as,
-        [a.symbol]: {
-          symbol: a.symbol,
-          shares: a.qty,
-          price: a.price,
-          target_weight: a.targetWeight / 100,
-          is_whole_shares: isWholeShares(a.aclass),
-          fees: buildFeesInput(a.fees),
-        },
-      }),
-      {}
-    );
-
-    return [budget, as, buildFeesInput(fees)];
-  }
+  return [budget, as, buildFeesInput(fees)];
 };
 
 export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
@@ -158,7 +137,6 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
 
   const { t } = useTranslation();
   const budget = useSelector((state) => state.pfolio.budget);
-  const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
   const assets = useSelector((state) => state.pfolio.assets);
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const fees = useSelector((state) => state.pfolio.fees);
@@ -175,7 +153,6 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
 
       const [inputBudget, as, inputFees] = buildProblemInput(
         budget,
-        pfolioAmount,
         assets,
         fees,
         useWholeShares
@@ -195,7 +172,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
           as,
           quoteCcy,
           useTaxEfficient,
-          useWholeShares,
+          USE_ADVANCED_ALGORITHM,
           inputFees
         );
 
