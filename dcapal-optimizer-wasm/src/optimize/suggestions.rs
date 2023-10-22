@@ -116,7 +116,6 @@ impl Problem {
 
         let assets = solution.assets.values_mut().collect::<Vec<_>>();
 
-        //find max current weight in the solution's assets
         calculate_allocation_amount(assets)
     }
 }
