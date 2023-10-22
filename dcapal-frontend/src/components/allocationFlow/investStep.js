@@ -59,8 +59,6 @@ export const InvestStep = ({
     setCash(Number(solution));
   };
 
-  const pfolioAmount = useSelector((state) => state.pfolio.totalAmount);
-
   useEffect(() => {
     const launchSolver = async () => {
       const solver = await spawn(
