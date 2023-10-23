@@ -59,7 +59,7 @@
     "html-webpack-plugin": "^5.5.3",
     "postcss": "^8.4.31",
     "postcss-loader": "^7.3.3",
-    "postcss-preset-env": "^9.1.4",
+    "postcss-preset-env": "^9.2.0",
     "prettier": "3.0.3",
     "style-loader": "^3.3.3",
     "svg-url-loader": "^8.0.0",
