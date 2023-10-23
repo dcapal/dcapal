@@ -154,12 +154,15 @@ export const InvestStep = ({
           components={[<span className="font-medium" />]}
         />
         {Number(solution) !== 0 ? (
-          <button
-            onClick={handleButtonClick}
-            style={{ textDecoration: "underline" }}
-          >
-            {t("investStep.clickHereToInsertAmount")}
-          </button>
+          <>
+            <button
+              onClick={handleButtonClick}
+              style={{ textDecoration: "underline", marginRight: "0.5rem" }}
+            >
+              {t("investStep.clickHere")}
+            </button>
+            <span>{t("investStep.toInsertAmount")}</span>
+          </>
         ) : null}
       </div>
 
