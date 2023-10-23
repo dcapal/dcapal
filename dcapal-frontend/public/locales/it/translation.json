@@ -102,9 +102,9 @@
       "doNotSplitInfo": "Con l'opzione <0>{{message}}</0>, suggeriamo il numero di quote da acquistare o vendere per asset non frazionari come azioni o ETF. In caso contrario, potremmo suggerire importi teoricamente ottimali da acquistare o vendere, ma dovrai calcolare tu quante quote acquistare.",
       "wholeShares": "",
       "runAllocation": "Alloca Budget",
-      "youShouldAllocateAmount": "Dovresti investire almeno <0>{{solution}}</0> <1>{{quoteCcy}}</1> per raggiungere la tua allocazione obiettivo. ",
+      "youShouldAllocateAmount": "Dovresti investire almeno <0>{{solution}}</0> <1>{{quoteCcy}}</1> per raggiungere la tua allocazione target. ",
       "youAlreadyReachedTargetAllocation": "Hai già raggiunto la tua allocazione target.",
-      "clickHereToInsertAmount": "Clicca qui per inserire l'ammontare suggerito."
+      "clickHereToInsertAmount": "Accetta l'ammontare suggerito."
     },
     "about": {
       "terms": "Termini",

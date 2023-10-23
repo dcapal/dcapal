@@ -154,7 +154,10 @@ export const InvestStep = ({
           components={[<span className="font-medium" />]}
         />
         {Number(solution) !== 0 ? (
-          <button onClick={handleButtonClick}>
+          <button
+            onClick={handleButtonClick}
+            style={{ textDecoration: "underline" }}
+          >
             {t("investStep.clickHereToInsertAmount")}
           </button>
         ) : null}
