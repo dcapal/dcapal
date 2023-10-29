@@ -137,7 +137,10 @@ export const InvestStep = ({
             solution: solution,
             quoteCcy: String(quoteCcy),
           }}
-          components={[<span className="font-medium" />]}
+          components={[
+            <span className="font-medium" />,
+            <span className="uppercase" />,
+          ]}
         />
         {Number(solution) !== 0 ? (
           <>
