@@ -3,34 +3,30 @@ import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
-import {
-  ACLASS,
-  isWholeShares,
-  setBudget,
-} from "./portfolioStep/portfolioSlice";
+import { isWholeShares, setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
 import { replacer, timeout } from "../../utils";
 
 const buildProblemInput = (assets, useWholeShares) => {
-    return Object.values(assets).reduce(
-      (as, a) => ({
-        ...as,
-        [a.symbol]: {
-          // Common input
-          symbol: a.symbol,
-          target_weight: a.targetWeight / 100,
-          // Use whole shares input
-          ...(useWholeShares && {shares: a.qty}),
-          ...(useWholeShares && {price: a.price}),
-          ...(useWholeShares && {is_whole_shares: isWholeShares(a.aclass)}),
-          // Use partial shares input
-          ...(!useWholeShares && {current_amount: a.amount}),
-        },
-      }),
-      {}
-    );
+  return Object.values(assets).reduce(
+    (as, a) => ({
+      ...as,
+      [a.symbol]: {
+        // Common input
+        symbol: a.symbol,
+        target_weight: a.targetWeight / 100,
+        // Use whole shares input
+        ...(useWholeShares && { shares: a.qty }),
+        ...(useWholeShares && { price: a.price }),
+        ...(useWholeShares && { is_whole_shares: isWholeShares(a.aclass) }),
+        // Use partial shares input
+        ...(!useWholeShares && { current_amount: a.amount }),
+      },
+    }),
+    {}
+  );
 };
 export const InvestStep = ({
   useTaxEfficient,
