@@ -24,7 +24,7 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
   const { t } = useTranslation();
 
   const className = classNames(
-    "absolute z-50 w-screen h-screen inset-0 flex flex-col bg-[#333333]",
+    "absolute z-50 w-full h-screen inset-0 flex flex-col bg-[#333333]",
     {
       invisible: !visible,
     }
@@ -61,9 +61,9 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
             {t("navbar.docs")}
           </div>
         </Link>
-        <div className="flex-grow flex justify-center items-end pb-2">
-          <LanguageSwitcher></LanguageSwitcher>
-        </div>
+      </div>
+      <div className="self-center pb-4">
+        <LanguageSwitcher />
       </div>
     </div>
   );
@@ -91,6 +91,7 @@ export const NavBar = () => {
 
   const toggleMenuVisible = () => {
     setMenuVisible(!menuVisible);
+    document.body.classList.toggle("fixed", !menuVisible);
   };
 
   const onClickHome = () => {
