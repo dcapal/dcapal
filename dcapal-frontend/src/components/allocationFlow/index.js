@@ -4,7 +4,6 @@ import { Step } from "../../app/appSlice";
 import { CcyStep } from "./ccyStep";
 import { EndStep } from "./endStep";
 import { ImportStep } from "./importStep";
-import { InitStep } from "./initStep";
 import { InvestStep } from "./investStep";
 import { PortfolioStep } from "./portfolioStep";
 
