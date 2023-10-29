@@ -129,7 +129,9 @@ export const InvestStep = ({
       <div className="mt-2 mb-20 text-xl font-normal">
         <Trans
           i18nKey={
-            Number(solution) !== 0
+            solution === null && isLoading
+              ? "investStep.loading"
+              : Number(solution) !== 0
               ? "investStep.youShouldAllocateAmount"
               : "investStep.youAlreadyReachedTargetAllocation"
           }

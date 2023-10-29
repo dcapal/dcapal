@@ -105,7 +105,8 @@
       "youShouldAllocateAmount": "Dovresti investire almeno <0>{{solution}}</0> <1>{{quoteCcy}}</1> per raggiungere la tua allocazione target. ",
       "youAlreadyReachedTargetAllocation": "Hai già raggiunto la tua allocazione target.",
       "clickHere": "Clicca qui",
-      "toInsertAmount": "per accettare l'ammontare suggerito."
+      "toInsertAmount": "per accettare l'ammontare suggerito.",
+      "loading": "Calcolando l'importo da investire per raggiungere l'allocazione target..."
     },
     "about": {
       "terms": "Termini",

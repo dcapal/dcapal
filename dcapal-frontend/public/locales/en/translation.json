@@ -105,7 +105,8 @@
       "youShouldAllocateAmount": "You should allocate at least <0>{{solution}}</0> <1>{{quoteCcy}}</1> to reach your target allocation. ",
       "youAlreadyReachedTargetAllocation": "You have already reached your target allocation.",
       "clickHere": "Click here",
-      "toInsertAmount": "to accept the suggested amount."
+      "toInsertAmount": "to accept the suggested amount.",
+      "loading": "Computing the amount to invest to reach the target allocation..."
     },
     "about": {
       "terms": "Terms",
