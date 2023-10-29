@@ -14,33 +14,23 @@ import { spawn, Thread, Worker } from "threads";
 import { replacer, timeout } from "../../utils";
 
 const buildProblemInput = (assets, useWholeShares) => {
-  if (!useWholeShares) {
     return Object.values(assets).reduce(
       (as, a) => ({
         ...as,
         [a.symbol]: {
+          // Common input
           symbol: a.symbol,
           target_weight: a.targetWeight / 100,
-          current_amount: a.amount,
+          // Use whole shares input
+          ...(useWholeShares && {shares: a.qty}),
+          ...(useWholeShares && {price: a.price}),
+          ...(useWholeShares && {is_whole_shares: isWholeShares(a.aclass)}),
+          // Use partial shares input
+          ...(!useWholeShares && {current_amount: a.amount}),
         },
       }),
       {}
     );
-  } else {
-    return Object.values(assets).reduce(
-      (as, a) => ({
-        ...as,
-        [a.symbol]: {
-          symbol: a.symbol,
-          shares: a.qty,
-          price: a.price,
-          target_weight: a.targetWeight / 100,
-          is_whole_shares: isWholeShares(a.aclass),
-        },
-      }),
-      {}
-    );
-  }
 };
 export const InvestStep = ({
   useTaxEfficient,
