@@ -73,7 +73,7 @@ export const InvestStep = ({
     };
 
     const solve = async () => {
-      const [sol] = await Promise.all([launchSolver(), timeout(1000)]);
+      const sol = await launchSolver();
       setIsLoading(false);
       if (sol) {
         setSolution(sol);
