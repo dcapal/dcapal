@@ -21,7 +21,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 log = "0.4.20"
 minilp = "0.2.2"
 serde = { version = "1", features = ["derive"] }
-serde-wasm-bindgen = "0.6.0"
+serde-wasm-bindgen = "0.6.1"
 wasm-bindgen-futures = "0.4.37"
 futures = "0.3.29"
 anyhow = "1.0.62"
