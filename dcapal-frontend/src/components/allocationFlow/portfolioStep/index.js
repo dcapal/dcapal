@@ -141,7 +141,7 @@ export const PortfolioStep = ({ ...props }) => {
   );
 
   return (
-    <div className="w-full h-full flex flex-col pt-2 items-center">
+    <div className="w-full flex flex-col pt-2 items-center">
       <div className="w-full my-2">
         <SearchBar
           text={searchText}

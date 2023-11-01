@@ -119,7 +119,7 @@ export const InvestStep = ({
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
         {t("investStep.howMuchAllocate")}
       </div>

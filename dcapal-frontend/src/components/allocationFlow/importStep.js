@@ -159,7 +159,7 @@ export const ImportStep = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
