@@ -49,6 +49,8 @@ export const InvestStep = ({
   };
 
   useEffect(() => {
+    if (totalAmount === 0) return;
+
     const launchSolver = async () => {
       const solver = await spawn(
         new Worker(new URL("../../workers/analyzer.js", import.meta.url), {
@@ -104,6 +106,18 @@ export const InvestStep = ({
 
   const isRunAllocationDisabled = cash + totalAmount <= 0;
 
+  let i18nKey = "";
+
+  if (totalAmount !== 0) {
+    if (solution === null && isLoading) {
+      i18nKey = "investStep.loading";
+    } else if (Number(solution) !== 0) {
+      i18nKey = "investStep.youShouldAllocateAmount";
+    } else {
+      i18nKey = "investStep.youAlreadyReachedTargetAllocation";
+    }
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
@@ -128,13 +142,7 @@ export const InvestStep = ({
       </div>
       <div className="mt-2 mb-20 text-xl font-normal">
         <Trans
-          i18nKey={
-            solution === null && isLoading
-              ? "investStep.loading"
-              : Number(solution) !== 0
-              ? "investStep.youShouldAllocateAmount"
-              : "investStep.youAlreadyReachedTargetAllocation"
-          }
+          i18nKey={i18nKey}
           values={{
             solution: solution,
             quoteCcy: String(quoteCcy),
