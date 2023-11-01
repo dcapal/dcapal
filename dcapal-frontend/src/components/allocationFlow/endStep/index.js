@@ -204,7 +204,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       {isLoading && (
         <>
           <div className="mt-2 mb-8 text-3xl font-light">

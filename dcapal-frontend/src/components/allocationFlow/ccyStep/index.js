@@ -44,7 +44,7 @@ export const CcyStep = ({ ...props }) => {
   const sortedCcys = [...ccys].sort(sortCcy);
 
   return (
-    <div className="w-full h-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
         {t("currencyStep.chooseCurrency")}
       </div>
