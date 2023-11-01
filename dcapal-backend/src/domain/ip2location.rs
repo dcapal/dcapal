@@ -13,16 +13,14 @@ pub struct Ip2LocationService {
 
 impl Ip2LocationService {
     pub fn try_new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let db = LocationDB::from_file_mmap(path)?;
+        let db = LocationDB::from_file(path)?;
 
         Ok(Self { db: Mutex::new(db) })
     }
 
     pub fn lookup(&self, ip: IpAddr) -> Option<GeoData> {
-        let record = {
-            let mut db = self.db.lock();
-            db.ip_lookup(ip)
-        };
+        let mut db = self.db.lock();
+        let record = db.ip_lookup(ip);
 
         match record {
             Ok(r) => Some(r.into()),
@@ -44,7 +42,7 @@ pub struct GeoData {
     pub longitude: String,
 }
 
-impl From<LocationRecord> for GeoData {
+impl From<LocationRecord<'_>> for GeoData {
     fn from(r: LocationRecord) -> Self {
         Self {
             ip: r.ip.to_string(),
