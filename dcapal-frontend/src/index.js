@@ -36,7 +36,6 @@ root.render(
       <PersistGate loading={null} persistor={persistor}>
         <BrowserRouter>
           <Router />
-          { Number(process.env.REACT_APP_ENABLE_COOKIE_BUTTON) === 1 && <CookieConsent/>}
         </BrowserRouter>
       </PersistGate>
     </Provider>
