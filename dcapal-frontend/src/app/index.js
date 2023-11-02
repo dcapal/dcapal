@@ -6,6 +6,7 @@ import { AllocationFlow } from "../components/allocationFlow";
 import { setCurrencies } from "./appSlice";
 import { fetchAssetsDcaPal } from "./providers";
 import { ContainerPage } from "../routes/containerPage";
+import CookieConsent from "../components/core/cookieConsent";
 
 const loadCurrencies = async (dispatch) => {
   const res = await fetchAssetsDcaPal("fiat");

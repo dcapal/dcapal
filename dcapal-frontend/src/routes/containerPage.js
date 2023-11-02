@@ -13,7 +13,7 @@ export const ContainerPage = ({ id, title, content }) => {
           <NavBar />
           {content}
           <Footer />
-          {process.env.ENABLE_COOKIE_BUTTON == 1 && <CookieButton />}
+          {Number(process.env.REACT_APP_ENABLE_COOKIE_BUTTON) === 1 && <CookieButton />}
         </div>
       </div>
     </>
