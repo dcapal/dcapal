@@ -13,6 +13,7 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import translationEN from "../public/locales/en/translation.json";
 import translationIT from "../public/locales/it/translation.json";
+import CookieConsent from "./components/core/cookieConsent";
 
 i18n
   .use(LanguageDetector)
@@ -35,6 +36,7 @@ root.render(
       <PersistGate loading={null} persistor={persistor}>
         <BrowserRouter>
           <Router />
+          { Number(process.env.REACT_APP_ENABLE_COOKIE_BUTTON) === 1 && <CookieConsent/>}
         </BrowserRouter>
       </PersistGate>
     </Provider>
