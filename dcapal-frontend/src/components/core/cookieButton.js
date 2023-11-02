@@ -15,6 +15,7 @@ export const CookieButton = () => {
         borderTopLeftRadius: "0.5rem",
       }}
       data-cc="c-settings"
+      onClick={() => {  window.CC.showSettings(0) }}
     >
       🍪
     </button>
