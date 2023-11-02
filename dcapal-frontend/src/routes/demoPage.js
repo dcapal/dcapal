@@ -14,7 +14,6 @@ import PF_60_40 from "../../demo/dcapal-60-40.json";
 import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
 import PF_MR_RIP from "../../demo/dcapal-mrrip.json";
 import { useTranslation } from "react-i18next";
-import { ContainerPage } from "./containerPage";
 
 const demoPortfolios = {
   [DEMO_PF_60_40]: JSON.stringify(PF_60_40),
