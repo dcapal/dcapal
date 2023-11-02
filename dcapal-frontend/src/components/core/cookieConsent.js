@@ -1,18 +1,16 @@
 import { useEffect } from "react";
 
-import 'vanilla-cookieconsent';
-import 'vanilla-cookieconsent/dist/cookieconsent.css';
+import "vanilla-cookieconsent";
+import "vanilla-cookieconsent/dist/cookieconsent.css";
 import pluginConfig from "./cookieConfig";
 
 export default function CookieConsent() {
-    useEffect(() => {
+  useEffect(() => {
+    if (!document.getElementById("cc--main")) {
+      window.CC = window.initCookieConsent();
+      window.CC.run(pluginConfig);
+    }
+  }, []);
 
-        if (!document.getElementById('cc--main')) {
-            window.CC = window.initCookieConsent();
-            window.CC.run(pluginConfig);
-        }
-
-    }, []);
-
-    return null;
+  return null;
 }
