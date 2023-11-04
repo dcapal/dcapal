@@ -21,7 +21,7 @@ export const AssetCard = ({
   isValidTargetWeight,
   ...props
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const dispatch = useDispatch();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
@@ -55,13 +55,13 @@ export const AssetCard = ({
           {!isMobile && (
             <div className="flex ml-4">
               <div className="font-medium">
-                {(price * qty).toLocaleString("en-US", priceFmt)}
+                {(price * qty).toLocaleString(i18n.language, priceFmt)}
               </div>
               <div className="ml-1 uppercase">{quoteCcy}</div>
             </div>
           )}
           <div className="whitespace-nowrap ml-4 py-1 px-2 bg-green-800 text-green-50 font-semibold rounded-md">
-            {weight.toLocaleString("en-US", {
+            {weight.toLocaleString(i18n.language, {
               minimumFractionDigits: 1,
               maximumFractionDigits: 1,
             })}{" "}
@@ -77,7 +77,7 @@ export const AssetCard = ({
             </div>
             <div className="uppercase text-sm">{quoteCcy}</div>
             <div className="ml-1 text-sm">
-              {(price * qty).toLocaleString("en-US", priceFmt)}
+              {(price * qty).toLocaleString(i18n.language, priceFmt)}
             </div>
           </div>
           <div className="flex items-center py-2">
@@ -86,7 +86,7 @@ export const AssetCard = ({
             </div>
             <div className="uppercase text-sm">{quoteCcy}</div>
             <div className="ml-1 text-sm">
-              {price.toLocaleString("en-US", priceFmt)}
+              {price.toLocaleString(i18n.language, priceFmt)}
             </div>
           </div>
           <div className="flex items-center h-12">
@@ -154,7 +154,7 @@ export const AssetCard = ({
               </div>
               <div className="uppercase text-sm">{quoteCcy}</div>
               <div className="ml-1 text-sm">
-                {price.toLocaleString("en-US", priceFmt)}
+                {price.toLocaleString(i18n.language, priceFmt)}
               </div>
             </div>
           </div>

@@ -9,6 +9,8 @@ import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
 import { replacer } from "../../utils";
 
+const amtDecimals = 2;
+
 const buildProblemInput = (assets, useWholeShares) => {
   return Object.values(assets).reduce(
     (as, a) => ({
@@ -28,6 +30,7 @@ const buildProblemInput = (assets, useWholeShares) => {
     {}
   );
 };
+
 export const InvestStep = ({
   useTaxEfficient,
   useWholeShares,
@@ -45,7 +48,7 @@ export const InvestStep = ({
   const [isLoading, setIsLoading] = useState(true);
 
   const handleButtonClick = () => {
-    setCash(Number(solution));
+    setCash(+Number(solution).toFixed(amtDecimals));
   };
 
   useEffect(() => {
@@ -140,11 +143,14 @@ export const InvestStep = ({
           {quoteCcy}
         </div>
       </div>
-      <div className="mt-2 mb-20 text-xl font-normal">
+      <div className="mt-2 mb-20 text-xl font-light">
         <Trans
           i18nKey={i18nKey}
           values={{
-            solution: solution,
+            solution:
+              Number(solution) !== 0
+                ? (+Number(solution).toFixed(amtDecimals)).toLocaleString()
+                : solution,
             quoteCcy: String(quoteCcy),
           }}
           components={[

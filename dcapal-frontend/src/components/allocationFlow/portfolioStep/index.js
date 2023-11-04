@@ -56,7 +56,7 @@ export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
   const [isShowFees, setShowFees] = useState(false);
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const assetStore = useSelector((state) => state.pfolio.assets);
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
@@ -265,7 +265,7 @@ export const PortfolioStep = ({ ...props }) => {
               i18nKey="portfolioStep.reviewYourWeight"
               values={{
                 targetWeights: t("portfolioStep.targetWeights"),
-                actualWeight: cumWeight.toLocaleString("en-US", {
+                actualWeight: cumWeight.toLocaleString(i18n.language, {
                   maximumFractionDigits: 12,
                 }),
               }}
