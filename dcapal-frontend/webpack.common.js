@@ -25,7 +25,10 @@ module.exports = (env, argv) => {
         },
         {
           test: /\.css$/i,
-          include: [path.resolve(__dirname, "src"), /node_modules\/vanilla-cookieconsent\/dist/],
+          include: [
+            path.resolve(__dirname, "src"),
+            path.resolve(__dirname, "node_modules/vanilla-cookieconsent/dist"),
+          ],
           use: ["style-loader", "css-loader", "postcss-loader"],
         },
         {
