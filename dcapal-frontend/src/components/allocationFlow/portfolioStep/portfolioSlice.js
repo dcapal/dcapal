@@ -109,9 +109,8 @@ export const getDefaultFees = (type) => {
   }
 };
 
-export const portfolioSlice = createSlice({
-  name: "portfolio",
-  initialState: {
+export const buildNewPortfolio = () => {
+  return {
     assets: {},
     quoteCcy: "eur",
     nextIdx: 0,
@@ -119,7 +118,32 @@ export const portfolioSlice = createSlice({
     budget: 0,
     fees: getDefaultFees(FeeType.ZERO_FEE),
     lastPriceRefresh: Date.now(),
-  },
+  };
+};
+
+/*
+TODO: Refactor portfolio slice
+  - Transform state into object:
+{
+  selected: string,
+  pfolios: Map<uuid, pfolio>,
+}
+  - Transform pfolio and add:
+{
+  uuid: string,
+  name: string
+}
+  - Add reducer to insert new portfolio
+  - Add reducer to select pfolio id
+  - Modify every reducer to lookup pfolio via selected id and return if not existing
+  - Update migrator (generate uuid)
+  - Update exporter to download selected pfolio id
+  - Update importer to add new portfolio 
+*/
+
+export const portfolioSlice = createSlice({
+  name: "portfolio",
+  initialState: buildNewPortfolio(),
   reducers: {
     addAsset: (state, action) => {
       const symbol = action.payload.symbol;
