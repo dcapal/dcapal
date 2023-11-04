@@ -1,12 +1,33 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
-import { setBudget } from "./portfolioStep/portfolioSlice";
+import { isWholeShares, setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
+import { spawn, Thread, Worker } from "threads";
+import { replacer } from "../../utils";
 
+const buildProblemInput = (assets, useWholeShares) => {
+  return Object.values(assets).reduce(
+    (as, a) => ({
+      ...as,
+      [a.symbol]: {
+        // Common input
+        symbol: a.symbol,
+        target_weight: a.targetWeight / 100,
+        // Use whole shares input
+        ...(useWholeShares && { shares: a.qty }),
+        ...(useWholeShares && { price: a.price }),
+        ...(useWholeShares && { is_whole_shares: isWholeShares(a.aclass) }),
+        // Use partial shares input
+        ...(!useWholeShares && { current_amount: a.amount }),
+      },
+    }),
+    {}
+  );
+};
 export const InvestStep = ({
   useTaxEfficient,
   useWholeShares,
@@ -19,6 +40,50 @@ export const InvestStep = ({
 
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const totalAmount = useSelector((state) => state.pfolio.totalAmount);
+  const assets = useSelector((state) => state.pfolio.assets);
+  const [solution, setSolution] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleButtonClick = () => {
+    setCash(Number(solution));
+  };
+
+  useEffect(() => {
+    if (totalAmount === 0) return;
+
+    const launchSolver = async () => {
+      const solver = await spawn(
+        new Worker(new URL("../../workers/analyzer.js", import.meta.url), {
+          name: "wasm-analyzer-worker",
+        })
+      );
+
+      const as = buildProblemInput(assets, useWholeShares);
+
+      try {
+        const sol = await solver.analyzeAndSolve(as);
+
+        await Thread.terminate(solver);
+
+        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
+
+        return sol;
+      } catch (error) {
+        console.error("Unexpected exception in dcapal-optimizer:", error);
+        return null;
+      }
+    };
+
+    const solve = async () => {
+      const sol = await launchSolver();
+      setIsLoading(false);
+      if (sol) {
+        setSolution(sol);
+      }
+    };
+
+    solve();
+  }, []);
 
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
@@ -41,12 +106,24 @@ export const InvestStep = ({
 
   const isRunAllocationDisabled = cash + totalAmount <= 0;
 
+  let i18nKey = "";
+
+  if (totalAmount !== 0) {
+    if (solution === null && isLoading) {
+      i18nKey = "investStep.loading";
+    } else if (Number(solution) !== 0) {
+      i18nKey = "investStep.youShouldAllocateAmount";
+    } else {
+      i18nKey = "investStep.youAlreadyReachedTargetAllocation";
+    }
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center">
       <div className="mt-2 mb-8 text-3xl font-light">
         {t("investStep.howMuchAllocate")}
       </div>
-      <div className="w-full flex justify-center items-end mb-20">
+      <div className="w-full flex justify-center items-end">
         <div className="w-full">
           <InputNumber
             textSize="4rem"
@@ -63,6 +140,31 @@ export const InvestStep = ({
           {quoteCcy}
         </div>
       </div>
+      <div className="mt-2 mb-20 text-xl font-normal">
+        <Trans
+          i18nKey={i18nKey}
+          values={{
+            solution: solution,
+            quoteCcy: String(quoteCcy),
+          }}
+          components={[
+            <span className="font-medium" />,
+            <span className="uppercase" />,
+          ]}
+        />
+        {Number(solution) !== 0 ? (
+          <>
+            <button
+              onClick={handleButtonClick}
+              style={{ textDecoration: "underline", marginRight: "0.5rem" }}
+            >
+              {t("investStep.clickHere")}
+            </button>
+            <span>{t("investStep.toInsertAmount")}</span>
+          </>
+        ) : null}
+      </div>
+
       <div className="w-full flex flex-col gap-1 justify-start">
         <div
           className="w-full flex items-center cursor-pointer"

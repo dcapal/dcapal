@@ -1,10 +1,7 @@
-pub mod optimize;
-mod utils;
+#[macro_use]
+extern crate lazy_static;
 
-use optimize::{
-    advanced::{self, TheoreticalAllocation},
-    basic, FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
-};
+use std::{collections::HashMap, sync::Mutex};
 
 use rand::{distributions, Rng};
 use rust_decimal::{
@@ -12,12 +9,18 @@ use rust_decimal::{
     Decimal,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Mutex};
-use utils::{parse_amount, parse_percentage, parse_shares};
 use wasm_bindgen::prelude::*;
 
-#[macro_use]
-extern crate lazy_static;
+use optimize::{
+    advanced::{self, TheoreticalAllocation},
+    basic, FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
+};
+use utils::{parse_amount, parse_percentage, parse_shares};
+
+use crate::optimize::suggestions;
+
+pub mod optimize;
+mod utils;
 
 const AMOUNT_DECIMALS: u32 = 4;
 const PERCENTAGE_DECIMALS: u32 = 6;
@@ -27,6 +30,8 @@ lazy_static! {
     static ref BASIC_PROBLEMS: Mutex<HashMap<String, optimize::basic::Problem>> =
         Mutex::new(HashMap::new());
     static ref ADVANCED_PROBLEMS: Mutex<HashMap<String, optimize::advanced::Problem>> =
+        Mutex::new(HashMap::new());
+    static ref SUGGESTION_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::Problem>> =
         Mutex::new(HashMap::new());
     static ref NUMERIC_DIST: distributions::Uniform<u8> =
         distributions::Uniform::new_inclusive(0, 9);
@@ -69,6 +74,18 @@ impl Solver {
                     kind: ProblemKind::Basic,
                 })
             }
+            JsProblemOptions::Analyze(options) => {
+                let options = suggestions::ProblemOptions::try_from(options)?;
+                let problem = optimize::suggestions::Problem::new(options);
+
+                let mut problems = SUGGESTION_PROBLEMS.lock().unwrap();
+                problems.insert(id.clone(), problem);
+
+                Ok(ProblemHandle {
+                    id,
+                    kind: ProblemKind::Analyze,
+                })
+            }
         }
     }
 
@@ -78,6 +95,7 @@ impl Solver {
         match handle.kind {
             ProblemKind::Advanced => Self::solve_advanced(&handle.id),
             ProblemKind::Basic => Self::solve_basic(&handle.id),
+            ProblemKind::Analyze => Self::suggest_amount_to_invest(&handle.id),
         }
     }
 
@@ -146,12 +164,24 @@ impl Solver {
         };
         Ok(serde_wasm_bindgen::to_value(&js_solution).unwrap())
     }
+
+    fn suggest_amount_to_invest(id: &str) -> Result<JsValue, JsValue> {
+        let problems = SUGGESTION_PROBLEMS.lock().unwrap();
+        let problem = problems
+            .get(id)
+            .ok_or_else(|| format!("Invalid problem id {}", id))?;
+
+        let solution = problem.suggest_invest_amount().round_dp(AMOUNT_DECIMALS);
+
+        Ok(serde_wasm_bindgen::to_value(&solution).unwrap())
+    }
 }
 
 #[wasm_bindgen]
 pub enum ProblemKind {
     Advanced,
     Basic,
+    Analyze,
 }
 
 #[wasm_bindgen]
@@ -211,6 +241,7 @@ impl From<TheoreticalAllocation> for JsTheoreticalAllocation {
 pub enum JsProblemOptions {
     Advanced(JsAdvancedOptions),
     Basic(JsBasicOptions),
+    Analyze(JsAnalyzeOptions),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -223,6 +254,11 @@ pub struct JsAdvancedOptions {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct JsAnalyzeOptions {
+    pub assets: HashMap<String, JsAnalyzeAsset>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct JsAdvancedAsset {
     pub symbol: String,
     pub shares: f64,
@@ -230,6 +266,15 @@ pub struct JsAdvancedAsset {
     pub target_weight: f64,
     pub is_whole_shares: bool,
     pub fees: Option<JsTransactionFees>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JsAnalyzeAsset {
+    pub symbol: String,
+    pub shares: f64,
+    pub price: f64,
+    pub target_weight: f64,
+    pub is_whole_shares: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -322,6 +367,29 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
     }
 }
 
+impl TryFrom<JsAnalyzeOptions> for suggestions::ProblemOptions {
+    type Error = String;
+
+    fn try_from(options: JsAnalyzeOptions) -> Result<Self, Self::Error> {
+        let assets = options
+            .assets
+            .into_iter()
+            .map(|(aid, a)| suggestions::ProblemAsset::try_from(a).map(|a| (aid, a)))
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        let current_total = assets
+            .values()
+            .map(|a| a.price * a.shares)
+            .sum::<Decimal>()
+            .round_dp(AMOUNT_DECIMALS);
+
+        Ok(suggestions::ProblemOptions {
+            current_pfolio_amount: current_total,
+            assets,
+        })
+    }
+}
+
 impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
     type Error = String;
 
@@ -386,12 +454,72 @@ impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
     }
 }
 
+impl TryFrom<JsAnalyzeAsset> for suggestions::ProblemAsset {
+    type Error = String;
+
+    fn try_from(asset: JsAnalyzeAsset) -> Result<Self, Self::Error> {
+        let JsAnalyzeAsset {
+            symbol,
+            shares,
+            price,
+            target_weight,
+            is_whole_shares,
+        } = asset;
+
+        if symbol.is_empty() {
+            return Err("Invalid symbol. Must not be empty".to_string());
+        }
+
+        if shares < 0. {
+            return Err(format!(
+                "Invalid shares ({}). Must be zero or positive",
+                shares
+            ));
+        }
+
+        if price < 0. {
+            return Err(format!(
+                "Invalid price ({}). Must be zero or positive",
+                price
+            ));
+        }
+
+        if target_weight < 0. {
+            return Err(format!(
+                "Invalid target weight ({}). Must be zero or positive",
+                target_weight
+            ));
+        }
+
+        if target_weight > 1. {
+            return Err(format!(
+                "Invalid target weight ({}). Must be less then or equal to 1.",
+                target_weight
+            ));
+        }
+
+        let shares = if is_whole_shares {
+            shares.trunc()
+        } else {
+            shares
+        };
+
+        Ok(suggestions::ProblemAsset {
+            symbol,
+            shares: parse_shares(shares),
+            price: parse_amount(price),
+            target_weight: parse_percentage(target_weight),
+            is_whole_shares,
+        })
+    }
+}
+
 impl TryFrom<JsTransactionFees> for TransactionFees {
     type Error = String;
 
     fn try_from(value: JsTransactionFees) -> Result<Self, Self::Error> {
         if let Some(max) = value.max_fee_impact {
-            if !(0. ..=1.).contains(&max) {
+            if !(0.0..=1.0).contains(&max) {
                 return Err(format!(
                     "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
                 ));
@@ -443,7 +571,7 @@ impl TryFrom<JsFeeStructureVariable> for FeeStructureVariable {
 
     fn try_from(value: JsFeeStructureVariable) -> Result<Self, Self::Error> {
         if let Some(rate) = value.fee_rate {
-            if !(0. ..=1.).contains(&rate) {
+            if !(0.0..=1.0).contains(&rate) {
                 return Err(format!(
                     "Invalid fee_rate ({rate}). Must be in [0, 1] range"
                 ));

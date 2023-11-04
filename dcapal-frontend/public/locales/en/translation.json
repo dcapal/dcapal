@@ -101,7 +101,12 @@
       "doNotSplit": "Don't split",
       "doNotSplitInfo": "With <0>{{message}}</0> option, we are going to suggest the number of shares to buy or sell for non-fractional assets like Stocks or ETFs. Otherwise, we might suggest theoretically optimal amounts to buy or sell but you will need to figure out how many shares to buy.",
       "wholeShares": " whole shares",
-      "runAllocation": "Run Allocation"
+      "runAllocation": "Run Allocation",
+      "youShouldAllocateAmount": "You should allocate at least <0>{{solution}}</0> <1>{{quoteCcy}}</1> to reach your target allocation. ",
+      "youAlreadyReachedTargetAllocation": "You have already reached your target allocation.",
+      "clickHere": "Click here",
+      "toInsertAmount": "to accept the suggested amount.",
+      "loading": "Computing the amount to invest to reach the target allocation..."
     },
     "about": {
       "terms": "Terms",

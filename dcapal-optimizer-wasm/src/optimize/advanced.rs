@@ -491,8 +491,6 @@ fn deallocate_asset_fee_too_high(asset: &mut Asset, general_fees: &TransactionFe
 
 #[cfg(test)]
 mod tests {
-    use std::assert_eq;
-
     use rust_decimal_macros::dec;
 
     use super::*;
