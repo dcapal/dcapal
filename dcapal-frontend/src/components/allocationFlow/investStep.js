@@ -7,7 +7,7 @@ import { isWholeShares, setBudget } from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
-import { replacer, timeout } from "../../utils";
+import { replacer } from "../../utils";
 
 const buildProblemInput = (assets, useWholeShares) => {
   return Object.values(assets).reduce(
