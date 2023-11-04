@@ -209,6 +209,7 @@ const SearchHeader = (props) => (
 );
 
 const SearchItemCW = (props) => {
+  const { i18n } = useTranslation();
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
 
   const [price, setPrice] = useState(null);
@@ -270,7 +271,7 @@ const SearchItemCW = (props) => {
             {isPrice && (
               <div className="flex items-center">
                 <div className="text-base font-medium m-1">
-                  {price.toLocaleString("en-US", {
+                  {price.toLocaleString(i18n.language, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -295,7 +296,7 @@ const SearchItemCW = (props) => {
 const SearchItemYF = (props) => {
   const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [price, setPrice] = useState(null);
   const [baseCcy, setBaseCcy] = useState("");
@@ -363,7 +364,7 @@ const SearchItemYF = (props) => {
             {price && (
               <div className="flex items-center">
                 <div className="text-base font-medium m-1">
-                  {price.toLocaleString("en-US", {
+                  {price.toLocaleString(i18n.language, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
