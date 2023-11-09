@@ -13,7 +13,7 @@ services:
       - ./config/redis/users.acl:/etc/redis/users.acl
       - ./data/redis/:/data
     healthcheck:
-      test: redis-cli --raw incr ping
+      test: redis-cli --raw ping
       interval: 10s
       timeout: 10s
       retries: 3
