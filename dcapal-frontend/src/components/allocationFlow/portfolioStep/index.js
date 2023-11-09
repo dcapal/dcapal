@@ -170,7 +170,7 @@ export const PortfolioStep = ({ ...props }) => {
       )}
       {assets && assets.length > 0 && (
         <div className="w-full flex items-center mb-3 pl-3 font-light text-2xl">
-          {pfolioName}
+          {pfolioName || t("importStep.defaultPortfolioName")}
         </div>
       )}
       <div className="w-full flex flex-col items-center">

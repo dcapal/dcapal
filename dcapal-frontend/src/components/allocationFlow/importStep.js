@@ -44,7 +44,7 @@ const parseFees = (fees) => {
   return parsed;
 };
 
-const importPfolio = async (pfolio, validCcys, dispatch) => {
+const importPfolio = async (pfolio, validCcys, dispatch, t) => {
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -55,18 +55,16 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
   }
 
   const imported = getNewPortfolio();
-  imported.name = pfolio.name || "Main portfolio";
+  imported.name = pfolio.name || t("importStep.defaultPortfolioName");
   imported.quoteCcy = pfolio.quoteCcy;
 
-  const fees = (() => {
+  imported.fees = (() => {
     if (pfolio.fees != null && typeof pfolio.fees === "object") {
       return parseFees(pfolio.fees) || getDefaultFees(FeeType.ZERO_FEE);
     } else {
       return getDefaultFees(FeeType.ZERO_FEE);
     }
   })();
-
-  imported.fees = fees;
 
   if (!pfolio.assets || !Array.isArray(pfolio.assets)) {
     stopWithError("[ImportStep] Missing 'assets' property");
@@ -141,7 +139,7 @@ export const ImportStep = () => {
 
     const runImport = async () => {
       const [success] = await Promise.all([
-        importPfolio(pfolio, validCcys, dispatch),
+        importPfolio(pfolio, validCcys, dispatch, t),
         timeout(1000),
       ]);
 

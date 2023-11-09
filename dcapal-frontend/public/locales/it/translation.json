@@ -84,7 +84,8 @@
       "fetchData": "Un attimo! Recupero dati freschi per il tuo portafoglio",
       "importPortfolio": "Importa Portafoglio",
       "ops": "Ops! Questo è imbarazzante",
-      "allocateYourSavings": "Alloca i tuoi risparmi"
+      "allocateYourSavings": "Alloca i tuoi risparmi",
+      "defaultPortfolioName": "Portafoglio principale"
     },
     "initStep": {
       "newPortfolio": "Nuovo portafoglio",

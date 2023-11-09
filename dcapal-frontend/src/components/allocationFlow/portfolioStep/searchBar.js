@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
 import { api } from "../../../app/api";
 import Fuse from "fuse.js";
 import { useSelector } from "react-redux";
@@ -83,7 +82,7 @@ export const SearchBar = (props) => {
   const fetchSearchApi = async (text) => {
     if (!text || text.length < 2) return;
 
-    searchId = uuidv4();
+    searchId = crypto.randomUUID();
     const currentSearchId = searchId;
 
     const fromDcaPal = async (type) => {

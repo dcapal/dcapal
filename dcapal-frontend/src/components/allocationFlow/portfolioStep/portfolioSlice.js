@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { roundPrice, uuid } from "../../../utils";
+import { roundPrice } from "../../../utils";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -111,7 +111,7 @@ export const getDefaultFees = (type) => {
 
 export const getNewPortfolio = () => {
   return {
-    id: uuid(),
+    id: crypto.randomUUID(),
     name: "",
     assets: {},
     quoteCcy: "eur",
@@ -222,7 +222,6 @@ export const portfolioSlice = createSlice({
 
       pfolio.totalAmount -= qty * price;
       pfolio.totalAmount += newAmount;
-      pfolio.totalAmount = pfolio.totalAmount;
 
       pfolio.assets = {
         ...pfolio.assets,

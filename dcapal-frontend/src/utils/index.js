@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
-
 export const timeout = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
@@ -24,8 +22,4 @@ export const replacer = (key, value) => {
 
 export const mapValues = (obj, func) => {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, func(v)]));
-};
-
-export const uuid = () => {
-  return uuidv4().replaceAll("-", "");
 };

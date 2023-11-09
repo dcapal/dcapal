@@ -1,4 +1,5 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import i18n from "i18next";
 import portfolioReducer, {
   FeeType,
   getDefaultFees,
@@ -16,7 +17,7 @@ import {
   REGISTER,
 } from "redux-persist";
 import createMigrate from "redux-persist/es/createMigrate";
-import { mapValues, uuid } from "../utils";
+import { mapValues } from "../utils";
 import { REFRESH_PRICE_INTERVAL_SEC } from "./config";
 
 const migrations = {
@@ -57,8 +58,8 @@ const migrations = {
   },
   4: (state) => {
     const pfolio = state.pfolio;
-    const id = uuid();
-    const name = "Main portfolio";
+    const id = crypto.randomUUID();
+    const name = i18n.t("importStep.defaultPortfolioName");
 
     const hasPfolio = Object.keys(pfolio?.assets).length > 0;
 

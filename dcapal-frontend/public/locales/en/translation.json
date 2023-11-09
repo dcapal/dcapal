@@ -84,7 +84,8 @@
       "fetchData": "Just a sec! Fetching fresh data for your portfolio",
       "importPortfolio": "Import Portfolio",
       "ops": "Oops! This is embarassing",
-      "allocateYourSavings": "Allocate your savings"
+      "allocateYourSavings": "Allocate your savings",
+      "defaultPortfolioName": "Main portfolio"
     },
     "initStep": {
       "newPortfolio": "New portfolio",
