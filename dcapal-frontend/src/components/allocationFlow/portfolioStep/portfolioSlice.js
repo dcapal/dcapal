@@ -137,12 +137,17 @@ const getPortfolio = (id, pfolios) => {
   return pfolios[id];
 };
 
+const initialState = () => {
+  const pfolio = getNewPortfolio();
+  return {
+    selected: pfolio.id,
+    pfolios: { [pfolio.id]: pfolio },
+  };
+};
+
 export const portfolioSlice = createSlice({
   name: "portfolio",
-  initialState: {
-    selected: null,
-    pfolios: {},
-  },
+  initialState: initialState(),
   reducers: {
     addPortfolio: (state, action) => {
       const { pfolio } = action.payload;
