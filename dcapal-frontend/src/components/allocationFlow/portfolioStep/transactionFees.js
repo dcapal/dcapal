@@ -2,6 +2,7 @@ import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   FeeType,
+  currentPortfolio,
   setFeeType,
   setFeeTypeAsset,
   setFixedFeeAmount,
@@ -17,21 +18,23 @@ import { Trans, useTranslation } from "react-i18next";
 
 export const TransactionFees = ({ asset }) => {
   const dispatch = useDispatch();
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const { t } = useTranslation();
 
   const fees = useSelector((state) => {
-    return asset && asset in state.pfolio.assets
-      ? state.pfolio.assets[asset].fees || state.pfolio.fees
-      : state.pfolio.fees;
+    const pfolio = currentPortfolio(state);
+    return asset && asset in pfolio.assets
+      ? pfolio.assets[asset].fees || pfolio.fees
+      : pfolio.fees;
   });
 
   const feeType = useSelector((state) => {
+    const pfolio = currentPortfolio(state);
     return asset
-      ? asset in state.pfolio.assets && state.pfolio.assets[asset].fees
-        ? state.pfolio.assets[asset].fees.feeStructure.type
+      ? asset in pfolio.assets && pfolio.assets[asset].fees
+        ? pfolio.assets[asset].fees.feeStructure.type
         : null
-      : state.pfolio.fees.feeStructure.type;
+      : pfolio.fees.feeStructure.type;
   });
 
   const maxFeeImpact = fees?.maxFeeImpact || null;

@@ -54,7 +54,6 @@
     },
     "portfolioStep": {
       "transactionFees": "Transaction fees",
-      "portfolioAssets": "Portfolio assets",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
       "targetWeights": "Target weights",

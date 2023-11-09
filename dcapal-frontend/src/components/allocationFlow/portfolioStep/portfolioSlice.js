@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { roundPrice } from "../../../utils";
+import { roundPrice, uuid } from "../../../utils";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -109,8 +109,10 @@ export const getDefaultFees = (type) => {
   }
 };
 
-export const buildNewPortfolio = () => {
+export const getNewPortfolio = () => {
   return {
+    id: uuid(),
+    name: "",
     assets: {},
     quoteCcy: "eur",
     nextIdx: 0,
@@ -121,36 +123,50 @@ export const buildNewPortfolio = () => {
   };
 };
 
-/*
-TODO: Refactor portfolio slice
-  - Transform state into object:
-{
-  selected: string,
-  pfolios: Map<uuid, pfolio>,
-}
-  - Transform pfolio and add:
-{
-  uuid: string,
-  name: string
-}
-  - Add reducer to insert new portfolio
-  - Add reducer to select pfolio id
-  - Modify every reducer to lookup pfolio via selected id and return if not existing
-  - Update migrator (generate uuid)
-  - Update exporter to download selected pfolio id
-  - Update importer to add new portfolio 
-*/
+export const currentPortfolio = (state) => {
+  if ("pfolio" in state) {
+    return getPortfolio(state.pfolio.selected, state.pfolio.pfolios);
+  }
+
+  return getPortfolio(state.selected, state.pfolios);
+};
+
+const getPortfolio = (id, pfolios) => {
+  if (!id || !(id in pfolios)) return null;
+
+  return pfolios[id];
+};
 
 export const portfolioSlice = createSlice({
   name: "portfolio",
-  initialState: buildNewPortfolio(),
+  initialState: {
+    selected: null,
+    pfolios: {},
+  },
   reducers: {
-    addAsset: (state, action) => {
-      const symbol = action.payload.symbol;
-      if (symbol && symbol in state.assets) return;
+    addPortfolio: (state, action) => {
+      const { pfolio } = action.payload;
+      if (pfolio.id in state.pfolios) return;
 
-      state.assets = {
-        ...state.assets,
+      state.pfolios = { ...state.pfolios, [pfolio.id]: pfolio };
+    },
+    selectPortfolio: (state, action) => {
+      const { id } = action.payload;
+      if (id === state.selected) return;
+
+      if (id in state.pfolios) {
+        state.selected = id;
+      }
+    },
+    addAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      const symbol = action.payload.symbol;
+      if (symbol && symbol in pfolio.assets) return;
+
+      pfolio.assets = {
+        ...pfolio.assets,
         [action.payload.symbol]: {
           idx: state.nextIdx,
           symbol: action.payload.symbol,
@@ -166,140 +182,173 @@ export const portfolioSlice = createSlice({
           fees: null,
         },
       };
-      state.nextIdx += 1;
+      pfolio.nextIdx += 1;
 
-      if (Object.keys(state.assets).length === 1) {
-        state.lastPriceRefresh = Date.now();
+      if (Object.keys(pfolio.assets).length === 1) {
+        pfolio.lastPriceRefresh = Date.now();
       }
     },
     removeAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       const symbol = action.payload.symbol;
-      if (symbol in state.assets) {
-        const asset = state.assets[symbol];
+      if (symbol in pfolio.assets) {
+        const asset = pfolio.assets[symbol];
         const price = asset?.price || 0;
         const qty = asset?.qty || 0;
 
-        state.totalAmount -= qty * price;
-        delete state.assets[symbol];
+        pfolio.totalAmount -= qty * price;
+        delete pfolio.assets[symbol];
 
-        Object.values(state.assets).forEach((asset) => {
-          updateWeight(asset, state.totalAmount);
+        Object.values(pfolio.assets).forEach((asset) => {
+          updateWeight(asset, pfolio.totalAmount);
         });
       }
     },
     setQty: (state, action) => {
-      const asset = state.assets[action.payload.symbol];
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      const asset = pfolio.assets[action.payload.symbol];
       const price = asset?.price || 0;
       const qty = asset?.qty || 0;
       const newAmount = (action.payload.qty || 0) * price;
 
-      state.totalAmount -= qty * price;
-      state.totalAmount += newAmount;
-      state.totalAmount = state.totalAmount;
+      pfolio.totalAmount -= qty * price;
+      pfolio.totalAmount += newAmount;
+      pfolio.totalAmount = pfolio.totalAmount;
 
-      state.assets = {
-        ...state.assets,
+      pfolio.assets = {
+        ...pfolio.assets,
         [action.payload.symbol]: {
-          ...state.assets[action.payload.symbol],
+          ...pfolio.assets[action.payload.symbol],
           qty: action.payload.qty || 0,
           amount: newAmount,
         },
       };
 
-      Object.values(state.assets).forEach((asset) => {
-        updateWeight(asset, state.totalAmount);
+      Object.values(pfolio.assets).forEach((asset) => {
+        updateWeight(asset, pfolio.totalAmount);
       });
     },
     setPrice: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       let { symbol, price } = action.payload;
-      if (!symbol || !(symbol in state.assets)) {
+      if (!symbol || !(symbol in pfolio.assets)) {
         return;
       }
 
-      const asset = state.assets[action.payload.symbol];
+      const asset = pfolio.assets[action.payload.symbol];
       price = roundPrice(price);
 
       // Refresh amounts
       const newAmount = (asset.qty || 0) * price;
-      state.totalAmount -= asset.qty * price;
-      state.totalAmount += newAmount;
-      state.totalAmount = state.totalAmount;
+      pfolio.totalAmount -= asset.qty * price;
+      pfolio.totalAmount += newAmount;
+      pfolio.totalAmount = pfolio.totalAmount;
 
       // Update asset info
       asset.price = price;
       asset.amount = newAmount;
 
-      Object.values(state.assets).forEach((asset) => {
-        updateWeight(asset, state.totalAmount);
+      Object.values(pfolio.assets).forEach((asset) => {
+        updateWeight(asset, pfolio.totalAmount);
       });
     },
     setTargetWeight: (state, action) => {
-      state.assets = {
-        ...state.assets,
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      pfolio.assets = {
+        ...pfolio.assets,
         [action.payload.symbol]: {
-          ...state.assets[action.payload.symbol],
+          ...pfolio.assets[action.payload.symbol],
           targetWeight: action.payload.weight || 0,
         },
       };
     },
     setRefreshTime: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       if (action.payload.time) {
-        state.lastPriceRefresh = action.payload.time;
+        pfolio.lastPriceRefresh = action.payload.time;
       }
     },
     setQuoteCurrency: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       if (action.payload.quoteCcy && action.payload.quoteCcy.length > 0) {
-        state.quoteCcy = action.payload.quoteCcy;
+        pfolio.quoteCcy = action.payload.quoteCcy;
       }
     },
     setBudget: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       if (action.payload.budget && action.payload.budget >= 0) {
-        state.budget = action.payload.budget;
+        pfolio.budget = action.payload.budget;
       }
     },
     setFees: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       if (action.payload.fees) {
-        state.fees = action.payload.fees;
+        pfolio.fees = action.payload.fees;
       }
     },
     setFeesAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       const { fees, symbol } = action.payload;
-      if (!symbol || !(symbol in state.assets)) {
+      if (!symbol || !(symbol in pfolio.assets)) {
         return;
       }
 
-      state.assets[symbol].fees = fees;
+      pfolio.assets[symbol].fees = fees;
     },
     setFeeType: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       if (!action.payload.type) {
-        state.fees = getDefaultFees(FeeType.ZERO_FEE);
+        pfolio.fees = getDefaultFees(FeeType.ZERO_FEE);
         return;
       }
 
-      if (!state.fees?.feeStructure?.type) {
-        state.fees = getDefaultFees(action.payload.type);
+      if (!pfolio.fees?.feeStructure?.type) {
+        pfolio.fees = getDefaultFees(action.payload.type);
         return;
       }
 
-      if (action.payload.type !== state.fees.feeStructure.type) {
-        state.fees = {
-          ...state.fees,
+      if (action.payload.type !== pfolio.fees.feeStructure.type) {
+        pfolio.fees = {
+          ...pfolio.fees,
           feeStructure: getDefaultFees(action.payload.type).feeStructure,
         };
       }
     },
     setFeeTypeAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       const { type, symbol } = action.payload;
-      if (!symbol || !(symbol in state.assets)) {
+      if (!symbol || !(symbol in pfolio.assets)) {
         return;
       }
 
       if (!type) {
-        state.assets[symbol].fees = null;
+        pfolio.assets[symbol].fees = null;
         return;
       }
 
-      const asset = state.assets[symbol];
+      const asset = pfolio.assets[symbol];
 
       if (!asset.fees?.feeStructure.type) {
         asset.fees = getDefaultFees(type);
@@ -314,47 +363,59 @@ export const portfolioSlice = createSlice({
       }
     },
     setMaxFeeImpact: (state, action) => {
-      if (state.fees) {
-        state.fees = {
-          ...state.fees,
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      if (pfolio.fees) {
+        pfolio.fees = {
+          ...pfolio.fees,
           maxFeeImpact: action.payload.value,
         };
       }
     },
     setMaxFeeImpactAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       const { value, symbol } = action.payload;
-      if (!symbol || !(symbol in state.assets)) {
+      if (!symbol || !(symbol in pfolio.assets)) {
         return;
       }
 
-      const fees = state.assets[symbol].fees;
+      const fees = pfolio.assets[symbol].fees;
       if (fees) {
-        state.assets[symbol].fees = {
+        pfolio.assets[symbol].fees = {
           ...fees,
           maxFeeImpact: value,
         };
       }
     },
     setFixedFeeAmount: (state, action) => {
-      if (state.fees && state.fees.feeStructure?.type === FeeType.FIXED) {
-        state.fees = {
-          ...state.fees,
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      if (pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.FIXED) {
+        pfolio.fees = {
+          ...pfolio.fees,
           feeStructure: {
-            ...state.fees.feeStructure,
+            ...pfolio.fees.feeStructure,
             feeAmount: action.payload.value,
           },
         };
       }
     },
     setFixedFeeAmountAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       const { value, symbol } = action.payload;
-      if (!symbol || !(symbol in state.assets)) {
+      if (!symbol || !(symbol in pfolio.assets)) {
         return;
       }
 
-      const fees = state.assets[symbol].fees;
+      const fees = pfolio.assets[symbol].fees;
       if (fees && fees.feeStructure.type === FeeType.FIXED) {
-        state.assets[symbol].fees = {
+        pfolio.assets[symbol].fees = {
           ...fees,
           feeStructure: {
             ...fees.feeStructure,
@@ -364,25 +425,31 @@ export const portfolioSlice = createSlice({
       }
     },
     setVariableFee: (state, action) => {
-      if (state.fees && state.fees.feeStructure?.type === FeeType.VARIABLE) {
-        state.fees = {
-          ...state.fees,
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      if (pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.VARIABLE) {
+        pfolio.fees = {
+          ...pfolio.fees,
           feeStructure: {
-            ...state.fees.feeStructure,
+            ...pfolio.fees.feeStructure,
             ...action.payload,
           },
         };
       }
     },
     setVariableFeeAsset: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
       const { symbol, ...rest } = action.payload;
-      if (!symbol || !(symbol in state.assets)) {
+      if (!symbol || !(symbol in pfolio.assets)) {
         return;
       }
 
-      const fees = state.assets[symbol].fees;
+      const fees = pfolio.assets[symbol].fees;
       if (fees && fees.feeStructure.type === FeeType.VARIABLE) {
-        state.assets[symbol].fees = {
+        pfolio.assets[symbol].fees = {
           ...fees,
           feeStructure: {
             ...fees.feeStructure,
@@ -392,20 +459,28 @@ export const portfolioSlice = createSlice({
       }
     },
     clearPortfolio: (state) => {
-      state.assets = {};
-      state.nextIdx = 0;
-      state.totalAmount = 0;
-      state.budget = 0;
-      state.fees = getDefaultFees(FeeType.ZERO_FEE);
-      state.lastPriceRefresh = Date.now();
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      pfolio.assets = {};
+      pfolio.nextIdx = 0;
+      pfolio.totalAmount = 0;
+      pfolio.budget = 0;
+      pfolio.fees = getDefaultFees(FeeType.ZERO_FEE);
+      pfolio.lastPriceRefresh = Date.now();
     },
     clearBudget: (state) => {
-      state.budget = 0;
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      pfolio.budget = 0;
     },
   },
 });
 
 export const {
+  addPortfolio,
+  selectPortfolio,
   addAsset,
   removeAsset,
   setQty,

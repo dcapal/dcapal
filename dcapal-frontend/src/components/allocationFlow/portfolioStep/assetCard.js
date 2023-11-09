@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useMediaQuery } from "@react-hook/media-query";
 
 import { InputNumber, InputNumberType } from "../../core/inputNumber";
-import { isWholeShares, removeAsset } from "./portfolioSlice";
+import { currentPortfolio, isWholeShares, removeAsset } from "./portfolioSlice";
 import { MEDIA_SMALL } from "../../../app/config";
 import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
@@ -22,7 +22,7 @@ export const AssetCard = ({
   ...props
 }) => {
   const { t, i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const dispatch = useDispatch();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();

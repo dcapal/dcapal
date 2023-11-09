@@ -13,7 +13,7 @@ import {
 } from "../../../app/providers";
 import { DCAPAL_API_SEARCH } from "../../../app/config";
 import { Spinner } from "../../spinner/spinner";
-import { ACLASS } from "./portfolioSlice";
+import { ACLASS, currentPortfolio } from "./portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 let searchId = undefined;
@@ -210,7 +210,7 @@ const SearchHeader = (props) => (
 
 const SearchItemCW = (props) => {
   const { i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
 
   const [price, setPrice] = useState(null);
   const cancelTokenSources = { price: useRef(null) };
@@ -294,7 +294,7 @@ const SearchItemCW = (props) => {
 };
 
 const SearchItemYF = (props) => {
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
   const { t, i18n } = useTranslation();
 

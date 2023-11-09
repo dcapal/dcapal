@@ -3,7 +3,7 @@ import portfolioReducer, {
   FeeType,
   getDefaultFees,
 } from "../components/allocationFlow/portfolioStep/portfolioSlice";
-import appReducer from "./appSlice";
+import appReducer, { Step } from "./appSlice";
 import storage from "redux-persist/lib/storage";
 import {
   persistReducer,
@@ -16,7 +16,7 @@ import {
   REGISTER,
 } from "redux-persist";
 import createMigrate from "redux-persist/es/createMigrate";
-import { mapValues } from "../utils";
+import { mapValues, uuid } from "../utils";
 import { REFRESH_PRICE_INTERVAL_SEC } from "./config";
 
 const migrations = {
@@ -55,11 +55,33 @@ const migrations = {
       },
     };
   },
+  4: (state) => {
+    const pfolio = state.pfolio;
+    const id = uuid();
+    const name = "Main portfolio";
+
+    const hasPfolio = Object.keys(pfolio?.assets).length > 0;
+
+    return {
+      ...state,
+      ...(!hasPfolio && { allocationFlowStep: Step.CCY }),
+      pfolio: {
+        selected: id,
+        pfolios: {
+          [id]: {
+            ...pfolio,
+            id: id,
+            name: name,
+          },
+        },
+      },
+    };
+  },
 };
 
 const rootConfig = {
   key: "root",
-  version: 3,
+  version: 4,
   storage,
   migrate: createMigrate(migrations, { debug: false }),
 };

@@ -2,7 +2,10 @@ import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { setQuoteCurrency } from "../portfolioStep/portfolioSlice";
+import {
+  currentPortfolio,
+  setQuoteCurrency,
+} from "../portfolioStep/portfolioSlice";
 import { CcyGroup } from "./ccyGroup";
 import { useTranslation } from "react-i18next";
 
@@ -26,7 +29,7 @@ const sortCcy = (a, b) => {
 };
 
 export const CcyStep = ({ ...props }) => {
-  const portfolioState = useSelector((state) => state.pfolio);
+  const portfolioState = useSelector(currentPortfolio);
   const [selected, setSelected] = useState(portfolioState.quoteCcy ?? "");
   const ccys = useSelector((state) => state.app.currencies);
   const dispatch = useDispatch();

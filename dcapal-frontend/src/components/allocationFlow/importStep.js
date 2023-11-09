@@ -10,14 +10,15 @@ import {
   ACLASS,
   FeeType,
   addAsset,
+  addPortfolio,
   clearPortfolio,
   getDefaultFees,
+  getNewPortfolio,
   parseAClass,
   parseFeeType,
-  setFees,
+  selectPortfolio,
   setFeesAsset,
   setQty,
-  setQuoteCurrency,
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
@@ -53,8 +54,9 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
     return false;
   }
 
-  dispatch(clearPortfolio());
-  dispatch(setQuoteCurrency({ quoteCcy: pfolio.quoteCcy }));
+  const imported = getNewPortfolio();
+  imported.name = pfolio.name || "Main portfolio";
+  imported.quoteCcy = pfolio.quoteCcy;
 
   const fees = (() => {
     if (pfolio.fees != null && typeof pfolio.fees === "object") {
@@ -64,12 +66,15 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
     }
   })();
 
+  imported.fees = fees;
+
   if (!pfolio.assets || !Array.isArray(pfolio.assets)) {
     stopWithError("[ImportStep] Missing 'assets' property");
     return false;
   }
 
-  dispatch(setFees({ fees: fees }));
+  dispatch(addPortfolio({ pfolio: imported }));
+  dispatch(selectPortfolio({ id: imported.id }));
 
   for (const a of pfolio.assets) {
     const price = await getFetcher(a.provider, validCcys)(

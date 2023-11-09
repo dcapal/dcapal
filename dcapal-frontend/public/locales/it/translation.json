@@ -54,7 +54,6 @@
     },
     "portfolioStep": {
       "transactionFees": "Costi di transazione",
-      "portfolioAssets": "Asset in portafoglio",
       "quantity": "Quantità",
       "targetWeight": "Allocazione Target",
       "targetWeights": "Pesi Obiettivo",

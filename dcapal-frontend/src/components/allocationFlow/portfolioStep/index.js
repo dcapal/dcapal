@@ -10,6 +10,7 @@ import { AssetCard } from "./assetCard";
 import {
   addAsset,
   clearPortfolio,
+  currentPortfolio,
   setPrice,
   setQty,
   setRefreshTime,
@@ -57,10 +58,13 @@ export const PortfolioStep = ({ ...props }) => {
   const [isShowFees, setShowFees] = useState(false);
 
   const { t, i18n } = useTranslation();
-  const assetStore = useSelector((state) => state.pfolio.assets);
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const pfolioName = useSelector((state) => currentPortfolio(state).name);
+  const assetStore = useSelector((state) => currentPortfolio(state).assets);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const validCcys = useSelector((state) => state.app.currencies);
-  const lastRefreshTime = useSelector((state) => state.pfolio.lastPriceRefresh);
+  const lastRefreshTime = useSelector(
+    (state) => currentPortfolio(state).lastPriceRefresh
+  );
 
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const dispatch = useDispatch();
@@ -166,7 +170,7 @@ export const PortfolioStep = ({ ...props }) => {
       )}
       {assets && assets.length > 0 && (
         <div className="w-full flex items-center mb-3 pl-3 font-light text-2xl">
-          {t("portfolioStep.portfolioAssets")}
+          {pfolioName}
         </div>
       )}
       <div className="w-full flex flex-col items-center">

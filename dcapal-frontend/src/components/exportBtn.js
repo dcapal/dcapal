@@ -3,6 +3,7 @@ import { useSelector } from "react-redux";
 import { Step } from "../app/appSlice";
 import {
   aclassToString,
+  currentPortfolio,
   feeTypeToString,
 } from "./allocationFlow/portfolioStep/portfolioSlice";
 import { useTranslation } from "react-i18next";
@@ -36,7 +37,12 @@ const exportPfolio = (pfolio) => {
     fees: a.fees != null ? toExportedFees(a.fees) : undefined,
   }));
 
-  const data = { quoteCcy: pfolio.quoteCcy, fees: pfolio.fees, assets: assets };
+  const data = {
+    name: pfolio.name,
+    quoteCcy: pfolio.quoteCcy,
+    fees: pfolio.fees,
+    assets: assets,
+  };
   const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
     JSON.stringify(data, null, 2)
   )}`;
@@ -59,13 +65,15 @@ export const ExportBtn = () => {
 
   const step = useSelector((state) => state.app.allocationFlowStep);
 
-  const assets = useSelector((state) => state.pfolio.assets);
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
-  const fees = useSelector((state) => state.pfolio.fees);
+  const name = useSelector((state) => currentPortfolio(state.pfolio).name);
+  const assets = useSelector((state) => currentPortfolio(state.pfolio).assets);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const fees = useSelector((state) => currentPortfolio(state).fees);
 
   const exportedFees = toExportedFees(fees);
 
   const pfolio = {
+    name: name,
     assets: assets,
     quoteCcy: quoteCcy,
     fees: exportedFees,
