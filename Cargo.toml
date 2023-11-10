@@ -3,7 +3,7 @@ resolver = "2"
 members = ["dcapal-backend", "dcapal-optimizer-wasm"]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 edition = "2021"
 rust-version = "1.73"
