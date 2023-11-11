@@ -4,7 +4,11 @@ import { useSelector } from "react-redux";
 import { MEDIA_SMALL } from "../../../app/config";
 import { UNALLOCATED_CASH } from ".";
 import { roundAmount, roundDecimals } from "../../../utils";
-import { ACLASS, FeeType } from "../portfolioStep/portfolioSlice";
+import {
+  ACLASS,
+  FeeType,
+  currentPortfolio,
+} from "../portfolioStep/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 const feeAmount = (fees, amount) => {
@@ -44,7 +48,7 @@ export const AllocateCard = ({
   theoAlloc,
 }) => {
   const { t, i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const isMobile = !useMediaQuery(MEDIA_SMALL);
 
   const amtFmt = {

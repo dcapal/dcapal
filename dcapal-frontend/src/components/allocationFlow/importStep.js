@@ -10,14 +10,15 @@ import {
   ACLASS,
   FeeType,
   addAsset,
+  addPortfolio,
   clearPortfolio,
   getDefaultFees,
+  getNewPortfolio,
   parseAClass,
   parseFeeType,
-  setFees,
+  selectPortfolio,
   setFeesAsset,
   setQty,
-  setQuoteCurrency,
   setTargetWeight,
 } from "./portfolioStep/portfolioSlice";
 
@@ -43,7 +44,7 @@ const parseFees = (fees) => {
   return parsed;
 };
 
-const importPfolio = async (pfolio, validCcys, dispatch) => {
+const importPfolio = async (pfolio, validCcys, dispatch, t) => {
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -53,10 +54,11 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
     return false;
   }
 
-  dispatch(clearPortfolio());
-  dispatch(setQuoteCurrency({ quoteCcy: pfolio.quoteCcy }));
+  const imported = getNewPortfolio();
+  imported.name = pfolio.name || t("importStep.defaultPortfolioName");
+  imported.quoteCcy = pfolio.quoteCcy;
 
-  const fees = (() => {
+  imported.fees = (() => {
     if (pfolio.fees != null && typeof pfolio.fees === "object") {
       return parseFees(pfolio.fees) || getDefaultFees(FeeType.ZERO_FEE);
     } else {
@@ -69,7 +71,8 @@ const importPfolio = async (pfolio, validCcys, dispatch) => {
     return false;
   }
 
-  dispatch(setFees({ fees: fees }));
+  dispatch(addPortfolio({ pfolio: imported }));
+  dispatch(selectPortfolio({ id: imported.id }));
 
   for (const a of pfolio.assets) {
     const price = await getFetcher(a.provider, validCcys)(
@@ -136,7 +139,7 @@ export const ImportStep = () => {
 
     const runImport = async () => {
       const [success] = await Promise.all([
-        importPfolio(pfolio, validCcys, dispatch),
+        importPfolio(pfolio, validCcys, dispatch, t),
         timeout(1000),
       ]);
 

@@ -5,7 +5,7 @@ const Dotenv = require("dotenv-webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
-module.exports = (env, argv) => {
+module.exports = (_env, argv) => {
   const devMode = argv.mode !== "production";
   console.log("Webpack build mode:", argv.mode);
   console.log("  devMode:", devMode);

@@ -7,6 +7,7 @@ import { Spinner } from "../../spinner/spinner";
 import {
   ACLASS,
   clearBudget,
+  currentPortfolio,
   feeTypeToString,
   isWholeShares,
 } from "../portfolioStep/portfolioSlice";
@@ -136,10 +137,10 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   const dispatch = useDispatch();
 
   const { t } = useTranslation();
-  const budget = useSelector((state) => state.pfolio.budget);
-  const assets = useSelector((state) => state.pfolio.assets);
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
-  const fees = useSelector((state) => state.pfolio.fees);
+  const budget = useSelector((state) => currentPortfolio(state).budget);
+  const assets = useSelector((state) => currentPortfolio(state).assets);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const fees = useSelector((state) => currentPortfolio(state).fees);
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
