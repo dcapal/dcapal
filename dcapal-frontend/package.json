@@ -29,7 +29,7 @@
     "fuse.js": "^7.0.0",
     "i18next": "^23.6.0",
     "i18next-browser-languagedetector": "^7.1.0",
-    "playwright": "^1.39.0",
+    "playwright": "^1.40.0",
     "react": "^18.2.0",
     "react-collapsed": "^4.1.1",
     "react-dom": "^18.2.0",
