@@ -13,7 +13,6 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import translationEN from "../public/locales/en/translation.json";
 import translationIT from "../public/locales/it/translation.json";
-import CookieConsent from "./components/core/cookieConsent";
 
 i18n
   .use(LanguageDetector)

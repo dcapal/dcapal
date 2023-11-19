@@ -3,7 +3,11 @@ import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "../../app/appSlice";
 import { InputNumber, InputNumberType } from "../core/inputNumber";
-import { isWholeShares, setBudget } from "./portfolioStep/portfolioSlice";
+import {
+  currentPortfolio,
+  isWholeShares,
+  setBudget,
+} from "./portfolioStep/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
@@ -41,9 +45,11 @@ export const InvestStep = ({
   const dispatch = useDispatch();
   const { t } = useTranslation();
 
-  const quoteCcy = useSelector((state) => state.pfolio.quoteCcy);
-  const totalAmount = useSelector((state) => state.pfolio.totalAmount);
-  const assets = useSelector((state) => state.pfolio.assets);
+  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const totalAmount = useSelector(
+    (state) => currentPortfolio(state).totalAmount
+  );
+  const assets = useSelector((state) => currentPortfolio(state).assets);
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -1,9 +1,10 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import i18n from "i18next";
 import portfolioReducer, {
   FeeType,
   getDefaultFees,
 } from "../components/allocationFlow/portfolioStep/portfolioSlice";
-import appReducer from "./appSlice";
+import appReducer, { Step } from "./appSlice";
 import storage from "redux-persist/lib/storage";
 import {
   persistReducer,
@@ -55,11 +56,33 @@ const migrations = {
       },
     };
   },
+  4: (state) => {
+    const pfolio = state.pfolio;
+    const id = crypto.randomUUID();
+    const name = i18n.t("importStep.defaultPortfolioName");
+
+    const hasPfolio = Object.keys(pfolio?.assets).length > 0;
+
+    return {
+      ...state,
+      ...(!hasPfolio && { allocationFlowStep: Step.CCY }),
+      pfolio: {
+        selected: id,
+        pfolios: {
+          [id]: {
+            ...pfolio,
+            id: id,
+            name: name,
+          },
+        },
+      },
+    };
+  },
 };
 
 const rootConfig = {
   key: "root",
-  version: 3,
+  version: 4,
   storage,
   migrate: createMigrate(migrations, { debug: false }),
 };
