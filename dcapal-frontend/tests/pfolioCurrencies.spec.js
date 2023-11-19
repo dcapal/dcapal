@@ -8,9 +8,10 @@ test("it loads and fetches portfolio currencies", async ({ page }) => {
     /DcaPal - A smart assistant for your periodic investments | DcaPal/
   );
 
-  await page.getByTestId("importStep.allocateYourSavings").first().click();
-
-  await page.waitForResponse("/api/assets/fiat");
+  await Promise.all([
+    page.getByTestId("importStep.allocateYourSavings").first().click(),
+    page.waitForResponse("/api/assets/fiat"),
+  ]);
 
   const ccyGroup = page.getByTestId("ccyGroup");
   await ccyGroup.waitFor();
