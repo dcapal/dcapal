@@ -245,7 +245,7 @@ export const AllocateCard = ({
             <div className="flex justify-between items-start">
               <div className="flex flex-col">
                 <div className="flex items-center">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.currentWeight")}
                   </div>
                   <span>
@@ -253,7 +253,7 @@ export const AllocateCard = ({
                   </span>
                 </div>
                 <div className="flex items-center">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.currentAmount")}
                   </div>
                   <span className="uppercase">
@@ -261,7 +261,7 @@ export const AllocateCard = ({
                   </span>
                 </div>
                 <div className="flex items-center">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.targetWeight")}
                   </div>
                   <div>
@@ -269,7 +269,7 @@ export const AllocateCard = ({
                   </div>
                 </div>
                 <div className="flex items-center">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.fees")}
                   </div>
                   <span className="uppercase">
@@ -282,7 +282,7 @@ export const AllocateCard = ({
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center mr-2">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.newWeight")}
                   </div>
                   <span className="grow text-right">
@@ -290,7 +290,7 @@ export const AllocateCard = ({
                   </span>
                 </div>
                 <div className="flex items-center mr-2">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.newAmount")}
                   </div>
                   <span className="grow uppercase text-right">
@@ -298,7 +298,7 @@ export const AllocateCard = ({
                   </span>
                 </div>
                 <div className="flex items-center mr-2">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs text-white/0">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs text-white/0">
                     {t("endStep.spacer")}
                   </div>
                   <span className="grow uppercase text-right text-white/0">
@@ -306,7 +306,7 @@ export const AllocateCard = ({
                   </span>
                 </div>
                 <div className="flex items-center mr-2">
-                  <div className="min-w-[5.5rem] mr-2 font-light text-xs">
+                  <div className="min-w-[5.75rem] mr-2 font-light text-xs">
                     {t("endStep.feeImpact")}
                   </div>
                   <span className="grow text-right">

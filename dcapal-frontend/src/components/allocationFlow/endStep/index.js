@@ -51,7 +51,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
     if (solution.amounts.has(card.symbol)) {
       card.amount = solution.amounts.get(card.symbol);
       card.amount += isCashAsset ? budgetLeft : 0;
-      card.weight = (100 * card.amount) / totalAmount;
+      card.weight = totalAmount > 0 ? (100 * card.amount) / totalAmount : 0;
     }
 
     if (solution?.shares?.has(card.symbol) && !isCashAsset) {
