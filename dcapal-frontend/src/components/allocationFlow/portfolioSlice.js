@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { roundPrice } from "../../../utils";
+import { roundPrice } from "../../utils";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;

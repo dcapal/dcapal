@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { api } from "../../../app/api";
+import { api } from "../../../../app/api";
 import Fuse from "fuse.js";
 import { useSelector } from "react-redux";
 import {
@@ -9,10 +9,10 @@ import {
   fetchPrice,
   fetchPriceYF,
   Provider,
-} from "../../../app/providers";
-import { DCAPAL_API_SEARCH } from "../../../app/config";
-import { Spinner } from "../../spinner/spinner";
-import { ACLASS, currentPortfolio } from "./portfolioSlice";
+} from "../../../../app/providers";
+import { DCAPAL_API_SEARCH } from "../../../../app/config";
+import { Spinner } from "../../../spinner/spinner";
+import { ACLASS, currentPortfolio } from "../../portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 let searchId = undefined;

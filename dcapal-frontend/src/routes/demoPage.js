@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { clearPortfolio } from "../components/allocationFlow/portfolioStep/portfolioSlice";
+import { clearPortfolio } from "../components/allocationFlow/portfolioSlice";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
 
 import {

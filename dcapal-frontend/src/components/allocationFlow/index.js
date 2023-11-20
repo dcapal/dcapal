@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
 import { Step } from "../../app/appSlice";
-import { CcyStep } from "./ccyStep";
-import { EndStep } from "./endStep";
-import { ImportStep } from "./importStep";
-import { InvestStep } from "./investStep";
-import { PortfolioStep } from "./portfolioStep";
+import { CcyStep } from "./steps/ccy";
+import { EndStep } from "./steps/end";
+import { ImportStep } from "./steps/importFile";
+import { InvestStep } from "./steps/invest";
+import { PortfolioStep } from "./steps/portfolio";
 
 export const AllocationFlow = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);

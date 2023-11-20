@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice";
-import { clearPortfolio } from "../allocationFlow/portfolioStep/portfolioSlice";
+import { clearPortfolio } from "../allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 export const LaunchBtn = () => {

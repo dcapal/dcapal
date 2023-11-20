@@ -3,7 +3,7 @@ import i18n from "i18next";
 import portfolioReducer, {
   FeeType,
   getDefaultFees,
-} from "../components/allocationFlow/portfolioStep/portfolioSlice";
+} from "../components/allocationFlow/portfolioSlice";
 import appReducer, { Step } from "./appSlice";
 import storage from "redux-persist/lib/storage";
 import {

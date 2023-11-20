@@ -1,14 +1,10 @@
 import { useMediaQuery } from "@react-hook/media-query";
 import React from "react";
 import { useSelector } from "react-redux";
-import { MEDIA_SMALL } from "../../../app/config";
+import { MEDIA_SMALL } from "../../../../app/config";
 import { UNALLOCATED_CASH } from ".";
-import { roundAmount, roundDecimals } from "../../../utils";
-import {
-  ACLASS,
-  FeeType,
-  currentPortfolio,
-} from "../portfolioStep/portfolioSlice";
+import { roundAmount, roundDecimals } from "../../../../utils";
+import { ACLASS, FeeType, currentPortfolio } from "../../portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 const feeAmount = (fees, amount) => {
