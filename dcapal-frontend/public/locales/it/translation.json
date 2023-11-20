@@ -8,10 +8,15 @@
       "refreshedPrices": "Prezzi aggiornati!",
       "goBack": "Indietro",
       "next": "Avanti",
-      "discard": "Cancella"
+      "discard": "Cancella",
+      "cancel": "Annulla",
+      "duplicate": "Duplica",
+      "save": "Salva",
+      "name": "Nome",
+      "currency": "Valuta"
     },
     "navbar": {
-      "getStarted": "Inizia qui",
+      "myPortfolios": "I miei portafogli",
       "about": "Chi siamo",
       "docs": "Documentazione",
       "exportPortfolio": "Esporta Portafoglio"
@@ -51,6 +56,12 @@
       "quantity": "Quantità",
       "targetWeight": "Allocazione Target",
       "transactionFees": "Costi di transazione"
+    },
+    "portfoliosStep": {
+      "myPortfolios": "I miei portafogli",
+      "newPortfolio": "Nuovo portafoglio",
+      "deletePortfolio": "Rimuovi portafoglio",
+      "copy": "(copia)"
     },
     "portfolioStep": {
       "transactionFees": "Costi di transazione",
@@ -112,7 +123,7 @@
       "terms": "Termini",
       "privacy": "Privacy",
       "contacts": "Contatti",
-      "docs": "Documenti",
+      "docs": "Documentazione",
       "about": "Chi siamo"
     },
     "page": {

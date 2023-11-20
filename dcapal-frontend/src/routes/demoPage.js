@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { clearPortfolio } from "../components/allocationFlow/portfolioSlice";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
 
 import {
@@ -48,10 +47,9 @@ export default function DemoPage() {
       dispatch(setAllocationFlowStep({ step: Step.IMPORT }));
     } else {
       dispatch(setPfolioFile({ file: "" }));
-      dispatch(setAllocationFlowStep({ step: Step.CCY }));
+      dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
     }
 
-    dispatch(clearPortfolio({}));
     navigate("/allocate");
   }, [pfolioFile]);
 

@@ -65,7 +65,11 @@ const migrations = {
 
     return {
       ...state,
-      ...(!hasPfolio && { allocationFlowStep: Step.CCY }),
+      app: {
+        ...state.app,
+        ...(!hasPfolio && { allocationFlowStep: Step.PORTFOLIOS }),
+        preferredCurrency: pfolio.quoteCcy ?? "",
+      },
       pfolio: {
         selected: id,
         pfolios: {

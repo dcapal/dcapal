@@ -9,8 +9,8 @@ import { AssetCard } from "./assetCard";
 
 import {
   addAsset,
-  clearPortfolio,
   currentPortfolio,
+  selectPortfolio,
   setPrice,
   setQty,
   setRefreshTime,
@@ -125,9 +125,9 @@ export const PortfolioStep = ({ ...props }) => {
     setSearchText("");
   };
 
-  const onClickDiscard = () => {
-    dispatch(clearPortfolio({}));
-    dispatch(setAllocationFlowStep({ step: Step.CCY }));
+  const onClickGoBack = () => {
+    dispatch(selectPortfolio({ id: null }));
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
   };
 
   const onClickAddLiquidity = () => {
@@ -211,7 +211,7 @@ export const PortfolioStep = ({ ...props }) => {
       {Object.keys(assetStore).length === 0 && (
         <span
           className="mt-2 font-medium underline cursor-pointer"
-          onClick={onClickDiscard}
+          onClick={onClickGoBack}
         >
           {t("common.goBack")}
         </span>
@@ -287,14 +287,14 @@ export const PortfolioStep = ({ ...props }) => {
         <>
           <p className="mt-6 font-thin text-xs">
             {t("portfolioStep.lastFetch")}{" "}
-            {new Date(lastRefreshTime).toLocaleString("en-US")}
+            {new Date(lastRefreshTime).toLocaleString(i18n.language)}
           </p>
           <div className="w-full mt-6 flex justify-between items-center">
             <span
               className="font-medium underline cursor-pointer"
-              onClick={onClickDiscard}
+              onClick={onClickGoBack}
             >
-              {t("common.discard")}
+              {t("common.goBack")}
             </span>
             <button
               className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"

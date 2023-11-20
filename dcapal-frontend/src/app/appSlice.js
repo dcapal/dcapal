@@ -2,7 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 
 export const Step = Object.freeze({
   INIT: 0,
-  CCY: 10,
+  PORTFOLIOS: 10,
   IMPORT: 20,
   PORTFOLIO: 30,
   INVEST: 40,
@@ -12,8 +12,9 @@ export const Step = Object.freeze({
 export const appSlice = createSlice({
   name: "app",
   initialState: {
-    allocationFlowStep: Step.CCY,
+    allocationFlowStep: Step.PORTFOLIOS,
     currencies: [],
+    preferredCurrency: "",
     pfolioFile: "",
   },
   reducers: {
@@ -23,13 +24,20 @@ export const appSlice = createSlice({
     setCurrencies: (state, action) => {
       state.currencies = action.payload.currencies;
     },
+    setPreferredCurrency: (state, action) => {
+      state.preferredCurrency = action.payload.ccy;
+    },
     setPfolioFile: (state, action) => {
       state.pfolioFile = action.payload.file;
     },
   },
 });
 
-export const { setAllocationFlowStep, setCurrencies, setPfolioFile } =
-  appSlice.actions;
+export const {
+  setAllocationFlowStep,
+  setCurrencies,
+  setPreferredCurrency,
+  setPfolioFile,
+} = appSlice.actions;
 
 export default appSlice.reducer;

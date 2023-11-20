@@ -14,8 +14,6 @@ const loadCurrencies = async (dispatch) => {
   dispatch(setCurrencies({ currencies: ccys }));
 };
 
-const Main = () => <AllocationFlow />;
-
 export const App = () => {
   const dispatch = useDispatch();
 
@@ -42,7 +40,7 @@ export const App = () => {
           <div className="absolute app-bg -z-50" />
           <div className="flex-grow w-full flex flex-col items-center">
             <div className="w-full max-w-[42rem] grow flex px-6 pt-4 pb-6">
-              <Main />
+              <AllocationFlow />
             </div>
           </div>
         </>

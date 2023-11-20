@@ -14,6 +14,8 @@ import classNames from "classnames";
 import { TransactionFees } from "./transactionFees";
 import { useTranslation } from "react-i18next";
 
+import CLOSE_SVG from "@images/icons/close-menu.svg";
+
 export const AssetCard = ({
   symbol,
   name,
@@ -46,7 +48,7 @@ export const AssetCard = ({
         className="absolute flex justify-center items-center w-8 h-8 -right-4 -top-3.5 rounded-full bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 cursor-pointer"
         onClick={onClickDelete}
       >
-        <div className="text-white mb-1">x</div>
+        <img className="w-3/5" alt="Remove asset" src={CLOSE_SVG} />
       </div>
       <div className="mb-2 flex items-center justify-between">
         <div className="min-w-0 flex flex-col">

@@ -1,5 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { roundPrice } from "../../utils";
+import i18n from "i18next";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -138,10 +139,9 @@ const getPortfolio = (id, pfolios) => {
 };
 
 const initialState = () => {
-  const pfolio = getNewPortfolio();
   return {
-    selected: pfolio.id,
-    pfolios: { [pfolio.id]: pfolio },
+    selected: null,
+    pfolios: {},
   };
 };
 
@@ -151,17 +151,43 @@ export const portfolioSlice = createSlice({
   reducers: {
     addPortfolio: (state, action) => {
       const { pfolio } = action.payload;
-      if (pfolio.id in state.pfolios) return;
+
+      state.pfolios = { ...state.pfolios, [pfolio.id]: pfolio };
+    },
+    deletePortfolio: (state, action) => {
+      const { id } = action.payload;
+      if (!(id in state.pfolios)) return;
+
+      delete state.pfolios[id];
+    },
+    duplicatePortfolio: (state, action) => {
+      const { id } = action.payload;
+      if (!(id in state.pfolios)) return;
+
+      const pfolio = { ...state.pfolios[id] };
+      pfolio.id = crypto.randomUUID();
+      pfolio.name += " " + i18n.t("portfoliosStep.copy");
 
       state.pfolios = { ...state.pfolios, [pfolio.id]: pfolio };
     },
     selectPortfolio: (state, action) => {
       const { id } = action.payload;
+      if (!id) {
+        state.selected = null;
+        return;
+      }
+
       if (id === state.selected) return;
 
       if (id in state.pfolios) {
         state.selected = id;
       }
+    },
+    renamePortfolio: (state, action) => {
+      const { id, name } = action.payload;
+      if (!(id in state.pfolios)) return;
+
+      state.pfolios[id].name = name;
     },
     addAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -484,7 +510,10 @@ export const portfolioSlice = createSlice({
 
 export const {
   addPortfolio,
+  deletePortfolio,
+  duplicatePortfolio,
   selectPortfolio,
+  renamePortfolio,
   addAsset,
   removeAsset,
   setQty,
