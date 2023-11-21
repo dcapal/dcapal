@@ -15,6 +15,7 @@ import {
   DEMO_PF_60_40,
   DEMO_PF_ALL_SEASONS,
   DEMO_PF_MR_RIP,
+  DEMO_PF_HODLX,
 } from "../app/config";
 
 export const Router = () => {
@@ -56,7 +57,12 @@ export const Router = () => {
     },
   ];
 
-  const demoRoutes = [DEMO_PF_60_40, DEMO_PF_ALL_SEASONS, DEMO_PF_MR_RIP];
+  const demoRoutes = [
+    DEMO_PF_60_40,
+    DEMO_PF_ALL_SEASONS,
+    DEMO_PF_MR_RIP,
+    DEMO_PF_HODLX,
+  ];
   for (const route of demoRoutes) {
     routesConfig.push({
       path: `demo/${route}`,

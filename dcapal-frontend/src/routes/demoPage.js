@@ -8,16 +8,19 @@ import {
   DEMO_PF_60_40,
   DEMO_PF_ALL_SEASONS,
   DEMO_PF_MR_RIP,
+  DEMO_PF_HODLX,
 } from "../app/config";
 import PF_60_40 from "../../demo/dcapal-60-40.json";
 import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
 import PF_MR_RIP from "../../demo/dcapal-mrrip.json";
+import PF_HODLX from "../../demo/dcapal-hodlx.json";
 import { useTranslation } from "react-i18next";
 
 const demoPortfolios = {
   [DEMO_PF_60_40]: JSON.stringify(PF_60_40),
   [DEMO_PF_ALL_SEASONS]: JSON.stringify(PF_ALL_SEASONS),
   [DEMO_PF_MR_RIP]: JSON.stringify(PF_MR_RIP),
+  [DEMO_PF_HODLX]: JSON.stringify(PF_HODLX),
 };
 
 const getPfolioFile = (path) => {
