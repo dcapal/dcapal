@@ -126,7 +126,7 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
         ? sortedCcys.at(0)
         : ""
     );
-  }, [preferredCcy, sortedCcys]);
+  }, [preferredCcy, ccys]);
 
   const onClickNext = () => {
     const pfolio = getNewPortfolio();
