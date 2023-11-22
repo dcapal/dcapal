@@ -488,17 +488,6 @@ export const portfolioSlice = createSlice({
         };
       }
     },
-    clearPortfolio: (state) => {
-      const pfolio = currentPortfolio(state);
-      if (!pfolio) return;
-
-      pfolio.assets = {};
-      pfolio.nextIdx = 0;
-      pfolio.totalAmount = 0;
-      pfolio.budget = 0;
-      pfolio.fees = getDefaultFees(FeeType.ZERO_FEE);
-      pfolio.lastPriceRefresh = Date.now();
-    },
     clearBudget: (state) => {
       const pfolio = currentPortfolio(state);
       if (!pfolio) return;
@@ -532,7 +521,6 @@ export const {
   setFixedFeeAmountAsset,
   setVariableFee,
   setVariableFeeAsset,
-  clearPortfolio,
   clearBudget,
 } = portfolioSlice.actions;
 
