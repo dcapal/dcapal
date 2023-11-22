@@ -5,7 +5,7 @@ import {
   aclassToString,
   currentPortfolio,
   feeTypeToString,
-} from "./allocationFlow/portfolioStep/portfolioSlice";
+} from "./allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 const pad = (n) => `${n}`.padStart(2, "0");
@@ -22,8 +22,8 @@ const toExportedFees = (fees) => {
   };
 };
 
-const exportPfolio = (pfolio) => {
-  const assets = Object.values(pfolio.assets).map((a) => ({
+const exportPfolio = ({ name, assets, quoteCcy, fees }) => {
+  const serializedAssets = Object.values(assets).map((a) => ({
     symbol: a.symbol,
     name: a.name,
     aclass: aclassToString(a.aclass),
@@ -38,10 +38,10 @@ const exportPfolio = (pfolio) => {
   }));
 
   const data = {
-    name: pfolio.name,
-    quoteCcy: pfolio.quoteCcy,
-    fees: pfolio.fees,
-    assets: assets,
+    name: name,
+    quoteCcy: quoteCcy,
+    fees: fees,
+    assets: serializedAssets,
   };
   const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
     JSON.stringify(data, null, 2)
@@ -65,10 +65,10 @@ export const ExportBtn = () => {
 
   const step = useSelector((state) => state.app.allocationFlowStep);
 
-  const name = useSelector((state) => currentPortfolio(state.pfolio).name);
-  const assets = useSelector((state) => currentPortfolio(state.pfolio).assets);
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const fees = useSelector((state) => currentPortfolio(state).fees);
+  const name = useSelector((state) => currentPortfolio(state)?.name);
+  const assets = useSelector((state) => currentPortfolio(state)?.assets);
+  const quoteCcy = useSelector((state) => currentPortfolio(state)?.quoteCcy);
+  const fees = useSelector((state) => currentPortfolio(state)?.fees);
 
   const exportedFees = toExportedFees(fees);
 

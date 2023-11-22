@@ -8,10 +8,14 @@
       "refreshedPrices": "Refreshed prices!",
       "goBack": "Go back",
       "next": "Next",
-      "discard": "Discard"
+      "cancel": "Cancel",
+      "duplicate": "Duplicate",
+      "save": "Save",
+      "name": "Name",
+      "currency": "Currency"
     },
     "navbar": {
-      "getStarted": "Get Started",
+      "myPortfolios": "My portfolios",
       "about": "About",
       "docs": "Docs",
       "exportPortfolio": "Export Portfolio"
@@ -51,6 +55,12 @@
       "quantity": "Quantity",
       "targetWeight": "Target weight",
       "transactionFees": "Transaction fees"
+    },
+    "portfoliosStep": {
+      "myPortfolios": "My Portfolios",
+      "newPortfolio": "New portfolio",
+      "deletePortfolio": "Delete",
+      "copy": "(copy)"
     },
     "portfolioStep": {
       "transactionFees": "Transaction fees",

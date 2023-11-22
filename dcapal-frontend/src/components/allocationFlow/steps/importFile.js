@@ -2,16 +2,19 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice";
-import { getFetcher } from "../../app/providers";
-import { timeout } from "../../utils";
-import { Spinner } from "../spinner/spinner";
+import {
+  setAllocationFlowStep,
+  setPfolioFile,
+  Step,
+} from "../../../app/appSlice";
+import { getFetcher } from "../../../app/providers";
+import { timeout } from "../../../utils";
+import { Spinner } from "../../spinner/spinner";
 import {
   ACLASS,
   FeeType,
   addAsset,
   addPortfolio,
-  clearPortfolio,
   getDefaultFees,
   getNewPortfolio,
   parseAClass,
@@ -20,7 +23,7 @@ import {
   setFeesAsset,
   setQty,
   setTargetWeight,
-} from "./portfolioStep/portfolioSlice";
+} from "../portfolioSlice";
 
 import { useTranslation } from "react-i18next";
 
@@ -44,7 +47,7 @@ const parseFees = (fees) => {
   return parsed;
 };
 
-const importPfolio = async (pfolio, validCcys, dispatch, t) => {
+const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -55,6 +58,7 @@ const importPfolio = async (pfolio, validCcys, dispatch, t) => {
   }
 
   const imported = getNewPortfolio();
+  imported.id = id;
   imported.name = pfolio.name || t("importStep.defaultPortfolioName");
   imported.quoteCcy = pfolio.quoteCcy;
 
@@ -119,6 +123,7 @@ const importPfolio = async (pfolio, validCcys, dispatch, t) => {
 export const ImportStep = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [pfolioId] = useState(crypto.randomUUID());
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -139,7 +144,10 @@ export const ImportStep = () => {
 
     const runImport = async () => {
       const [success] = await Promise.all([
-        importPfolio(pfolio, validCcys, dispatch, t),
+        // Pass `pfolioId` to `importPfolio` to overcome component re-render
+        // issues that ended up adding the imported portfolio multiple times
+        // with different UUIDs
+        importPfolio(pfolioId, pfolio, validCcys, dispatch, t),
         timeout(1000),
       ]);
 
@@ -156,8 +164,7 @@ export const ImportStep = () => {
   }, [pfolioFile]);
 
   const onClickGoBack = () => {
-    dispatch(clearPortfolio({}));
-    dispatch(setAllocationFlowStep({ step: Step.CCY }));
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
     navigate("/");
   };
 

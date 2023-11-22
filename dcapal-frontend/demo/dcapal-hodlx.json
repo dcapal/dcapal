@@ -1,0 +1,126 @@
+{
+  "name": "21Shares Crypto Basket 10 (HODLX)",
+  "quoteCcy": "eur",
+  "assets": [
+    {
+      "symbol": "btc",
+      "name": "Bitcoin",
+      "aclass": "CRYPTO",
+      "baseCcy": "btc",
+      "provider": "DCAPal",
+      "price": 33670.1,
+      "qty": 0.1,
+      "amount": 3367.01,
+      "weight": 57.23771375808655,
+      "targetWeight": 65.72
+    },
+    {
+      "symbol": "eth",
+      "name": "Ethereum",
+      "aclass": "CRYPTO",
+      "baseCcy": "eth",
+      "provider": "DCAPal",
+      "price": 1800.95,
+      "qty": 1,
+      "amount": 1800.95,
+      "weight": 30.61537108372888,
+      "targetWeight": 22.36
+    },
+    {
+      "symbol": "ada",
+      "name": "Cardano",
+      "aclass": "CRYPTO",
+      "baseCcy": "ada",
+      "provider": "DCAPal",
+      "price": 0.3335,
+      "qty": 250,
+      "amount": 83.375,
+      "weight": 1.4173389400626866,
+      "targetWeight": 3.51
+    },
+    {
+      "symbol": "xrp",
+      "name": "XRP",
+      "aclass": "CRYPTO",
+      "baseCcy": "xrp",
+      "provider": "DCAPal",
+      "price": 0.5362,
+      "qty": 400,
+      "amount": 214.48000000000002,
+      "weight": 3.6460672367573617,
+      "targetWeight": 3.16
+    },
+    {
+      "symbol": "matic",
+      "name": "Polygon",
+      "aclass": "CRYPTO",
+      "baseCcy": "matic",
+      "provider": "DCAPal",
+      "price": 0.6787,
+      "qty": 100,
+      "amount": 67.86999999999999,
+      "weight": 1.1537606460216434,
+      "targetWeight": 1.18
+    },
+    {
+      "symbol": "sol",
+      "name": "Solana",
+      "aclass": "CRYPTO",
+      "baseCcy": "sol",
+      "provider": "DCAPal",
+      "price": 48.1,
+      "qty": 5,
+      "amount": 240.5,
+      "weight": 4.0883959830293986,
+      "targetWeight": 1.49
+    },
+    {
+      "symbol": "atom",
+      "name": "Cosmos",
+      "aclass": "CRYPTO",
+      "baseCcy": "atom",
+      "provider": "DCAPal",
+      "price": 7.7162,
+      "qty": 3,
+      "amount": 23.1486,
+      "weight": 0.39351618816114065,
+      "targetWeight": 0.71
+    },
+    {
+      "symbol": "dot",
+      "name": "Polkadot",
+      "aclass": "CRYPTO",
+      "baseCcy": "dot",
+      "provider": "DCAPal",
+      "price": 4.5484,
+      "qty": 10,
+      "amount": 45.484,
+      "weight": 0.773208328033718,
+      "targetWeight": 0.58
+    },
+    {
+      "symbol": "ltc",
+      "name": "Litecoin",
+      "aclass": "CRYPTO",
+      "baseCcy": "ltc",
+      "provider": "DCAPal",
+      "price": 61.45,
+      "qty": 0.5,
+      "amount": 30.725,
+      "weight": 0.5223117113454399,
+      "targetWeight": 0.51
+    },
+    {
+      "symbol": "trx",
+      "name": "TRON",
+      "aclass": "CRYPTO",
+      "baseCcy": "trx",
+      "provider": "DCAPal",
+      "price": 0.0896,
+      "qty": 100,
+      "amount": 8.959999999999999,
+      "weight": 0.15231612477315346,
+      "targetWeight": 0.78
+    }
+  ]
+}

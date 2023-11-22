@@ -11,6 +11,8 @@ import LanguageSwitcher from "../languageSwitcher";
 
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
+import { useDispatch } from "react-redux";
+import { Step, setAllocationFlowStep } from "../../app/appSlice";
 
 const CloseBtn = ({ onClick }) => {
   return (
@@ -21,7 +23,13 @@ const CloseBtn = ({ onClick }) => {
 };
 
 const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
+  const dispatch = useDispatch();
   const { t } = useTranslation();
+
+  const onClickMyPortfolios = () => {
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    toggleMenu();
+  };
 
   const className = classNames(
     "absolute z-50 w-full h-screen inset-0 flex flex-col bg-[#333333]",
@@ -44,9 +52,9 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
         <CloseBtn onClick={toggleMenu} />
       </div>
       <div className="flex flex-1 flex-col px-8 py-3 gap-y-6">
-        <Link to={"/allocate"} onClick={toggleMenu}>
+        <Link to={"/allocate"} onClick={onClickMyPortfolios}>
           <div className="w-full text-2xl font-light text-white">
-            {t("navbar.getStarted")}
+            {t("navbar.myPortfolios")}
           </div>
         </Link>
         <Link to={"/about"} onClick={toggleMenu}>
@@ -85,6 +93,7 @@ export const NavBar = () => {
   const [menuVisible, setMenuVisible] = useState(false);
 
   const { t } = useTranslation();
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = !useMediaQuery(MEDIA_SMALL);
@@ -98,6 +107,10 @@ export const NavBar = () => {
     navigate("/");
   };
 
+  const onClickMyPortfolios = () => {
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+  };
+
   const isAllocate = location.pathname === "/allocate";
 
   return (
@@ -109,7 +122,9 @@ export const NavBar = () => {
         {!isMobile && (
           <div className="flex gap-x-5">
             <div className="text-lg font-light text-white">
-              <Link to={"/allocate"}>{t("navbar.getStarted")}</Link>
+              <Link to={"/allocate"} onClick={onClickMyPortfolios}>
+                {t("navbar.myPortfolios")}
+              </Link>
             </div>
             <div className="text-lg font-light text-white">
               <Link to={"/about"}>{t("navbar.about")}</Link>

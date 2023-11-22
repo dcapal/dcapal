@@ -2,7 +2,6 @@ import React, { useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice";
-import { clearPortfolio } from "../allocationFlow/portfolioStep/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 export const LaunchBtn = () => {
@@ -22,7 +21,6 @@ export const LaunchBtn = () => {
     if (e.target.files && e.target.files.length > 0) {
       const reader = new FileReader();
       reader.onload = function (event) {
-        dispatch(clearPortfolio({}));
         dispatch(setPfolioFile({ file: event.target.result }));
         dispatch(setAllocationFlowStep({ step: Step.IMPORT }));
         navigate("/allocate");
@@ -33,6 +31,7 @@ export const LaunchBtn = () => {
 
   const onClickStart = () => {
     dispatch(setPfolioFile({ file: "" }));
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
     navigate("/allocate");
   };
 

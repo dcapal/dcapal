@@ -24,6 +24,7 @@ You can start using [DcaPal](https://dcapal.com) right away. It's free. No regis
 
 - [60/40 Portfolio](https://dcapal.com/demo/60-40)
 - [All-seasons Portfolio](https://dcapal.com/demo/all-seasons)
+- [21Shares Crypto Basket 10 (HODLX)](https://dcapal.com/demo/hodlx)
 
 ## Build Instructions
 

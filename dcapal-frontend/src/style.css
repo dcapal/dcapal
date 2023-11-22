@@ -18,4 +18,43 @@
     -webkit-appearance: none;
     margin: 0;
   }
+
+  /* Customize scrollbar on Desktop only */
+  @media (pointer: fine) {
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      box-shadow: inset 0 0 10px 10px #e5e5e5;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      box-shadow: inset 0 0 10px 10px #a3a3a3;
+      border-radius: 40px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      box-shadow: inset 0 0 10px 10px #737373;
+    }
+
+    div > *::-webkit-scrollbar {
+      width: 12px;
+    }
+
+    div > *::-webkit-scrollbar-track {
+      box-shadow: inset 0 0 10px 10px #e5e5e5;
+      border: solid 4px transparent;
+    }
+
+    div > *::-webkit-scrollbar-thumb {
+      box-shadow: inset 0 0 10px 10px #a3a3a3;
+      border: solid 4px transparent;
+      border-radius: 40px;
+    }
+
+    div > *::-webkit-scrollbar-thumb:hover {
+      box-shadow: inset 0 0 10px 10px #737373;
+    }
+}
 }
