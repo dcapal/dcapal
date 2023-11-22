@@ -1,6 +1,8 @@
 pub mod dto;
 pub mod market_data;
 
+use std::collections::HashMap;
+
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
 
@@ -86,5 +88,11 @@ impl StatsRepository {
         let n_records: u32 = redis.hset_nx(Self::VISITOR_IP, ip, geo).await?;
 
         Ok(n_records > 0)
+    }
+
+    pub async fn fetch_all_visitors(&self) -> Result<HashMap<String, i32>> {
+        let mut redis = self.redis.get().await?;
+
+        Ok(redis.hgetall(Self::VISITORS).await?)
     }
 }
