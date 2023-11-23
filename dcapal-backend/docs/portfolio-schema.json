@@ -1,0 +1,181 @@
+{
+    "$id": "https://github.com/leonardoarcari/dcapal/blob/master/dcapal-backend/docs/portfolio-schema.json",
+    "$schema": "https://json-schema.org/draft-07/schema",
+    "description": "DcaPal Portfolio",
+    "type": "object",
+    "required": [
+        "quoteCcy",
+        "assets"
+    ],
+    "properties": {
+        "name": {
+            "description": "Portfolio name",
+            "type": "string",
+            "minLength": 1
+        },
+        "quoteCcy": {
+            "description": "Portfolio currency",
+            "$ref": "#/$defs/fiatCurrency"
+        },
+        "fees": {
+            "$ref": "#/$defs/transactionFees"
+        },
+        "assets": {
+            "description": "Portfolio assets",
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/asset"
+            },
+            "uniqueItems": true
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "fiatCurrency": {
+            "type": "string",
+            "enum": [
+                "usd",
+                "eur",
+                "gbp",
+                "chf",
+                "jpy",
+                "cad",
+                "aed",
+                "aud"
+            ]
+        },
+        "percentage": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 100.0
+        },
+        "transactionFees": {
+            "description": "Transaction fees",
+            "type": "object",
+            "required": [
+                "feeStructure"
+            ],
+            "properties": {
+                "maxFeeImpact": {
+                    "description": "Max acceptable fees impact on the allocation",
+                    "$ref": "#/$defs/percentage"
+                },
+                "feeStructure": {
+                    "description": "Fee structure",
+                    "type": "object",
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "type": {
+                                    "const": "zeroFee"
+                                }
+                            },
+                            "required": [
+                                "type"
+                            ]
+                        },
+                        {
+                            "properties": {
+                                "type": {
+                                    "const": "fixed"
+                                },
+                                "feeAmount": {
+                                    "description": "Transaction fee amount",
+                                    "type": "number",
+                                    "minimum": 0.0
+                                }
+                            },
+                            "required": [
+                                "type",
+                                "feeAmount"
+                            ]
+                        },
+                        {
+                            "properties": {
+                                "type": {
+                                    "const": "variable"
+                                },
+                                "feeRate": {
+                                    "description": "Transaction fee rate (in percentage)",
+                                    "$ref": "#/$defs/percentage"
+                                },
+                                "minFee": {
+                                    "description": "Transaction fee minimum amount",
+                                    "type": "number",
+                                    "minimum": 0.0
+                                },
+                                "maxFee": {
+                                    "description": "Transaction fee maximum amount",
+                                    "type": "number",
+                                    "minimum": 0.0
+                                }
+                            },
+                            "required": [
+                                "type",
+                                "feeRate",
+                                "minFee"
+                            ]
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": false
+        },
+        "asset": {
+            "description": "Portfolio asset",
+            "type": "object",
+            "required": [],
+            "properties": {
+                "symbol": {
+                    "description": "Asset ticker",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "name": {
+                    "description": "Asset name",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "aclass": {
+                    "description": "Asset class",
+                    "enum": [
+                        "EQUITY",
+                        "CRYPTO",
+                        "CURRENCY"
+                    ]
+                },
+                "baseCcy": {
+                    "description": "Asset base currency",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "price": {
+                    "description": "Asset price",
+                    "type": "number",
+                    "minimum": 0.0
+                },
+                "qty": {
+                    "description": "Number of units of the asset in portfolio",
+                    "type": "number",
+                    "minimum": 0.0
+                },
+                "targetWeight": {
+                    "description": "Asset target weight",
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 100.0
+                },
+                "provider": {
+                    "description": "Price provider (choose DCAPal for Crypto, YF for anything else)",
+                    "enum": [
+                        "DCAPal",
+                        "YF"
+                    ]
+                },
+                "fees": {
+                    "$ref": "#/$defs/transactionFees"
+                }
+            }
+        }
+    }
+}
