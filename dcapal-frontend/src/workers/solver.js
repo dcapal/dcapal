@@ -56,7 +56,7 @@ expose({
     const handle = Solver.build_problem(input);
     const solution = Solver.solve(handle);
     if (!Solver.delete_problem(handle)) {
-      console.error(`Failed to delete solved problem (handle=${handle}`);
+      console.error(`Failed to delete solved problem (handle=${handle})`);
     }
 
     return solution;
