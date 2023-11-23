@@ -124,7 +124,16 @@
         "asset": {
             "description": "Portfolio asset",
             "type": "object",
-            "required": [],
+            "required": [
+                "symbol",
+                "name",
+                "aclass",
+                "baseCcy",
+                "price",
+                "qty",
+                "targetWeight",
+                "provider"
+            ],
             "properties": {
                 "symbol": {
                     "description": "Asset ticker",

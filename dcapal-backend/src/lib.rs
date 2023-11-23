@@ -14,7 +14,10 @@ use crate::{
 
 use adapter::{CryptoWatchProvider, IpApi, KrakenProvider, YahooProvider};
 use axum::{
-    extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get, Router,
+    extract::connect_info::IntoMakeServiceWithConnectInfo,
+    middleware,
+    routing::{get, post},
+    Router,
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
@@ -22,7 +25,9 @@ use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
 use hyper::Body;
 use metrics::{describe_counter, Unit};
-use repository::{market_data::MarketDataRepository, MiscRepository, StatsRepository};
+use repository::{
+    market_data::MarketDataRepository, ImportedRepository, MiscRepository, StatsRepository,
+};
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
@@ -66,6 +71,7 @@ struct Repository {
     pub misc: Arc<MiscRepository>,
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
+    pub imported: Arc<ImportedRepository>,
 }
 
 #[derive(Clone)]
@@ -100,6 +106,7 @@ impl DcaServer {
             misc: Arc::new(MiscRepository::new(redis.clone())),
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
+            imported: Arc::new(ImportedRepository::new(redis.clone())),
         });
 
         let providers = Arc::new(Provider {
@@ -147,6 +154,7 @@ impl DcaServer {
             .route("/assets/fiat", get(api::get_assets_fiat))
             .route("/assets/crypto", get(api::get_assets_crypto))
             .route("/price/:asset", get(api::get_price))
+            .route("/import/portfolio", post(api::import_portfolio))
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())

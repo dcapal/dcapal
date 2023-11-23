@@ -3,6 +3,7 @@ pub mod market_data;
 
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
+use uuid::Uuid;
 
 use crate::{domain::ip2location::GeoData, error::Result, DateTime};
 
@@ -86,5 +87,42 @@ impl StatsRepository {
         let n_records: u32 = redis.hset_nx(Self::VISITOR_IP, ip, geo).await?;
 
         Ok(n_records > 0)
+    }
+}
+
+#[derive(Clone)]
+pub struct ImportedRepository {
+    redis: deadpool_redis::Pool,
+}
+
+pub struct ImportedPortfolio {
+    pub id: Uuid,
+    pub expires_at: DateTime,
+}
+
+impl ImportedRepository {
+    const IMPORTED: &'static str = concatcp!(REDIS_BASE, ':', "imported");
+
+    pub fn new(redis: deadpool_redis::Pool) -> Self {
+        Self { redis }
+    }
+
+    pub async fn store_portfolio(&self, pfolio: &serde_json::Value) -> Result<ImportedPortfolio> {
+        let mut redis = self.redis.get().await?;
+
+        let id = Uuid::new_v4();
+        let key = format!("{}:{}", Self::IMPORTED, id.simple());
+        let value = serde_json::to_string(&pfolio).unwrap();
+
+        redis.set_ex(&key, value, 15).await?;
+
+        let expires_at: i64 = redis::cmd("EXPIRETIME")
+            .arg(&key)
+            .query_async(&mut redis)
+            .await?;
+
+        let expires_at = DateTime::from_timestamp(expires_at, 0).unwrap_or_else(Utc::now);
+
+        Ok(ImportedPortfolio { id, expires_at })
     }
 }
