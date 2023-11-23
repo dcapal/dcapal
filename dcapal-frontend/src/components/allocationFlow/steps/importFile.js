@@ -32,19 +32,41 @@ import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 const parseFees = (fees) => {
   if (!fees) return null;
 
-  const parsed = {
-    ...fees,
-    feeStructure: {
-      ...fees.feeStructure,
-      type: parseFeeType(fees.feeStructure.type),
-    },
-  };
+  const feeType = parseFeeType(fees.feeStructure.type);
+  if (!feeType) return null;
 
-  if (!parsed.feeStructure.type) {
-    return null;
+  const parsed = getDefaultFees(feeType);
+
+  if (feeType === FeeType.ZERO_FEE) return parsed;
+
+  if (feeType === FeeType.FIXED) {
+    if (fees.maxFeeImpact) {
+      parsed.maxFeeImpact = fees.maxFeeImpact;
+    }
+    if (fees.feeStructure.feeAmount) {
+      parsed.feeStructure.feeAmount = fees.feeStructure.feeAmount;
+    }
+
+    return parsed;
   }
 
-  return parsed;
+  if (feeType === FeeType.VARIABLE) {
+    if (fees.maxFeeImpact) {
+      parsed.maxFeeImpact = fees.maxFeeImpact;
+    }
+    if (fees.feeStructure.feeRate) {
+      parsed.feeStructure.feeRate = fees.feeStructure.feeRate;
+    }
+    if (fees.feeStructure.minFee) {
+      parsed.feeStructure.minFee = fees.feeStructure.minFee;
+    }
+    if (fees.feeStructure.maxFee) {
+      parsed.feeStructure.maxFee = fees.feeStructure.maxFee;
+    }
+    return parsed;
+  }
+
+  return null;
 };
 
 const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
