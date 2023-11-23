@@ -175,6 +175,20 @@ impl Solver {
 
         Ok(serde_wasm_bindgen::to_value(&solution).unwrap())
     }
+
+    pub fn delete_problem(handle: &ProblemHandle) -> Result<bool, JsValue> {
+        utils::require_init();
+
+        Ok(match handle.kind {
+            ProblemKind::Advanced => delete_problem(&ADVANCED_PROBLEMS, &handle.id),
+            ProblemKind::Basic => delete_problem(&BASIC_PROBLEMS, &handle.id),
+            ProblemKind::Analyze => delete_problem(&SUGGESTION_PROBLEMS, &handle.id),
+        })
+    }
+}
+
+fn delete_problem<P>(problems: &Mutex<HashMap<String, P>>, id: &str) -> bool {
+    problems.lock().unwrap().remove(id).is_some()
 }
 
 #[wasm_bindgen]
