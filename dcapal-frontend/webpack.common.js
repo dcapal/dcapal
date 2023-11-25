@@ -39,7 +39,11 @@ module.exports = (_env, argv) => {
     },
     resolve: {
       alias: {
-        "@images": path.resolve(__dirname, "images/"),
+        "@images": path.resolve(__dirname, "images"),
+        "@app": path.resolve(__dirname, "src/app/"),
+        "@components": path.resolve(__dirname, "src/components"),
+        "@utils": path.resolve(__dirname, "src/utils"),
+        "@workers": path.resolve(__dirname, "src/workers"),
       },
     },
     plugins: [
