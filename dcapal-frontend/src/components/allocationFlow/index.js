@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Step, setAllocationFlowStep } from "../../app/appSlice";
+import { Step, setAllocationFlowStep } from "@app/appSlice";
 import { EndStep } from "./steps/end";
 import { ImportStep } from "./steps/importFile";
 import { InvestStep } from "./steps/invest";

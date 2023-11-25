@@ -11,9 +11,9 @@ import {
   setMaxFeeImpactAsset,
   setVariableFee,
   setVariableFeeAsset,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
-import { InputNumber, InputNumberType } from "../../../core/inputNumber";
+import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import { Trans, useTranslation } from "react-i18next";
 
 export const TransactionFees = ({ asset }) => {

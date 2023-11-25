@@ -2,14 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import {
-  setAllocationFlowStep,
-  setPfolioFile,
-  Step,
-} from "../../../app/appSlice";
-import { getFetcher } from "../../../app/providers";
-import { timeout } from "../../../utils";
-import { Spinner } from "../../spinner/spinner";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { getFetcher } from "@app/providers";
+import { timeout } from "@utils/index.js";
+import { Spinner } from "@components/spinner/spinner";
 import {
   ACLASS,
   FeeType,
@@ -23,7 +19,7 @@ import {
   setFeesAsset,
   setQty,
   setTargetWeight,
-} from "../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 
 import { useTranslation } from "react-i18next";
 

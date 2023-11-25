@@ -1,12 +1,13 @@
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useRoutes } from "react-router-dom";
-import { App } from "../app";
-import { setAllocationFlowStep, Step } from "../app/appSlice";
+import { App } from "@app";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 import AboutPage from "./aboutPage";
 import DemoPage from "./demoPage";
 import ErrorPage from "./errorPage";
+import ImportPage from "./importPage";
 import NotFoundPage from "./notFoundPage";
 import { Root } from "./root";
 import UnderConstructionPage from "./underConstruction";
@@ -16,8 +17,7 @@ import {
   DEMO_PF_ALL_SEASONS,
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
-} from "../app/config";
-import ImportPage from "./importPage";
+} from "@app/config";
 
 export const Router = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);

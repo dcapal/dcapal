@@ -3,18 +3,18 @@ import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 import { PortfolioCard } from "./portfolioCard";
 import { useNavigate } from "react-router-dom";
-import { InputText } from "../../../core/inputText";
-import { CcyGroup } from "../ccy/ccyGroup";
+import { InputText } from "@components/core/inputText";
+import { CcyGroup } from "@components/allocationFlow/steps/ccy/ccyGroup";
 import {
   Step,
   setAllocationFlowStep,
   setPreferredCurrency,
-} from "../../../../app/appSlice";
+} from "@app/appSlice";
 import {
   addPortfolio,
   getNewPortfolio,
   selectPortfolio,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
 
 export const PortfoliosStep = () => {
