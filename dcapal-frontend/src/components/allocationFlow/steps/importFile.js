@@ -8,7 +8,7 @@ import {
   Step,
 } from "../../../app/appSlice";
 import { getFetcher } from "../../../app/providers";
-import { timeout } from "../../../utils";
+import { timeout } from "@utils/index.js";
 import { Spinner } from "../../spinner/spinner";
 import {
   ACLASS,

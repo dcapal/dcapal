@@ -7,7 +7,7 @@ import { currentPortfolio, isWholeShares, setBudget } from "../portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
-import { replacer } from "../../../utils";
+import { replacer } from "@utils/index.js";
 
 const amtDecimals = 2;
 

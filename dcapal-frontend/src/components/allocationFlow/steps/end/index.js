@@ -5,9 +5,8 @@ import { setAllocationFlowStep, Step } from "../../../../app/appSlice";
 import {
   replacer,
   roundAmount,
-  roundDecimals,
   timeout,
-} from "../../../../utils";
+} from "@utils/index.js";
 import { Spinner } from "../../../spinner/spinner";
 import {
   ACLASS,
