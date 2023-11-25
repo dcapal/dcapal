@@ -13,6 +13,8 @@ pub struct Scenario {
     #[serde(with = "rust_decimal::serde::float")]
     pub budget: Decimal,
     pub is_buy_only: bool,
+    #[serde(default)]
+    pub use_all_budget: bool,
     pub portfolio: Portfolio,
     pub expect: Expect,
 }
@@ -24,8 +26,6 @@ impl Scenario {
             Algorithm::Basic => todo!(),
             Algorithm::Advanced => {
                 let budget = self.budget.to_f64().unwrap();
-                let pfolio_ccy = self.portfolio.quote_ccy;
-                let is_buy_only = self.is_buy_only;
                 let assets = self
                     .portfolio
                     .assets
@@ -35,10 +35,11 @@ impl Scenario {
 
                 JsProblemOptions::Advanced(JsAdvancedOptions {
                     budget,
-                    pfolio_ccy,
+                    pfolio_ccy: self.portfolio.quote_ccy,
                     assets,
-                    is_buy_only,
                     fees: self.portfolio.fees,
+                    is_buy_only: self.is_buy_only,
+                    use_all_budget: self.use_all_budget,
                 })
             }
         };

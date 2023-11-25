@@ -16,8 +16,6 @@ import { useTranslation } from "react-i18next";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
-const USE_ADVANCED_ALGORITHM = true;
-
 const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
   const cards = Object.values(assets).map((a) => ({
     symbol: a.symbol,
@@ -172,9 +170,9 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
           inputBudget,
           as,
           quoteCcy,
+          inputFees,
           useTaxEfficient,
-          USE_ADVANCED_ALGORITHM,
-          inputFees
+          false
         );
 
         await Thread.terminate(solver);

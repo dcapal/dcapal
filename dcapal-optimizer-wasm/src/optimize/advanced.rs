@@ -14,8 +14,9 @@ pub struct ProblemOptions {
     pub current_pfolio_amount: Decimal,
     pub assets: HashMap<String, ProblemAsset>,
     pub budget: Decimal,
-    pub is_buy_only: bool,
     pub fees: TransactionFees,
+    pub is_buy_only: bool,
+    pub use_all_budget: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -498,7 +499,7 @@ mod tests {
     #[test_log::test]
     fn it_solves_60_40_portfolio_buy_only() {
         // Given
-        let (problem, assets) = build_60_40_portfolio_no_allocation(true);
+        let (problem, assets) = build_60_40_portfolio_no_allocation(true, false);
         let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
@@ -524,7 +525,7 @@ mod tests {
     #[test_log::test]
     fn it_solves_60_40_portfolio_buy_and_sell() {
         // Given
-        let (problem, assets) = build_60_40_portfolio_no_allocation(false);
+        let (problem, assets) = build_60_40_portfolio_no_allocation(false, false);
         let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
@@ -550,7 +551,7 @@ mod tests {
     #[test_log::test]
     fn it_solves_60_40_unbalanced_portfolio_buy_only() {
         // Given
-        let (problem, assets) = build_60_40_portfolio_unbalanced(true, false);
+        let (problem, assets) = build_60_40_portfolio_unbalanced(true, false, false);
         let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
@@ -576,7 +577,7 @@ mod tests {
     #[test_log::test]
     fn it_solves_60_40_unbalanced_portfolio_buy_and_sell_price_too_high_to_sell() {
         // Given
-        let (problem, assets) = build_60_40_portfolio_unbalanced(false, false);
+        let (problem, assets) = build_60_40_portfolio_unbalanced(false, false, false);
         let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
@@ -602,7 +603,7 @@ mod tests {
     #[test_log::test]
     fn it_solves_60_40_unbalanced_portfolio_buy_and_sell() {
         // Given
-        let (problem, assets) = build_60_40_portfolio_unbalanced(false, true);
+        let (problem, assets) = build_60_40_portfolio_unbalanced(false, true, false);
         let [vwce, aggh] = <[String; 2]>::try_from(assets).ok().unwrap();
 
         // When
@@ -625,7 +626,10 @@ mod tests {
         assert_eq!(solution.budget_left, dec!(0.58));
     }
 
-    fn build_60_40_portfolio_no_allocation(is_buy_only: bool) -> (Problem, Vec<String>) {
+    fn build_60_40_portfolio_no_allocation(
+        is_buy_only: bool,
+        use_all_budget: bool,
+    ) -> (Problem, Vec<String>) {
         let budget = dec!(100.);
         let vwce = "VWCE".to_string();
         let aggh = "AGGH".to_string();
@@ -664,8 +668,9 @@ mod tests {
             current_pfolio_amount,
             assets,
             budget,
-            is_buy_only,
             fees: TransactionFees::default(),
+            is_buy_only,
+            use_all_budget,
         };
 
         (Problem::new(options), vec![vwce, aggh])
@@ -674,6 +679,7 @@ mod tests {
     fn build_60_40_portfolio_unbalanced(
         is_buy_only: bool,
         is_low_price: bool,
+        use_all_budget: bool,
     ) -> (Problem, Vec<String>) {
         let budget = dec!(10.4);
         let vwce = "VWCE".to_string();
@@ -720,8 +726,9 @@ mod tests {
             current_pfolio_amount,
             assets,
             budget,
-            is_buy_only,
             fees: TransactionFees::default(),
+            is_buy_only,
+            use_all_budget,
         };
 
         (Problem::new(options), vec![vwce, aggh])
