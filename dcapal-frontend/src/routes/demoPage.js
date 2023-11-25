@@ -2,14 +2,14 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
 
 import {
   DEMO_PF_60_40,
   DEMO_PF_ALL_SEASONS,
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
-} from "../app/config";
+} from "@app/config";
 import PF_60_40 from "../../demo/dcapal-60-40.json";
 import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
 import PF_MR_RIP from "../../demo/dcapal-mrrip.json";

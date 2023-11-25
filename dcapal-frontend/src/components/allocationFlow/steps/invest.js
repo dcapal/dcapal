@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
-import { setAllocationFlowStep, Step } from "../../../app/appSlice";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { InputNumber, InputNumberType } from "../../core/inputNumber";
 import { currentPortfolio, isWholeShares, setBudget } from "../portfolioSlice";
 import classNames from "classnames";

@@ -8,7 +8,7 @@ import {
   isWholeShares,
   removeAsset,
 } from "../../portfolioSlice";
-import { MEDIA_SMALL } from "../../../../app/config";
+import { MEDIA_SMALL } from "@app/config";
 import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
 import { TransactionFees } from "./transactionFees";

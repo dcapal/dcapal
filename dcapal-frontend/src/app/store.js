@@ -4,7 +4,7 @@ import portfolioReducer, {
   FeeType,
   getDefaultFees,
 } from "../components/allocationFlow/portfolioSlice";
-import appReducer, { Step } from "./appSlice";
+import appReducer, { Step } from "@app/appSlice";
 import storage from "redux-persist/lib/storage";
 import {
   persistReducer,

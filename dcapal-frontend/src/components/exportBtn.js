@@ -1,6 +1,6 @@
 import React from "react";
 import { useSelector } from "react-redux";
-import { Step } from "../app/appSlice";
+import { Step } from "@app/appSlice";
 import {
   aclassToString,
   currentPortfolio,

@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { Toaster } from "react-hot-toast";
 
 import { AllocationFlow } from "../components/allocationFlow";
-import { setCurrencies } from "./appSlice";
+import { setCurrencies } from "@app/appSlice";
 import { fetchAssetsDcaPal } from "./providers";
 import { ContainerPage } from "../routes/containerPage";
 

@@ -17,18 +17,15 @@ import {
   setTargetWeight,
 } from "../../portfolioSlice";
 
-import { setAllocationFlowStep, Step } from "../../../../app/appSlice";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
 
-import {
-  MEDIA_SMALL,
-  REFRESH_PRICE_INTERVAL_SEC,
-} from "../../../../app/config";
+import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 
 import SETTINGS from "@images/icons/settings.svg";
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees";
-import { getFetcher } from "../../../../app/providers";
+import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {

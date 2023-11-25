@@ -1,7 +1,7 @@
 import React from "react";
 import { Helmet } from "react-helmet";
 import { useLocation } from "react-router-dom";
-import { DCAPAL_CANONICAL } from "../app/config";
+import { DCAPAL_CANONICAL } from "@app/config";
 
 export const DcaPalHelmet = ({ title }) => {
   const location = useLocation();

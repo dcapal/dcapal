@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { spawn, Thread, Worker } from "threads";
-import { setAllocationFlowStep, Step } from "../../../../app/appSlice";
-import {
-  replacer,
-  roundAmount,
-  timeout,
-} from "@utils/index.js";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "../../../spinner/spinner";
 import {
   ACLASS,

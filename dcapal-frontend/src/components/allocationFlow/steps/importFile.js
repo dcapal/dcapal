@@ -2,12 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import {
-  setAllocationFlowStep,
-  setPfolioFile,
-  Step,
-} from "../../../app/appSlice";
-import { getFetcher } from "../../../app/providers";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { getFetcher } from "@app/providers";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "../../spinner/spinner";
 import {
