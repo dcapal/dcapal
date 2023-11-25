@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -11,10 +11,10 @@ import { api } from "../app/api";
 import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 import { Spinner } from "../components/spinner/spinner";
 
-const fetchImportedPortfolio = async (id, token) => {
+const fetchImportedPortfolio = async (id) => {
   const url = `${DCAPAL_API}/import/portfolio/${id}`;
   try {
-    const response = await api.get(url, { cancelToken: token });
+    const response = await api.get(url);
 
     if (response.status != 200) {
       console.error(
@@ -25,9 +25,7 @@ const fetchImportedPortfolio = async (id, token) => {
 
     return response.data;
   } catch (error) {
-    if (!axios.isCancel(error)) {
-      console.error(error);
-    }
+    console.error(error);
     return null;
   }
 };
@@ -44,8 +42,6 @@ export default function ImportPage() {
   const location = useLocation();
   const { t } = useTranslation();
 
-  const cancelToken = useRef(null);
-
   const searchParams = new URLSearchParams(location.search);
   const portfolioId = searchParams.get("p");
 
@@ -53,10 +49,7 @@ export default function ImportPage() {
     if (!portfolioId) return navigateToPortfolios(dispatch, navigate);
 
     const fetchPortfolio = async () => {
-      cancelToken.current = axios.CancelToken.source();
-      const token = cancelToken.current.token;
-
-      const p = await fetchImportedPortfolio(portfolioId, token);
+      const p = await fetchImportedPortfolio(portfolioId);
       if (!p) return navigateToPortfolios(dispatch, navigate);
 
       dispatch(setPfolioFile({ file: JSON.stringify(p) }));
@@ -65,13 +58,11 @@ export default function ImportPage() {
     };
 
     fetchPortfolio();
-
-    return () => cancelToken.current?.cancel();
   }, [portfolioId]);
 
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
+      <div className="w-full px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
           alt="Import Portfolio"
