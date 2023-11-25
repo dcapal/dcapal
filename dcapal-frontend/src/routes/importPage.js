@@ -2,14 +2,13 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import axios from "axios";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice";
-import { DCAPAL_API } from "../app/config";
-import { api } from "../app/api";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { DCAPAL_API } from "@app/config";
+import { api } from "@app/api";
 
 import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
-import { Spinner } from "../components/spinner/spinner";
+import { Spinner } from "@components/spinner/spinner";
 
 const fetchImportedPortfolio = async (id) => {
   const url = `${DCAPAL_API}/import/portfolio/${id}`;
