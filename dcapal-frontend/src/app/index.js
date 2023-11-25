@@ -2,10 +2,10 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { Toaster } from "react-hot-toast";
 
-import { AllocationFlow } from "../components/allocationFlow";
-import { setCurrencies } from "./appSlice";
+import { AllocationFlow } from "@components/allocationFlow";
+import { setCurrencies } from "@app/appSlice";
 import { fetchAssetsDcaPal } from "./providers";
-import { ContainerPage } from "../routes/containerPage";
+import { ContainerPage } from "@routes/containerPage";
 
 const loadCurrencies = async (dispatch) => {
   const res = await fetchAssetsDcaPal("fiat");

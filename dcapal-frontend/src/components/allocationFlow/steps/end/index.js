@@ -1,21 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { spawn, Thread, Worker } from "threads";
-import { setAllocationFlowStep, Step } from "../../../../app/appSlice";
-import {
-  replacer,
-  roundAmount,
-  roundDecimals,
-  timeout,
-} from "../../../../utils";
-import { Spinner } from "../../../spinner/spinner";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { replacer, roundAmount, timeout } from "@utils/index.js";
+import { Spinner } from "@components/spinner/spinner";
 import {
   ACLASS,
   clearBudget,
   currentPortfolio,
   feeTypeToString,
   isWholeShares,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 
@@ -152,7 +147,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   useEffect(() => {
     const launchSolver = async () => {
       const solver = await spawn(
-        new Worker(new URL("../../../../workers/solver.js", import.meta.url), {
+        new Worker(new URL("@workers/solver.js", import.meta.url), {
           name: "wasm-solver-worker",
         })
       );

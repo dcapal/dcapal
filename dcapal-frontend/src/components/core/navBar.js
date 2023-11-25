@@ -2,17 +2,17 @@ import { useMediaQuery } from "@react-hook/media-query";
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { MEDIA_SMALL } from "../../app/config";
-import { ExportBtn } from "../exportBtn";
+import { MEDIA_SMALL } from "@app/config";
+import { ExportBtn } from "@components/exportBtn";
 
 import classNames from "classnames";
 import { useTranslation } from "react-i18next";
-import LanguageSwitcher from "../languageSwitcher";
+import LanguageSwitcher from "@components/languageSwitcher";
 
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
 import { useDispatch } from "react-redux";
-import { Step, setAllocationFlowStep } from "../../app/appSlice";
+import { Step, setAllocationFlowStep } from "@app/appSlice";
 
 const CloseBtn = ({ onClick }) => {
   return (

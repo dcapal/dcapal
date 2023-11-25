@@ -1,11 +1,11 @@
 import React from "react";
 import { useSelector } from "react-redux";
-import { Step } from "../app/appSlice";
+import { Step } from "@app/appSlice";
 import {
   aclassToString,
   currentPortfolio,
   feeTypeToString,
-} from "./allocationFlow/portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 const pad = (n) => `${n}`.padStart(2, "0");
