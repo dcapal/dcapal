@@ -1,6 +1,8 @@
 pub mod dto;
 pub mod market_data;
 
+use std::fmt::Display;
+
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
 use uuid::Uuid;
@@ -111,10 +113,10 @@ impl ImportedRepository {
         let mut redis = self.redis.get().await?;
 
         let id = Uuid::new_v4();
-        let key = format!("{}:{}", Self::IMPORTED, id.simple());
+        let key = Self::redis_imported_key(id.simple());
         let value = serde_json::to_string(&pfolio).unwrap();
 
-        redis.set_ex(&key, value, 15).await?;
+        redis.set_ex(&key, value, 60).await?;
 
         let expires_at: i64 = redis::cmd("EXPIRETIME")
             .arg(&key)
@@ -124,5 +126,17 @@ impl ImportedRepository {
         let expires_at = DateTime::from_timestamp(expires_at, 0).unwrap_or_else(Utc::now);
 
         Ok(ImportedPortfolio { id, expires_at })
+    }
+
+    pub async fn find_portfolio(&self, id: &str) -> Result<Option<serde_json::Value>> {
+        let mut redis = self.redis.get().await?;
+
+        let key = Self::redis_imported_key(id);
+        let portfolio: Option<String> = redis.get(key).await?;
+        Ok(portfolio.map(|s| serde_json::from_str(&s).unwrap()))
+    }
+
+    fn redis_imported_key(id: impl Display) -> String {
+        format!("{}:{}", Self::IMPORTED, id)
     }
 }

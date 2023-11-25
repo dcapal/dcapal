@@ -155,6 +155,7 @@ impl DcaServer {
             .route("/assets/crypto", get(api::get_assets_crypto))
             .route("/price/:asset", get(api::get_price))
             .route("/import/portfolio", post(api::import_portfolio))
+            .route("/import/portfolio/:id", get(api::get_imported_portfolio))
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())

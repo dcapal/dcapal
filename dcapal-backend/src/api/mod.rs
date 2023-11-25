@@ -16,7 +16,7 @@ use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-static PORTFOLIO_SCHEMA_STR: &str = include_str!("../../docs/portfolio-schema.json");
+static PORTFOLIO_SCHEMA_STR: &str = include_str!("../../docs/schema/portfolio/v1/schema.json");
 
 lazy_static! {
     static ref ASSETS_CACHE_CONTROL: CacheControl = CacheControl::new()
@@ -115,4 +115,16 @@ pub async fn import_portfolio(
     );
 
     Ok(response.into_response())
+}
+
+pub async fn get_imported_portfolio(
+    Path(id): Path<String>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let repo = &ctx.repos.imported;
+
+    match repo.find_portfolio(&id).await? {
+        Some(portfolio) => Ok(Json(portfolio).into_response()),
+        None => Ok((StatusCode::NOT_FOUND).into_response()),
+    }
 }
