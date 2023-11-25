@@ -1,7 +1,7 @@
 import React from "react";
 
-import { LaunchBtn } from "../components/core/launchBtn";
-import { RootCard } from "../components/core/rootCard";
+import { LaunchBtn } from "@components/core/launchBtn";
+import { RootCard } from "@components/core/rootCard";
 import { Trans, useTranslation } from "react-i18next";
 import { ContainerPage } from "./containerPage";
 

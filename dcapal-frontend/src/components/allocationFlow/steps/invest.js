@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
-import { setAllocationFlowStep, Step } from "../../../app/appSlice";
-import { InputNumber, InputNumberType } from "../../core/inputNumber";
-import { currentPortfolio, isWholeShares, setBudget } from "../portfolioSlice";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { InputNumber, InputNumberType } from "@components/core/inputNumber";
+import {
+  currentPortfolio,
+  isWholeShares,
+  setBudget,
+} from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
-import { replacer } from "../../../utils";
-
+import { replacer } from "@utils/index.js";
 const amtDecimals = 2;
 
 const buildProblemInput = (assets, useWholeShares) => {
@@ -58,7 +61,7 @@ export const InvestStep = ({
 
     const launchSolver = async () => {
       const solver = await spawn(
-        new Worker(new URL("../../../workers/analyzer.js", import.meta.url), {
+        new Worker(new URL("@workers/analyzer.js", import.meta.url), {
           name: "wasm-analyzer-worker",
         })
       );

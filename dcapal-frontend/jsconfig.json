@@ -1,7 +1,14 @@
 {
   "compilerOptions": {
+    "baseUrl": "./",
     "paths": {
-      "@images/*": ["./images/*"]
+      "@images/*": ["images/*"],
+      "@app/*": ["src/app/*"],
+      "@components/*": ["src/components/*"],
+      "@utils/*": ["src/utils/*"],
+      "@workers/*": ["src/workers/*"],
+      "@demo/*": ["demo/*"],
+      "@routes/*": ["src/routes/*"]
     }
   },
   "exclude": ["node_modules"]
