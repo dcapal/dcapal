@@ -15,7 +15,7 @@ import {
   setQty,
   setRefreshTime,
   setTargetWeight,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 

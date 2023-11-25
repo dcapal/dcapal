@@ -3,14 +3,14 @@ import { useDispatch, useSelector } from "react-redux";
 import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
-import { Spinner } from "../../../spinner/spinner";
+import { Spinner } from "@components/spinner/spinner";
 import {
   ACLASS,
   clearBudget,
   currentPortfolio,
   feeTypeToString,
   isWholeShares,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 

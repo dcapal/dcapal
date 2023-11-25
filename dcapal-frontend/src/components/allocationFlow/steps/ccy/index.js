@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
-import { currentPortfolio, setQuoteCurrency } from "../../portfolioSlice";
+import { currentPortfolio, setQuoteCurrency } from "@components/allocationFlow/portfolioSlice";
 import { CcyGroup } from "./ccyGroup";
 import { useTranslation } from "react-i18next";
 

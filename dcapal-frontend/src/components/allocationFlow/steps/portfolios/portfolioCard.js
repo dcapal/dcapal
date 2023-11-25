@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { InputText } from "../../../core/inputText";
+import { InputText } from "@components/core/inputText";
 import { useDispatch } from "react-redux";
 import {
   deletePortfolio,
   duplicatePortfolio,
   renamePortfolio,
   selectPortfolio,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import { Step, setAllocationFlowStep } from "@app/appSlice";
 
 import EDIT_SVG from "@images/icons/edit.svg";

@@ -2,12 +2,12 @@ import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useMediaQuery } from "@react-hook/media-query";
 
-import { InputNumber, InputNumberType } from "../../../core/inputNumber";
+import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import {
   currentPortfolio,
   isWholeShares,
   removeAsset,
-} from "../../portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice";
 import { MEDIA_SMALL } from "@app/config";
 import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
