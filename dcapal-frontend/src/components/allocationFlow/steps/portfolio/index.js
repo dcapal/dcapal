@@ -45,7 +45,7 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
       console.warn(
         "[ImportStep] Failed to fetch price for",
         a.symbol,
-        `(provider: ${quoteCcy})`
+        `(provider=${a.provider} quoteCcy=${quoteCcy})`
       );
       return;
     }

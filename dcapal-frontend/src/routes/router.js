@@ -17,6 +17,7 @@ import {
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
 } from "../app/config";
+import ImportPage from "./importPage";
 
 export const Router = () => {
   const step = useSelector((state) => state.app.allocationFlowStep);
@@ -53,6 +54,11 @@ export const Router = () => {
     {
       path: "docs",
       element: <UnderConstructionPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "import",
+      element: <ImportPage />,
       errorElement: <ErrorPage />,
     },
   ];

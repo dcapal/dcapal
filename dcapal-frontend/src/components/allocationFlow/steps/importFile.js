@@ -109,7 +109,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
       console.warn(
         "[ImportStep] Failed to fetch price for",
         a.symbol,
-        `(provider: ${pfolio.quoteCcy})`
+        `(provider=${a.provider} quoteCcy=${pfolio.quoteCcy})`
       );
       continue;
     }
