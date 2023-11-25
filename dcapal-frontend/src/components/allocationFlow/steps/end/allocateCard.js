@@ -4,7 +4,11 @@ import { useSelector } from "react-redux";
 import { MEDIA_SMALL } from "@app/config";
 import { UNALLOCATED_CASH } from ".";
 import { roundAmount, roundDecimals } from "@utils/index.js";
-import { ACLASS, FeeType, currentPortfolio } from "@components/allocationFlow/portfolioSlice";
+import {
+  ACLASS,
+  FeeType,
+  currentPortfolio,
+} from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 const feeAmount = (fees, amount) => {

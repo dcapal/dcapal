@@ -12,7 +12,10 @@ import {
 } from "@app/providers";
 import { DCAPAL_API_SEARCH } from "@app/config";
 import { Spinner } from "@components/spinner/spinner";
-import { ACLASS, currentPortfolio } from "@components/allocationFlow/portfolioSlice";
+import {
+  ACLASS,
+  currentPortfolio,
+} from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 let searchId = undefined;
