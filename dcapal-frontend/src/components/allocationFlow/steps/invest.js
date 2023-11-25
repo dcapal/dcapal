@@ -58,7 +58,7 @@ export const InvestStep = ({
 
     const launchSolver = async () => {
       const solver = await spawn(
-        new Worker(new URL("../../../workers/analyzer.js", import.meta.url), {
+        new Worker(new URL("@workers/analyzer.js", import.meta.url), {
           name: "wasm-analyzer-worker",
         })
       );

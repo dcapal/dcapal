@@ -147,7 +147,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
   useEffect(() => {
     const launchSolver = async () => {
       const solver = await spawn(
-        new Worker(new URL("../../../../workers/solver.js", import.meta.url), {
+        new Worker(new URL("@workers/solver.js", import.meta.url), {
           name: "wasm-solver-worker",
         })
       );
