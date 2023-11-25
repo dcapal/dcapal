@@ -7,7 +7,7 @@ import {
   feeTypeToString,
 } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
-import { ignoreNullReplacer } from "../utils";
+import { ignoreNullReplacer } from "@utils";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 
