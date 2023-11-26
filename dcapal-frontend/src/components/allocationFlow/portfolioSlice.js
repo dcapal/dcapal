@@ -1,3 +1,4 @@
+import { store } from "@app/store";
 import { createSlice } from "@reduxjs/toolkit";
 import { roundPrice } from "@utils/index.js";
 import i18n from "i18next";
@@ -162,6 +163,17 @@ export const getNewPortfolio = () => {
     fees: getDefaultFees(FeeType.ZERO_FEE),
     lastPriceRefresh: Date.now(),
   };
+};
+
+export const getDefaultPortfolioName = () => {
+  const defaultName = i18n.t("importStep.defaultPortfolioName");
+  const defaultNameCount = Object.values(store.getState().pfolio.pfolios)
+    .map((p) => p.name)
+    .filter((name) => name.startsWith(defaultName)).length;
+
+  return defaultNameCount > 0
+    ? `${defaultName} ${defaultNameCount + 1}`
+    : `${defaultName}`;
 };
 
 export const currentPortfolio = (state) => {

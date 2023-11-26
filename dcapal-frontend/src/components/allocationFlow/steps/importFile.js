@@ -14,6 +14,7 @@ import {
   addAsset,
   addPortfolio,
   getDefaultFees,
+  getDefaultPortfolioName,
   getNewPortfolio,
   parseAClass,
   parseFees,
@@ -25,7 +26,7 @@ import {
 
 import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
-const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
+const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -37,7 +38,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
 
   const imported = getNewPortfolio();
   imported.id = id;
-  imported.name = pfolio.name || t("importStep.defaultPortfolioName");
+  imported.name = pfolio.name;
   imported.quoteCcy = pfolio.quoteCcy;
 
   imported.fees = (() => {
@@ -106,8 +107,13 @@ export const ImportStep = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const pfolioFile = useSelector((state) => state.app.pfolioFile);
   const validCcys = useSelector((state) => state.app.currencies);
+
+  const pfolioFile = useSelector((state) => state.app.pfolioFile);
+  const pfolio = pfolioFile ? JSON.parse(pfolioFile) : {};
+  if (Object.keys(pfolio).length > 0) {
+    pfolio.name = pfolio.name ?? getDefaultPortfolioName();
+  }
 
   useEffect(() => {
     return () => {
@@ -116,16 +122,14 @@ export const ImportStep = () => {
   }, []);
 
   useEffect(() => {
-    if (pfolioFile.length === 0) return;
-
-    const pfolio = JSON.parse(pfolioFile);
+    if (Object.keys(pfolio).length === 0) return;
 
     const runImport = async () => {
       const [success] = await Promise.all([
         // Pass `pfolioId` to `importPfolio` to overcome component re-render
         // issues that ended up adding the imported portfolio multiple times
         // with different UUIDs
-        importPfolio(pfolioId, pfolio, validCcys, dispatch, t),
+        importPfolio(pfolioId, pfolio, validCcys, dispatch),
         timeout(1000),
       ]);
 
@@ -139,7 +143,7 @@ export const ImportStep = () => {
     };
 
     runImport();
-  }, [pfolioFile]);
+  }, [pfolio]);
 
   const onClickGoBack = () => {
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
