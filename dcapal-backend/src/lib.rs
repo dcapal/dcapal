@@ -24,7 +24,7 @@ use deadpool_redis::{Pool, Runtime};
 use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
 use hyper::Body;
-use metrics::{describe_counter, Unit};
+use metrics::{counter, describe_counter, Unit};
 use repository::{
     market_data::MarketDataRepository, ImportedRepository, MiscRepository, StatsRepository,
 };
@@ -36,7 +36,7 @@ use std::{
 use tokio::task::JoinHandle;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
-use tracing::info;
+use tracing::{error, info};
 
 #[macro_use]
 extern crate const_format;
@@ -190,7 +190,7 @@ impl DcaServer {
 
     pub async fn start(&mut self, signal_handler: BoxFuture<'_, ()>) -> Result<()> {
         info!("Initializing metrics");
-        self.init_metrics();
+        self.init_metrics().await;
 
         info!("Starting Maintenance task");
         {
@@ -210,7 +210,7 @@ impl DcaServer {
             .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))
     }
 
-    pub fn init_metrics(&self) {
+    pub async fn init_metrics(&self) {
         describe_counter!(stats::VISITORS_TOTAL, Unit::Count, "Number of API visitors");
         describe_counter!(
             stats::REQUESTS_TOTAL,
@@ -222,6 +222,11 @@ impl DcaServer {
             Unit::Microseconds,
             "Summary of endpoint response time"
         );
+
+        // Refresh Prometheus stats
+        if let Err(e) = refresh_total_visitors_stats(&self.ctx.repos.stats).await {
+            error!("Failed to refresh Prometheus stats: {e:?}");
+        }
     }
 }
 
@@ -245,4 +250,25 @@ fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
         })?;
 
     Ok(redis_pool)
+}
+
+async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
+    let visitors = stats_repo.fetch_all_visitors().await?;
+    for (ip, count) in visitors {
+        // Refresh Prometheus visitors location
+        let geo = stats_repo.find_visitor_ip(&ip).await?;
+        if let Some(geo) = geo {
+            counter!(
+                stats::VISITORS_TOTAL,
+                count as u64,
+                &[
+                    ("ip", geo.ip),
+                    ("latitude", geo.latitude),
+                    ("longitude", geo.longitude),
+                ]
+            );
+        }
+    }
+
+    Ok(())
 }
