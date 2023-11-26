@@ -5,7 +5,7 @@ use crate::domain::entity::AssetKind;
 use crate::domain::utils::Expiring;
 use crate::error::{DcaError, Result};
 use crate::repository::ImportedPortfolio;
-use crate::AppContext;
+use crate::{stats, AppContext};
 
 use axum::extract::{Path, Query, State};
 use axum::headers::CacheControl;
@@ -14,6 +14,7 @@ use axum::{Json, TypedHeader};
 use hyper::StatusCode;
 use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
+use metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 
 static PORTFOLIO_SCHEMA_STR: &str = include_str!("../../docs/schema/portfolio/v1/schema.json");
@@ -105,9 +106,13 @@ pub async fn import_portfolio(
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Response> {
     let repo = &ctx.repos.imported;
+    let stats_repo = &ctx.repos.stats;
 
     let cmd = ImportPortfolioCmd::try_new(payload, &PORTFOLIO_JSON_SCHEMA)?;
     let imported = repo.store_portfolio(&cmd.pfolio).await?;
+
+    increment_counter!(stats::IMPORTED_PORTFOLIOS_TOTAL);
+    let _ = stats_repo.increase_imported_portfolio_count().await;
 
     let response = (
         StatusCode::CREATED,

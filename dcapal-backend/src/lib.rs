@@ -24,7 +24,7 @@ use deadpool_redis::{Pool, Runtime};
 use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
 use hyper::Body;
-use metrics::{counter, describe_counter, Unit};
+use metrics::{counter, describe_counter, describe_histogram, Unit};
 use repository::{
     market_data::MarketDataRepository, ImportedRepository, MiscRepository, StatsRepository,
 };
@@ -217,15 +217,29 @@ impl DcaServer {
             Unit::Count,
             "Number of requests processed"
         );
-        describe_counter!(
+        describe_histogram!(
             stats::LATENCY_SUMMARY,
             Unit::Microseconds,
             "Summary of endpoint response time"
         );
+        describe_counter!(
+            stats::IMPORTED_PORTFOLIOS_TOTAL,
+            Unit::Count,
+            "Number of portfolios imported"
+        );
 
         // Refresh Prometheus stats
         if let Err(e) = refresh_total_visitors_stats(&self.ctx.repos.stats).await {
-            error!("Failed to refresh Prometheus stats: {e:?}");
+            error!(
+                "Failed to refresh Prometheus {} metric: {e:?}",
+                stats::VISITORS_TOTAL
+            );
+        }
+        if let Err(e) = refresh_imported_portfolios_stats(&self.ctx.repos.stats).await {
+            error!(
+                "Failed to refresh Prometheus {} metric: {e:?}",
+                stats::IMPORTED_PORTFOLIOS_TOTAL
+            );
         }
     }
 }
@@ -269,6 +283,13 @@ async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()
             );
         }
     }
+
+    Ok(())
+}
+
+async fn refresh_imported_portfolios_stats(stats_repo: &StatsRepository) -> Result<()> {
+    let count = stats_repo.get_imported_portfolio_count().await?;
+    counter!(stats::IMPORTED_PORTFOLIOS_TOTAL, count as u64);
 
     Ok(())
 }

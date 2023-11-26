@@ -54,6 +54,8 @@ pub struct StatsRepository {
 
 impl StatsRepository {
     const STATS: &'static str = concatcp!(REDIS_BASE, ':', "stats");
+    const IMPORTED_PORTFOLIO_KEY: &'static str = "imported-portfolio-total";
+
     const VISITORS: &'static str = concatcp!(StatsRepository::STATS, ':', "visitors");
     const VISITOR_IP: &'static str = concatcp!(StatsRepository::STATS, ':', "visitor-ip");
 
@@ -96,6 +98,26 @@ impl StatsRepository {
         let mut redis = self.redis.get().await?;
 
         Ok(redis.hgetall(Self::VISITORS).await?)
+    }
+
+    pub async fn increase_imported_portfolio_count(&self) -> Result<i64> {
+        let mut redis = self.redis.get().await?;
+
+        let count: i64 = redis
+            .hincr(Self::STATS, Self::IMPORTED_PORTFOLIO_KEY, 1)
+            .await?;
+
+        Ok(count)
+    }
+
+    pub async fn get_imported_portfolio_count(&self) -> Result<i64> {
+        let mut redis = self.redis.get().await?;
+
+        let count: Option<i64> = redis
+            .hget(Self::STATS, Self::IMPORTED_PORTFOLIO_KEY)
+            .await?;
+
+        Ok(count.unwrap_or_default())
     }
 }
 
