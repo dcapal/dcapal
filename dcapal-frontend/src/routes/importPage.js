@@ -4,10 +4,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
-
-import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 import { Spinner } from "@components/spinner/spinner";
 import { useFetchImportedPortfolio } from "@hooks/useFetchImportedPortfolio";
+
+import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
 const navigateToPortfolios = (portfolio, step, dispatch, navigate) => {
   dispatch(setPfolioFile({ file: portfolio ? JSON.stringify(portfolio) : "" }));
@@ -42,7 +42,7 @@ export default function ImportPage() {
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
           alt="Import Portfolio"
-          src={IMPORT_PORTFOLIO}
+          src={IMPORT_PORTFOLIO_SVG}
         />
         <h1 className="text-3xl font-bold">
           {t("importStep.importPortfolio")}

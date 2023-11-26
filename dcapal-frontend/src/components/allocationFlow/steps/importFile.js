@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
 import { getFetcher } from "@app/providers";
 import { timeout } from "@utils/index.js";
@@ -14,56 +16,14 @@ import {
   getDefaultFees,
   getNewPortfolio,
   parseAClass,
-  parseFeeType,
+  parseFees,
   selectPortfolio,
   setFeesAsset,
   setQty,
   setTargetWeight,
 } from "@components/allocationFlow/portfolioSlice";
 
-import { useTranslation } from "react-i18next";
-
-import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
-
-const parseFees = (fees) => {
-  if (!fees) return null;
-
-  const feeType = parseFeeType(fees.feeStructure.type);
-  if (!feeType) return null;
-
-  const parsed = getDefaultFees(feeType);
-
-  if (feeType === FeeType.ZERO_FEE) return parsed;
-
-  if (feeType === FeeType.FIXED) {
-    if (fees.maxFeeImpact) {
-      parsed.maxFeeImpact = fees.maxFeeImpact;
-    }
-    if (fees.feeStructure.feeAmount) {
-      parsed.feeStructure.feeAmount = fees.feeStructure.feeAmount;
-    }
-
-    return parsed;
-  }
-
-  if (feeType === FeeType.VARIABLE) {
-    if (fees.maxFeeImpact) {
-      parsed.maxFeeImpact = fees.maxFeeImpact;
-    }
-    if (fees.feeStructure.feeRate) {
-      parsed.feeStructure.feeRate = fees.feeStructure.feeRate;
-    }
-    if (fees.feeStructure.minFee) {
-      parsed.feeStructure.minFee = fees.feeStructure.minFee;
-    }
-    if (fees.feeStructure.maxFee) {
-      parsed.feeStructure.maxFee = fees.feeStructure.maxFee;
-    }
-    return parsed;
-  }
-
-  return null;
-};
+import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
 const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
   const stopWithError = (...args) => {
@@ -192,7 +152,7 @@ export const ImportStep = () => {
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
           alt="Import Portfolio"
-          src={IMPORT_PORTFOLIO}
+          src={IMPORT_PORTFOLIO_SVG}
         />
         {isLoading && (
           <>
