@@ -4,34 +4,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
-import { DCAPAL_API } from "@app/config";
-import { api } from "@app/api";
 
 import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
 import { Spinner } from "@components/spinner/spinner";
+import { useFetchImportedPortfolio } from "@hooks/useFetchImportedPortfolio";
 
-const fetchImportedPortfolio = async (id) => {
-  const url = `${DCAPAL_API}/import/portfolio/${id}`;
-  try {
-    const response = await api.get(url);
-
-    if (response.status != 200) {
-      console.error(
-        `Failed to fetch imported portfolio (${id}): {status: ${response.status}, data: ${response.data}}`
-      );
-      return null;
-    }
-
-    return response.data;
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-};
-
-const navigateToPortfolios = (dispatch, navigate) => {
-  dispatch(setPfolioFile({ file: "" }));
-  dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+const navigateToPortfolios = (portfolio, step, dispatch, navigate) => {
+  dispatch(setPfolioFile({ file: portfolio ? JSON.stringify(portfolio) : "" }));
+  dispatch(setAllocationFlowStep({ step: step }));
   navigate("/allocate");
 };
 
@@ -44,20 +24,17 @@ export default function ImportPage() {
   const searchParams = new URLSearchParams(location.search);
   const portfolioId = searchParams.get("p");
 
+  const [portfolio, isLoading] = useFetchImportedPortfolio(portfolioId);
+
   useEffect(() => {
-    if (!portfolioId) return navigateToPortfolios(dispatch, navigate);
+    if (isLoading) return;
 
-    const fetchPortfolio = async () => {
-      const p = await fetchImportedPortfolio(portfolioId);
-      if (!p) return navigateToPortfolios(dispatch, navigate);
-
-      dispatch(setPfolioFile({ file: JSON.stringify(p) }));
-      dispatch(setAllocationFlowStep({ step: Step.IMPORT }));
-      navigate("/allocate");
-    };
-
-    fetchPortfolio();
-  }, [portfolioId]);
+    if (!portfolio) {
+      navigateToPortfolios(null, Step.PORTFOLIOS, dispatch, navigate);
+    } else {
+      navigateToPortfolios(portfolio, Step.IMPORT, dispatch, navigate);
+    }
+  }, [portfolio, isLoading]);
 
   return (
     <div className="w-full flex flex-col items-center">
