@@ -31,7 +31,7 @@
     "i18next-browser-languagedetector": "^7.2.0",
     "playwright": "^1.40.0",
     "react": "^18.2.0",
-    "react-collapsed": "^4.1.1",
+    "react-collapsed": "^4.1.2",
     "react-dom": "^18.2.0",
     "react-github-btn": "^1.4.0",
     "react-helmet": "^6.1.0",
