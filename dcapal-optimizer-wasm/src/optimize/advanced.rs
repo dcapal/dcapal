@@ -174,15 +174,44 @@ impl Problem {
             sell_over_allocated_assets(&mut solution, pfolio_amount)
         };
 
-        let pfolio_fees = &self.options.fees;
-
         // Budget available to allocate
         let mut budget_left = self.options.budget + sold_amount;
 
         debug!("[Init] solution={solution:?} pfolio_amount={pfolio_amount} sold_amount={sold_amount} budget_left={budget_left}");
 
+        // Run main budget allocation algorithm
+        Self::allocate_budget(
+            &mut solution.assets,
+            &mut budget_left,
+            pfolio_amount,
+            &self.options.fees,
+        );
+
+        if self.options.use_all_budget && !is_negligible(&budget_left) {
+            Self::exahust_budget_left(&mut solution.assets, &mut budget_left, pfolio_amount);
+        }
+
+        // Reconcile solution weights
+        for asset in solution.assets.values_mut() {
+            asset.weight = (asset.amount / pfolio_amount).round_dp(PERCENTAGE_DECIMALS);
+        }
+
+        solution.is_solved = true;
+        solution.budget_left = budget_left;
+
+        debug!("[Solution] solution={solution:?}");
+
+        solution
+    }
+
+    fn allocate_budget(
+        assets: &mut HashMap<String, Asset>,
+        budget_left: &mut Decimal,
+        pfolio_amount: Decimal,
+        pfolio_fees: &TransactionFees,
+    ) {
         // Get under allocated assets
-        let mut open_assets = under_allocated_view(&mut solution.assets);
+        let mut open_assets = under_allocated_view(assets);
 
         // Rescale target weights for open assets only
         let mut w_sum: Decimal = open_assets.iter().map(|a| a.target_weight).sum();
@@ -198,14 +227,14 @@ impl Problem {
                 step, budget_left, open_assets, w_sum, adjusted_weights
             );
 
-            let mut budget_left_next = budget_left;
+            let mut budget_left_next = *budget_left;
             let mut is_all_unallocated = true;
 
-            if !is_negligible(&budget_left) {
+            if !is_negligible(budget_left) {
                 // Allocate budget depending on target weight
                 for (i, asset) in open_assets.iter_mut().enumerate() {
                     let w_i = adjusted_weights[i];
-                    let allocated = amount_to_allocate(asset, budget_left, w_i);
+                    let allocated = amount_to_allocate(asset, *budget_left, w_i);
                     let allocated_shares = shares_to_allocate(asset, allocated);
 
                     if allocated_shares > Decimal::ZERO {
@@ -225,20 +254,20 @@ impl Problem {
 
             // Check asset constraints
             let mut freed_budget =
-                check_fully_allocated_assets(&mut open_assets, &budget_left, pfolio_fees);
+                check_fully_allocated_assets(&mut open_assets, budget_left, pfolio_fees);
 
             // If previous step freed some budget, do another round of allocation unconditionally.
             // Otherwise, try to break ties or exit
             if freed_budget == Decimal::ZERO {
                 // Unblock ties if necessary
-                if !is_negligible(&budget_left) && is_all_unallocated {
+                if !is_negligible(budget_left) && is_all_unallocated {
                     freed_budget += unblock_ties(&mut open_assets, pfolio_fees);
                 }
 
                 // Check remaining budget
-                let was_negligible = is_negligible(&budget_left);
-                budget_left = budget_left_next + freed_budget;
-                if was_negligible && is_negligible(&budget_left) {
+                let was_negligible = is_negligible(budget_left);
+                *budget_left = budget_left_next + freed_budget;
+                if was_negligible && is_negligible(budget_left) {
                     // Check fee impact for open assets
                     freed_budget = Decimal::ZERO;
                     for asset in &mut open_assets {
@@ -247,8 +276,8 @@ impl Problem {
                         }
                     }
 
-                    budget_left += freed_budget;
-                    if is_negligible(&budget_left) {
+                    *budget_left += freed_budget;
+                    if is_negligible(budget_left) {
                         for asset in &mut open_assets {
                             asset.state = SolutionState::FullyAllocated;
                         }
@@ -256,20 +285,14 @@ impl Problem {
                     }
                 }
             } else {
-                budget_left = budget_left_next + freed_budget
+                *budget_left = budget_left_next + freed_budget
             }
 
             // Refresh open_assets
             if freed_budget > Decimal::ZERO {
-                debug!(
-                    "[Step {step}] Before refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}",
-                    open_assets.len()
-                );
-                open_assets = refresh_open_assets(&mut solution.assets, &budget_left);
-                debug!(
-                    "[Step {step}] After refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}",
-                    open_assets.len()
-                );
+                debug!("[Step {step}] Before refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}", open_assets.len());
+                open_assets = refresh_open_assets(assets, budget_left);
+                debug!("[Step {step}] After refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}", open_assets.len());
             }
 
             // Update open_assets rescaled weights
@@ -283,21 +306,103 @@ impl Problem {
         }
 
         debug!(
-            "[Solution] budget_left={} open_assets={:?} w_sum={} adjusted_weights={:?}",
+            "[End] budget_left={} open_assets={:?} w_sum={} adjusted_weights={:?}",
             budget_left, open_assets, w_sum, adjusted_weights
         );
+    }
 
-        // Reconcile solution weights
-        for asset in solution.assets.values_mut() {
+    fn exahust_budget_left(
+        assets: &mut HashMap<String, Asset>,
+        budget_left: &mut Decimal,
+        pfolio_amount: Decimal,
+    ) {
+        static EXCLUDED_STATES: &[SolutionState] = &[
+            SolutionState::Overallocated,
+            SolutionState::FeesTooHigh,
+            SolutionState::PriceTooHigh,
+        ];
+
+        // For starters, allocate remaining budget to under-allocated assets, prioritizing assets
+        // farther from their target allocation
+        let mut candidates = assets
+            .values_mut()
+            .filter(|a| !EXCLUDED_STATES.contains(&a.state))
+            .filter(|a| (a.target_amount - a.amount) > Decimal::ZERO)
+            .collect::<Vec<_>>();
+
+        // Order by distance from target allocation, descending
+        candidates.sort_by(|a, b| {
+            (a.target_amount - a.amount)
+                .cmp(&(b.target_amount - b.amount))
+                .reverse()
+        });
+
+        debug!("[Exhaust/1] Before: budget_left={budget_left} candidates={candidates:?}");
+        for asset in &mut candidates {
+            let distance = Decimal::min(asset.target_amount - asset.amount, *budget_left);
+
+            let allocated_shares = shares_to_allocate(asset, distance);
+            if allocated_shares == Decimal::ZERO {
+                continue;
+            }
+
+            let allocated = (allocated_shares * asset.price).round_dp(AMOUNT_DECIMALS);
+            asset.amount += allocated;
+            asset.shares += allocated_shares;
             asset.weight = (asset.amount / pfolio_amount).round_dp(PERCENTAGE_DECIMALS);
+            *budget_left -= allocated;
         }
+        debug!("[Exhaust/1] After: budget_left={budget_left} candidates={candidates:?}");
 
-        solution.is_solved = true;
-        solution.budget_left = budget_left;
+        // Then, spread remaining budget by target weight
+        let mut candidates = assets
+            .values_mut()
+            .filter(|a| !EXCLUDED_STATES.contains(&a.state))
+            .collect::<Vec<_>>();
 
-        debug!("[Solution] solution={solution:?}");
+        let w_sum: Decimal = candidates.iter().map(|a| a.target_weight).sum();
+        let adjusted_weights = candidates
+            .iter()
+            .map(|a| (a.target_weight / w_sum).round_dp(PERCENTAGE_DECIMALS))
+            .collect::<Vec<Decimal>>();
 
-        solution
+        debug!("[Exhaust/2] Before: budget_left={budget_left} candidates={candidates:?}");
+        for (i, asset) in candidates.iter_mut().enumerate() {
+            let w_i = adjusted_weights[i];
+            let allocated_shares = shares_to_allocate(asset, w_i * (*budget_left));
+            if allocated_shares == Decimal::ZERO {
+                continue;
+            }
+
+            let allocated = (allocated_shares * asset.price).round_dp(AMOUNT_DECIMALS);
+            asset.amount += allocated;
+            asset.shares += allocated_shares;
+            asset.weight = (asset.amount / pfolio_amount).round_dp(PERCENTAGE_DECIMALS);
+            *budget_left -= allocated;
+        }
+        debug!("[Exhaust/2] After: budget_left={budget_left} candidates={candidates:?}");
+
+        // Finally just drop everything on most allocated assets
+        candidates.sort_by(|a, b| {
+            a.get_allocated_amount()
+                .cmp(&b.get_allocated_amount())
+                .reverse()
+        });
+
+        debug!("[Exhaust/3] Before: budget_left={budget_left} candidates={candidates:?}");
+        for asset in &mut candidates {
+            let allocated_shares = shares_to_allocate(asset, *budget_left);
+            if allocated_shares == Decimal::ZERO {
+                continue;
+            }
+
+            let allocated = (allocated_shares * asset.price).round_dp(AMOUNT_DECIMALS);
+            asset.amount += allocated;
+            asset.shares += allocated_shares;
+            asset.weight = (asset.amount / pfolio_amount).round_dp(PERCENTAGE_DECIMALS);
+            *budget_left -= allocated;
+        }
+        debug!("[Exhaust/3] Before: budget_left={budget_left} candidates={candidates:?}");
     }
 }
 
