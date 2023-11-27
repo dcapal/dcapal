@@ -129,7 +129,7 @@ const buildProblemInput = (budget, assets, fees, useWholeShares) => {
   return [budget, as, buildFeesInput(fees)];
 };
 
-export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
+export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
@@ -172,7 +172,7 @@ export const EndStep = ({ useTaxEfficient, useWholeShares }) => {
           quoteCcy,
           inputFees,
           useTaxEfficient,
-          false
+          useAllBudget
         );
 
         await Thread.terminate(solver);
