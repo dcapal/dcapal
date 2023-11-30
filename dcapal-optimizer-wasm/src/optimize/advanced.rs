@@ -188,7 +188,7 @@ impl Problem {
         );
 
         if self.options.use_all_budget && !is_negligible(&budget_left) {
-            Self::exahust_budget_left(&mut solution.assets, &mut budget_left, pfolio_amount);
+            Self::exhaust_budget_left(&mut solution.assets, &mut budget_left, pfolio_amount);
         }
 
         // Reconcile solution weights
@@ -311,7 +311,7 @@ impl Problem {
         );
     }
 
-    fn exahust_budget_left(
+    fn exhaust_budget_left(
         assets: &mut HashMap<String, Asset>,
         budget_left: &mut Decimal,
         pfolio_amount: Decimal,
