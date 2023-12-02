@@ -7,9 +7,9 @@ use crate::error::{DcaError, Result};
 use crate::AppContext;
 
 use axum::extract::{Path, Query, State};
-use axum::headers::CacheControl;
 use axum::response::{IntoResponse, Response};
-use axum::{Json, TypedHeader};
+use axum::Json;
+use axum_extra::{headers::CacheControl, TypedHeader};
 use lazy_static::lazy_static;
 use serde::Deserialize;
 
