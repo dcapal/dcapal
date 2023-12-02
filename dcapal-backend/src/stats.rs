@@ -5,11 +5,11 @@ use std::{
 };
 
 use axum::{
-    extract::{ConnectInfo, State},
+    extract::{ConnectInfo, Request, State},
     middleware::Next,
     response::Response,
 };
-use hyper::Request;
+use hyper::HeaderMap;
 use metrics::{histogram, increment_counter};
 use tracing::{info, log::error};
 
@@ -24,7 +24,7 @@ pub const REQUESTS_TOTAL: &str = concatcp!(BASE, '_', "requests_total");
 pub const LATENCY_SUMMARY: &str = concatcp!(BASE, '_', "latency_summary");
 pub const IMPORTED_PORTFOLIOS_TOTAL: &str = concatcp!(BASE, '_', "imported_portfolios_total");
 
-pub async fn latency_stats<B>(req: Request<B>, next: Next<B>) -> Response {
+pub async fn latency_stats(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
     if path == "/" {
         return next.run(req).await;
@@ -43,11 +43,11 @@ pub async fn latency_stats<B>(req: Request<B>, next: Next<B>) -> Response {
     res
 }
 
-pub async fn requests_stats<B>(
+pub async fn requests_stats(
     State(state): State<AppContext>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    req: Request<B>,
-    next: Next<B>,
+    req: Request,
+    next: Next,
 ) -> Result<Response> {
     let path = req.uri().path().to_string();
     if path == "/" {
@@ -59,7 +59,7 @@ pub async fn requests_stats<B>(
 
     // Visitors stats
     record_visitors_stats(
-        &req,
+        req.headers(),
         addr,
         state.repos.stats.clone(),
         state.services.ip2location.clone(),
@@ -69,8 +69,8 @@ pub async fn requests_stats<B>(
     Ok(next.run(req).await)
 }
 
-async fn record_visitors_stats<B>(
-    req: &Request<B>,
+async fn record_visitors_stats(
+    headers: &HeaderMap,
     addr: SocketAddr,
     repo: Arc<StatsRepository>,
     ip_service: Option<Arc<Ip2LocationService>>,
@@ -81,7 +81,7 @@ async fn record_visitors_stats<B>(
     let ip = IP_HEADERS
         .iter()
         .find_map(|header| {
-            req.headers().get(*header).map(|h| {
+            headers.get(*header).map(|h| {
                 h.to_str()
                     .map(|h| h.parse::<IpAddr>().unwrap_or(FALLBACK_IP))
                     .unwrap_or(FALLBACK_IP)

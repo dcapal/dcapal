@@ -23,7 +23,6 @@ use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
-use hyper::Body;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
 use repository::{
     market_data::MarketDataRepository, ImportedRepository, MiscRepository, StatsRepository,
@@ -33,7 +32,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::task::JoinHandle;
+use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
@@ -84,7 +83,7 @@ pub struct Provider {
 
 pub struct DcaServer {
     addr: SocketAddr,
-    app: IntoMakeServiceWithConnectInfo<Router<(), Body>, SocketAddr>,
+    app: IntoMakeServiceWithConnectInfo<Router<()>, SocketAddr>,
     ctx: AppContext,
     maintenance_handle: Option<JoinHandle<()>>,
     stop_tx: tokio::sync::watch::Sender<bool>,
@@ -188,7 +187,7 @@ impl DcaServer {
         })
     }
 
-    pub async fn start(&mut self, signal_handler: BoxFuture<'_, ()>) -> Result<()> {
+    pub async fn start(&mut self, _signal_handler: BoxFuture<'_, ()>) -> Result<()> {
         info!("Initializing metrics");
         self.init_metrics().await;
 
@@ -203,11 +202,15 @@ impl DcaServer {
         }
 
         info!("Starting DcaServer at {}", &self.addr);
-        axum::Server::bind(&self.addr)
-            .serve(self.app.clone())
-            .with_graceful_shutdown(signal_handler)
+        let listener = TcpListener::bind(&self.addr)
             .await
-            .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))
+            .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))?;
+
+        axum::serve(listener, self.app.clone())
+            .await
+            .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))?;
+
+        Ok(())
     }
 
     pub async fn init_metrics(&self) {

@@ -8,9 +8,9 @@ use crate::repository::ImportedPortfolio;
 use crate::{stats, AppContext};
 
 use axum::extract::{Path, Query, State};
-use axum::headers::CacheControl;
 use axum::response::{IntoResponse, Response};
-use axum::{Json, TypedHeader};
+use axum::Json;
+use axum_extra::{headers::CacheControl, TypedHeader};
 use hyper::StatusCode;
 use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
