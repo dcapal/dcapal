@@ -99,15 +99,15 @@ export const AllocateCard = ({
     diffAmount > 0
       ? "bg-green-800"
       : diffAmount < 0
-      ? "bg-red-300"
-      : "bg-neutral-500";
+        ? "bg-red-300"
+        : "bg-neutral-500";
 
   const textColor =
     diffAmount > 0
       ? "text-green-50"
       : diffAmount < 0
-      ? "text-red-800"
-      : "text-white";
+        ? "text-red-800"
+        : "text-white";
 
   const diffAmountClass = `ml-4 py-1 px-2 whitespace-nowrap ${bgColor} ${textColor} font-semibold rounded-md`;
 
