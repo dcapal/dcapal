@@ -354,6 +354,10 @@ impl Problem {
         }
         debug!("[Exhaust/1] After: budget_left={budget_left} candidates={candidates:?}");
 
+        if is_negligible(budget_left) {
+            return;
+        }
+
         // Then, spread remaining budget by target weight
         let mut candidates = assets
             .values_mut()
@@ -381,6 +385,10 @@ impl Problem {
             *budget_left -= allocated;
         }
         debug!("[Exhaust/2] After: budget_left={budget_left} candidates={candidates:?}");
+
+        if is_negligible(budget_left) {
+            return;
+        }
 
         // Finally just drop everything on most allocated assets
         candidates.sort_by(|a, b| {
