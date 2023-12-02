@@ -1,8 +1,8 @@
 use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
-use hyper::StatusCode;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use reqwest::StatusCode;
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
