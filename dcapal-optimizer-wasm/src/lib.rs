@@ -263,8 +263,10 @@ pub struct JsAdvancedOptions {
     pub budget: f64,
     pub pfolio_ccy: String,
     pub assets: HashMap<String, JsAdvancedAsset>,
-    pub is_buy_only: bool,
     pub fees: Option<JsTransactionFees>,
+    pub is_buy_only: bool,
+    #[serde(default)]
+    pub use_all_budget: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -375,8 +377,9 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
             current_pfolio_amount: current_total,
             assets,
             budget,
-            is_buy_only: options.is_buy_only,
             fees,
+            is_buy_only: options.is_buy_only,
+            use_all_budget: options.use_all_budget,
         })
     }
 }
