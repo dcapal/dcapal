@@ -13,6 +13,7 @@ export const AllocationFlow = () => {
 
   const [useTaxEfficient, setUseTaxEfficient] = useState(true);
   const [useWholeShares, setUseWholeShares] = useState(true);
+  const [useAllBudget, setUseAllBudget] = useState(true);
 
   const dispatch = useDispatch();
 
@@ -33,14 +34,17 @@ export const AllocationFlow = () => {
       <InvestStep
         useTaxEfficient={useTaxEfficient}
         useWholeShares={useWholeShares}
+        useAllBudget={useAllBudget}
         setUseTaxEfficient={setUseTaxEfficient}
         setUseWholeShares={setUseWholeShares}
+        setUseAllBudget={setUseAllBudget}
       />
     );
   } else if (step === Step.END) {
     return (
       <EndStep
         useTaxEfficient={useTaxEfficient}
+        useAllBudget={useAllBudget}
         useWholeShares={useWholeShares}
       />
     );
