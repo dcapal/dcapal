@@ -78,7 +78,7 @@ impl CryptoWatchProvider {
                     .get(&a.quote.symbol)
                     .expect("Quote asset not found");
 
-                Market::new(pair, base.clone(), quote.clone())
+                Market::new(pair, base.clone(), quote.clone(), None)
             })
             .collect::<Vec<Market>>();
 

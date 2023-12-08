@@ -7,14 +7,14 @@ use crate::{
     app::{
         infra,
         services::{ip2location::Ip2LocationService, market_data::MarketDataService},
-        workers::price_updater::PriceUpdaterWorker,
+        workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
     config::Config,
     error::{DcaError, Result},
     ports::{
         inbound::rest,
         outbound::{
-            adapter::{CryptoWatchProvider, IpApi, KrakenProvider, YahooProvider},
+            adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
                 market_data::MarketDataRepository, ImportedRepository, MiscRepository,
                 StatsRepository,
@@ -60,7 +60,7 @@ pub struct AppContextInner {
     redis: Pool,
     services: Services,
     repos: Arc<Repository>,
-    providers: Arc<Provider>,
+    providers: Arc<PriceProviders>,
 }
 
 pub type AppContext = Arc<AppContextInner>;
@@ -79,19 +79,11 @@ struct Repository {
     pub imported: Arc<ImportedRepository>,
 }
 
-#[derive(Clone)]
-pub struct Provider {
-    pub cw: Arc<CryptoWatchProvider>,
-    pub kraken: Arc<KrakenProvider>,
-    pub yahoo: Arc<YahooProvider>,
-    pub ipapi: Arc<IpApi>,
-}
-
 pub struct DcaServer {
     addr: SocketAddr,
     app: IntoMakeServiceWithConnectInfo<Router<()>, SocketAddr>,
     ctx: AppContext,
-    maintenance_handle: Option<JoinHandle<()>>,
+    worker_handlers: Vec<JoinHandle<()>>,
     stop_tx: tokio::sync::watch::Sender<bool>,
 }
 
@@ -114,7 +106,7 @@ impl DcaServer {
             imported: Arc::new(ImportedRepository::new(redis.clone())),
         });
 
-        let providers = Arc::new(Provider {
+        let providers = Arc::new(PriceProviders {
             cw: Arc::new(CryptoWatchProvider::new(
                 http.clone(),
                 &config.app.providers,
@@ -137,11 +129,7 @@ impl DcaServer {
         };
 
         let services = Services {
-            mkt_data: Arc::new(MarketDataService::new(
-                config.clone(),
-                repos.mkt_data.clone(),
-                providers.clone(),
-            )),
+            mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             ip2location,
         };
 
@@ -188,7 +176,7 @@ impl DcaServer {
             addr,
             app,
             ctx,
-            maintenance_handle: None,
+            worker_handlers: Vec::new(),
             stop_tx,
         })
     }
@@ -197,14 +185,26 @@ impl DcaServer {
         info!("Initializing metrics");
         self.init_metrics().await;
 
-        info!("Starting Maintenance worker");
+        info!("Starting MarketDiscovery worker");
         {
             let ctx = self.ctx.clone();
             let stop_rx = self.stop_tx.subscribe();
             let handle = tokio::spawn(async move {
-                infra::maintenance::run(ctx, stop_rx).await;
+                let worker = MarketDiscoveryWorker::new(&ctx);
+                worker.run(stop_rx).await;
             });
-            self.maintenance_handle.replace(handle);
+            self.worker_handlers.push(handle);
+        }
+
+        info!("Starting PriceUpdater worker");
+        {
+            let ctx = self.ctx.clone();
+            let stop_rx = self.stop_tx.subscribe();
+            let handle = tokio::spawn(async move {
+                let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 60));
+                worker.run(stop_rx).await;
+            });
+            self.worker_handlers.push(handle);
         }
 
         info!("Starting DcaServer at {}", &self.addr);

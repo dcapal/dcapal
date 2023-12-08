@@ -185,6 +185,7 @@ impl KrakenProvider {
                     format!("{base_id}{quote_id}"),
                     base.clone(),
                     quote.clone(),
+                    None,
                 ))
             })
             .collect::<Vec<_>>();
@@ -402,6 +403,7 @@ async fn resolve_assets_data_kraken_only(
                 format!("{base_id}{quote_id}"),
                 base.clone(),
                 quote.clone(),
+                None,
             ))
         })
         .collect::<Vec<_>>();
