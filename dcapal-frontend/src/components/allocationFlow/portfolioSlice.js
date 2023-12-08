@@ -1,6 +1,6 @@
 import { store } from "@app/store";
 import { createSlice } from "@reduxjs/toolkit";
-import { roundPrice } from "@utils/index.js";
+import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
 
 const updateWeight = (asset, totalAmount) => {
@@ -278,10 +278,8 @@ export const portfolioSlice = createSlice({
       const symbol = action.payload.symbol;
       if (symbol in pfolio.assets) {
         const asset = pfolio.assets[symbol];
-        const price = asset?.price || 0;
-        const qty = asset?.qty || 0;
 
-        pfolio.totalAmount -= qty * price;
+        pfolio.totalAmount -= asset.amount;
         delete pfolio.assets[symbol];
 
         Object.values(pfolio.assets).forEach((asset) => {
@@ -295,10 +293,9 @@ export const portfolioSlice = createSlice({
 
       const asset = pfolio.assets[action.payload.symbol];
       const price = asset?.price || 0;
-      const qty = asset?.qty || 0;
-      const newAmount = (action.payload.qty || 0) * price;
+      const newAmount = roundAmount((action.payload.qty || 0) * price);
 
-      pfolio.totalAmount -= qty * price;
+      pfolio.totalAmount -= asset.amount;
       pfolio.totalAmount += newAmount;
 
       pfolio.assets = {
@@ -327,8 +324,8 @@ export const portfolioSlice = createSlice({
       price = roundPrice(price);
 
       // Refresh amounts
-      const newAmount = (asset.qty || 0) * price;
-      pfolio.totalAmount -= asset.qty * price;
+      const newAmount = roundAmount((asset.qty || 0) * price);
+      pfolio.totalAmount -= asset.amount;
       pfolio.totalAmount += newAmount;
       pfolio.totalAmount = pfolio.totalAmount;
 

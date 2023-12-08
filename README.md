@@ -88,5 +88,12 @@ flowchart LR
     end
 ```
 
-# Contributing
+## Contributing
 Contributions and suggestions about how to improve this project are welcome! Please follow our [contribution guidelines](CONTRIBUTING.md).
+
+## Thanks to all Contributors ❤️
+Born as a personal Sunday morning project, DcaPal would have never grown so much without the help of heros willing to contribute with their time and work. Thank you very much ya all! 
+
+<a href="https://github.com/leonardoarcari/dcapal/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=leonardoarcari/dcapal" />
+</a>

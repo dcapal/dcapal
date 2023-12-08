@@ -123,8 +123,8 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
       preferredCcy
         ? preferredCcy
         : sortedCcys.length > 0
-        ? sortedCcys.at(0)
-        : ""
+          ? sortedCcys.at(0)
+          : ""
     );
   }, [preferredCcy, ccys]);
 
