@@ -22,6 +22,7 @@ const BASE: &str = "dcapal";
 pub const VISITORS_TOTAL: &str = concatcp!(BASE, '_', "visitors_total");
 pub const REQUESTS_TOTAL: &str = concatcp!(BASE, '_', "requests_total");
 pub const LATENCY_SUMMARY: &str = concatcp!(BASE, '_', "latency_summary");
+pub const IMPORTED_PORTFOLIOS_TOTAL: &str = concatcp!(BASE, '_', "imported_portfolios_total");
 
 pub async fn latency_stats(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();

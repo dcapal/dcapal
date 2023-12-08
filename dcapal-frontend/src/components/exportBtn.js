@@ -7,6 +7,7 @@ import {
   feeTypeToString,
 } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
+import { ignoreNullReplacer } from "@utils";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 
@@ -44,7 +45,7 @@ const exportPfolio = ({ name, assets, quoteCcy, fees }) => {
     assets: serializedAssets,
   };
   const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
-    JSON.stringify(data, null, 2)
+    JSON.stringify(data, ignoreNullReplacer, 2)
   )}`;
   const link = document.createElement("a");
   link.href = jsonString;

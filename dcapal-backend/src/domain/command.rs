@@ -1,3 +1,5 @@
+use jsonschema::JSONSchema;
+
 use crate::{
     error::{DcaError, Result},
     repository::market_data::MarketDataRepository,
@@ -34,5 +36,21 @@ impl ConversionRateQuery {
             base: base_asset.unwrap(),
             quote: quote_asset.unwrap(),
         })
+    }
+}
+
+pub struct ImportPortfolioCmd {
+    pub pfolio: serde_json::Value,
+}
+
+impl ImportPortfolioCmd {
+    pub fn try_new(payload: serde_json::Value, schema: &JSONSchema) -> Result<Self> {
+        if !schema.is_valid(&payload) {
+            return Err(DcaError::BadRequest(
+                "Input portfolio does not match portfolio schema requirements".to_string(),
+            ));
+        }
+
+        Ok(Self { pfolio: payload })
     }
 }

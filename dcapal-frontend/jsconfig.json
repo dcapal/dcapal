@@ -2,14 +2,33 @@
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "@images/*": ["images/*"],
-      "@app/*": ["src/app/*"],
-      "@components/*": ["src/components/*"],
-      "@utils/*": ["src/utils/*"],
-      "@workers/*": ["src/workers/*"],
-      "@demo/*": ["demo/*"],
-      "@routes/*": ["src/routes/*"]
+      "@app/*": [
+        "src/app/*"
+      ],
+      "@components/*": [
+        "src/components/*"
+      ],
+      "@demo/*": [
+        "demo/*"
+      ],
+      "@hooks/*": [
+        "src/hooks/*"
+      ],
+      "@images/*": [
+        "images/*"
+      ],
+      "@routes/*": [
+        "src/routes/*"
+      ],
+      "@utils/*": [
+        "src/utils/*"
+      ],
+      "@workers/*": [
+        "src/workers/*"
+      ]
     }
   },
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

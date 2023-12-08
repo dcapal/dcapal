@@ -2,9 +2,11 @@ pub mod dto;
 pub mod market_data;
 
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
+use uuid::Uuid;
 
 use crate::{domain::ip2location::GeoData, error::Result, DateTime};
 
@@ -52,6 +54,8 @@ pub struct StatsRepository {
 
 impl StatsRepository {
     const STATS: &'static str = concatcp!(REDIS_BASE, ':', "stats");
+    const IMPORTED_PORTFOLIO_KEY: &'static str = "imported-portfolio-total";
+
     const VISITORS: &'static str = concatcp!(StatsRepository::STATS, ':', "visitors");
     const VISITOR_IP: &'static str = concatcp!(StatsRepository::STATS, ':', "visitor-ip");
 
@@ -94,5 +98,74 @@ impl StatsRepository {
         let mut redis = self.redis.get().await?;
 
         Ok(redis.hgetall(Self::VISITORS).await?)
+    }
+
+    pub async fn increase_imported_portfolio_count(&self) -> Result<i64> {
+        let mut redis = self.redis.get().await?;
+
+        let count: i64 = redis
+            .hincr(Self::STATS, Self::IMPORTED_PORTFOLIO_KEY, 1)
+            .await?;
+
+        Ok(count)
+    }
+
+    pub async fn get_imported_portfolio_count(&self) -> Result<i64> {
+        let mut redis = self.redis.get().await?;
+
+        let count: Option<i64> = redis
+            .hget(Self::STATS, Self::IMPORTED_PORTFOLIO_KEY)
+            .await?;
+
+        Ok(count.unwrap_or_default())
+    }
+}
+
+#[derive(Clone)]
+pub struct ImportedRepository {
+    redis: deadpool_redis::Pool,
+}
+
+pub struct ImportedPortfolio {
+    pub id: Uuid,
+    pub expires_at: DateTime,
+}
+
+impl ImportedRepository {
+    const IMPORTED: &'static str = concatcp!(REDIS_BASE, ':', "imported");
+
+    pub fn new(redis: deadpool_redis::Pool) -> Self {
+        Self { redis }
+    }
+
+    pub async fn store_portfolio(&self, pfolio: &serde_json::Value) -> Result<ImportedPortfolio> {
+        let mut redis = self.redis.get().await?;
+
+        let id = Uuid::new_v4();
+        let key = Self::redis_imported_key(id.simple());
+        let value = serde_json::to_string(&pfolio).unwrap();
+
+        redis.set_ex(&key, value, 60).await?;
+
+        let expires_at: i64 = redis::cmd("EXPIRETIME")
+            .arg(&key)
+            .query_async(&mut redis)
+            .await?;
+
+        let expires_at = DateTime::from_timestamp(expires_at, 0).unwrap_or_else(Utc::now);
+
+        Ok(ImportedPortfolio { id, expires_at })
+    }
+
+    pub async fn find_portfolio(&self, id: &str) -> Result<Option<serde_json::Value>> {
+        let mut redis = self.redis.get().await?;
+
+        let key = Self::redis_imported_key(id);
+        let portfolio: Option<String> = redis.get(key).await?;
+        Ok(portfolio.map(|s| serde_json::from_str(&s).unwrap()))
+    }
+
+    fn redis_imported_key(id: impl Display) -> String {
+        format!("{}:{}", Self::IMPORTED, id)
     }
 }

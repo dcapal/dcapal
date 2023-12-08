@@ -14,14 +14,19 @@ use crate::{
 
 use adapter::{CryptoWatchProvider, IpApi, KrakenProvider, YahooProvider};
 use axum::{
-    extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get, Router,
+    extract::connect_info::IntoMakeServiceWithConnectInfo,
+    middleware,
+    routing::{get, post},
+    Router,
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
-use metrics::{counter, describe_counter, Unit};
-use repository::{market_data::MarketDataRepository, MiscRepository, StatsRepository};
+use metrics::{counter, describe_counter, describe_histogram, Unit};
+use repository::{
+    market_data::MarketDataRepository, ImportedRepository, MiscRepository, StatsRepository,
+};
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
@@ -65,6 +70,7 @@ struct Repository {
     pub misc: Arc<MiscRepository>,
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
+    pub imported: Arc<ImportedRepository>,
 }
 
 #[derive(Clone)]
@@ -99,6 +105,7 @@ impl DcaServer {
             misc: Arc::new(MiscRepository::new(redis.clone())),
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
+            imported: Arc::new(ImportedRepository::new(redis.clone())),
         });
 
         let providers = Arc::new(Provider {
@@ -146,6 +153,8 @@ impl DcaServer {
             .route("/assets/fiat", get(api::get_assets_fiat))
             .route("/assets/crypto", get(api::get_assets_crypto))
             .route("/price/:asset", get(api::get_price))
+            .route("/import/portfolio", post(api::import_portfolio))
+            .route("/import/portfolio/:id", get(api::get_imported_portfolio))
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())
@@ -211,15 +220,29 @@ impl DcaServer {
             Unit::Count,
             "Number of requests processed"
         );
-        describe_counter!(
+        describe_histogram!(
             stats::LATENCY_SUMMARY,
             Unit::Microseconds,
             "Summary of endpoint response time"
         );
+        describe_counter!(
+            stats::IMPORTED_PORTFOLIOS_TOTAL,
+            Unit::Count,
+            "Number of portfolios imported"
+        );
 
         // Refresh Prometheus stats
         if let Err(e) = refresh_total_visitors_stats(&self.ctx.repos.stats).await {
-            error!("Failed to refresh Prometheus stats: {e:?}");
+            error!(
+                "Failed to refresh Prometheus {} metric: {e:?}",
+                stats::VISITORS_TOTAL
+            );
+        }
+        if let Err(e) = refresh_imported_portfolios_stats(&self.ctx.repos.stats).await {
+            error!(
+                "Failed to refresh Prometheus {} metric: {e:?}",
+                stats::IMPORTED_PORTFOLIOS_TOTAL
+            );
         }
     }
 }
@@ -263,6 +286,13 @@ async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()
             );
         }
     }
+
+    Ok(())
+}
+
+async fn refresh_imported_portfolios_stats(stats_repo: &StatsRepository) -> Result<()> {
+    let count = stats_repo.get_imported_portfolio_count().await?;
+    counter!(stats::IMPORTED_PORTFOLIOS_TOTAL, count as u64);
 
     Ok(())
 }

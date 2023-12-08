@@ -1,3 +1,4 @@
+import { store } from "@app/store";
 import { createSlice } from "@reduxjs/toolkit";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
@@ -78,6 +79,46 @@ export const parseFeeType = (typeStr) => {
   return null;
 };
 
+export const parseFees = (fees) => {
+  if (!fees) return null;
+
+  const feeType = parseFeeType(fees.feeStructure.type);
+  if (!feeType) return null;
+
+  const parsed = getDefaultFees(feeType);
+
+  if (feeType === FeeType.ZERO_FEE) return parsed;
+
+  if (feeType === FeeType.FIXED) {
+    if (fees.maxFeeImpact) {
+      parsed.maxFeeImpact = fees.maxFeeImpact;
+    }
+    if (fees.feeStructure.feeAmount) {
+      parsed.feeStructure.feeAmount = fees.feeStructure.feeAmount;
+    }
+
+    return parsed;
+  }
+
+  if (feeType === FeeType.VARIABLE) {
+    if (fees.maxFeeImpact) {
+      parsed.maxFeeImpact = fees.maxFeeImpact;
+    }
+    if (fees.feeStructure.feeRate) {
+      parsed.feeStructure.feeRate = fees.feeStructure.feeRate;
+    }
+    if (fees.feeStructure.minFee) {
+      parsed.feeStructure.minFee = fees.feeStructure.minFee;
+    }
+    if (fees.feeStructure.maxFee) {
+      parsed.feeStructure.maxFee = fees.feeStructure.maxFee;
+    }
+    return parsed;
+  }
+
+  return null;
+};
+
 export const getDefaultFees = (type) => {
   if (!type) {
     return null;
@@ -122,6 +163,17 @@ export const getNewPortfolio = () => {
     fees: getDefaultFees(FeeType.ZERO_FEE),
     lastPriceRefresh: Date.now(),
   };
+};
+
+export const getDefaultPortfolioName = () => {
+  const defaultName = i18n.t("importStep.defaultPortfolioName");
+  const defaultNameCount = Object.values(store.getState().pfolio.pfolios)
+    .map((p) => p.name)
+    .filter((name) => name.startsWith(defaultName)).length;
+
+  return defaultNameCount > 0
+    ? `${defaultName} ${defaultNameCount + 1}`
+    : `${defaultName}`;
 };
 
 export const currentPortfolio = (state) => {

@@ -24,3 +24,5 @@ export const replacer = (key, value) => {
 export const mapValues = (obj, func) => {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, func(v)]));
 };
+
+export const ignoreNullReplacer = (k, v) => v ?? undefined;
