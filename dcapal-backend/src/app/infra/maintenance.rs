@@ -1,19 +1,15 @@
 use chrono::{TimeZone, Utc};
 use std::time::Duration;
-use tokio::sync::watch;
 use tracing::{debug, error, info};
 
-use crate::{error::Result, repository::MiscRepository, AppContext, DateTime};
+use crate::{
+    app::infra::utils::{should_stop, StopToken},
+    error::Result,
+    ports::outbound::repository::MiscRepository,
+    AppContext, DateTime,
+};
 
-async fn should_stop(stop_rx: &mut watch::Receiver<bool>) {
-    while stop_rx.changed().await.is_ok() {
-        if *stop_rx.borrow_and_update() {
-            return;
-        }
-    }
-}
-
-pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
+pub async fn run(ctx: AppContext, mut stop_token: StopToken) {
     let mkt_data = &ctx.services.mkt_data;
 
     let mut is_running = true;
@@ -21,7 +17,7 @@ pub async fn run(ctx: AppContext, mut stop_rx: watch::Receiver<bool>) {
         // Wait for time
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(1)) => {}
-            _ = should_stop(&mut stop_rx) => { is_running = false; }
+            _ = should_stop(&mut stop_token) => { is_running = false; }
         }
 
         let res = is_outdated(&ctx.repos.misc).await;

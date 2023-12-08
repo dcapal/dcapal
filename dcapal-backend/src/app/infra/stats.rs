@@ -14,7 +14,8 @@ use metrics::{histogram, increment_counter};
 use tracing::{info, log::error};
 
 use crate::{
-    domain::ip2location::Ip2LocationService, error::Result, repository::StatsRepository, AppContext,
+    app::services::ip2location::Ip2LocationService, error::Result,
+    ports::outbound::repository::StatsRepository, AppContext,
 };
 
 const BASE: &str = "dcapal";

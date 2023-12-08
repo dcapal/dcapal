@@ -7,7 +7,7 @@ use hyper::StatusCode;
 use redis::RedisError;
 use tracing::error;
 
-use crate::domain::entity::{AssetId, MarketId};
+use crate::app::domain::entity::{AssetId, MarketId};
 
 #[derive(thiserror::Error)]
 pub enum DcaError {

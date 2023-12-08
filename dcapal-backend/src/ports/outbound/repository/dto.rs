@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::entity::{AssetId, Market, MarketId, Price};
+use crate::app::domain::entity::{AssetId, Market, MarketId, Price};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MarketDto {

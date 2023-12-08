@@ -10,23 +10,22 @@ use parking_lot::RwLock;
 use tracing::{error, info, warn};
 
 use crate::{
+    app::{
+        domain::entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
+        infra::utils::{Expiring, ExpiringOnceCell, ExpiringOption},
+        services::command::ConversionRateQuery,
+    },
     config::Config,
     error::{DcaError, Result},
-    repository::market_data::MarketDataRepository,
+    ports::outbound::repository::market_data::MarketDataRepository,
     Provider,
-};
-
-use super::{
-    command::ConversionRateQuery,
-    entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
-    utils::{Expiring, ExpiringOnceCell, ExpiringOption},
 };
 
 pub struct MarketDataService {
     config: Arc<Config>,
     repo: Arc<MarketDataRepository>,
     providers: Arc<Provider>,
-    mkt_loaders: DashMap<MarketId, Arc<ExpiringOnceCell<Option<Arc<Market>>>>>,
+    markets: DashMap<MarketId, Arc<Market>>,
     pricers: DashMap<(AssetId, AssetId), Arc<ExpiringOnceCell<ExpiringOption<Price>>>>,
     assets_cache: RwLock<AssetsCache>,
 }
@@ -39,7 +38,7 @@ impl MarketDataService {
         repo: Arc<MarketDataRepository>,
         providers: Arc<Provider>,
     ) -> Self {
-        let mkt_loaders = DashMap::new();
+        let markets = DashMap::new();
         let pricers = DashMap::new();
         let assets_cache = RwLock::new(AssetsCache::new());
 
@@ -47,7 +46,7 @@ impl MarketDataService {
             config,
             repo,
             providers,
-            mkt_loaders,
+            markets,
             pricers,
             assets_cache,
         }
@@ -99,36 +98,26 @@ impl MarketDataService {
         cache.fiats = None;
     }
 
+    /// Lookup a [`Market`] by [`MarketId`]
     pub async fn get_market(&self, id: MarketId) -> Result<Option<Arc<Market>>> {
-        let loader = self
-            .mkt_loaders
-            .entry(id.clone())
-            .or_insert_with(|| {
-                Arc::new(ExpiringOnceCell::new(|market: &Option<Arc<Market>>| {
-                    if let Some(ref m) = market {
-                        m.is_price_outdated()
-                    } else {
-                        false
-                    }
-                }))
-            })
-            .clone();
-
-        let market = loader
-            .get_or_try_init(|| async { self.load_market(&id).await })
-            .await;
-
-        if market.is_ok() {
-            return market;
+        if let Some(market) = self.markets.get(&id) {
+            return Ok(Some(market.clone()));
         }
 
-        let e = market.unwrap_err();
-        error!("{:?}", e);
-        if matches!(e, DcaError::PriceNotAvailableId(_)) {
-            Err(e)
-        } else {
-            Ok(None)
-        }
+        let market = match self.load_market(&id).await {
+            Ok(m) => m,
+            Err(e) => {
+                error!("{:?}", e);
+                None
+            }
+        };
+
+        let Some(market) = market else {
+            return Ok(None);
+        };
+
+        self.markets.insert(id, market.clone());
+        Ok(Some(market))
     }
 
     async fn load_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
@@ -137,25 +126,13 @@ impl MarketDataService {
             DcaError::MarketNotFound(id.clone())
         })?;
 
-        if mkt.is_none() {
-            info!("Cannot find market '{}'", id);
-            return Ok(None);
+        match mkt {
+            Some(mkt) => Ok(Some(Arc::new(mkt))),
+            None => {
+                info!("Cannot find market '{}'", id);
+                Ok(None)
+            }
         }
-
-        let mkt = self
-            .refresh_mkt_price(mkt.unwrap())
-            .await
-            .map(Arc::new)
-            .map_err(|e| {
-                error!(mkt = id, "Error occured in fetching price: {:?}", e);
-                DcaError::PriceNotAvailableId(id.clone())
-            })?;
-
-        if let Err(e) = self.repo.update_mkt_price(&mkt).await {
-            error!(mkt = id, "Failed to update price: {}", e);
-        }
-
-        Ok(Some(mkt))
     }
 
     async fn refresh_mkt_price(&self, mut mkt: Market) -> Result<Market> {
@@ -393,7 +370,7 @@ impl MarketDataService {
 
         // Invalidate caches
         self.invalidate_asset_cache();
-        self.mkt_loaders.clear();
+        self.markets.clear();
         self.pricers.clear();
 
         Ok(())
@@ -431,7 +408,7 @@ impl MarketDataService {
 
         // Invalidate caches
         self.invalidate_asset_cache();
-        self.mkt_loaders.clear();
+        self.markets.clear();
         self.pricers.clear();
 
         Ok(())

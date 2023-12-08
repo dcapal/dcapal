@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tracing::{debug, warn};
 
 use crate::{
-    domain::entity::{Market, OHLCFrequency},
+    app::domain::entity::{Market, OHLCFrequency},
     error::{DcaError, Result},
     DateTime,
 };

@@ -1,18 +1,28 @@
-pub mod adapter;
-pub mod api;
+pub mod app;
 pub mod config;
-pub mod domain;
 pub mod error;
-pub mod maintenance;
-pub mod repository;
-pub mod stats;
+pub mod ports;
 
 use crate::{
+    app::{
+        infra,
+        services::{ip2location::Ip2LocationService, market_data::MarketDataService},
+        workers::price_updater::PriceUpdaterWorker,
+    },
     config::Config,
     error::{DcaError, Result},
+    ports::{
+        inbound::rest,
+        outbound::{
+            adapter::{CryptoWatchProvider, IpApi, KrakenProvider, YahooProvider},
+            repository::{
+                market_data::MarketDataRepository, ImportedRepository, MiscRepository,
+                StatsRepository,
+            },
+        },
+    },
 };
 
-use adapter::{CryptoWatchProvider, IpApi, KrakenProvider, YahooProvider};
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo,
     middleware,
@@ -21,12 +31,8 @@ use axum::{
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
-use domain::{ip2location::Ip2LocationService, market_data::MarketDataService};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
-use repository::{
-    market_data::MarketDataRepository, ImportedRepository, MiscRepository, StatsRepository,
-};
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
@@ -150,19 +156,19 @@ impl DcaServer {
 
         let app = Router::new()
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
-            .route("/assets/fiat", get(api::get_assets_fiat))
-            .route("/assets/crypto", get(api::get_assets_crypto))
-            .route("/price/:asset", get(api::get_price))
-            .route("/import/portfolio", post(api::import_portfolio))
-            .route("/import/portfolio/:id", get(api::get_imported_portfolio))
+            .route("/assets/fiat", get(rest::get_assets_fiat))
+            .route("/assets/crypto", get(rest::get_assets_crypto))
+            .route("/price/:asset", get(rest::get_price))
+            .route("/import/portfolio", post(rest::import_portfolio))
+            .route("/import/portfolio/:id", get(rest::get_imported_portfolio))
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())
                     .layer(middleware::from_fn_with_state(
                         ctx.clone(),
-                        stats::requests_stats,
+                        infra::stats::requests_stats,
                     ))
-                    .layer(middleware::from_fn(stats::latency_stats)),
+                    .layer(middleware::from_fn(infra::stats::latency_stats)),
             )
             .with_state(ctx.clone())
             .into_make_service_with_connect_info();
@@ -191,12 +197,12 @@ impl DcaServer {
         info!("Initializing metrics");
         self.init_metrics().await;
 
-        info!("Starting Maintenance task");
+        info!("Starting Maintenance worker");
         {
             let ctx = self.ctx.clone();
             let stop_rx = self.stop_tx.subscribe();
             let handle = tokio::spawn(async move {
-                maintenance::run(ctx, stop_rx).await;
+                infra::maintenance::run(ctx, stop_rx).await;
             });
             self.maintenance_handle.replace(handle);
         }
@@ -214,19 +220,23 @@ impl DcaServer {
     }
 
     pub async fn init_metrics(&self) {
-        describe_counter!(stats::VISITORS_TOTAL, Unit::Count, "Number of API visitors");
         describe_counter!(
-            stats::REQUESTS_TOTAL,
+            infra::stats::VISITORS_TOTAL,
+            Unit::Count,
+            "Number of API visitors"
+        );
+        describe_counter!(
+            infra::stats::REQUESTS_TOTAL,
             Unit::Count,
             "Number of requests processed"
         );
         describe_histogram!(
-            stats::LATENCY_SUMMARY,
+            infra::stats::LATENCY_SUMMARY,
             Unit::Microseconds,
             "Summary of endpoint response time"
         );
         describe_counter!(
-            stats::IMPORTED_PORTFOLIOS_TOTAL,
+            infra::stats::IMPORTED_PORTFOLIOS_TOTAL,
             Unit::Count,
             "Number of portfolios imported"
         );
@@ -235,13 +245,13 @@ impl DcaServer {
         if let Err(e) = refresh_total_visitors_stats(&self.ctx.repos.stats).await {
             error!(
                 "Failed to refresh Prometheus {} metric: {e:?}",
-                stats::VISITORS_TOTAL
+                infra::stats::VISITORS_TOTAL
             );
         }
         if let Err(e) = refresh_imported_portfolios_stats(&self.ctx.repos.stats).await {
             error!(
                 "Failed to refresh Prometheus {} metric: {e:?}",
-                stats::IMPORTED_PORTFOLIOS_TOTAL
+                infra::stats::IMPORTED_PORTFOLIOS_TOTAL
             );
         }
     }
@@ -276,7 +286,7 @@ async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()
         let geo = stats_repo.find_visitor_ip(&ip).await?;
         if let Some(geo) = geo {
             counter!(
-                stats::VISITORS_TOTAL,
+                infra::stats::VISITORS_TOTAL,
                 count as u64,
                 &[
                     ("ip", geo.ip),
@@ -292,7 +302,7 @@ async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()
 
 async fn refresh_imported_portfolios_stats(stats_repo: &StatsRepository) -> Result<()> {
     let count = stats_repo.get_imported_portfolio_count().await?;
-    counter!(stats::IMPORTED_PORTFOLIOS_TOTAL, count as u64);
+    counter!(infra::stats::IMPORTED_PORTFOLIOS_TOTAL, count as u64);
 
     Ok(())
 }

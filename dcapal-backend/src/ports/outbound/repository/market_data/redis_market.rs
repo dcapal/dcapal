@@ -3,9 +3,9 @@ use futures::{StreamExt, TryStreamExt};
 use tracing::{debug, error};
 
 use crate::{
-    domain::entity::{Market, MarketId},
+    app::domain::entity::{Market, MarketId},
     error::{DcaError, Result},
-    repository::{dto::MarketDto, REDIS_BASE},
+    ports::outbound::repository::{dto::MarketDto, REDIS_BASE},
 };
 
 use super::MarketDataRepository;

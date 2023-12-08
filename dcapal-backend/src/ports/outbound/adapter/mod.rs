@@ -1,3 +1,5 @@
+//! The [`adapter`](self) module contains adapters to third-party services
+
 mod cw;
 mod ipapi;
 mod kraken;

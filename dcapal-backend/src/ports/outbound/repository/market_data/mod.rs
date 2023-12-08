@@ -2,7 +2,7 @@ mod redis_asset;
 mod redis_market;
 
 use crate::{
-    domain::entity::{Asset, AssetId, AssetKind, Market, MarketId},
+    app::domain::entity::{Asset, AssetId, AssetKind, Market, MarketId},
     error::{DcaError, Result},
 };
 

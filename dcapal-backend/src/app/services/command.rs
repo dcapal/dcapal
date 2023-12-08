@@ -1,11 +1,10 @@
 use jsonschema::JSONSchema;
 
 use crate::{
+    app::domain::entity::{Asset, AssetId},
     error::{DcaError, Result},
-    repository::market_data::MarketDataRepository,
+    ports::outbound::repository::market_data::MarketDataRepository,
 };
-
-use super::entity::{Asset, AssetId};
 
 pub struct ConversionRateQuery {
     pub base: Asset,

@@ -1,11 +1,13 @@
+//! The [`rest`](self) module implements the REST API of the system
+
 use std::time::Duration;
 
-use crate::domain::command::{ConversionRateQuery, ImportPortfolioCmd};
-use crate::domain::entity::AssetKind;
-use crate::domain::utils::Expiring;
+use crate::app::domain::entity::AssetKind;
+use crate::app::infra::utils::Expiring;
+use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
 use crate::error::{DcaError, Result};
-use crate::repository::ImportedPortfolio;
-use crate::{stats, AppContext};
+use crate::ports::outbound::repository::ImportedPortfolio;
+use crate::{infra::stats, AppContext};
 
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
@@ -17,7 +19,8 @@ use lazy_static::lazy_static;
 use metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 
-static PORTFOLIO_SCHEMA_STR: &str = include_str!("../../docs/schema/portfolio/v1/schema.json");
+static PORTFOLIO_SCHEMA_STR: &str =
+    include_str!("../../../../docs/schema/portfolio/v1/schema.json");
 
 lazy_static! {
     static ref ASSETS_CACHE_CONTROL: CacheControl = CacheControl::new()

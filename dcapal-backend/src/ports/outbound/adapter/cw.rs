@@ -8,10 +8,10 @@ use std::{
 use tracing::{debug, error, info};
 
 use crate::{
+    app::domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
-    domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     error::{DcaError, Result},
-    repository::market_data::MarketDataRepository,
+    ports::outbound::repository::market_data::MarketDataRepository,
     DateTime,
 };
 
