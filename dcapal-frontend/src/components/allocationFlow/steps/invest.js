@@ -12,6 +12,7 @@ import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
 import { replacer } from "@utils/index.js";
+
 const amtDecimals = 2;
 
 const buildProblemInput = (assets) => {
@@ -23,7 +24,7 @@ const buildProblemInput = (assets) => {
         target_weight: a.targetWeight / 100,
         shares: a.qty,
         price: a.price,
-        is_whole_shares: isWholeShares(a.aclass),
+        is_whole_shares: a.is_whole_shares,
         current_amount: a.amount,
       },
     }),
