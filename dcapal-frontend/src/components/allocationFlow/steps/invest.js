@@ -14,20 +14,17 @@ import { spawn, Thread, Worker } from "threads";
 import { replacer } from "@utils/index.js";
 const amtDecimals = 2;
 
-const buildProblemInput = (assets, useWholeShares) => {
+const buildProblemInput = (assets) => {
   return Object.values(assets).reduce(
     (as, a) => ({
       ...as,
       [a.symbol]: {
-        // Common input
         symbol: a.symbol,
         target_weight: a.targetWeight / 100,
-        // Use whole shares input
-        ...(useWholeShares && { shares: a.qty }),
-        ...(useWholeShares && { price: a.price }),
-        ...(useWholeShares && { is_whole_shares: isWholeShares(a.aclass) }),
-        // Use partial shares input
-        ...(!useWholeShares && { current_amount: a.amount }),
+        shares: a.qty,
+        price: a.price,
+        is_whole_shares: isWholeShares(a.aclass),
+        current_amount: a.amount,
       },
     }),
     {}
