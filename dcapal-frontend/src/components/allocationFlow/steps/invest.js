@@ -65,7 +65,7 @@ export const InvestStep = ({
         })
       );
 
-      const as = buildProblemInput(assets, useWholeShares);
+      const as = buildProblemInput(assets);
 
       try {
         const sol = await solver.analyzeAndSolve(as);
