@@ -85,27 +85,4 @@ impl PriceUpdaterWorker {
 
         Ok(())
     }
-
-    async fn refresh_mkt_price(&self, mkt: &Market) -> Result<Option<Price>> {
-        info!(
-            "Fetching price for market {} from {}",
-            mkt.id, self.price_provider
-        );
-
-        let now = Utc::now();
-        let price = match self.price_provider {
-            PriceProvider::CryptoWatch => self.providers.cw.fetch_market_price(mkt, now).await?,
-            PriceProvider::Kraken => self.providers.kraken.fetch_market_price(mkt, now).await?,
-            PriceProvider::Yahoo => self.providers.yahoo.fetch_market_price(mkt, now).await?,
-        };
-
-        if price.is_none() {
-            warn!(
-                "Cannot fetch {} price for any frequency (ts={})",
-                mkt.id, now
-            );
-        }
-
-        Ok(price.map(|px| Price::new(px, now)))
-    }
 }

@@ -9,9 +9,8 @@ use crate::{
         domain::entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
         services::command::ConversionRateQuery,
     },
-    config::PriceProvider,
     error::{DcaError, Result},
-    ports::outbound::{adapter::PriceProviders, repository::market_data::MarketDataRepository},
+    ports::outbound::repository::market_data::MarketDataRepository,
 };
 
 pub struct MarketDataService {
