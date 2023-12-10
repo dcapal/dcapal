@@ -24,7 +24,7 @@ const buildProblemInput = (assets) => {
         target_weight: a.targetWeight / 100,
         shares: a.qty,
         price: a.price,
-        is_whole_shares: a.is_whole_shares,
+        is_whole_shares: isWholeShares(a.aclass),
         current_amount: a.amount,
       },
     }),
