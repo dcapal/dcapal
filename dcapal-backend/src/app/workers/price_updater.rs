@@ -5,10 +5,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     app::{
-        domain::{
-            entity::{Market, Price},
-            market_data_utils::fetch_market_price,
-        },
+        domain::market_data_utils::fetch_market_price,
         infra::utils::{should_stop, StopToken},
         services::market_data::MarketDataService,
     },
