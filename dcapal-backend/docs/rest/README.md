@@ -4,7 +4,7 @@ This document provides REST API endpoints documentation for DcaPal backend.
 
 Endpoints are divided in *public* and *internal* families: public APIs are intended for Developers wishing to integrate their tools or apps with DcaPal, whereas *internal* APIs are meant to be called by DcaPal client only. Furthermore, endpoints are classified as *open* or *authorized*: open APIs can be freely called and do not require authentication, while authorized APIs require authentication and access to resources is constrained by visibility rules.
 
-> #### ℹ️ Base URL
+> [!NOTE]
 > When not specified, endpoints always assume `https://dcapal.com/api/` base URL
 
 ## Public endpoints
