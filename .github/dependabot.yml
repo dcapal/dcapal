@@ -5,11 +5,23 @@
 
 version: 2
 updates:
-   # Enable version updates for cargo
+   # Enable version updates for cargo (backend)
   - package-ecosystem: "cargo"
-    directory: "/"
+    directory: "/dcapal-backend"
     schedule:
       interval: "weekly"
+    labels:
+      - "A-backend"
+      - "C-dependency"
+
+  # Enable version updates for cargo (optimizer)
+  - package-ecosystem: "cargo"
+    directory: "/dcapal-optimizer-wasm"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "A-optimizer"
+      - "C-dependency"
 
    # Enable version updates for npm
   - package-ecosystem: "npm"
@@ -18,6 +30,19 @@ updates:
     # Check the npm registry for updates every day (weekdays)
     schedule:
       interval: "weekly"
+    labels:
+      - "A-frontend"
+      - "C-dependency"
+    groups:
+      babel:
+        patterns:
+        - "@babel*"
+      playwright:
+        patterns:
+        - "*playwright*
+      i18next:
+        patterns:
+        - "*i18next*
 
   # Enable version updates for Docker
   - package-ecosystem: "docker"
