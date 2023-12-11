@@ -45,7 +45,7 @@ updates:
         - "@babel*"
       playwright:
         patterns:
-        - "*playwright*
+        - "*playwright*"
       i18next:
         patterns:
         - "*i18next*"
