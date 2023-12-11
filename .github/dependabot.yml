@@ -5,25 +5,15 @@
 
 version: 2
 updates:
-   # Enable version updates for cargo (backend)
+   # Enable version updates for cargo
   - package-ecosystem: "cargo"
-    directory: "/dcapal-backend"
+    directory: "/"
     schedule:
       interval: "weekly"
     # Allow up to 10 open pull requests
     open-pull-requests-limit: 10 
     labels:
       - "A-backend"
-      - "C-dependency"
-
-  # Enable version updates for cargo (optimizer)
-  - package-ecosystem: "cargo"
-    directory: "/dcapal-optimizer-wasm"
-    schedule:
-      interval: "weekly"
-    # Allow up to 10 open pull requests  
-    open-pull-requests-limit: 10
-    labels:
       - "A-optimizer"
       - "C-dependency"
 
