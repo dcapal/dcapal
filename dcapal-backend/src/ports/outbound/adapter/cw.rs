@@ -8,10 +8,10 @@ use std::{
 use tracing::{debug, error, info};
 
 use crate::{
+    app::domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
-    domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     error::{DcaError, Result},
-    repository::market_data::MarketDataRepository,
+    ports::outbound::repository::market_data::MarketDataRepository,
     DateTime,
 };
 
@@ -78,7 +78,7 @@ impl CryptoWatchProvider {
                     .get(&a.quote.symbol)
                     .expect("Quote asset not found");
 
-                Market::new(pair, base.clone(), quote.clone())
+                Market::new(pair, base.clone(), quote.clone(), None)
             })
             .collect::<Vec<Market>>();
 

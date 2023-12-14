@@ -1,9 +1,8 @@
 use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::app::infra::utils::Expiring;
 use crate::DateTime;
-
-use super::utils::Expiring;
 
 pub type AssetId = String;
 pub type MarketId = String;
@@ -164,13 +163,13 @@ pub struct Market {
 }
 
 impl Market {
-    pub fn new(id: MarketId, base: Asset, quote: Asset) -> Self {
+    pub fn new(id: MarketId, base: Asset, quote: Asset, price: Option<Price>) -> Self {
         Self {
             id,
             pair: format!("{}/{}", base.id().to_uppercase(), quote.id().to_uppercase()),
             base,
             quote,
-            price: None,
+            price,
         }
     }
 
@@ -178,8 +177,8 @@ impl Market {
         &self.price
     }
 
-    pub fn set_price(&mut self, price: f64, ts: DateTime) {
-        self.price.replace(Price::new(price, ts));
+    pub fn set_price(&mut self, price: Price) {
+        self.price.replace(price);
     }
 
     pub fn is_fiat(&self) -> bool {

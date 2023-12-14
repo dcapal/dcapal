@@ -3,9 +3,9 @@ use futures::{StreamExt, TryStreamExt};
 use tracing::{debug, error};
 
 use crate::{
-    domain::entity::{Market, MarketId},
+    app::domain::entity::{Market, MarketId},
     error::{DcaError, Result},
-    repository::{dto::MarketDto, REDIS_BASE},
+    ports::outbound::repository::{dto::MarketDto, REDIS_BASE},
 };
 
 use super::MarketDataRepository;
@@ -164,6 +164,6 @@ async fn resolve_market(market: MarketDto, repo: &MarketDataRepository) -> Resul
             error!(mkt = market.id, "Quote asset not found: {}", &market.quote);
             Ok(None)
         }
-        (Some(b), Some(q)) => Ok(Some(Market::new(market.id, b, q))),
+        (Some(b), Some(q)) => Ok(Some(Market::new(market.id, b, q, market.price))),
     }
 }

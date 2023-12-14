@@ -2,9 +2,9 @@ use axum::async_trait;
 use tracing::{debug, error};
 
 use crate::{
-    domain::entity::{Asset, AssetId, AssetKind},
+    app::domain::entity::{Asset, AssetId, AssetKind},
     error::{DcaError, Result},
-    repository::REDIS_BASE,
+    ports::outbound::repository::REDIS_BASE,
 };
 
 const ASSET_KEY: &str = concatcp!(REDIS_BASE, ':', "asset");

@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures::Future;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::{watch, OnceCell, RwLock};
 
 pub struct ExpiringOnceCellValue<T> {
     pub value: T,
@@ -126,6 +126,16 @@ impl<T: Expiring> Expiring for ExpiringOption<T> {
         match self {
             ExpiringOption::Some(v) => v.time_to_live(),
             ExpiringOption::None(start, ttl) => (*start + *ttl) - Instant::now(),
+        }
+    }
+}
+
+pub type StopToken = watch::Receiver<bool>;
+
+pub async fn should_stop(stop_rx: &mut StopToken) {
+    while stop_rx.changed().await.is_ok() {
+        if *stop_rx.borrow_and_update() {
+            return;
         }
     }
 }

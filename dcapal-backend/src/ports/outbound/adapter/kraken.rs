@@ -11,10 +11,10 @@ use std::{
 use tracing::{debug, error, warn};
 
 use crate::{
+    app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
-    domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     error::{DcaError, Result},
-    repository::market_data::MarketDataRepository,
+    ports::outbound::repository::market_data::MarketDataRepository,
     DateTime,
 };
 
@@ -185,6 +185,7 @@ impl KrakenProvider {
                     format!("{base_id}{quote_id}"),
                     base.clone(),
                     quote.clone(),
+                    None,
                 ))
             })
             .collect::<Vec<_>>();
@@ -402,6 +403,7 @@ async fn resolve_assets_data_kraken_only(
                 format!("{base_id}{quote_id}"),
                 base.clone(),
                 quote.clone(),
+                None,
             ))
         })
         .collect::<Vec<_>>();

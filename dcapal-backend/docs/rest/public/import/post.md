@@ -1,6 +1,6 @@
 # Import portfolio
 
-Temporarely upload DcaPal portfolio definition to later import it in DcaPal client
+Temporarily upload DcaPal portfolio definition to later import it in DcaPal client
 
 **URL** : `/import/portfolio`
 
