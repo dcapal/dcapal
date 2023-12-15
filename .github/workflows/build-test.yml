@@ -30,7 +30,7 @@ jobs:
       - name: Lint
         run: |
           cd dcapal-backend
-          cargo fmt -- --check
+          cargo fmt --all -- --check
           cargo clippy -- -D warnings
 
       - name: Build and Test

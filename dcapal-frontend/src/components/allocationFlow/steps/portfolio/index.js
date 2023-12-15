@@ -40,9 +40,9 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
     const price = await getFetcher(a.provider, validCcys)(a.symbol, quoteCcy);
     if (!price) {
       console.warn(
-          "[ImportStep] Failed to fetch price for",
-          a.symbol,
-          `(provider: ${quoteCcy})`
+        "[ImportStep] Failed to fetch price for",
+        a.symbol,
+        `(provider=${a.provider} quoteCcy=${quoteCcy})`
       );
       return;
     }

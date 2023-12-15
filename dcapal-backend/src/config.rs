@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 
-#[derive(Clone, Debug, Serialize, Deserialize, strum_macros::Display)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, strum_macros::Display)]
 #[serde(rename_all = "lowercase")]
 pub enum PriceProvider {
     CryptoWatch,
