@@ -174,11 +174,13 @@ export const PortfolioStep = ({ ...props }) => {
         }
       >
         {assets && assets.length > 0 && (
-          <div className="w-[20rem] lg:sticky hidden md:flex  relative px-3 pt-2 pb-3 flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md  top-0 h-[30rem]">
-            <p className="font-light text-xl">
-              💸 {t("portfolioStep.transactionFees")}
-            </p>
-            <TransactionFees />
+          <div className="w-[20rem] lg:sticky hidden md:flex  relative  flex-col gap-2">
+            <div className="w-full bg-white ring-1 ring-black/5 rounded-md px-3 pt-2 pb-3 shadow-md top-0">
+              <p className="font-light text-xl">
+                💸 {t("portfolioStep.transactionFees")}
+              </p>
+              <TransactionFees />
+            </div>
           </div>
         )}
 
@@ -218,55 +220,7 @@ export const PortfolioStep = ({ ...props }) => {
               />
             );
           })}
-          {Object.keys(assetStore).length > 0 && (
-            <div
-              className={classNames("w-full max-w-[40rem] flex flex-col mt-4", {
-                "gap-4": isMobile,
-                "gap-2": !isMobile,
-              })}
-            >
-              <div className="w-full flex items-center justify-start">
-                <img
-                  className="w-full max-w-[3rem] p-1 self-start"
-                  alt="Bag"
-                  src={BAG}
-                />
-                <p className="flex-grow font-light">
-                  <Trans
-                    i18nKey="portfolioStep.fillWithNumber"
-                    values={{
-                      field: t("portfolioStep.quantity"),
-                      symbol: assets[assets.length - 1].symbol,
-                    }}
-                    components={[
-                      <span className="font-normal" />,
-                      <span className="uppercase" />,
-                    ]}
-                  />
-                </p>
-              </div>
-              <div className="w-full flex items-center justify-start">
-                <img
-                  className="w-full max-w-[3rem] p-1 self-start"
-                  alt="Piechart"
-                  src={PIECHART}
-                />
-                <p className="flex-grow font-light">
-                  <Trans
-                    i18nKey="portfolioStep.defineTargetWeight"
-                    values={{
-                      targetWeight: t("portfolioStep.targetWeight"),
-                      percentage: "20%",
-                    }}
-                    components={[
-                      <span className="font-normal" />,
-                      <span className="italic" />,
-                    ]}
-                  />
-                </p>
-              </div>
-            </div>
-          )}
+
           {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
             !isAllAllocated && (
               <div className="mt-6 font-light text-red-500">
@@ -285,31 +239,82 @@ export const PortfolioStep = ({ ...props }) => {
                 />
               </div>
             )}
-          {Object.keys(assetStore).length > 0 && (
-            <>
-              <p className="mt-6 font-thin text-xs">
-                {t("portfolioStep.lastFetch")}{" "}
-                {new Date(lastRefreshTime).toLocaleString(i18n.language)}
-              </p>
-              <div className="w-full mt-6 flex justify-between items-center">
-                <span
-                  className="font-medium underline cursor-pointer"
-                  onClick={onClickGoBack}
-                >
-                  {t("common.goBack")}
-                </span>
-                <button
-                  className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
-                  onClick={onClickAddLiquidity}
-                  disabled={!isAllAllocated}
-                >
-                  {t("common.next")}
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </div>
+      <div className={"w-full mt-5"}>
+        {Object.keys(assetStore).length > 0 && (
+          <div
+            className={classNames("w-full max-w-[40rem] flex flex-col mt-4", {
+              "gap-4": isMobile,
+              "gap-2": !isMobile,
+            })}
+          >
+            <div className="w-full flex items-center justify-start">
+              <img
+                className="w-full max-w-[3rem] p-1 self-start"
+                alt="Bag"
+                src={BAG}
+              />
+              <p className="flex-grow font-light">
+                <Trans
+                  i18nKey="portfolioStep.fillWithNumber"
+                  values={{
+                    field: t("portfolioStep.quantity"),
+                    symbol: assets[assets.length - 1].symbol,
+                  }}
+                  components={[
+                    <span className="font-normal" />,
+                    <span className="uppercase" />,
+                  ]}
+                />
+              </p>
+            </div>
+            <div className="w-full flex items-center justify-start">
+              <img
+                className="w-full max-w-[3rem] p-1 self-start"
+                alt="Piechart"
+                src={PIECHART}
+              />
+              <p className="flex-grow font-light">
+                <Trans
+                  i18nKey="portfolioStep.defineTargetWeight"
+                  values={{
+                    targetWeight: t("portfolioStep.targetWeight"),
+                    percentage: "20%",
+                  }}
+                  components={[
+                    <span className="font-normal" />,
+                    <span className="italic" />,
+                  ]}
+                />
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+      {Object.keys(assetStore).length > 0 && (
+        <>
+          <p className="mt-6 font-thin text-xs">
+            {t("portfolioStep.lastFetch")}{" "}
+            {new Date(lastRefreshTime).toLocaleString(i18n.language)}
+          </p>
+          <div className="w-full mt-6 flex justify-between items-center">
+            <span
+              className="font-medium underline cursor-pointer"
+              onClick={onClickGoBack}
+            >
+              {t("common.goBack")}
+            </span>
+            <button
+              className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
+              onClick={onClickAddLiquidity}
+              disabled={!isAllAllocated}
+            >
+              {t("common.next")}
+            </button>
+          </div>
+        </>
+      )}
       {Object.keys(assetStore).length === 0 && (
         <span
           className="mt-2 font-medium underline cursor-pointer"
