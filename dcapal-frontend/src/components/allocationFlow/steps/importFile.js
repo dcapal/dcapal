@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
 import { getFetcher } from "@app/providers";
 import { timeout } from "@utils/index.js";
@@ -12,38 +14,19 @@ import {
   addAsset,
   addPortfolio,
   getDefaultFees,
+  getDefaultPortfolioName,
   getNewPortfolio,
   parseAClass,
-  parseFeeType,
+  parseFees,
   selectPortfolio,
   setFeesAsset,
   setQty,
   setTargetWeight,
 } from "@components/allocationFlow/portfolioSlice";
 
-import { useTranslation } from "react-i18next";
+import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
-import IMPORT_PORTFOLIO from "@images/headers/import-portfolio.svg";
-
-const parseFees = (fees) => {
-  if (!fees) return null;
-
-  const parsed = {
-    ...fees,
-    feeStructure: {
-      ...fees.feeStructure,
-      type: parseFeeType(fees.feeStructure.type),
-    },
-  };
-
-  if (!parsed.feeStructure.type) {
-    return null;
-  }
-
-  return parsed;
-};
-
-const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
+const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -55,7 +38,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
 
   const imported = getNewPortfolio();
   imported.id = id;
-  imported.name = pfolio.name || t("importStep.defaultPortfolioName");
+  imported.name = pfolio.name;
   imported.quoteCcy = pfolio.quoteCcy;
 
   imported.fees = (() => {
@@ -83,7 +66,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch, t) => {
       console.warn(
         "[ImportStep] Failed to fetch price for",
         a.symbol,
-        `(provider: ${pfolio.quoteCcy})`
+        `(provider=${a.provider} quoteCcy=${pfolio.quoteCcy})`
       );
       continue;
     }
@@ -124,8 +107,13 @@ export const ImportStep = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const pfolioFile = useSelector((state) => state.app.pfolioFile);
   const validCcys = useSelector((state) => state.app.currencies);
+
+  const pfolioFile = useSelector((state) => state.app.pfolioFile);
+  const pfolio = pfolioFile ? JSON.parse(pfolioFile) : {};
+  if (Object.keys(pfolio).length > 0) {
+    pfolio.name = pfolio.name ?? getDefaultPortfolioName();
+  }
 
   useEffect(() => {
     return () => {
@@ -134,16 +122,14 @@ export const ImportStep = () => {
   }, []);
 
   useEffect(() => {
-    if (pfolioFile.length === 0) return;
-
-    const pfolio = JSON.parse(pfolioFile);
+    if (Object.keys(pfolio).length === 0) return;
 
     const runImport = async () => {
       const [success] = await Promise.all([
         // Pass `pfolioId` to `importPfolio` to overcome component re-render
         // issues that ended up adding the imported portfolio multiple times
         // with different UUIDs
-        importPfolio(pfolioId, pfolio, validCcys, dispatch, t),
+        importPfolio(pfolioId, pfolio, validCcys, dispatch),
         timeout(1000),
       ]);
 
@@ -157,7 +143,7 @@ export const ImportStep = () => {
     };
 
     runImport();
-  }, [pfolioFile]);
+  }, [pfolio]);
 
   const onClickGoBack = () => {
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
@@ -170,7 +156,7 @@ export const ImportStep = () => {
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"
           alt="Import Portfolio"
-          src={IMPORT_PORTFOLIO}
+          src={IMPORT_PORTFOLIO_SVG}
         />
         {isLoading && (
           <>

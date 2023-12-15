@@ -5,42 +5,25 @@ const buildProblemInput = (
   budget,
   assets,
   pfolioCcy,
+  fees,
   isBuyOnly,
-  isAdvancedAlgorithm,
-  fees
+  useAllBudget
 ) => {
-  if (isAdvancedAlgorithm) {
-    return {
-      type: "advanced",
-      budget: budget,
-      pfolio_ccy: pfolioCcy,
-      assets: {
-        ...assets,
-      },
-      is_buy_only: isBuyOnly,
-      fees: fees,
-    };
-  } else {
-    return {
-      type: "basic",
-      budget: budget,
-      assets: {
-        ...assets,
-      },
-      is_buy_only: isBuyOnly,
-    };
-  }
+  return {
+    type: "advanced",
+    budget: budget,
+    pfolio_ccy: pfolioCcy,
+    assets: {
+      ...assets,
+    },
+    is_buy_only: isBuyOnly,
+    use_all_budget: useAllBudget,
+    fees: fees,
+  };
 };
 
 expose({
-  async makeAndSolve(
-    budget,
-    assets,
-    pfolioCcy,
-    isBuyOnly,
-    isAdvancedAlgorithm,
-    fees
-  ) {
+  async makeAndSolve(budget, assets, pfolioCcy, fees, isBuyOnly, useAllBudget) {
     if (Number.isNaN(budget) || budget < 0) return null;
     if (!assets || Object.keys(assets).length === 0) return null;
 
@@ -48,9 +31,9 @@ expose({
       budget,
       assets,
       pfolioCcy,
+      fees,
       isBuyOnly,
-      isAdvancedAlgorithm,
-      fees
+      useAllBudget
     );
 
     const handle = Solver.build_problem(input);

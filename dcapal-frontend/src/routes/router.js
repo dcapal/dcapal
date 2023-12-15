@@ -7,6 +7,7 @@ import { setAllocationFlowStep, Step } from "@app/appSlice";
 import AboutPage from "./aboutPage";
 import DemoPage from "./demoPage";
 import ErrorPage from "./errorPage";
+import ImportPage from "./importPage";
 import NotFoundPage from "./notFoundPage";
 import { Root } from "./root";
 import UnderConstructionPage from "./underConstruction";
@@ -53,6 +54,11 @@ export const Router = () => {
     {
       path: "docs",
       element: <UnderConstructionPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "import",
+      element: <ImportPage />,
       errorElement: <ErrorPage />,
     },
   ];

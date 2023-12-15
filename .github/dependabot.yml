@@ -10,6 +10,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Allow up to 10 open pull requests
+    open-pull-requests-limit: 10 
+    labels:
+      - "A-backend"
+      - "A-optimizer"
+      - "C-dependency"
 
    # Enable version updates for npm
   - package-ecosystem: "npm"
@@ -18,11 +24,18 @@ updates:
     # Check the npm registry for updates every day (weekdays)
     schedule:
       interval: "weekly"
-
-  # Enable version updates for Docker
-  - package-ecosystem: "docker"
-    # Look for a `Dockerfile` in the `root` directory
-    directory: "/dcapal-backend/docker"
-    # Check for updates once a week
-    schedule:
-      interval: "weekly"
+    # Allow up to 10 open pull requests
+    open-pull-requests-limit: 10
+    labels:
+      - "A-frontend"
+      - "C-dependency"
+    groups:
+      babel:
+        patterns:
+        - "@babel*"
+      playwright:
+        patterns:
+        - "*playwright*"
+      i18next:
+        patterns:
+        - "*i18next*"

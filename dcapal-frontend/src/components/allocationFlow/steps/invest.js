@@ -12,22 +12,20 @@ import classNames from "classnames";
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
 import { replacer } from "@utils/index.js";
+
 const amtDecimals = 2;
 
-const buildProblemInput = (assets, useWholeShares) => {
+const buildProblemInput = (assets) => {
   return Object.values(assets).reduce(
     (as, a) => ({
       ...as,
       [a.symbol]: {
-        // Common input
         symbol: a.symbol,
         target_weight: a.targetWeight / 100,
-        // Use whole shares input
-        ...(useWholeShares && { shares: a.qty }),
-        ...(useWholeShares && { price: a.price }),
-        ...(useWholeShares && { is_whole_shares: isWholeShares(a.aclass) }),
-        // Use partial shares input
-        ...(!useWholeShares && { current_amount: a.amount }),
+        shares: a.qty,
+        price: a.price,
+        is_whole_shares: isWholeShares(a.aclass),
+        current_amount: a.amount,
       },
     }),
     {}
@@ -37,8 +35,10 @@ const buildProblemInput = (assets, useWholeShares) => {
 export const InvestStep = ({
   useTaxEfficient,
   useWholeShares,
+  useAllBudget,
   setUseTaxEfficient,
   setUseWholeShares,
+  setUseAllBudget,
 }) => {
   const [cash, setCash] = useState(0);
   const dispatch = useDispatch();
@@ -66,7 +66,7 @@ export const InvestStep = ({
         })
       );
 
-      const as = buildProblemInput(assets, useWholeShares);
+      const as = buildProblemInput(assets);
 
       try {
         const sol = await solver.analyzeAndSolve(as);
@@ -95,12 +95,16 @@ export const InvestStep = ({
 
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
-  const onClickTaxEfficient = (e) => {
+  const onClickTaxEfficient = () => {
     setUseTaxEfficient(!useTaxEfficient);
   };
 
-  const onClickWholeShares = (e) => {
+  const onClickWholeShares = () => {
     setUseWholeShares(!useWholeShares);
+  };
+
+  const onClickUseAllBudget = () => {
+    setUseAllBudget(!useAllBudget);
   };
 
   const onClickGoBack = () => {
@@ -148,7 +152,7 @@ export const InvestStep = ({
           {quoteCcy}
         </div>
       </div>
-      <div className="mt-2 mb-20 text-xl font-light">
+      <div className="mt-2 text-xl font-light">
         <Trans
           i18nKey={i18nKey}
           values={{
@@ -176,59 +180,77 @@ export const InvestStep = ({
         ) : null}
       </div>
 
-      <div className="w-full flex flex-col gap-1 justify-start">
-        <div
-          className="w-full flex items-center cursor-pointer"
-          onClick={onClickTaxEfficient}
-        >
-          <input
-            id="tax-efficient-checkbox"
-            type="checkbox"
-            className="w-4 h-4 accent-neutral-500 cursor-pointer"
-            checked={useTaxEfficient}
-            onChange={onClickTaxEfficient}
-          />
-          <label
-            htmlFor="#tax-efficient-checkbox"
-            className="ml-2 cursor-pointer select-none"
+      <div className="w-full flex flex-col gap-4 mt-20">
+        <p className="text"></p>
+        <div className="w-full flex flex-col gap-1 justify-start">
+          <div
+            className="w-full flex items-center cursor-pointer"
+            onClick={onClickTaxEfficient}
           >
+            <input
+              id="tax-efficient-checkbox"
+              type="checkbox"
+              className="w-4 h-4 accent-neutral-500 cursor-pointer"
+              checked={useTaxEfficient}
+              onChange={onClickTaxEfficient}
+            />
+            <label
+              htmlFor="#tax-efficient-checkbox"
+              className="ml-2 cursor-pointer select-none"
+            >
+              <Trans
+                i18nKey="investStep.taxEfficientAlgorithm"
+                values={{
+                  tax: t("investStep.taxEfficient"),
+                }}
+                components={[<span className="font-medium capitalize" />]}
+              />
+            </label>
+          </div>
+          <p className="text-sm font-light">
             <Trans
-              i18nKey="investStep.taxEfficientAlgorithm"
+              i18nKey="investStep.taxEfficientInfo"
               values={{
                 tax: t("investStep.taxEfficient"),
               }}
-              components={[<span className="font-medium" />]}
+              components={[<span className="italic capitalize" />]}
             />
-          </label>
+          </p>
         </div>
-        <p className="text-sm font-light">
-          <Trans
-            i18nKey="investStep.taxEfficientInfo"
-            values={{
-              tax: t("investStep.taxEfficient"),
-            }}
-            components={[<span className="italic" />]}
-          />
-        </p>
-      </div>
-      <div className="w-full mt-6 flex flex-col gap-3">
-        <div
-          className="flex gap-1 items-center font-light text-xs"
-          {...getToggleProps()}
-        >
-          <span
-            className={classNames("transition-transform", {
-              "rotate-90": isExpanded,
-            })}
+        <div className="w-full flex flex-col gap-1 justify-start">
+          <div
+            className="w-full flex items-center cursor-pointer"
+            onClick={onClickUseAllBudget}
           >
-            {">"}
-          </span>
-          <span>{t("investStep.advanced")}</span>
+            <input
+              id="tax-efficient-checkbox"
+              type="checkbox"
+              className="w-4 h-4 accent-neutral-500 cursor-pointer"
+              checked={useAllBudget}
+              onChange={onClickUseAllBudget}
+            />
+            <label
+              htmlFor="#tax-efficient-checkbox"
+              className="ml-2 cursor-pointer select-none"
+            >
+              {t("investStep.allocate")}{" "}
+              <span className="font-medium capitalize">
+                {t("investStep.allBudget")}
+              </span>
+            </label>
+          </div>
+          <p className="text-sm font-light">
+            <Trans
+              i18nKey="investStep.allocateAllBudgetInfo"
+              values={{
+                message:
+                  t("investStep.allocate") + " " + t("investStep.allBudget"),
+              }}
+              components={[<span className="italic capitalize" />]}
+            />
+          </p>
         </div>
-        <div
-          className="w-full pl-6 flex flex-col gap-1 justify-start text-sm"
-          {...getCollapseProps()}
-        >
+        <div className="w-full flex flex-col gap-1 justify-start">
           <div
             className="w-full flex items-center cursor-pointer"
             onClick={onClickWholeShares}
@@ -237,29 +259,34 @@ export const InvestStep = ({
               id="tax-efficient-checkbox"
               type="checkbox"
               className="w-4 h-4 accent-neutral-500 cursor-pointer"
-              checked={useWholeShares}
+              checked={!useWholeShares}
               onChange={onClickWholeShares}
             />
             <label
               htmlFor="#tax-efficient-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
-              <span className="font-medium">{t("investStep.doNotSplit")}</span>
-              {t("investStep.wholeShares")}
+              <Trans
+                i18nKey="investStep.useFractionalShares"
+                values={{
+                  fractionalShares: t("investStep.fractionalShares"),
+                }}
+                components={[<span className="font-medium capitalize" />]}
+              />
             </label>
           </div>
           <p className="text-sm font-light">
             <Trans
-              i18nKey="investStep.doNotSplitInfo"
+              i18nKey="investStep.useFractionalSharesInfo"
               values={{
-                message:
-                  t("investStep.doNotSplit") + t("investStep.wholeShares"),
+                message: t("investStep.fractionalShares"),
               }}
-              components={[<span className="italic" />]}
+              components={[<span className="italic capitalize" />]}
             />
           </p>
         </div>
       </div>
+
       <div className="w-full mt-6 flex items-center justify-between">
         <span
           className="font-medium underline cursor-pointer"

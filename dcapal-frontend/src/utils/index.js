@@ -3,7 +3,8 @@ export const timeout = (ms) => {
 };
 
 export const roundDecimals = (a, n) => {
-  return Math.round((a + Number.EPSILON) * Math.pow(10, n)) / Math.pow(10, n);
+  const num = Math.round(a + "e" + n);
+  return Number(num + "e" + -n);
 };
 
 export const roundAmount = (a) => roundDecimals(a, 2);
@@ -23,3 +24,5 @@ export const replacer = (key, value) => {
 export const mapValues = (obj, func) => {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, func(v)]));
 };
+
+export const ignoreNullReplacer = (k, v) => v ?? undefined;

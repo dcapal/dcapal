@@ -1,0 +1,73 @@
+{
+    "algorithm": "advanced",
+    "budget": 250.0,
+    "isBuyOnly": true,
+    "useAllBudget": false,
+    "portfolio": {
+        "name": "Low budget",
+        "quoteCcy": "eur",
+        "fees": {
+            "feeStructure": {
+                "type": "zeroFee"
+            }
+        },
+        "assets": [
+            {
+                "symbol": "SWDA.MI",
+                "name": "iShares Core MSCI World UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 78.5,
+                "qty": 10,
+                "amount": 785,
+                "weight": 65.46740390469282,
+                "targetWeight": 70
+            },
+            {
+                "symbol": "IMEA.SW",
+                "name": "iShares Core MSCI Europe UCITS ETF EUR (Acc)",
+                "aclass": "EQUITY",
+                "baseCcy": "chf",
+                "provider": "YF",
+                "price": 68.6559,
+                "qty": 4,
+                "amount": 274.62,
+                "weight": 22.903049863644327,
+                "targetWeight": 15
+            },
+            {
+                "symbol": "EIMI.MI",
+                "name": "iShares Core MSCI EM IMI UCITS ETF",
+                "aclass": "EQUITY",
+                "baseCcy": "eur",
+                "provider": "YF",
+                "price": 27.89,
+                "qty": 5,
+                "amount": 139.45,
+                "weight": 11.6298464643432,
+                "targetWeight": 15
+            }
+        ]
+    },
+    "expect": {
+        "result": "solved",
+        "solution": {
+            "SWDA.MI": {
+                "shares": 12,
+                "amount": 942.0,
+                "weight": 0.650071
+            },
+            "IMEA.SW": {
+                "shares": 4,
+                "amount": 274.6236,
+                "weight": 0.189517
+            },
+            "EIMI.MI": {
+                "shares": 6,
+                "amount": 167.34,
+                "weight": 0.115481
+            }
+        }
+    }
+}

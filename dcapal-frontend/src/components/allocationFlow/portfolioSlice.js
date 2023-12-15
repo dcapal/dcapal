@@ -1,5 +1,6 @@
+import { store } from "@app/store";
 import { createSlice } from "@reduxjs/toolkit";
-import { roundPrice } from "@utils/index.js";
+import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
 
 const updateWeight = (asset, totalAmount) => {
@@ -78,6 +79,46 @@ export const parseFeeType = (typeStr) => {
   return null;
 };
 
+export const parseFees = (fees) => {
+  if (!fees) return null;
+
+  const feeType = parseFeeType(fees.feeStructure.type);
+  if (!feeType) return null;
+
+  const parsed = getDefaultFees(feeType);
+
+  if (feeType === FeeType.ZERO_FEE) return parsed;
+
+  if (feeType === FeeType.FIXED) {
+    if (fees.maxFeeImpact) {
+      parsed.maxFeeImpact = fees.maxFeeImpact;
+    }
+    if (fees.feeStructure.feeAmount) {
+      parsed.feeStructure.feeAmount = fees.feeStructure.feeAmount;
+    }
+
+    return parsed;
+  }
+
+  if (feeType === FeeType.VARIABLE) {
+    if (fees.maxFeeImpact) {
+      parsed.maxFeeImpact = fees.maxFeeImpact;
+    }
+    if (fees.feeStructure.feeRate) {
+      parsed.feeStructure.feeRate = fees.feeStructure.feeRate;
+    }
+    if (fees.feeStructure.minFee) {
+      parsed.feeStructure.minFee = fees.feeStructure.minFee;
+    }
+    if (fees.feeStructure.maxFee) {
+      parsed.feeStructure.maxFee = fees.feeStructure.maxFee;
+    }
+    return parsed;
+  }
+
+  return null;
+};
+
 export const getDefaultFees = (type) => {
   if (!type) {
     return null;
@@ -122,6 +163,17 @@ export const getNewPortfolio = () => {
     fees: getDefaultFees(FeeType.ZERO_FEE),
     lastPriceRefresh: Date.now(),
   };
+};
+
+export const getDefaultPortfolioName = () => {
+  const defaultName = i18n.t("importStep.defaultPortfolioName");
+  const defaultNameCount = Object.values(store.getState().pfolio.pfolios)
+    .map((p) => p.name)
+    .filter((name) => name.startsWith(defaultName)).length;
+
+  return defaultNameCount > 0
+    ? `${defaultName} ${defaultNameCount + 1}`
+    : `${defaultName}`;
 };
 
 export const currentPortfolio = (state) => {
@@ -226,10 +278,8 @@ export const portfolioSlice = createSlice({
       const symbol = action.payload.symbol;
       if (symbol in pfolio.assets) {
         const asset = pfolio.assets[symbol];
-        const price = asset?.price || 0;
-        const qty = asset?.qty || 0;
 
-        pfolio.totalAmount -= qty * price;
+        pfolio.totalAmount -= asset.amount;
         delete pfolio.assets[symbol];
 
         Object.values(pfolio.assets).forEach((asset) => {
@@ -243,10 +293,9 @@ export const portfolioSlice = createSlice({
 
       const asset = pfolio.assets[action.payload.symbol];
       const price = asset?.price || 0;
-      const qty = asset?.qty || 0;
-      const newAmount = (action.payload.qty || 0) * price;
+      const newAmount = roundAmount((action.payload.qty || 0) * price);
 
-      pfolio.totalAmount -= qty * price;
+      pfolio.totalAmount -= asset.amount;
       pfolio.totalAmount += newAmount;
 
       pfolio.assets = {
@@ -275,8 +324,8 @@ export const portfolioSlice = createSlice({
       price = roundPrice(price);
 
       // Refresh amounts
-      const newAmount = (asset.qty || 0) * price;
-      pfolio.totalAmount -= asset.qty * price;
+      const newAmount = roundAmount((asset.qty || 0) * price);
+      pfolio.totalAmount -= asset.amount;
       pfolio.totalAmount += newAmount;
       pfolio.totalAmount = pfolio.totalAmount;
 
