@@ -43,9 +43,9 @@ const toUnixTimestamp = (date, startOfDay) => {
 };
 
 export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
-  const lastThreeDays = new Date();
-  lastThreeDays.setDate(lastThreeDays.getDate() - 3);
-  const period1 = toUnixTimestamp(lastThreeDays, true);
+  const lastFourDays = new Date();
+  lastFourDays.setDate(lastFourDays.getDate() - 4);
+  const period1 = toUnixTimestamp(lastFourDays, true);
   const period2 = toUnixTimestamp(new Date(), false);
   const url = `${DCAPAL_API_CHART}/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
   try {

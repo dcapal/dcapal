@@ -1,8 +1,6 @@
 import React, { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useLocation, useRoutes } from "react-router-dom";
+import { useRoutes } from "react-router-dom";
 import { App } from "@app";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 import AboutPage from "./aboutPage";
 import DemoPage from "./demoPage";
@@ -20,17 +18,6 @@ import {
 } from "@app/config";
 
 export const Router = () => {
-  const step = useSelector((state) => state.app.allocationFlowStep);
-
-  const dispatch = useDispatch();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (location.pathname === "/allocate" && step > Step.PORTFOLIO) {
-      dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
-    }
-  }, [location]);
-
   let routesConfig = [
     {
       path: "*",

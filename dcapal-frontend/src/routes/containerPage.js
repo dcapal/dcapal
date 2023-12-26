@@ -9,7 +9,7 @@ export const ContainerPage = ({ id, title, content }) => {
   return (
     <>
       <DcaPalHelmet id={id} title={title} />
-      <div className="w-full h-screen">
+      <div className="w-full h-dvh">
         <div className="h-full flex flex-col items-center">
           <NavBar />
           {content}

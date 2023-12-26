@@ -12,6 +12,7 @@ module.exports = (env, argv) =>
         directory: path.resolve(__dirname, "./dist"),
       },
       compress: true,
+      allowedHosts: "all",
       port: 3000,
       historyApiFallback: true,
       hot: true,

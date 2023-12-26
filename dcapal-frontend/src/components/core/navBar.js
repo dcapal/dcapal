@@ -32,7 +32,7 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
   };
 
   const className = classNames(
-    "absolute z-50 w-full h-screen inset-0 flex flex-col bg-[#333333]",
+    "absolute z-50 w-full h-dvh inset-0 flex flex-col justify-between bg-[#333333]",
     {
       invisible: !visible,
     }
@@ -40,35 +40,37 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
 
   return (
     <div className={className}>
-      <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
-        <div className="flex gap-x-8">
-          <div
-            className="text-xl font-semibold text-white"
-            onClick={onClickTitle}
-          >
-            <Link to={"/"}>DcaPal</Link>
+      <div className="w-full">
+        <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
+          <div className="flex gap-x-8">
+            <div
+              className="text-xl font-semibold text-white"
+              onClick={onClickTitle}
+            >
+              <Link to={"/"}>DcaPal</Link>
+            </div>
           </div>
+          <CloseBtn onClick={toggleMenu} />
         </div>
-        <CloseBtn onClick={toggleMenu} />
-      </div>
-      <div className="flex flex-1 flex-col px-8 py-3 gap-y-6">
-        <Link to={"/allocate"} onClick={onClickMyPortfolios}>
-          <div className="w-full text-2xl font-light text-white">
-            {t("navbar.myPortfolios")}
-          </div>
-        </Link>
-        <Link to={"/about"} onClick={toggleMenu}>
-          <div className="w-full text-2xl font-light text-white">
-            {" "}
-            {t("navbar.about")}
-          </div>
-        </Link>
-        <Link to={"/docs"} onClick={toggleMenu}>
-          <div className="w-full text-2xl font-light text-white">
-            {" "}
-            {t("navbar.docs")}
-          </div>
-        </Link>
+        <div className="grow flex flex-col px-8 py-3 gap-y-6">
+          <Link to={"/allocate"} onClick={onClickMyPortfolios}>
+            <div className="w-full text-2xl font-light text-white">
+              {t("navbar.myPortfolios")}
+            </div>
+          </Link>
+          <Link to={"/about"} onClick={toggleMenu}>
+            <div className="w-full text-2xl font-light text-white">
+              {" "}
+              {t("navbar.about")}
+            </div>
+          </Link>
+          <Link to={"/docs"} onClick={toggleMenu}>
+            <div className="w-full text-2xl font-light text-white">
+              {" "}
+              {t("navbar.docs")}
+            </div>
+          </Link>
+        </div>
       </div>
       <div className="self-center pb-4">
         <LanguageSwitcher />

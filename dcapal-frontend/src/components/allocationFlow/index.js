@@ -21,6 +21,7 @@ export const AllocationFlow = () => {
     if (step >= Step.PORTFOLIO && !selectedPfolio) {
       dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
     }
+    window.scrollTo(0, 0); // Reset scroll position on step change
   }, [step]);
 
   if (step <= Step.PORTFOLIOS) {
