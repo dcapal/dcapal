@@ -19,6 +19,11 @@
     margin: 0;
   }
 
+  /* Firefox */
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+
   /* Customize scrollbar on Desktop only */
   @media (pointer: fine) {
     ::-webkit-scrollbar {
