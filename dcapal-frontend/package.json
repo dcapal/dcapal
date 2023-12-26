@@ -1,6 +1,6 @@
 {
   "name": "dcapal-frontend",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A web client for DcaPal web application",
   "main": "index.js",
   "scripts": {
