@@ -11,8 +11,28 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
+const amtFmt = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+};
+
+const priceFmt = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+};
+
+const weightFmt = {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+};
+
+const feeImpactFmt = {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 4,
+};
+
 const feeAmount = (fees, amount) => {
-  if (!fees) return 0;
+  if (!fees || !amount) return 0;
 
   switch (fees.feeStructure.type) {
     case FeeType.ZERO_FEE:
@@ -25,7 +45,7 @@ const feeAmount = (fees, amount) => {
           (fees.feeStructure.feeRate * amount) / 100,
           fees.feeStructure.minFee
         ),
-        fees.feeStructure.maxFee
+        fees.feeStructure.maxFee || Infinity
       );
     default:
       return 0;
@@ -50,19 +70,6 @@ export const AllocateCard = ({
   const { t, i18n } = useTranslation();
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const isMobile = !useMediaQuery(MEDIA_SMALL);
-
-  const amtFmt = {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  };
-  const priceFmt = {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  };
-  const weightFmt = {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  };
 
   const diffAmount = (amount || 0) - (oldAmount || 0);
   const diffSign = diffAmount === 0 ? " " : diffAmount > 0 ? "+" : "-";
@@ -229,15 +236,14 @@ export const AllocateCard = ({
                   {t("endStep.fees")}
                 </div>
                 <p className="uppercase">
-                  {amountFees.toLocaleString(i18n.language, priceFmt)}{" "}
-                  {quoteCcy}
+                  {amountFees.toLocaleString(i18n.language, amtFmt)} {quoteCcy}
                 </p>
               </div>
               <div className="w-full flex items-center justify-between">
                 <div className="min-w-[5.5rem] mr-2 font-light text-xs">
                   {t("endStep.feeImpact")}
                 </div>
-                <p>{feeImpact.toLocaleString(i18n.language, weightFmt)} %</p>
+                <p>{feeImpact.toLocaleString(i18n.language, feeImpactFmt)} %</p>
               </div>
             </div>
           )}
@@ -274,7 +280,7 @@ export const AllocateCard = ({
                   </div>
                   <span className="uppercase">
                     <div>
-                      {amountFees.toLocaleString(i18n.language, priceFmt)}{" "}
+                      {amountFees.toLocaleString(i18n.language, amtFmt)}{" "}
                       {quoteCcy}
                     </div>
                   </span>
@@ -310,7 +316,7 @@ export const AllocateCard = ({
                     {t("endStep.feeImpact")}
                   </div>
                   <span className="grow text-right">
-                    {feeImpact.toLocaleString(i18n.language, weightFmt)} %
+                    {feeImpact.toLocaleString(i18n.language, feeImpactFmt)} %
                   </span>
                 </div>
               </div>
@@ -331,10 +337,10 @@ export const AllocateCard = ({
                 )}{" "}
                 <span className="uppercase">{quoteCcy}</span>){" "}
                 {t("endStep.butWouldHavePaid")}{" "}
-                {theo?.fees.toLocaleString(i18n.language, priceFmt)}{" "}
+                {theo?.fees.toLocaleString(i18n.language, amtFmt)}{" "}
                 <span className="uppercase">{quoteCcy}</span>{" "}
                 {t("endStep.worthOfFees")} (
-                {theo?.feeImpact.toLocaleString(i18n.language, weightFmt)}%{" "}
+                {theo?.feeImpact.toLocaleString(i18n.language, feeImpactFmt)}%{" "}
                 {t("endStep.impact")})
               </span>
             </div>

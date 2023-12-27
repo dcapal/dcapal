@@ -31,6 +31,13 @@ jobs:
     needs: [extract-tag-version]
     steps:
       - uses: actions/checkout@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ${{ env.DOCKER_REPO }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Cache Docker layers
@@ -51,7 +58,8 @@ jobs:
           context: .
           file: ./dcapal-backend/docker/Dockerfile
           push: true
-          tags: ${{ env.DOCKER_REPO }}:latest${{ startsWith(env.RELEASE_VERSION, 'v') && format(',{0}:{1}', env.DOCKER_REPO, env.RELEASE_VERSION) || ''}}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
       - # Temp fix

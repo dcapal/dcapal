@@ -575,7 +575,7 @@ fn is_fee_impact_too_high(asset: &Asset, general_fees: &TransactionFees) -> bool
     }
 
     let fees = asset.compute_fee(&allocated, general_fees);
-    let impact = fees / allocated;
+    let impact = (fees / allocated).round_dp(PERCENTAGE_DECIMALS);
 
     debug!(
         "allocated={allocated} fees={fees} impact={impact} max_fee_impact={}",
