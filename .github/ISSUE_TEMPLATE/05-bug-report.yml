@@ -1,0 +1,54 @@
+name: 🐞 Bug Report
+description: For report a bug.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a new issue, check existing [issues](https://github.com/leonardoarcari/dcapal/issues) and upvote if applicable.
+  - type: textarea
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of the bug.
+      placeholder: "When I click on submit an error appears ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Is it a regression?
+      description: Did this behaviour used to work in the previous version?.
+      placeholder: "Yes, the last version in which this bug was not present was: ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: To Reproduce
+      description: Step to reproduce security issue.
+      placeholder: "First of all ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behaviour
+      placeholder: "I expect to receive my portfolio but ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Media prove
+      placeholder: "Some screenshot or a video."
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Your environment
+      description: OS, browser, node version, npm version ...
+      placeholder: "macOS Catalina, Chrome 120, Node 20, npm 10"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional context
+      placeholder: "In addition my browser crash."
+    validations:
+      required: false
