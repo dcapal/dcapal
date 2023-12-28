@@ -1,13 +1,10 @@
 name: ❓ Question or Support Request
 description: Ask something about the project or propose something.
 title: "[Question]: "
-labels: []
-assignees: ""
 body:
   - type: markdown
     attributes:
-      values: |
-        # **❓ Question or Support Request**
+      value: |
         Before opening a new issue, check existing [issues](https://github.com/leonardoarcari/dcapal/issues) and upvote if applicable.
   - type: textarea
     attributes:
