@@ -1,0 +1,15 @@
+name: ❓ Question or Support Request
+description: Ask something about the project or propose something.
+title: "[Question]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a new issue, check existing [issues](https://github.com/leonardoarcari/dcapal/issues) and upvote if applicable.
+  - type: textarea
+    attributes:
+      label: Describe your question or ask for support
+      description: A clear and concise description of the question.
+      placeholder: "How can I use DcaPal?"
+    validations:
+      required: true

@@ -1,0 +1,47 @@
+name: ⚠️ Security Report
+description: For issues related to application security.
+title: "[Security]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a new issue, check existing [issues](https://github.com/leonardoarcari/dcapal/issues) and upvote if applicable.
+  - type: textarea
+    attributes:
+      label: Describe the security issue
+      description: A clear and concise description of the security issue.
+      placeholder: "JWT does not work in my laptop because ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: To Reproduce
+      description: Step to reproduce security issue.
+      placeholder: "First of all ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behaviour
+      placeholder: "I expect to receive my portfolio but ..."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Media prove
+      placeholder: "Some screenshot or a video."
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Your environment
+      description: OS, browser, node version, npm version ...
+      placeholder: "macOS Catalina, Chrome 120, Node 20, npm 10"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional context
+      placeholder: "In addition my browser crash."
+    validations:
+      required: false
