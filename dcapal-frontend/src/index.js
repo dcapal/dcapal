@@ -4,8 +4,8 @@ import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 
 import "./style.css";
-import { store, persistor } from "@app/store";
-import { Router } from "@routes/router";
+import { store, persistor } from "./app/store";
+import { Router } from "@routes/router.jsx";
 import { BrowserRouter } from "react-router-dom";
 
 import i18n from "i18next";

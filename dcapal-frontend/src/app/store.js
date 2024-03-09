@@ -3,8 +3,8 @@ import i18n from "i18next";
 import portfolioReducer, {
   FeeType,
   getDefaultFees,
-} from "@components/allocationFlow/portfolioSlice";
-import appReducer, { Step } from "@app/appSlice";
+} from "../components/allocationFlow/portfolioSlice"
+import appReducer, { Step } from "./appSlice";
 import storage from "redux-persist/lib/storage";
 import {
   persistReducer,
@@ -17,8 +17,8 @@ import {
   REGISTER,
 } from "redux-persist";
 import createMigrate from "redux-persist/es/createMigrate";
-import { mapValues } from "@utils/index.js";
-import { REFRESH_PRICE_INTERVAL_SEC } from "./config";
+import { mapValues } from "../utils/index.js";
+import { REFRESH_PRICE_INTERVAL_SEC } from "./config.js";
 
 const migrations = {
   0: (state) => {
