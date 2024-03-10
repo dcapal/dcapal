@@ -6,7 +6,6 @@ import { CookieButton } from "../components/core/cookieButton";
 import CookieConsent from "../components/core/cookieConsent";
 
 export const ContainerPage = ({ id, title, content }) => {
-  console.log(import.meta.env.VITE_ENABLE_COOKIE_BUTTON)
   const cookieButtonEnabled  = Number(import.meta.env.VITE_ENABLE_COOKIE_BUTTON) === 1
   return (
     <>
