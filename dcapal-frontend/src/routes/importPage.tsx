@@ -1,13 +1,13 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice.js";
-import { Spinner } from "../components/spinner/spinner.jsx";
-import { useFetchImportedPortfolio } from "../hooks/useFetchImportedPortfolio.jsx";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice.js";
+import { Spinner } from "@components/spinner/spinner.jsx";
+import { useFetchImportedPortfolio } from "@hooks/useFetchImportedPortfolio.jsx";
 
-import IMPORT_PORTFOLIO_SVG from "/@images/headers/import-portfolio.svg";
+import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
 const navigateToPortfolios = (portfolio, step, dispatch, navigate) => {
   dispatch(setPfolioFile({ file: portfolio ? JSON.stringify(portfolio) : "" }));

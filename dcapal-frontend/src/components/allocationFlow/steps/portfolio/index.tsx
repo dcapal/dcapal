@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
@@ -17,15 +17,15 @@ import {
   setTargetWeight,
 } from "../../portfolioSlice.jsx";
 
-import { setAllocationFlowStep, Step } from "../../../../app/appSlice.js";
+import { setAllocationFlowStep, Step } from "@app/appSlice.js";
 
-import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "../../../../app/config.js";
+import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config.js";
 
-import SETTINGS from "/@images/icons/settings.svg";
-import BAG from "/@images/icons/bag.svg";
-import PIECHART from "/@images/icons/piechart.svg";
+import SETTINGS from "@images/icons/settings.svg";
+import BAG from "@images/icons/bag.svg";
+import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees.jsx";
-import { getFetcher } from "../../../../app/providers.js";
+import { getFetcher } from "@app/providers.js";
 import { Trans, useTranslation } from "react-i18next";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {

@@ -1,9 +1,8 @@
-import React from "react";
-import { NavBar } from "../components/core/navBar";
+import { NavBar } from "@components/core/navBar";
 import { DcaPalHelmet } from "./helmet.jsx";
-import { Footer } from "../components/core/footer";
-import { CookieButton } from "../components/core/cookieButton";
-import CookieConsent from "../components/core/cookieConsent";
+import { Footer } from "@components/core/footer";
+import { CookieButton } from "@components/core/cookieButton";
+import CookieConsent from "@components/core/cookieConsent";
 
 export const ContainerPage = ({ id, title, content }) => {
   const cookieButtonEnabled  = Number(import.meta.env.VITE_ENABLE_COOKIE_BUTTON) === 1

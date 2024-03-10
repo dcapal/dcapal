@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { api } from "../../../../app/api.jsx";
+import { api } from "@app/api.jsx";
 import Fuse from "fuse.js";
 import { useSelector } from "react-redux";
 import {
@@ -9,8 +9,8 @@ import {
   fetchPrice,
   fetchPriceYF,
   Provider,
-} from "../../../../app/providers.js";
-import { DCAPAL_API_SEARCH } from "../../../../app/config.js";
+} from "@app/providers.js";
+import { DCAPAL_API_SEARCH } from "@app/config.js";
 import { Spinner } from "../../../spinner/spinner.jsx";
 import {
   ACLASS,

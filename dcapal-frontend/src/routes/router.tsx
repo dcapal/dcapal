@@ -1,6 +1,5 @@
-import React from "react";
 import { useRoutes } from "react-router-dom";
-import { App } from "../app/index";
+import { App } from "@app/index";
 
 import AboutPage from "./aboutPage.jsx";
 import DemoPage from "./demoPage.jsx";

@@ -1,13 +1,12 @@
-import React from "react";
 import { useSelector } from "react-redux";
-import { Step } from "../app/appSlice.js";
+import { Step } from "@app/appSlice.js";
 import {
   aclassToString,
   currentPortfolio,
   feeTypeToString,
 } from "./allocationFlow/portfolioSlice.jsx";
 import { useTranslation } from "react-i18next";
-import { ignoreNullReplacer } from "../utils/";
+import { ignoreNullReplacer } from "@utils/index";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 

@@ -1,9 +1,8 @@
 import { useMediaQuery } from "@react-hook/media-query";
-import React from "react";
 import { useSelector } from "react-redux";
-import { MEDIA_SMALL } from "../../../../app/config.js";
+import { MEDIA_SMALL } from "@app/config.js";
 import { UNALLOCATED_CASH } from ".";
-import { roundAmount, roundDecimals } from "../../../../utils/index.js";
+import { roundAmount, roundDecimals } from "@utils/index.js";
 import {
   ACLASS,
   FeeType,

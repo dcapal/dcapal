@@ -17,7 +17,7 @@ import {
   REGISTER,
 } from "redux-persist";
 import createMigrate from "redux-persist/es/createMigrate";
-import { mapValues } from "../utils/index.js";
+import { mapValues } from "@utils/index.js";
 import { REFRESH_PRICE_INTERVAL_SEC } from "./config.js";
 
 const migrations = {

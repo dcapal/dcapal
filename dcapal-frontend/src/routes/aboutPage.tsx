@@ -1,15 +1,14 @@
-import React from "react";
 import GitHubButton from "react-github-btn";
 
 import { Trans, useTranslation } from "react-i18next";
 import { ContainerPage } from "./containerPage";
 
-import ME from "/@images/headers/me.jpg";
-import GITHUB from "/@images/social/github.svg";
-import LINKEDIN from "/@images/social/linkedin.svg";
-import TELEGRAM from "/@images/social/telegram.svg";
-import TWITTER from "/@images/social/twitter.svg";
-import YOUTUBE from "/@images/social/youtube.svg";
+import ME from "@images/headers/me.jpg";
+import GITHUB from "@images/social/github.svg";
+import LINKEDIN from "@images/social/linkedin.svg";
+import TELEGRAM from "@images/social/telegram.svg";
+import TWITTER from "@images/social/twitter.svg";
+import YOUTUBE from "@images/social/youtube.svg";
 
 const SocialBar = () => {
   return (

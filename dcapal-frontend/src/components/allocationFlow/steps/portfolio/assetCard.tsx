@@ -1,4 +1,3 @@
-import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useMediaQuery } from "@react-hook/media-query";
 
@@ -8,13 +7,13 @@ import {
   isWholeShares,
   removeAsset,
 } from "../../portfolioSlice.jsx";
-import { MEDIA_SMALL } from "../../../../app/config.js";
+import { MEDIA_SMALL } from "@app/config.js";
 import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
 import { TransactionFees } from "./transactionFees.jsx";
 import { useTranslation } from "react-i18next";
 
-import CLOSE_SVG from "/@images/icons/close-menu.svg";
+import CLOSE_SVG from "@images/icons/close-menu.svg";
 
 export const AssetCard = ({
   symbol,

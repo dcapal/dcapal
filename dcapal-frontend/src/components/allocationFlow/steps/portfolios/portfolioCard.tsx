@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { InputText } from "../../../core/inputText.jsx";
 import { useDispatch } from "react-redux";
@@ -8,10 +8,10 @@ import {
   renamePortfolio,
   selectPortfolio,
 } from "../../portfolioSlice.jsx";
-import { Step, setAllocationFlowStep } from "../../../../app/appSlice.js";
+import { Step, setAllocationFlowStep } from "@app/appSlice.js";
 
-import EDIT_SVG from "/@images//icons/edit.svg";
-import CLOSE_SVG from "/@images//icons/close-menu.svg";
+import EDIT_SVG from "@images//icons/edit.svg";
+import CLOSE_SVG from "@images//icons/close-menu.svg";
 
 const orderByWeightDesc = (a, b) => b.weight - a.weight;
 

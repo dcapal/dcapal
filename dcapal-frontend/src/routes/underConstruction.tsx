@@ -1,6 +1,4 @@
-import React from "react";
-
-import UNDER_CONSTRUCTION from "/@images/headers/under-construction.svg";
+import UNDER_CONSTRUCTION from "@images/headers/under-construction.svg";
 
 import { Link } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";

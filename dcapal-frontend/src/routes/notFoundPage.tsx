@@ -1,6 +1,4 @@
-import React from "react";
-
-import NOT_FOUND from "/@images/headers/not-found.svg";
+import NOT_FOUND from "@images/headers/not-found.svg";
 
 import { useTranslation } from "react-i18next";
 import { ContainerPage } from "./containerPage";

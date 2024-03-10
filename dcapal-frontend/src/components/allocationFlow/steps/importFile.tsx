@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "../../../app/appSlice.js";
-import { getFetcher } from "../../../app/providers.js";
-import { timeout } from "../../../utils";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice.js";
+import { getFetcher } from "@app/providers.js";
+import { timeout } from "@utils/index.ts";
 import { Spinner } from "../../spinner/spinner.jsx";
 import {
   ACLASS,
@@ -24,7 +24,7 @@ import {
   setTargetWeight,
 } from "../portfolioSlice.jsx";
 
-import IMPORT_PORTFOLIO_SVG from "/@images//headers/import-portfolio.svg";
+import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
 const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   const stopWithError = (...args) => {

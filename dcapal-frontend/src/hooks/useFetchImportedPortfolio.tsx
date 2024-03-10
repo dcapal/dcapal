@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { DCAPAL_API } from "../app/config.js";
-import { api } from "../app/api.jsx";
+import { DCAPAL_API } from "@app/config.js";
+import { api } from "@app/api.jsx";
 
 export const useFetchImportedPortfolio = (portfolioId) => {
   const [portfolio, setPortfolio] = useState(null);

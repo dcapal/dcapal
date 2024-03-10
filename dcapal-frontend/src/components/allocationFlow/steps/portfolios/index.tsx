@@ -9,7 +9,7 @@ import {
   Step,
   setAllocationFlowStep,
   setPreferredCurrency,
-} from "../../../../app/appSlice.js";
+} from "@app/appSlice.js";
 import {
   addPortfolio,
   getNewPortfolio,

@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "../app/appSlice.js";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice.js";
 
 import {
   DEMO_PF_60_40,
@@ -10,10 +10,10 @@ import {
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
 } from "../app/config.js";
-import PF_60_40 from "../../demo/dcapal-60-40.json";
-import PF_ALL_SEASONS from "../../demo/dcapal-all-seasons.json";
-import PF_MR_RIP from "../../demo/dcapal-mrrip.json";
-import PF_HODLX from "../../demo/dcapal-hodlx.json";
+import PF_60_40 from "@demo/dcapal-60-40.json";
+import PF_ALL_SEASONS from "@demo/dcapal-all-seasons.json";
+import PF_MR_RIP from "@demo/dcapal-mrrip.json";
+import PF_HODLX from "@demo/dcapal-hodlx.json";
 import { useTranslation } from "react-i18next";
 
 const demoPortfolios = {

@@ -1,7 +1,7 @@
-import React, { useRef } from "react";
+import { useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { setAllocationFlowStep, setPfolioFile, Step } from "../../app/appSlice.js";
+import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice.js";
 import { useTranslation } from "react-i18next";
 
 export const LaunchBtn = () => {

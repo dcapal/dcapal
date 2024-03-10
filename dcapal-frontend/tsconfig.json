@@ -20,13 +20,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-//    "baseUrl": "./src",
     "paths": {
       "@app/*": [ "./src/app/*" ],
       "@components/*": [ "./src/components/*" ],
       "@demo/*": [ "./demo/*" ],
       "@hooks/*": [ "./src/hooks/*" ],
-      "@images/*": [ "./images/*" ],
+      "@images/*": [ "./@images/*" ],
       "@routes/*": [ "./src/routes/*" ],
       "@utils/*": [ "./src/utils/*" ],
       "@workers/*": [ "./src/workers/*" ]

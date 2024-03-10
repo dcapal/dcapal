@@ -1,15 +1,13 @@
-import React from "react";
-
-import { LaunchBtn } from "../components/core/launchBtn";
-import { RootCard } from "../components/core/rootCard";
+import { LaunchBtn } from "@components/core/launchBtn";
+import { RootCard } from "@components/core/rootCard";
 import { Trans, useTranslation } from "react-i18next";
 import { ContainerPage } from "./containerPage";
 
-import INVESTING_FRONT from "/@images/headers/investing_front.svg";
-import ICON_AMOUNT from "/@images/icons/amount.svg";
-import ICON_MARKET from "/@images/icons/market.svg";
-import ICON_PORTFOLIO from "/@images/icons/portfolio.svg";
-import ICON_REBALANCE from "/@images/icons/rebalance.svg";
+import INVESTING_FRONT from "@images/headers/investing_front.svg";
+import ICON_AMOUNT from "@images/icons/amount.svg";
+import ICON_MARKET from "@images/icons/market.svg";
+import ICON_PORTFOLIO from "@images/icons/portfolio.svg";
+import ICON_REBALANCE from "@images/icons/rebalance.svg";
 
 export const Root = () => {
   const { t } = useTranslation();

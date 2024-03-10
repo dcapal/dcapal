@@ -1,6 +1,6 @@
-import { store } from "../../app/store.js";
+import { store } from "@app/store.js";
 import { createSlice } from "@reduxjs/toolkit";
-import { roundAmount, roundPrice } from "../../utils";
+import { roundAmount, roundPrice } from "@utils/index.ts";
 import i18n from "i18next";
 
 const updateWeight = (asset, totalAmount) => {
