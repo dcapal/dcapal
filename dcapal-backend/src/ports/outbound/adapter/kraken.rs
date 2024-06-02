@@ -1,13 +1,14 @@
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    fmt::Debug,
+};
+
 use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use reqwest::StatusCode;
 use serde::{de::DeserializeOwned, Deserialize};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    fmt::Debug,
-};
 use tracing::{debug, error, warn};
 
 use crate::{
@@ -483,8 +484,9 @@ async fn fetch_assets(
 }
 
 mod fiat {
-    use lazy_static::lazy_static;
     use std::collections::HashMap;
+
+    use lazy_static::lazy_static;
 
     lazy_static! {
         static ref FIAT_IDS: HashMap<&'static str, &'static str> = HashMap::from([
@@ -525,7 +527,7 @@ fn get_kraken_api_periods(freq: OHLCFrequency) -> &'static str {
 }
 
 #[derive(Debug, Clone)]
-struct KAssetsDataCurrency {
+pub struct KAssetsDataCurrency {
     symbol: String,
     name: String,
     is_fiat: bool,
@@ -548,12 +550,6 @@ impl Into<Asset> for KAssetsDataCurrency {
     }
 }
 
-#[derive(Debug, Clone)]
-struct KAssetData {
-    _base: KAssetsDataCurrency,
-    _quote: KAssetsDataCurrency,
-}
-
 #[derive(Debug, Clone, Deserialize)]
 struct OHLCResult {
     error: Vec<String>,
@@ -563,7 +559,7 @@ struct OHLCResult {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum Payload {
-    Last(i64),
+    Last(()),
     CandleSticks(CandleSticks),
 }
 
