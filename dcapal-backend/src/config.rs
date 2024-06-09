@@ -1,3 +1,4 @@
+use clerk_rs::ClerkConfiguration;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;

@@ -14,6 +14,8 @@ use axum::{
     Router,
 };
 use chrono::prelude::*;
+use clerk_rs::validators::axum::ClerkLayer;
+use clerk_rs::ClerkConfiguration;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
@@ -92,6 +94,10 @@ pub struct DcaServer {
     stop_tx: tokio::sync::watch::Sender<bool>,
 }
 
+async fn index() -> &'static str {
+    "Hello world!"
+}
+
 impl DcaServer {
     pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
@@ -152,13 +158,28 @@ impl DcaServer {
             providers,
         });
 
-        let app = Router::new()
+        let clerk_config: ClerkConfiguration = ClerkConfiguration::new(
+            None,
+            None,
+            Some("sk_test_uhCfScBrTtyI2LMePbYkiDVdJSqpcGWJNjX1LVe2LC".to_string()),
+            None,
+        );
+
+        let open_routes = Router::new()
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
             .route("/assets/fiat", get(rest::get_assets_fiat))
             .route("/assets/crypto", get(rest::get_assets_crypto))
             .route("/price/:asset", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
-            .route("/import/portfolio/:id", get(rest::get_imported_portfolio))
+            .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
+
+        let with_auth = Router::new()
+            .route("/index", get(index))
+            .layer(ClerkLayer::new(clerk_config, None, true));
+
+        let merged_app = Router::new().merge(open_routes).merge(with_auth);
+
+        let app = merged_app
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())

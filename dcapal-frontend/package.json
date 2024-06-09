@@ -21,6 +21,7 @@
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {
+    "@clerk/clerk-react": "^5.2.3",
     "@react-hook/media-query": "^1.1.1",
     "@reduxjs/toolkit": "^2.2.6",
     "axios": "^1.7.2",
