@@ -26,6 +26,7 @@
     "@chakra-ui/react": "^2.8.2",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
+    "@clerk/clerk-react": "^5.2.3",
     "@react-hook/media-query": "^1.1.1",
     "@reduxjs/toolkit": "^2.2.7",
     "axios": "^1.7.7",
