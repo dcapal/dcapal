@@ -192,12 +192,8 @@ impl DcaServer {
             providers,
         });
 
-        let clerk_configuration: ClerkConfiguration = ClerkConfiguration::new(
-            None,
-            None,
-            Some("".to_string()),
-            None,
-        );
+        let clerk_configuration: ClerkConfiguration =
+            ClerkConfiguration::new(None, None, Some("".to_string()), None);
 
         let clerk_client = Clerk::new(clerk_configuration.clone());
 
