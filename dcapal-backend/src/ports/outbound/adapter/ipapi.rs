@@ -72,7 +72,7 @@ mod res {
     #[allow(clippy::large_enum_variant)]
     pub enum IpApiResult {
         GeoIP(GeoIp),
-        Error(Error),
+        Error(()),
     }
 
     #[derive(Debug, Clone, Deserialize)]
