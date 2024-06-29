@@ -1,7 +1,26 @@
-pub mod app;
-pub mod config;
-pub mod error;
-pub mod ports;
+#[macro_use]
+extern crate const_format;
+
+use std::{
+    net::{AddrParseError, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
+
+use axum::{
+    extract::connect_info::IntoMakeServiceWithConnectInfo,
+    middleware,
+    routing::{get, post},
+    Router,
+};
+use chrono::prelude::*;
+use deadpool_redis::{Pool, Runtime};
+use futures::future::BoxFuture;
+use metrics::{counter, describe_counter, describe_histogram, Unit};
+use tokio::{net::TcpListener, task::JoinHandle};
+use tower::ServiceBuilder;
+use tower_http::trace::TraceLayer;
+use tracing::{error, info};
 
 use crate::{
     app::{
@@ -23,28 +42,10 @@ use crate::{
     },
 };
 
-use axum::{
-    extract::connect_info::IntoMakeServiceWithConnectInfo,
-    middleware,
-    routing::{get, post},
-    Router,
-};
-use chrono::prelude::*;
-use deadpool_redis::{Pool, Runtime};
-use futures::future::BoxFuture;
-use metrics::{counter, describe_counter, describe_histogram, Unit};
-use std::{
-    net::{AddrParseError, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-use tokio::{net::TcpListener, task::JoinHandle};
-use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
-use tracing::{error, info};
-
-#[macro_use]
-extern crate const_format;
+pub mod app;
+pub mod config;
+pub mod error;
+pub mod ports;
 
 pub type DateTime = chrono::DateTime<Utc>;
 
@@ -141,7 +142,6 @@ impl DcaServer {
             repos,
             providers,
         });
-        
 
         let app = Router::new()
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
