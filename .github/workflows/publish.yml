@@ -2,17 +2,17 @@ name: Publish
 
 on:
   workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [master]
+    workflows: [ CI ]
+    types: [ completed ]
+    branches: [ master ]
   push:
-    tags: 
+    tags:
       - v[0-9]+.[0-9]+.[0-9]+
       - v[0-9]+.[0-9]+.[0-9]+-*
 
 env:
   CARGO_TERM_COLOR: always
-  DOCKER_REPO: leonardoarcari/dcapal
+  DOCKER_REPO: dcapal/dcapal
 
 jobs:
   extract-tag-version:
@@ -28,7 +28,7 @@ jobs:
 
   build-publish-docker-image:
     runs-on: ubuntu-22.04
-    needs: [extract-tag-version]
+    needs: [ extract-tag-version ]
     steps:
       - uses: actions/checkout@v3
       - name: Docker meta

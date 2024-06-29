@@ -148,25 +148,25 @@ export default function AboutPage() {
                     alignSuper1: <span className="align-super" />,
                     githubStar: (
                       <GitHubButton
-                        href="https://github.com/leonardoarcari/dcapal"
+                        href="https://github.com/dcapal/dcapal"
                         data-icon="octicon-star"
                         data-size="large"
-                        aria-label="Star leonardoarcari/dcapal on GitHub"
+                        aria-label="Star dcapal/dcapal on GitHub"
                       />
                     ),
                     alignSuper2: <span className="align-super" />,
                     githubLink: (
                       <a
                         className="underline"
-                        href="https://github.com/leonardoarcari/dcapal"
+                        href="https://github.com/dcapal/dcapal"
                       />
                     ),
                     githubIssue: (
                       <GitHubButton
-                        href="https://github.com/leonardoarcari/dcapal/issues"
+                        href="https://github.com/dcapal/dcapal/issues"
                         data-icon="octicon-issue-opened"
                         data-size="large"
-                        aria-label="Issue leonardoarcari/dcapal on GitHub"
+                        aria-label="Issue dcapal/dcapal on GitHub"
                       />
                     ),
                     alignSuper3: <span className="align-super" />,

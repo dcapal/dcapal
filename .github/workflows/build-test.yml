@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: ["master", "rc/**"]
+    branches: [ "master", "rc/**" ]
   pull_request:
-    branches: ["master", "rc/**"]
+    branches: [ "master", "rc/**" ]
 
 env:
   CARGO_TERM_COLOR: always
-  DOCKER_REPO: leonardoarcari/dcapal
+  DOCKER_REPO: dcapal/dcapal
 
 jobs:
   backend-build-test:
@@ -99,7 +99,7 @@ jobs:
 
   frontend-build-test:
     runs-on: ubuntu-22.04
-    needs: [frontend-check, optimizer-build-test]
+    needs: [ frontend-check, optimizer-build-test ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
@@ -127,7 +127,7 @@ jobs:
   frontend-e2e-tests:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    needs: [frontend-check, optimizer-build-test]
+    needs: [ frontend-check, optimizer-build-test ]
     services:
       registry:
         image: registry:2
