@@ -11,13 +11,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/leonardoarcari/dcapal.git"
+    "url": "git+https://github.com/dcapal/dcapal.git"
   },
   "keywords": [],
   "author": "Leonardo Arcari <leonardo1.arcari@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/leonardoarcari/dcapal/issues"
+    "url": "https://github.com/dcapal/dcapal/issues"
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {

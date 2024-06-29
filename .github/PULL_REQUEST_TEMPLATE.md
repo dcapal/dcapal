@@ -15,7 +15,7 @@ is true:
 
 Any questions should be directed to @leonardoarcari.
 
-[1]: https://github.com/leonardoarcari/dcapal/pulls
+[1]: https://github.com/dcapal/dcapal/pulls
 
 -->
 

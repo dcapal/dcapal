@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 env:
   CARGO_TERM_COLOR: always
-  DOCKER_REPO: leonardoarcari/dcapal
+  DOCKER_REPO: dcapal/dcapal
   IP2LOCATION_FILENAME: IP2LOCATION-LITE-DB5.IPV6.BIN
 
 jobs:
@@ -102,7 +102,7 @@ jobs:
           accountId: ${{ secrets.CF_R2_ACCOUNT_ID }}
           workingDirectory: dcapal-backend/data/dcapal
           command: r2 object get ip2location-db/${{ env.IP2LOCATION_FILENAME }}.zip
-      
+
       - name: Deploy IP2Location database
         uses: appleboy/scp-action@master
         with:
@@ -171,7 +171,7 @@ jobs:
           version: "3.9"
           services:
             dcapal:
-              image: leonardoarcari/dcapal:latest
+              image: dcapal/dcapal:latest
               restart: always
               ports:
                 - ${DCAPAL_API_PORT}:8080
