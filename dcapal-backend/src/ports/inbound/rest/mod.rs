@@ -1,5 +1,7 @@
 //! The [`rest`](self) module implements the REST API of the system
 
+pub(crate) mod auth;
+
 use std::time::Duration;
 
 use crate::app::domain::entity::AssetKind;
