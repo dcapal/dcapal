@@ -22,11 +22,12 @@ use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use metrics::{counter, describe_counter, describe_histogram, Unit};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
-use supabase_rs::SupabaseClient;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::{Layer, ServiceBuilder};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
+
+use supabase_rs::SupabaseClient;
 
 use crate::config::Postgres;
 use crate::{
@@ -156,8 +157,6 @@ impl DcaServer {
             repos,
             providers,
         });
-
-        SupabaseClient::new("your-project-url".to_string(), "your-anon-key".to_string());
 
         let open_routes = Router::new()
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
