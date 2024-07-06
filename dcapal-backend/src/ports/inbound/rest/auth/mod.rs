@@ -1,25 +1,24 @@
+use std::fmt::Display;
+
 use axum::{
     async_trait,
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
-    Json, RequestPartsExt, Router,
+    Json, RequestPartsExt,
 };
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use once_cell::sync::Lazy;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::fmt::Display;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
 static KEYS: Lazy<Keys> = Lazy::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    Keys::new(secret.as_bytes())
+    Keys::new(secret.as_ref())
 });
 pub async fn protected(claims: Claims) -> Result<String, AuthError> {
     // Send the protected data to the user
@@ -44,7 +43,7 @@ impl Keys {
 
 impl Display for Claims {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Email: {}\nCompany: {}", self.sub, self.company)
+        write!(f, "Email: {}\nCompany:", self.email)
     }
 }
 #[async_trait]
@@ -60,12 +59,46 @@ where
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| AuthError::InvalidToken)?;
-        // Decode the user data
-        let token_data = decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())
-            .map_err(|_| AuthError::InvalidToken)?;
 
-        Ok(token_data.claims)
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.set_audience(&["authenticated"]);
+
+        let token_data_valid = decode::<Claims>(bearer.token(), &KEYS.decoding, &validation)
+            .map_err(|e| {
+                eprintln!("Failed to validate jwt token: {}", e);
+                AuthError::InvalidToken
+            })?;
+
+        // Decode the user data through the Supabase API (may introduce latency)
+        // let api_key = parts.headers.get("apikey").unwrap().to_str().unwrap();
+        // let token_data = verify_token(bearer.token(), api_key)
+        //  .await
+        //.map_err(|_| AuthError::InvalidToken)?;
+
+        Ok(token_data_valid.claims)
     }
+}
+
+#[derive(Deserialize)]
+struct SupabaseUser {
+    id: String,
+    email: String,
+    // Add other fields as necessary
+}
+
+async fn verify_token(token: &str, api_key: &str) -> Result<Claims, reqwest::Error> {
+    let client = Client::new();
+    let user_info_url = "{supabase_url}/auth/v1/user";
+    let response = client
+        .get(user_info_url)
+        .bearer_auth(token)
+        .header("apikey", api_key)
+        .send()
+        .await?
+        .json::<Claims>()
+        .await?;
+
+    Ok(response)
 }
 
 impl IntoResponse for AuthError {
@@ -85,9 +118,7 @@ impl IntoResponse for AuthError {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    sub: String,
-    company: String,
-    exp: usize,
+    email: String,
 }
 
 #[derive(Debug)]
