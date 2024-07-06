@@ -15,6 +15,8 @@ import {
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
 } from "@app/config";
+import Auth from "@routes/loginPage";
+import AuthPage from "@routes/loginPage";
 
 import(/* webpackPrefetch: true */ "@app");
 
@@ -49,6 +51,11 @@ export const Router = () => {
     {
       path: "import",
       element: <ImportPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "login",
+      element: <AuthPage />,
       errorElement: <ErrorPage />,
     },
   ];
