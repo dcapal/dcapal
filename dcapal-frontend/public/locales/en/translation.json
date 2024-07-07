@@ -18,7 +18,8 @@
       "myPortfolios": "My portfolios",
       "about": "About",
       "docs": "Docs",
-      "exportPortfolio": "Export Portfolio"
+      "exportPortfolio": "Export Portfolio",
+      "login": "Login"
     },
     "currencyStep": {
       "chooseCurrency": "Choose your portfolio currency"
