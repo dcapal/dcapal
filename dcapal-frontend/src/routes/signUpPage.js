@@ -1,4 +1,5 @@
 import React from "react";
+
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
@@ -37,7 +38,7 @@ const subtitleStyle = {
 };
 
 const linkStyle = {
-  marginTop: "25px",
+  marginTop: "20px",
   textAlign: "center",
   textDecoration: "underline",
   fontSize: "13px",
@@ -46,11 +47,11 @@ const linkStyle = {
   color: "#666",
 };
 
-export default function AuthPage() {
+export default function SignUpPage() {
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
-        <h1 style={titleStyle}>Sign In</h1>
+        <h1 style={titleStyle}>Sign Up</h1>
         <p style={subtitleStyle}>to continue to DcaPal</p>
         <Auth
           supabaseClient={supabase}
@@ -69,16 +70,12 @@ export default function AuthPage() {
             },
           }}
           providers={["google", "github"]}
-          view="sign_in"
+          view="sign_up"
           showLinks={false}
         />
         <div style={linkStyle}>
-          <a href="/signup" style={linkStyle}>
-            Don't have an account? Sign up
-          </a>
-          <br />
-          <a href="/reset-password" style={linkStyle}>
-            Forgot your password?
+          <a href="/login" style={linkStyle}>
+            Already have an account? Sign in
           </a>
         </div>
       </div>

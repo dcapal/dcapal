@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Pointer};
 
 use axum::{
     async_trait,
@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
 static KEYS: Lazy<Keys> = Lazy::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     Keys::new(secret.as_ref())
