@@ -97,6 +97,12 @@ pub struct DcaServer {
     stop_tx: tokio::sync::watch::Sender<bool>,
 }
 
+#[derive(Clone)]
+struct Auth {
+    mkt_data: Arc<MarketDataService>,
+    ip2location: Option<Arc<Ip2LocationService>>,
+}
+
 impl DcaServer {
     pub async fn try_new(config: Config) -> Result<Self> {
         dotenv().ok();

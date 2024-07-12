@@ -19,6 +19,8 @@ import {
 } from "@app/config";
 import AuthPage from "@routes/loginPage";
 import Account from "@routes/profilePage";
+import SignUpPage from "@routes/signUpPage";
+import ResetPasswordPage from "@routes/resetPassword";
 
 export const Router = () => {
   const [session, setSession] = useState(null);
@@ -68,6 +70,16 @@ export const Router = () => {
     {
       path: "login",
       element: <AuthPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "signup",
+      element: <SignUpPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "reset-password",
+      element: <ResetPasswordPage />,
       errorElement: <ErrorPage />,
     },
     {

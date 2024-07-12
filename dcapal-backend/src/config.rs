@@ -39,6 +39,12 @@ pub struct Providers {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Auth {
+    pub jwt_secret: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IpService {
     pub db_path: String,
 }
@@ -54,6 +60,7 @@ pub struct Application {
     pub log: Log,
     pub providers: Providers,
     pub services: Option<Services>,
+    pub auth: Auth,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

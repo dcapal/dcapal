@@ -117,13 +117,6 @@ export const NavBar = () => {
   const [user, setUser] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  const handleLogout = () => {
-    // Clear user data and perform logout operations
-    localStorage.removeItem("user");
-    setUser(null);
-    supabase.auth.signOut();
-  };
-
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user ? user.user_metadata["name"] : null);
@@ -177,7 +170,7 @@ export const NavBar = () => {
                   Profile
                 </Link>
                 <button
-                  onClick={handleLogout}
+                  onClick={() => supabase.auth.signOut()}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Logout

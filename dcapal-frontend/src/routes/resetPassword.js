@@ -37,21 +37,23 @@ const subtitleStyle = {
 };
 
 const linkStyle = {
-  marginTop: "25px",
+  marginTop: "20px",
   textAlign: "center",
   textDecoration: "underline",
-  fontSize: "13px",
+  fontSize: "14px",
   fontWeight: "normal",
   lineHeight: "1.5",
   color: "#666",
 };
 
-export default function AuthPage() {
+export default function ResetPasswordPage() {
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
-        <h1 style={titleStyle}>Sign In</h1>
-        <p style={subtitleStyle}>to continue to DcaPal</p>
+        <h1 style={titleStyle}>Forgot Your Password?</h1>
+        <p style={subtitleStyle}>
+          Enter your email address to receive a password reset link.
+        </p>
         <Auth
           supabaseClient={supabase}
           appearance={{
@@ -69,18 +71,10 @@ export default function AuthPage() {
             },
           }}
           providers={["google", "github"]}
-          view="sign_in"
+          view="forgotten_password"
+          magicLink={false}
           showLinks={false}
         />
-        <div style={linkStyle}>
-          <a href="/signup" style={linkStyle}>
-            Don't have an account? Sign up
-          </a>
-          <br />
-          <a href="/reset-password" style={linkStyle}>
-            Forgot your password?
-          </a>
-        </div>
       </div>
     </div>
   );
