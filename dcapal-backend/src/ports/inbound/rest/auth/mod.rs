@@ -1,11 +1,14 @@
 use std::fmt::{Display, Pointer};
 
+use axum::extract::{Request, State};
+use axum::http::header;
+use axum::middleware::Next;
 use axum::{
     async_trait,
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
     response::{IntoResponse, Response},
-    Json, RequestPartsExt,
+    Extension, Json, RequestPartsExt,
 };
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
@@ -17,15 +20,19 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-static KEYS: Lazy<Keys> = Lazy::new(|| {
-    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    Keys::new(secret.as_ref())
-});
-pub async fn protected(claims: Claims) -> Result<String, AuthError> {
-    // Send the protected data to the user
-    Ok(format!(
-        "Welcome to the protected area :)\nYour data:\n{claims}",
-    ))
+use crate::AppContext;
+
+pub async fn protected(
+    Extension(jwtauth): Extension<JWTAuthMiddleware>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let json_response = json!({
+        "status":  "success",
+        "data": serde_json::json!({
+            "user": &jwtauth.user
+        })
+    });
+
+    Ok(Json(json_response))
 }
 
 struct Keys {
@@ -47,40 +54,74 @@ impl Display for Claims {
         write!(f, "Email: {}\nCompany:", self.email)
     }
 }
-#[async_trait]
-impl<S> FromRequestParts<S> for Claims
-where
-    S: Send + Sync,
-{
-    type Rejection = AuthError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // Extract the token from the authorization header
-        let TypedHeader(Authorization(bearer)) = parts
-            .extract::<TypedHeader<Authorization<Bearer>>>()
-            .await
-            .map_err(|_| AuthError::InvalidToken)?;
-
-        let mut validation = Validation::new(Algorithm::HS256);
-        validation.set_audience(&["authenticated"]);
-
-        let token_data_valid = decode::<Claims>(bearer.token(), &KEYS.decoding, &validation)
-            .map_err(|e| {
-                eprintln!("Failed to validate jwt token: {}", e);
-                AuthError::InvalidToken
-            })?;
-
-        // Decode the user data through the Supabase API (may introduce latency)
-        // let api_key = parts.headers.get("apikey").unwrap().to_str().unwrap();
-        // let token_data = verify_token(bearer.token(), api_key)
-        //  .await
-        //.map_err(|_| AuthError::InvalidToken)?;
-
-        Ok(token_data_valid.claims)
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JWTAuthMiddleware {
+    pub user: SupabaseUser,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse {
+    pub status: &'static str,
+    pub message: String,
+}
+
+pub async fn validate_jwt(
+    State(state): State<AppContext>,
+    mut req: Request,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<ErrorResponse>)> {
+    let access_token = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|auth_header| auth_header.to_str().ok())
+        .and_then(|auth_value| {
+            if auth_value.starts_with("Bearer ") {
+                Some(auth_value[7..].to_owned())
+            } else {
+                None
+            }
+        });
+
+    let access_token = access_token.ok_or_else(|| {
+        let error_response = ErrorResponse {
+            status: "fail",
+            message: "You are not logged in, please provide token".to_string(),
+        };
+        (StatusCode::UNAUTHORIZED, Json(error_response))
+    })?;
+
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_audience(&["authenticated"]);
+
+    let jwt_secret_key = state.config.app.auth.jwt_secret.clone();
+
+    let token_data_valid = match decode::<Claims>(
+        &access_token,
+        &DecodingKey::from_secret(jwt_secret_key.as_ref()),
+        &validation,
+    ) {
+        Ok(token_data) => token_data,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                status: "fail",
+                message: format!("Failed to validate jwt token: {}", e),
+            };
+            return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
+        }
+    };
+
+    req.extensions_mut().insert(JWTAuthMiddleware {
+        user: SupabaseUser {
+            id: token_data_valid.claims.email.clone(),
+            email: token_data_valid.claims.email.clone(),
+        },
+    });
+
+    Ok(next.run(req).await)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct SupabaseUser {
     id: String,
     email: String,

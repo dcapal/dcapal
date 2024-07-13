@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "@app/config";
+import { DCAPAL_API, supabase } from "@app/config";
+import { api } from "@app/api";
 
 export default function Account({ session }) {
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,8 @@ export default function Account({ session }) {
       ignore = true;
     };
   }, [session]);
+
+  const [todos, setTodos] = useState([]);
 
   async function updateProfile(event, avatarUrl) {
     event.preventDefault();
