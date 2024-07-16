@@ -22,6 +22,8 @@ use serde_json::json;
 
 use crate::AppContext;
 
+const JWT_AUDIENCE_DOMAIN: &str = "authenticated";
+
 pub async fn protected(
     Extension(jwtauth): Extension<JWTAuthMiddleware>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -92,7 +94,7 @@ pub async fn validate_jwt(
     })?;
 
     let mut validation = Validation::new(Algorithm::HS256);
-    validation.set_audience(&["authenticated"]);
+    validation.set_audience(&[JWT_AUDIENCE_DOMAIN.to_string()]);
 
     let jwt_secret_key = state.config.app.auth.jwt_secret.clone();
 

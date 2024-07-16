@@ -8,6 +8,10 @@ export default function Account({ session }) {
   const [website, setWebsite] = useState(null);
   const [avatar_url, setAvatarUrl] = useState(null);
 
+  const config = {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  };
+
   useEffect(() => {
     let ignore = false;
 
@@ -15,11 +19,7 @@ export default function Account({ session }) {
       setLoading(true);
       const { user } = session;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(`username, website, avatar_url`)
-        .eq("id", user.id)
-        .single();
+      const { data, error } = await api.get(`${DCAPAL_API}/protected`, config);
 
       if (!ignore) {
         if (error) {
@@ -28,7 +28,7 @@ export default function Account({ session }) {
           //setUsername(data.username);
           //setWebsite(data.website);
           //setAvatarUrl(data.avatar_url);
-          setUsername("John Doe");
+          setUsername(data?.data?.user?.email);
         }
       }
 

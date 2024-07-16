@@ -119,7 +119,11 @@ export const NavBar = () => {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user ? user.user_metadata["name"] : null);
+      if (user) {
+        user.user_metadata["name"] && setUser(user.user_metadata["name"]);
+      } else {
+        setUser(null);
+      }
     });
   }, []);
 
@@ -157,7 +161,9 @@ export const NavBar = () => {
           <div className="relative">
             <button
               className="text-lg font-light text-white"
-              onClick={() => setDropdownVisible(!dropdownVisible)}
+              onClick={() => {
+                setDropdownVisible(!dropdownVisible);
+              }}
             >
               {user}
             </button>
@@ -170,7 +176,7 @@ export const NavBar = () => {
                   Profile
                 </Link>
                 <button
-                  onClick={() => supabase.auth.signOut()}
+                  onClick={supabase.auth.signOut()}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Logout
