@@ -559,7 +559,8 @@ struct OHLCResult {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum Payload {
-    Last(()),
+    #[allow(dead_code)]
+    Last(i64),
     CandleSticks(CandleSticks),
 }
 
