@@ -135,6 +135,25 @@ export const NavBar = () => {
     });
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) throw error;
+
+      // Clear user data from state
+      setUser(null);
+
+      // Clear any stored tokens or user data
+      localStorage.removeItem("token");
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Error signing out:", error.message);
+    }
+  };
+
   return (
     <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
       <div className="flex gap-x-8">
@@ -184,7 +203,7 @@ export const NavBar = () => {
                   Profile
                 </Link>
                 <button
-                  onClick={() => supabase.auth.signOut()}
+                  onClick={handleLogout}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Logout
