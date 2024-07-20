@@ -17,7 +17,7 @@ export const Footer = () => {
         <a href="https://github.com/dcapal/dcapal">Github</a>
       </div>
       <p className="text-xs text-white/70">
-        © {new Date().getFullYear().toString()} Leonardo Arcari
+        © {new Date().getFullYear().toString()} DcaPal
       </p>
     </footer>
   );
