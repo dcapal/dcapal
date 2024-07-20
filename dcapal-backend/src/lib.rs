@@ -7,23 +7,21 @@ use std::{
     time::Duration,
 };
 
-use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
-use axum::response::IntoResponse;
-use axum::routing::post;
-use axum::{extract::State, middleware, routing::get, Router};
-use axum_extra::headers::authorization::Bearer;
-use axum_extra::headers::Authorization;
-use axum_extra::TypedHeader;
+use axum::{
+    extract::connect_info::IntoMakeServiceWithConnectInfo,
+    middleware,
+    routing::{get, post},
+    Router,
+};
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
-use dotenv::dotenv;
 use futures::future::BoxFuture;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use metrics::{counter, describe_counter, describe_histogram, Unit};
+use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use tokio::{net::TcpListener, task::JoinHandle};
-use tower::{Layer, ServiceBuilder};
+use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
