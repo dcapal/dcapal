@@ -18,4 +18,5 @@ function LanguageSwitcher() {
     </select>
   );
 }
+
 export default LanguageSwitcher;

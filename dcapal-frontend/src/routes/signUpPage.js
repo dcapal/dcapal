@@ -4,6 +4,10 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
 
+const containerStyle = {
+  backgroundColor: "#F3F4F6", // light gray
+};
+
 const formContainerStyle = {
   backgroundColor: "#FFFFFF",
   padding: "20px",
@@ -41,77 +45,79 @@ const linkStyle = {
 // Media query styles
 export default function SignUpPage() {
   return (
-    <div className="grid md:grid-cols-2 w-full min-h-screen">
-      <div className="bg-primary flex flex-col items-center justify-center p-8 md:p-12 lg:p-16">
-        <div className="max-w-md space-y-6">
-          <div className="flex items-center space-x-2">
-            <span className="text-5xl font-bold text-primary-foreground">
-              DcaPal
-            </span>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-3xl font-bold text-primary-foreground">
-              Dollar Cost Averaging Made Easy
-            </h2>
-            <p className="text-primary-foreground/80">
-              Signing up for DcaPal provides numerous benefits, including the
-              ability to keep your portfolio under control with tax-efficient
-              suggestions for your monthly investments.
-            </p>
-          </div>
-          <ul className="space-y-2 text-primary-foreground">
-            <li className="flex items-center space-x-2">
-              <CheckIcon className="h-5 w-5" />
-              <span>
-                Access to your investment portfolios across all devices*
+    <div style={containerStyle}>
+      <div className="grid md:grid-cols-2 w-full min-h-screen">
+        <div className="bg-primary flex flex-col items-center justify-center p-8 md:p-12 lg:p-16">
+          <div className="max-w-md space-y-6">
+            <div className="flex items-center space-x-2">
+              <span className="text-5xl font-bold text-primary-foreground">
+                DcaPal
               </span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <CheckIcon className="h-5 w-5" />
-              <span>Dive into a fully customizable experience*</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <CheckIcon className="h-5 w-5" />
-              <span>Access to the dashboard*</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <CheckIcon className="h-5 w-5" />
-              <span>Set custom alerts for your investments*</span>
-            </li>
-          </ul>
-          <div className="text-primary-foreground/80 text-center">
-            *Feature not yet available.
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-3xl font-bold text-primary-foreground">
+                Dollar Cost Averaging Made Easy
+              </h2>
+              <p className="text-primary-foreground/80">
+                Signing up for DcaPal provides numerous benefits, including the
+                ability to keep your portfolio under control with tax-efficient
+                suggestions for your monthly investments.
+              </p>
+            </div>
+            <ul className="space-y-2 text-primary-foreground">
+              <li className="flex items-center space-x-2">
+                <CheckIcon className="h-5 w-5" />
+                <span>
+                  Access to your investment portfolios across all devices*
+                </span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <CheckIcon className="h-5 w-5" />
+                <span>Dive into a fully customizable experience*</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <CheckIcon className="h-5 w-5" />
+                <span>Access to the dashboard*</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <CheckIcon className="h-5 w-5" />
+                <span>Set custom alerts for your investments*</span>
+              </li>
+            </ul>
+            <div className="text-primary-foreground/80 text-center">
+              *Feature not yet available.
+            </div>
           </div>
         </div>
-      </div>
-      <div className="flex items-center justify-center p-8 md:p-12 lg:p-16">
-        <div style={formContainerStyle}>
-          <h1 style={titleStyle}>Sign Up</h1>
-          <p style={subtitleStyle}>to continue to DcaPal</p>
-          <Auth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: "#0000FF",
-                    brandAccent: "#0000FF",
-                  },
-                  radii: {
-                    button: "5px",
+        <div className="flex items-center justify-center p-8 md:p-12 lg:p-16">
+          <div style={formContainerStyle}>
+            <h1 style={titleStyle}>Sign Up</h1>
+            <p style={subtitleStyle}>to continue to DcaPal</p>
+            <Auth
+              supabaseClient={supabase}
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: "#0000FF",
+                      brandAccent: "#0000FF",
+                    },
+                    radii: {
+                      button: "5px",
+                    },
                   },
                 },
-              },
-            }}
-            providers={["google", "github"]}
-            view="sign_up"
-            showLinks={false}
-          />
-          <div style={linkStyle}>
-            <a href="/login" style={linkStyle}>
-              Already have an account? Sign in
-            </a>
+              }}
+              providers={["google", "github"]}
+              view="sign_up"
+              showLinks={false}
+            />
+            <div style={linkStyle}>
+              <a href="/login" style={linkStyle}>
+                Already have an account? Sign in
+              </a>
+            </div>
           </div>
         </div>
       </div>
