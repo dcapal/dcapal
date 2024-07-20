@@ -16,7 +16,7 @@ use axum_extra::{headers::CacheControl, TypedHeader};
 use hyper::StatusCode;
 use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
-use metrics::increment_counter;
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 
 static PORTFOLIO_SCHEMA_STR: &str =
@@ -114,7 +114,7 @@ pub async fn import_portfolio(
     let cmd = ImportPortfolioCmd::try_new(payload, &PORTFOLIO_JSON_SCHEMA)?;
     let imported = repo.store_portfolio(&cmd.pfolio).await?;
 
-    increment_counter!(stats::IMPORTED_PORTFOLIOS_TOTAL);
+    counter!(stats::IMPORTED_PORTFOLIOS_TOTAL).increment(1);
     let _ = stats_repo.increase_imported_portfolio_count().await;
 
     let response = (

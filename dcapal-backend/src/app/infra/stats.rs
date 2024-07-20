@@ -10,7 +10,7 @@ use axum::{
     response::Response,
 };
 use hyper::HeaderMap;
-use metrics::{histogram, increment_counter};
+use metrics::{counter, histogram};
 use tracing::{info, log::error};
 
 use crate::{
@@ -35,11 +35,7 @@ pub async fn latency_stats(req: Request, next: Next) -> Response {
     let res = next.run(req).await;
 
     let latency = start.elapsed();
-    histogram!(
-        LATENCY_SUMMARY,
-        latency.as_micros() as f64,
-        &[("path", path)]
-    );
+    histogram!(LATENCY_SUMMARY, &[("path", path)]).record(latency.as_micros() as f64);
 
     res
 }
@@ -56,7 +52,7 @@ pub async fn requests_stats(
     }
 
     // Request stats
-    increment_counter!(REQUESTS_TOTAL, &[("path", path)]);
+    counter!(REQUESTS_TOTAL, &[("path", path)]).increment(1);
 
     // Visitors stats
     record_visitors_stats(
@@ -124,14 +120,15 @@ async fn fetch_geo_ip_inner(
 
     let ip_str = ip.to_string();
     if let Some(geo) = repo.find_visitor_ip(&ip_str).await? {
-        increment_counter!(
+        counter!(
             VISITORS_TOTAL,
             &[
                 ("ip", geo.ip),
                 ("latitude", geo.latitude),
                 ("longitude", geo.longitude),
             ]
-        );
+        )
+        .increment(1);
         return Ok(());
     }
 
@@ -140,14 +137,15 @@ async fn fetch_geo_ip_inner(
         return Ok(());
     };
 
-    increment_counter!(
+    counter!(
         VISITORS_TOTAL,
         &[
             ("ip", geo.ip.clone()),
             ("latitude", geo.latitude.clone()),
             ("longitude", geo.longitude.clone()),
         ]
-    );
+    )
+    .increment(1);
 
     let is_stored = repo.store_visitor_ip(&ip_str, &geo).await?;
     if !is_stored {
