@@ -12,7 +12,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  DOCKER_REPO: dcapal/dcapal
+  DOCKER_REPO: leonardoarcari/dcapal
 
 jobs:
   extract-tag-version:
