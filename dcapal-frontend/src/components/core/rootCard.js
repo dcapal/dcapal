@@ -4,7 +4,7 @@ export const RootCard = ({ id, imgSrc, text, ...props }) => {
   return (
     <div
       id={id}
-      className="bg-card p-6 rounded-lg shadow-md  text-center bg-[#F3F4F6] rounded"
+      className="w-full bg-card p-6 shadow-md flex flex-col items-center justify-center text-center bg-[#F3F4F6] rounded-lg"
     >
       <div className="flex justify-center items-center">
         <img
