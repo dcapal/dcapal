@@ -18,7 +18,7 @@ export const Root = () => {
       title={"DcaPal - A smart assistant for your periodic investments"}
       content={
         <>
-          <div className="w-full px-6 py-8 mb-8 bg-[#ededed]">
+          <div className="w-full px-6 py-8 mb-8 bg-[#F3F4F6]">
             <div className="flex flex-col items-center gap-y-7">
               <div className="w-full max-w-[35rem] flex flex-col items-start gap-y-7">
                 <h1 className="text-3xl sm:text-4xl font-bold">
@@ -52,62 +52,62 @@ export const Root = () => {
               />
             </span>
           </div>
-          <div
-            id="allocate-process"
-            className="w-full max-w-[25rem] px-4 pt-8 flex flex-col gap-y-6"
-          >
-            <RootCard
-              imgSrc={ICON_PORTFOLIO}
-              text={
-                <Trans
-                  i18nKey="page.root.cardStep1"
-                  components={{
-                    p1: <p />,
-                    bold: <span className="font-normal" />,
-                  }}
-                />
-              }
-            />
-            <RootCard
-              imgSrc={ICON_AMOUNT}
-              text={
-                <Trans
-                  i18nKey="page.root.cardStep2"
-                  components={{
-                    p1: <p />,
-                    bold: <span className="font-normal" />,
-                  }}
-                />
-              }
-            />
-            <RootCard
-              id={"tax-efficient"}
-              imgSrc={ICON_REBALANCE}
-              text={
-                <Trans
-                  i18nKey="page.root.cardStep3"
-                  components={{
-                    p1: <p />,
-                    bold1: <span className="font-normal" />,
-                    bold2: <span className="font-normal" />,
-                  }}
-                />
-              }
-            />
-            <RootCard
-              imgSrc={ICON_MARKET}
-              text={
-                <Trans
-                  i18nKey="page.root.cardStep4"
-                  components={{
-                    p1: <p />,
-                    bold: <span className="font-normal" />,
-                  }}
-                />
-              }
-            />
+          <br />
+          <div id="allocate-process" className="container px-4 md:px-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <RootCard
+                imgSrc={ICON_PORTFOLIO}
+                text={
+                  <Trans
+                    i18nKey="page.root.cardStep1"
+                    components={{
+                      p1: <p />,
+                      bold: <span className="font-normal" />,
+                    }}
+                  />
+                }
+              />
+              <RootCard
+                imgSrc={ICON_AMOUNT}
+                text={
+                  <Trans
+                    i18nKey="page.root.cardStep2"
+                    components={{
+                      p1: <p />,
+                      bold: <span className="font-normal" />,
+                    }}
+                  />
+                }
+              />
+              <RootCard
+                id={"tax-efficient"}
+                imgSrc={ICON_REBALANCE}
+                text={
+                  <Trans
+                    i18nKey="page.root.cardStep3"
+                    components={{
+                      p1: <p />,
+                      bold1: <span className="font-normal" />,
+                      bold2: <span className="font-normal" />,
+                    }}
+                  />
+                }
+              />
+              <RootCard
+                imgSrc={ICON_MARKET}
+                text={
+                  <Trans
+                    i18nKey="page.root.cardStep4"
+                    components={{
+                      p1: <p />,
+                      bold: <span className="font-normal" />,
+                    }}
+                  />
+                }
+              />
+            </div>
           </div>
-          <div className="w-full px-6 py-8 mt-10 bg-[#ededed]">
+          <div className="w-full px-6 py-8 mt-10 bg-[#F3F4F6]">
             <div className="flex flex-col items-center gap-y-7 text-center">
               <div className="w-full max-w-[35rem] flex flex-col gap-y-4">
                 <Trans
