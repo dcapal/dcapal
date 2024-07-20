@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use log::debug;
 use rust_decimal::prelude::*;
@@ -57,7 +57,7 @@ pub struct TheoreticalAllocation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SolutionState {
     Open,
-    Overallocated,
+    DoNotAllocate,
     FullyAllocated,
     PriceTooHigh,
     FeesTooHigh,
@@ -162,13 +162,15 @@ impl Problem {
     }
 
     pub fn solve(&self) -> Solution {
+        debug!("[Options] {:?}", self.options);
+
         let mut solution = Solution::new(self.options.clone());
 
         // New portfolio amount
         let pfolio_amount = self.options.current_pfolio_amount + self.options.budget;
 
         let sold_amount = if self.options.is_buy_only {
-            close_over_allocated_assets(&mut solution.assets);
+            close_fully_allocated_assets(&mut solution.assets);
             Decimal::ZERO
         } else {
             sell_over_allocated_assets(&mut solution, pfolio_amount)
@@ -317,7 +319,7 @@ impl Problem {
         pfolio_amount: Decimal,
     ) {
         static EXCLUDED_STATES: &[SolutionState] = &[
-            SolutionState::Overallocated,
+            SolutionState::DoNotAllocate,
             SolutionState::FeesTooHigh,
             SolutionState::PriceTooHigh,
         ];
@@ -437,10 +439,11 @@ fn refresh_open_assets<'a>(
         .collect::<_>()
 }
 
-fn close_over_allocated_assets(assets: &mut HashMap<String, Asset>) {
+fn close_fully_allocated_assets(assets: &mut HashMap<String, Asset>) {
     for asset in assets.values_mut() {
-        if asset.current_amount > asset.target_amount {
-            asset.state = SolutionState::Overallocated;
+        match asset.current_amount.cmp(&asset.target_amount) {
+            Ordering::Equal | Ordering::Greater => asset.state = SolutionState::DoNotAllocate,
+            Ordering::Less => {}
         }
     }
 }
@@ -452,7 +455,7 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
             continue;
         }
 
-        asset.state = SolutionState::Overallocated;
+        asset.state = SolutionState::DoNotAllocate;
 
         let overallocated = asset.current_amount - asset.target_amount;
         let sell_shares = shares_to_allocate(asset, overallocated);
