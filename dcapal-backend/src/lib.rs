@@ -288,13 +288,13 @@ async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()
         if let Some(geo) = geo {
             counter!(
                 infra::stats::VISITORS_TOTAL,
-                count as u64,
                 &[
                     ("ip", geo.ip),
                     ("latitude", geo.latitude),
                     ("longitude", geo.longitude),
                 ]
-            );
+            )
+            .increment(count as u64);
         }
     }
 
@@ -303,7 +303,7 @@ async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()
 
 async fn refresh_imported_portfolios_stats(stats_repo: &StatsRepository) -> Result<()> {
     let count = stats_repo.get_imported_portfolio_count().await?;
-    counter!(infra::stats::IMPORTED_PORTFOLIOS_TOTAL, count as u64);
+    counter!(infra::stats::IMPORTED_PORTFOLIOS_TOTAL).increment(count as u64);
 
     Ok(())
 }
