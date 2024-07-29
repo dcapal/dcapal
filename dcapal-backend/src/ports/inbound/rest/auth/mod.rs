@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
+use axum::{Extension, http::StatusCode, Json, response::IntoResponse};
 use axum::extract::{Request, State};
 use axum::http::header;
 use axum::middleware::Next;
-use axum::{http::StatusCode, response::IntoResponse, Extension, Json};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -52,11 +52,9 @@ pub async fn validate_jwt(
         .get(header::AUTHORIZATION)
         .and_then(|auth_header| auth_header.to_str().ok())
         .and_then(|auth_value| {
-            if let Some(stripped) = auth_value.strip_prefix("Bearer ") {
-                Some(stripped.to_owned())
-            } else {
-                None
-            }
+            auth_value
+                .strip_prefix("Bearer ")
+                .map(|stripped| stripped.to_owned())
         });
 
     let access_token = access_token.ok_or_else(|| {
