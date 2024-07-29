@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use axum::{Extension, http::StatusCode, Json, response::IntoResponse};
 use axum::extract::{Request, State};
 use axum::http::header;
 use axum::middleware::Next;
-use jsonwebtoken::{Algorithm, decode, DecodingKey, Validation};
+use axum::{http::StatusCode, response::IntoResponse, Extension, Json};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
