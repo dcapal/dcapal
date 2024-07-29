@@ -27,6 +27,7 @@
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@clerk/clerk-react": "^5.2.3",
+    "@heroicons/react": "^2.1.5",
     "@react-hook/media-query": "^1.1.1",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
