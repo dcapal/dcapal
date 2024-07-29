@@ -7,6 +7,7 @@ import "./style.css";
 import { persistor, store } from "@app/store";
 import { Router } from "@routes/router";
 import { BrowserRouter } from "react-router-dom";
+import { ChakraProvider } from "@chakra-ui/react";
 
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
@@ -31,12 +32,14 @@ i18n
 const root = createRoot(document.getElementById("app"));
 root.render(
   <React.StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <BrowserRouter>
-          <Router />
-        </BrowserRouter>
-      </PersistGate>
-    </Provider>
+    <ChakraProvider>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <BrowserRouter>
+            <Router />
+          </BrowserRouter>
+        </PersistGate>
+      </Provider>
+    </ChakraProvider>
   </React.StrictMode>
 );

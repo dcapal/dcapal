@@ -85,7 +85,7 @@ export const Router = () => {
     {
       path: "profile",
       element: (
-        <div className="container" style={{ padding: "50px 0 100px 0" }}>
+        <div>
           {!session ? (
             <AuthPage />
           ) : (
