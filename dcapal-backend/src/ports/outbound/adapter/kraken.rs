@@ -14,9 +14,9 @@ use tracing::{debug, error, warn};
 use crate::{
     app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
+    DateTime,
     error::{DcaError, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
-    DateTime,
 };
 
 use super::DefaultCircuitBreaker;
@@ -529,30 +529,6 @@ fn get_kraken_api_periods(freq: OHLCFrequency) -> &'static str {
     match freq {
         OHLCFrequency::Minutes5 => "5",
         OHLCFrequency::Daily => "1440",
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct KAssetsDataCurrency {
-    symbol: String,
-    name: String,
-    is_fiat: bool,
-}
-
-#[allow(clippy::from_over_into)]
-impl Into<Asset> for KAssetsDataCurrency {
-    fn into(self) -> Asset {
-        if self.is_fiat {
-            Asset::Fiat(Fiat {
-                id: self.symbol,
-                symbol: self.name,
-            })
-        } else {
-            Asset::Crypto(Crypto {
-                id: self.symbol,
-                symbol: self.name,
-            })
-        }
     }
 }
 
