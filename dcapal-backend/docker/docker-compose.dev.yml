@@ -51,3 +51,19 @@ services:
       - /var/run:/var/run:rw
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+
+  postgres:
+    image: supabase/postgres:15.1.1.78
+    container_name: supabase-postgres
+    hostname: postgres
+    ports:
+      - "6543:5432"
+    environment:
+      POSTGRES_USER: dcapal
+      POSTGRES_PASSWORD: dcapal
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
