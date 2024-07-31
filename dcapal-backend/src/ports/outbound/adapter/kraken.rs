@@ -14,9 +14,9 @@ use tracing::{debug, error, warn};
 use crate::{
     app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
-    DateTime,
     error::{DcaError, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
+    DateTime,
 };
 
 use super::DefaultCircuitBreaker;
