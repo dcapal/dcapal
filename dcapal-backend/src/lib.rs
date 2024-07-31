@@ -17,11 +17,14 @@ use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
+use crate::config::Postgres;
 use crate::{
     app::{
         infra,
@@ -59,6 +62,7 @@ pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
     redis: Pool,
+    postgres: PgPool,
     services: Services,
     repos: Arc<Repository>,
     providers: Arc<PriceProviders>,
@@ -89,7 +93,7 @@ pub struct DcaServer {
 }
 
 impl DcaServer {
-    pub fn try_new(config: Config) -> Result<Self> {
+    pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
 
         let http = reqwest::Client::builder()
@@ -99,6 +103,8 @@ impl DcaServer {
             .build()?;
 
         let redis = build_redis_pool(&config.server.redis)?;
+
+        let postgres = build_postgres_pool(&config.server.postgres).await?;
 
         let repos = Arc::new(Repository {
             misc: Arc::new(MiscRepository::new(redis.clone())),
@@ -138,6 +144,7 @@ impl DcaServer {
             config: config.clone(),
             http,
             redis,
+            postgres,
             services,
             repos,
             providers,
@@ -278,6 +285,25 @@ fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
         })?;
 
     Ok(redis_pool)
+}
+
+async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
+    let url = config.connection_url();
+    let pool = PgPoolOptions::new()
+        .max_connections(50)
+        .connect(&url)
+        .await
+        .map_err(|e| {
+            DcaError::StartupFailure(
+                format!(
+                    "Error in building Postgres poll config (user={}, hostname={}, port={}, db={})",
+                    &config.user, &config.hostname, &config.port, &config.database
+                ),
+                e.into(),
+            )
+        })?;
+
+    Ok(pool)
 }
 
 async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
