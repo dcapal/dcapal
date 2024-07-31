@@ -26,3 +26,9 @@ server:
     port: 6379
     user: dcapal
     password: dcapal
+  postgres:
+    hostname: 127.0.0.1
+    port: 6543
+    user: dcapal
+    password: dcapal
+    database: postgres
