@@ -28,7 +28,7 @@ server:
     password: dcapal
   postgres:
     hostname: 127.0.0.1
-    port: 6543
-    user: dcapal
-    password: dcapal
+    port: 5432
+    user: postgres
+    password: postgres
     database: postgres

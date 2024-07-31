@@ -4,7 +4,6 @@
 **/pkg/
 wasm-pack.log
 TODO.md
-**/.env
 
 # IDE stuff
 .vscode

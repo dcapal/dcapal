@@ -106,6 +106,8 @@ impl DcaServer {
 
         let postgres = build_postgres_pool(&config.server.postgres).await?;
 
+        sqlx::migrate!().run(&postgres).await?;
+
         let repos = Arc::new(Repository {
             misc: Arc::new(MiscRepository::new(redis.clone())),
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
@@ -302,6 +304,14 @@ async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
                 e.into(),
             )
         })?;
+
+    let row: (i64,) = sqlx::query_as("SELECT $1")
+        .bind(150_i64)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| DcaError::StartupFailure("Failed to query Postgres".into(), e.into()))?;
+
+    assert_eq!(row.0, 150);
 
     Ok(pool)
 }
