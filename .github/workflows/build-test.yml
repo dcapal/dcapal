@@ -210,11 +210,15 @@ jobs:
 
       - name: Run dcapal-backend
         run: |
-          cd dcapal-backend && \
-          docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
-          up --no-build --wait --verbose
+          cd dcapal-backend
+          if ! docker compose -f docker-compose.yml \
+                              -f ./docker/docker-compose.local.yml \
+                              -f docker-compose.override.yml \
+                              up --no-build --wait; then
+            echo "Docker Compose failed. Printing logs:"
+            docker compose logs
+            exit 1
+          fi
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v3
