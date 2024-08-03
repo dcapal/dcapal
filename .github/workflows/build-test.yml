@@ -214,7 +214,7 @@ jobs:
           docker compose -f docker-compose.yml \
                          -f ./docker/docker-compose.local.yml \
                          -f docker-compose.override.yml \
-          up --remove-orphans --no-build --wait
+          up --no-build --wait --verbose
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v3
