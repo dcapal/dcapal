@@ -32,12 +32,12 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_HOST: /var/run/postgresql
-      PGPORT: ${POSTGRES_PORT}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB}
-      POSTGRES_DB: ${POSTGRES_DB}
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
       # Must be superuser to create event trigger
