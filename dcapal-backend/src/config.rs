@@ -72,6 +72,23 @@ impl Redis {
         )
     }
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Postgres {
+    pub hostname: String,
+    pub port: u32,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+}
+
+impl Postgres {
+    pub fn connection_url(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:{}/{}",
+            self.user, self.password, self.hostname, self.port, self.database
+        )
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Web {
@@ -89,6 +106,7 @@ pub struct Metrics {
 pub struct Server {
     pub web: Web,
     pub redis: Redis,
+    pub postgres: Postgres,
     pub metrics: Metrics,
 }
 

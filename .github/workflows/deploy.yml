@@ -213,6 +213,8 @@ jobs:
           DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
           app:
@@ -243,6 +245,12 @@ jobs:
               port: 6379
               user: ${REDIS_USER}
               password: ${REDIS_PASSWORD}
+            postgres:
+              hostname: aws-0-eu-central-1.pooler.supabase.com
+              port: 6543
+              user: ${POSTGRES_USER}
+              password: ${POSTGRES_PASSWORD}
+              database: postgres
           EOF
 
       - name: Deploy dcapal-backend config
