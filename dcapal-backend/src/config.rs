@@ -39,6 +39,12 @@ pub struct Providers {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Auth {
+    pub jwt_secret: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IpService {
     pub db_path: String,
 }
@@ -54,6 +60,7 @@ pub struct Application {
     pub log: Log,
     pub providers: Providers,
     pub services: Option<Services>,
+    pub auth: Auth,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -69,6 +76,23 @@ impl Redis {
         format!(
             "redis://{}:{}@{}:{}/",
             self.user, self.password, self.hostname, self.port
+        )
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Postgres {
+    pub hostname: String,
+    pub port: u32,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+}
+
+impl Postgres {
+    pub fn connection_url(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:{}/{}",
+            self.user, self.password, self.hostname, self.port, self.database
         )
     }
 }
@@ -89,6 +113,7 @@ pub struct Metrics {
 pub struct Server {
     pub web: Web,
     pub redis: Redis,
+    pub postgres: Postgres,
     pub metrics: Metrics,
 }
 

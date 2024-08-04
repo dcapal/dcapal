@@ -1,8 +1,7 @@
 import { useMediaQuery } from "@react-hook/media-query";
-import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
-import { MEDIA_SMALL } from "@app/config";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { MEDIA_SMALL, supabase } from "@app/config";
 import { ExportBtn } from "@components/exportBtn";
 
 import classNames from "classnames";
@@ -12,7 +11,7 @@ import LanguageSwitcher from "@components/languageSwitcher";
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
 import { useDispatch } from "react-redux";
-import { Step, setAllocationFlowStep } from "@app/appSlice";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 const CloseBtn = ({ onClick }) => {
   return (
@@ -109,11 +108,48 @@ export const NavBar = () => {
     navigate("/");
   };
 
+  const onClickProfile = () => {
+    navigate("/profile");
+    setDropdownVisible(false);
+  };
+
   const onClickMyPortfolios = () => {
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
   };
 
   const isAllocate = location.pathname === "/allocate";
+
+  const [user, setUser] = useState(null);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        user.user_metadata["name"] && setUser(user.user_metadata["name"]);
+      } else {
+        setUser(null);
+      }
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) throw error;
+
+      // Clear user data from state
+      setUser(null);
+
+      // Clear any stored tokens or user data
+      localStorage.removeItem("token");
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Error signing out:", error.message);
+    }
+  };
 
   return (
     <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
@@ -145,8 +181,40 @@ export const NavBar = () => {
         )}
       </div>
       <div className="flex gap-x-2 items-center">
-        {!isMobile && <LanguageSwitcher></LanguageSwitcher>}
+        {user ? (
+          <div className="relative">
+            <button
+              className="text-lg font-light text-white"
+              onClick={() => {
+                setDropdownVisible(!dropdownVisible);
+              }}
+            >
+              {user}
+            </button>
+            {dropdownVisible && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
+                <button
+                  onClick={onClickProfile}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-lg font-light text-white">
+            <Link to="/login">{t("navbar.login")}</Link>
+          </div>
+        )}
 
+        {!isMobile && <LanguageSwitcher />}
         {isAllocate && <ExportBtn />}
         {isMobile && <MenuBtn onClick={toggleMenuVisible} />}
       </div>

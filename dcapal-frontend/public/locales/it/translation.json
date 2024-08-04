@@ -18,7 +18,8 @@
       "myPortfolios": "I miei portafogli",
       "about": "Chi siamo",
       "docs": "Documentazione",
-      "exportPortfolio": "Esporta Portafoglio"
+      "exportPortfolio": "Esporta Portafoglio",
+      "login": "Accedi"
     },
     "currencyStep": {
       "chooseCurrency": "Seleziona la valuta del tuo portafoglio"

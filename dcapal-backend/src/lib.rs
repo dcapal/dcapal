@@ -17,11 +17,15 @@ use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
+use serde::{Deserialize, Serialize};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
+use crate::config::Postgres;
 use crate::{
     app::{
         infra,
@@ -31,7 +35,7 @@ use crate::{
     config::Config,
     error::{DcaError, Result},
     ports::{
-        inbound::rest,
+        inbound::{rest, rest::auth},
         outbound::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
@@ -59,6 +63,7 @@ pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
     redis: Pool,
+    postgres: PgPool,
     services: Services,
     repos: Arc<Repository>,
     providers: Arc<PriceProviders>,
@@ -89,7 +94,7 @@ pub struct DcaServer {
 }
 
 impl DcaServer {
-    pub fn try_new(config: Config) -> Result<Self> {
+    pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
 
         let http = reqwest::Client::builder()
@@ -99,6 +104,10 @@ impl DcaServer {
             .build()?;
 
         let redis = build_redis_pool(&config.server.redis)?;
+
+        let postgres = build_postgres_pool(&config.server.postgres).await?;
+
+        sqlx::migrate!().run(&postgres).await?;
 
         let repos = Arc::new(Repository {
             misc: Arc::new(MiscRepository::new(redis.clone())),
@@ -138,18 +147,31 @@ impl DcaServer {
             config: config.clone(),
             http,
             redis,
+            postgres,
             services,
             repos,
             providers,
         });
 
-        let app = Router::new()
+        let open_routes = Router::new()
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
             .route("/assets/fiat", get(rest::get_assets_fiat))
             .route("/assets/crypto", get(rest::get_assets_crypto))
             .route("/price/:asset", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
-            .route("/import/portfolio/:id", get(rest::get_imported_portfolio))
+            .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
+
+        let with_auth = Router::new()
+            .route("/protected", get(auth::protected))
+            .layer(middleware::from_fn_with_state(
+                ctx.clone(),
+                auth::validate_jwt,
+            ))
+            .with_state(ctx.clone());
+
+        let merged_app = Router::new().merge(open_routes).merge(with_auth);
+
+        let app = merged_app
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())
@@ -278,6 +300,33 @@ fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
         })?;
 
     Ok(redis_pool)
+}
+
+async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
+    let url = config.connection_url();
+    let pool = PgPoolOptions::new()
+        .max_connections(50)
+        .connect(&url)
+        .await
+        .map_err(|e| {
+            DcaError::StartupFailure(
+                format!(
+                    "Error in building Postgres poll config (user={}, hostname={}, port={}, db={})",
+                    &config.user, &config.hostname, &config.port, &config.database
+                ),
+                e.into(),
+            )
+        })?;
+
+    let row: (i64,) = sqlx::query_as("SELECT $1")
+        .bind(150_i64)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| DcaError::StartupFailure("Failed to query Postgres".into(), e.into()))?;
+
+    assert_eq!(row.0, 150);
+
+    Ok(pool)
 }
 
 async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
