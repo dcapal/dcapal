@@ -25,8 +25,6 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
-use supabase_rs::SupabaseClient;
-
 use crate::config::Postgres;
 use crate::{
     app::{
@@ -96,7 +94,7 @@ pub struct DcaServer {
 }
 
 impl DcaServer {
-    pub asyncfn try_new(config: Config) -> Result<Self> {
+    pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
 
         let http = reqwest::Client::builder()

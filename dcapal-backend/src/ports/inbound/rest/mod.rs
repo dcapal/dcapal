@@ -1,15 +1,6 @@
 //! The [`rest`](self) module implements the REST API of the system
 
-pub(crate) mod auth;
-
 use std::time::Duration;
-
-use crate::app::domain::entity::AssetKind;
-use crate::app::infra::utils::Expiring;
-use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
-use crate::error::{DcaError, Result};
-use crate::ports::outbound::repository::ImportedPortfolio;
-use crate::{infra::stats, AppContext};
 
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
@@ -20,6 +11,15 @@ use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
+
+use crate::app::domain::entity::AssetKind;
+use crate::app::infra::utils::Expiring;
+use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
+use crate::error::{DcaError, Result};
+use crate::ports::outbound::repository::ImportedPortfolio;
+use crate::{infra::stats, AppContext};
+
+pub(crate) mod auth;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../docs/schema/portfolio/v1/schema.json");
