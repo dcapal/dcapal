@@ -6,7 +6,9 @@ import { ContainerPage } from "./containerPage";
 
 export default function Account({ session }) {
   const [loading, setLoading] = useState(true);
-  const [username, setUsername] = useState(null);
+  const [firstname, setFirstname] = useState(null);
+  const [birthDate, setBirthDate] = useState(null);
+  const [email, setEmail] = useState(null);
   const [website, setWebsite] = useState(null);
   const [avatar_url, setAvatarUrl] = useState(null);
 
@@ -21,16 +23,19 @@ export default function Account({ session }) {
       setLoading(true);
       const { user } = session;
 
-      const { data, error } = await api.get(`${DCAPAL_API}/protected`, config);
+      const { data, error } = await api.get(
+        `${DCAPAL_API}/v1/user/profile`,
+        config
+      );
 
       if (!ignore) {
         if (error) {
           console.warn(error);
         } else if (data) {
           //setUsername(data.username);
-          //setWebsite(data.website);
-          //setAvatarUrl(data.avatar_url);
-          setUsername(data?.data?.user?.email);
+          setEmail(data?.email);
+          setBirthDate(data?.birth_date);
+          setFirstname(data?.first_name);
         }
       }
 
@@ -92,19 +97,11 @@ export default function Account({ session }) {
                 <label className="w-1/4 text-lg font-semibold">
                   Birth Date
                 </label>
-                <Input
-                  placeholder="Select Date and Time"
-                  size="md"
-                  type="date"
-                />
+                <Input placeholder={birthDate} size="md" type="date" />
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">Email</label>
-                <Input
-                  placeholder={session.user.email}
-                  className="w-3/4"
-                  type="email"
-                />
+                <Input placeholder={email} className="w-3/4" type="email" />
               </div>
             </div>
             <div className="flex justify-end p-4 border-t">
