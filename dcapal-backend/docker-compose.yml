@@ -42,7 +42,7 @@ services:
       # Always use a fresh database when developing
       - /var/lib/postgresql/data
       # Seed data should be inserted last (alphabetical order)
-      - ./dev/data.sql:/docker-entrypoint-initdb.d/seed.sql
+      - ./docker/dev/data.sql:/docker-entrypoint-initdb.d/seed.sql
 
 networks:
   dcapalnetwork:
