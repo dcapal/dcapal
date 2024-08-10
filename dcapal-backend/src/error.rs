@@ -46,6 +46,14 @@ pub enum DcaError {
     Ip2Location(ip2location::error::Error),
     #[error("MigrateError: {0:?}")]
     Execute(#[from] MigrateError),
+    #[error("SQLx Error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error(transparent)]
+    TypeHeaderError(#[from] axum_extra::typed_header::TypedHeaderRejection),
+    #[error(transparent)]
+    UuidError(#[from] uuid::Error),
+    #[error(transparent)]
+    JwtError(#[from] jsonwebtoken::errors::Error),
 }
 
 impl Debug for DcaError {
