@@ -40,6 +40,8 @@ itertools = "0.13.0"
 failsafe = "1.3.0"
 ip2location = "0.5.3"
 jsonschema = "0.18.3"
-uuid = { version = "1.10.0", features = ["v4"] }
+uuid = { version = "1.10.0", features = ["v4", "serde"] }
 jsonwebtoken = "9.3.0"
 sqlx = { version = "0.8.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "uuid", "time"] }
+utoipa = "4.2.3"
+once_cell = "1.19.0"

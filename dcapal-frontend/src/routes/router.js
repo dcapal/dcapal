@@ -21,6 +21,7 @@ import AuthPage from "@routes/loginPage";
 import Account from "@routes/profilePage";
 import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
+import Dashboard from "@routes/mainDashboardPage";
 
 import(/* webpackPrefetch: true */ "@app");
 
@@ -94,6 +95,19 @@ export const Router = () => {
             <AuthPage />
           ) : (
             <Account key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "dashboard",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <Dashboard key={session.user.id} session={session} />
           )}
         </div>
       ),

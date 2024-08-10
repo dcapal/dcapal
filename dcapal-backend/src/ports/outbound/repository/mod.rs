@@ -1,8 +1,5 @@
 //! The [`repository`](self) module contains interfaces to persistent storage services, like Redis.
 
-pub mod dto;
-pub mod market_data;
-
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -11,6 +8,10 @@ use redis::AsyncCommands;
 use uuid::Uuid;
 
 use crate::{app::services::ip2location::GeoData, error::Result, DateTime};
+
+pub mod dto;
+pub mod market_data;
+pub mod user;
 
 const REDIS_BASE: &str = "dcapal:be";
 

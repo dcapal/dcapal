@@ -35,7 +35,7 @@ use crate::{
     config::Config,
     error::{DcaError, Result},
     ports::{
-        inbound::{rest, rest::auth},
+        inbound::rest,
         outbound::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
@@ -162,10 +162,10 @@ impl DcaServer {
             .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
 
         let with_auth = Router::new()
-            .route("/protected", get(auth::protected))
+            .route("/protected", get(rest::auth::protected))
             .layer(middleware::from_fn_with_state(
                 ctx.clone(),
-                auth::validate_jwt,
+                rest::auth::validate_jwt,
             ))
             .with_state(ctx.clone());
 

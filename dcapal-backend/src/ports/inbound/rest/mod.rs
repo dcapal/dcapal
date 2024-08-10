@@ -19,7 +19,8 @@ use crate::error::{DcaError, Result};
 use crate::ports::outbound::repository::ImportedPortfolio;
 use crate::{infra::stats, AppContext};
 
-pub(crate) mod auth;
+mod auth;
+mod user;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../docs/schema/portfolio/v1/schema.json");
