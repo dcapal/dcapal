@@ -52,34 +52,8 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
 
-  postgres:
-    container_name: supabase-db
-    image: supabase/postgres:15.1.1.78
-    command:
-      - postgres
-      - -c
-      - config_file=/etc/postgresql/postgresql.conf
-      - -c
-      - log_min_messages=fatal # prevents Realtime polling queries from appearing in logs
-    restart: 'no'
-    ports:
-      # Pass down internal port because it's set dynamically by other services
-      - ${POSTGRES_PORT}:${POSTGRES_PORT}
-    environment:
-      POSTGRES_HOST: /var/run/postgresql
-      PGPORT: ${POSTGRES_PORT}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB}
-      POSTGRES_DB: ${POSTGRES_DB}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXP: ${JWT_EXPIRY}
+  postgres-db:
     volumes:
-      # Always use a fresh database when developing
-      - /var/lib/postgresql/data
-      # Seed data should be inserted last (alphabetical order)
-      - ./dev/data.sql:/docker-entrypoint-initdb.d/seed.sql
-
-volumes:
-  db-config:
+      - ./docker/scripts:/docker-entrypoint-initdb.d
+networks:
+  server-side: { }

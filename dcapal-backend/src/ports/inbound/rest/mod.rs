@@ -20,7 +20,7 @@ use crate::ports::outbound::repository::ImportedPortfolio;
 use crate::{infra::stats, AppContext};
 
 mod auth;
-mod user;
+pub mod user;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../docs/schema/portfolio/v1/schema.json");
