@@ -12,7 +12,13 @@ use serde::Serialize;
 
 use uuid::Uuid;
 
-pub static DECODE_HEADER: Lazy<Validation> = Lazy::new(|| Validation::new(Algorithm::HS256));
+const JWT_AUDIENCE_DOMAIN: &str = "authenticated";
+pub static DECODE_HEADER: Lazy<Validation> = Lazy::new(|| {
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_audience(&[JWT_AUDIENCE_DOMAIN.to_string()]);
+    validation
+});
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     // issued at
@@ -22,7 +28,7 @@ pub struct Claims {
     // subject
     pub sub: Uuid,
     // session id
-    pub sid: Uuid,
+    pub session_id: Uuid,
     // role user
     pub role: String,
 }

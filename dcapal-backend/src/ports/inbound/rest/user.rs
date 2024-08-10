@@ -1,8 +1,10 @@
 use crate::app::infra::claim::Claims;
-use crate::error::{DcaError, Result};
+use crate::error::Result;
+use crate::ports::inbound::dto::response::UserProfileResponse;
 use crate::ports::inbound::service;
 use crate::AppContext;
 use axum::extract::State;
+use axum::Json;
 
 /// Get user profile information.
 #[utoipa::path(
@@ -18,15 +20,15 @@ use axum::extract::State;
 pub async fn get_profile(
     State(ctx): State<AppContext>,
     claims: Claims,
-) -> Result<Json<ProfileResponse>> {
+) -> Result<Json<UserProfileResponse>> {
     //info!("Get profile user id: {}.", user.uid);
-    match service::user::get_profile(&state, user.uid).await {
+    match service::user::get_profile(State(ctx), claims.sub).await {
         Ok(resp) => {
-            info!("Success get profile user: {}.", user.uid);
+            //info!("Success get profile user: {}.", user.uid);
             Ok(Json(resp))
         }
         Err(e) => {
-            warn!("Unsuccessfully get profile user: {e:?}.");
+            //warn!("Unsuccessfully get profile user: {e:?}.");
             Err(e)
         }
     }

@@ -162,11 +162,7 @@ impl DcaServer {
             .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
 
         let with_auth = Router::new()
-            .route("/protected", get(rest::auth::protected))
-            .layer(middleware::from_fn_with_state(
-                ctx.clone(),
-                rest::auth::validate_jwt,
-            ))
+            .route("/api/v1/user/profile", get(rest::user::get_profile))
             .with_state(ctx.clone());
 
         let merged_app = Router::new().merge(open_routes).merge(with_auth);
