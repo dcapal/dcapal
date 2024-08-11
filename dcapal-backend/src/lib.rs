@@ -13,6 +13,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use axum_extra::headers::UserAgent;
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
@@ -25,7 +26,10 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
+use crate::app::services::user::UserService;
 use crate::config::Postgres;
+use crate::ports::inbound::rest::user::get_profile;
+use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
     app::{
         infra,
@@ -75,6 +79,7 @@ pub type AppContext = Arc<AppContextInner>;
 struct Services {
     mkt_data: Arc<MarketDataService>,
     ip2location: Option<Arc<Ip2LocationService>>,
+    user: Arc<UserService>,
 }
 
 #[derive(Clone)]
@@ -83,6 +88,7 @@ struct Repository {
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
+    pub user: Arc<UserRepository>,
 }
 
 pub struct DcaServer {
@@ -114,6 +120,7 @@ impl DcaServer {
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
+            user: Arc::new(UserRepository::new(postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {
@@ -141,6 +148,7 @@ impl DcaServer {
         let services = Services {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             ip2location,
+            user: Arc::new(UserService::new(repos.user.clone())),
         };
 
         let ctx = Arc::new(AppContextInner {
@@ -161,11 +169,11 @@ impl DcaServer {
             .route("/import/portfolio", post(rest::import_portfolio))
             .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
 
-        let with_auth = Router::new()
-            .route("/v1/user/profile", get(rest::user::get_profile))
+        let authenticated_routes = Router::new()
+            .route("/v1/user/profile", get(get_profile))
             .with_state(ctx.clone());
 
-        let merged_app = Router::new().merge(open_routes).merge(with_auth);
+        let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);
 
         let app = merged_app
             .route_layer(

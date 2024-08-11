@@ -1,30 +1,30 @@
-use axum::extract::State;
-use chrono::NaiveDate;
+use crate::app::domain::entity::User;
+use crate::error::Result;
 use uuid::Uuid;
 
-use crate::error::Result;
-use crate::AppContext;
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct UserEntity {
-    pub first_name: String,
-    pub last_name: Option<String>,
-    pub email: String,
-    pub birth_date: NaiveDate,
+#[derive(Clone)]
+pub struct UserRepository {
+    pub postgres: sqlx::PgPool,
 }
 
-pub async fn get_current_user(user_id: Uuid, State(ctx): State<AppContext>) -> Result<UserEntity> {
-    let user = sqlx::query!(
-        r#"select first_name, last_name, email, birthdate from "users" where id = $1"#,
-        user_id
-    )
-    .fetch_one(&ctx.postgres)
-    .await?;
+impl UserRepository {
+    pub fn new(postgres: sqlx::PgPool) -> Self {
+        Self { postgres }
+    }
 
-    Ok(UserEntity {
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        birth_date: Default::default(),
-    })
+    pub async fn get_current_user(&self, user_id: Uuid) -> Result<Option<User>> {
+        let user = sqlx::query!(
+            r#"select first_name, last_name, email, birthdate from "users" where id = $1"#,
+            user_id
+        )
+        .fetch_one(&self.postgres)
+        .await?;
+
+        Ok(Some(User {
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            birth_date: user.birthdate,
+        }))
+    }
 }

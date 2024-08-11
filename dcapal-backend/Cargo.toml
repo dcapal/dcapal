@@ -45,3 +45,4 @@ jsonwebtoken = "9.3.0"
 sqlx = { version = "0.8.0", features = ["runtime-tokio", "tls-native-tls", "postgres", "uuid", "time"] }
 utoipa = "4.2.3"
 once_cell = "1.19.0"
+time = { version = "0.3.36", features = ["serde"] }
