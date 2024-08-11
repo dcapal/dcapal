@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::infra::utils::Expiring;
 use crate::DateTime;
+use time::Date;
 
 pub type AssetId = String;
 pub type MarketId = String;
@@ -202,4 +203,12 @@ impl Expiring for Market {
             .map(|p| p.time_to_live())
             .unwrap_or_else(|| std::time::Duration::from_secs(0))
     }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct User {
+    pub first_name: String,
+    pub last_name: Option<String>,
+    pub email: String,
+    pub birth_date: Date,
 }

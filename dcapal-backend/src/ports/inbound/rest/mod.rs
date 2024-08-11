@@ -136,6 +136,6 @@ pub async fn get_imported_portfolio(
 
     match repo.find_portfolio(&id).await? {
         Some(portfolio) => Ok(Json(portfolio).into_response()),
-        None => Ok((StatusCode::NOT_FOUND).into_response()),
+        None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
 }

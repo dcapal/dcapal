@@ -1,10 +1,33 @@
+use crate::app::domain::entity::User;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
-use crate::ports::inbound::dto::response::UserProfileResponse;
-use crate::ports::inbound::service;
 use crate::AppContext;
 use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
+use serde::{Deserialize, Serialize};
+use time::Date;
+use utoipa::ToSchema;
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct UserProfileResponse {
+    pub first_name: String,
+    pub last_name: Option<String>,
+    pub email: String,
+    pub birth_date: Date,
+}
+
+impl From<User> for UserProfileResponse {
+    fn from(entity: User) -> Self {
+        Self {
+            first_name: entity.first_name,
+            last_name: entity.last_name,
+            email: entity.email,
+            birth_date: entity.birth_date,
+        }
+    }
+}
 
 /// Get user profile information.
 #[utoipa::path(
@@ -17,19 +40,9 @@ use axum::Json;
     ),
     security(("jwt" = []))
 )]
-pub async fn get_profile(
-    State(ctx): State<AppContext>,
-    claims: Claims,
-) -> Result<Json<UserProfileResponse>> {
-    //info!("Get profile user id: {}.", user.uid);
-    match service::user::get_profile(State(ctx), claims.sub).await {
-        Ok(resp) => {
-            //info!("Success get profile user: {}.", user.uid);
-            Ok(Json(resp))
-        }
-        Err(e) => {
-            //warn!("Unsuccessfully get profile user: {e:?}.");
-            Err(e)
-        }
+pub async fn get_profile(State(ctx): State<AppContext>, claims: Claims) -> Result<Response> {
+    match &ctx.services.user.get_profile(claims.sub).await? {
+        Some(user) => Ok(Json(UserProfileResponse::from(user.clone())).into_response()),
+        None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
 }

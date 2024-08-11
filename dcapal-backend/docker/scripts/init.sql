@@ -11,18 +11,3 @@ CREATE TABLE auth.users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
--- Create a function to automatically update the updated_at column
-CREATE OR REPLACE FUNCTION update_modified_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create a trigger to call the function before each update
-CREATE TRIGGER update_users_modtime
-BEFORE UPDATE ON auth.users
-FOR EACH ROW
-EXECUTE FUNCTION update_modified_column();

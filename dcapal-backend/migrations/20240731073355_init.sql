@@ -85,6 +85,17 @@ create table public.instrument_prices
     updated_at    timestamp with time zone default now() not null
 );
 
+-- PORTFOLIOS
+create table public.portfolios
+(
+    id          uuid primary key         default gen_random_uuid(),
+    user_id     uuid references public.users           not null,
+    name        text                                   not null,
+    description text,
+    created_at  timestamp with time zone default now() not null,
+    updated_at  timestamp with time zone default now() not null
+);
+
 -- HOLDINGS
 create table public.holdings
 (
@@ -95,17 +106,6 @@ create table public.holdings
     quantity      numeric(20, 10)                        not null,
     created_at    timestamp with time zone default now() not null,
     updated_at    timestamp with time zone default now() not null
-);
-
--- PORTFOLIOS
-create table public.portfolios
-(
-    id          uuid primary key         default gen_random_uuid(),
-    user_id     uuid references public.users           not null,
-    name        text                                   not null,
-    description text,
-    created_at  timestamp with time zone default now() not null,
-    updated_at  timestamp with time zone default now() not null
 );
 
 -- INVESTMENTS_PREFERENCES
