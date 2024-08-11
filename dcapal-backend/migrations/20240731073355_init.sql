@@ -92,6 +92,7 @@ create table public.portfolios
     user_id     uuid references public.users           not null,
     name        text                                   not null,
     description text,
+    currency    text                                   not null,
     created_at  timestamp with time zone default now() not null,
     updated_at  timestamp with time zone default now() not null
 );
