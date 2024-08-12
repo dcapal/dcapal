@@ -106,6 +106,9 @@ impl DcaServer {
 
         let postgres = build_postgres_pool(&config.server.postgres).await?;
 
+        //TODO: When switching to the Docker container for Postgres, we need to run the migrations with start.sh
+        sqlx::migrate!().run(&postgres).await?;
+
         let repos = Arc::new(Repository {
             misc: Arc::new(MiscRepository::new(redis.clone())),
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
