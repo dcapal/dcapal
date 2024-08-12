@@ -18,7 +18,6 @@ COPY ./Cargo.lock ./Cargo.lock
 COPY ./dcapal-backend ./dcapal-backend
 COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
 RUN cargo build --profile release-with-debug --bin dcapal-backend
-RUN cargo install sqlx-cli
 
 FROM debian:bookworm-slim AS runtime
 # Install runtime dependencies
@@ -34,10 +33,4 @@ WORKDIR /var/dcapal/dcapal-backend
 RUN mkdir bin
 RUN mkdir data
 COPY --from=builder /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/dcapal-backend/bin
-COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
-COPY --from=builder /var/dcapal/dcapal-backend/migrations /var/dcapal/dcapal-backend/migrations
-# Copy startup script
-COPY start.sh /var/dcapal/start.sh
-RUN chmod +x /var/dcapal/start.sh
-
-ENTRYPOINT ["/var/dcapal/start.sh"]
+ENTRYPOINT ["/var/dcapal/dcapal-backend/bin/dcapal-backend"]
