@@ -16,6 +16,7 @@
     },
     "navbar": {
       "myPortfolios": "I miei portafogli",
+      "dashboard": "Dashboard",
       "about": "Chi siamo",
       "docs": "Documentazione",
       "exportPortfolio": "Esporta Portafoglio",

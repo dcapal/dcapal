@@ -63,6 +63,11 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
               {t("navbar.myPortfolios")}
             </div>
           </Link>
+          <Link to={"/dashboard"} onClick={toggleMenu}>
+            <div className="w-full text-2xl font-light text-white">
+              {t("navbar.dashboard")}
+            </div>
+          </Link>
           <Link to={"/about"} onClick={toggleMenu}>
             <div className="w-full text-2xl font-light text-white">
               {" "}
@@ -171,6 +176,9 @@ export const NavBar = () => {
               <Link to={"/allocate"} onClick={onClickMyPortfolios}>
                 {t("navbar.myPortfolios")}
               </Link>
+            </div>
+            <div className="text-lg font-light text-white">
+              <Link to={"/dashboard"}>{t("navbar.dashboard")}</Link>
             </div>
             <div className="text-lg font-light text-white">
               <Link to={"/about"}>{t("navbar.about")}</Link>

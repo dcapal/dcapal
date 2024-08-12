@@ -28,6 +28,7 @@ use tracing::{error, info};
 
 use crate::app::services::user::UserService;
 use crate::config::Postgres;
+use crate::ports::inbound::rest::portfolio::get_portfolio_holdings;
 use crate::ports::inbound::rest::user::get_profile;
 use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
@@ -171,6 +172,10 @@ impl DcaServer {
 
         let authenticated_routes = Router::new()
             .route("/v1/user/profile", get(get_profile))
+            .route(
+                "/v1/user/portfolios/:id/holdings",
+                get(get_portfolio_holdings),
+            )
             .with_state(ctx.clone());
 
         let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);
@@ -228,7 +233,7 @@ impl DcaServer {
             let ctx = self.ctx.clone();
             let stop_rx = self.stop_tx.subscribe();
             let handle = tokio::spawn(async move {
-                let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 60));
+                let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 600));
                 worker.run(stop_rx).await;
             });
             self.worker_handlers.push(handle);
