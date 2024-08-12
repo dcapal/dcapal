@@ -16,6 +16,7 @@
     },
     "navbar": {
       "myPortfolios": "My portfolios",
+      "dashboard": "Dashboard",
       "about": "About",
       "docs": "Docs",
       "exportPortfolio": "Export Portfolio",

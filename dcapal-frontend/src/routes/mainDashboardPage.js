@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { DCAPAL_API, supabase } from "@app/config";
+import { DCAPAL_API } from "@app/config";
 import { api } from "@app/api";
 import {
   Button,
@@ -17,63 +17,31 @@ import {
 } from "@chakra-ui/react";
 import { ContainerPage } from "./containerPage";
 import { ChevronDownIcon } from "@chakra-ui/icons";
+
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Legend,
   Line,
   LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
+  Tooltip,
   XAxis,
+  YAxis,
 } from "recharts";
 
 export default function Dashboard({ session }) {
-  const data = [
-    {
-      name: "Page A",
-      uv: 4000,
-      pv: 2400,
-      amt: 2400,
-    },
-    {
-      name: "Page B",
-      uv: 3000,
-      pv: 1398,
-      amt: 2210,
-    },
-    {
-      name: "Page C",
-      uv: 2000,
-      pv: 9800,
-      amt: 2290,
-    },
-    {
-      name: "Page D",
-      uv: 2780,
-      pv: 3908,
-      amt: 2000,
-    },
-    {
-      name: "Page E",
-      uv: 1890,
-      pv: 4800,
-      amt: 2181,
-    },
-    {
-      name: "Page F",
-      uv: 2390,
-      pv: 3800,
-      amt: 2500,
-    },
-    {
-      name: "Page G",
-      uv: 3490,
-      pv: 4300,
-      amt: 2100,
-    },
+  const mockData = [
+    { name: "Asset A", weight: 25.5 },
+    { name: "Asset B", weight: 30.2 },
+    { name: "Asset C", weight: 15.8 },
+    { name: "Asset D", weight: 28.5 },
   ];
+  const [holdings, setHoldings] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState(null);
@@ -85,60 +53,26 @@ export default function Dashboard({ session }) {
   };
 
   useEffect(() => {
-    let ignore = false;
+    fetchData();
+  }, []);
 
-    async function getProfile() {
-      setLoading(true);
-      const { user } = session;
-
-      const { data, error } = await api.get(`${DCAPAL_API}/protected`, config);
-
-      if (!ignore) {
-        if (error) {
-          console.warn(error);
-        } else if (data) {
-          //setUsername(data.username);
-          //setWebsite(data.website);
-          //setAvatarUrl(data.avatar_url);
-          setUsername(data?.data?.user?.email);
-        }
-      }
-
-      setLoading(false);
+  const fetchData = async () => {
+    try {
+      const response = await api.get(
+        `${DCAPAL_API}/v1/user/portfolios/uuid_v4/holdings`,
+        config
+      );
+      setHoldings(response.data.holdings);
+    } catch (error) {
+      console.error("Error fetching data:", error);
     }
+  };
 
-    getProfile();
-
-    return () => {
-      ignore = true;
-    };
-  }, [session]);
-
-  const [todos, setTodos] = useState([]);
-
-  async function updateProfile(event, avatarUrl) {
-    event.preventDefault();
-
-    setLoading(true);
-    const { user } = session;
-
-    const updates = {
-      id: user.id,
-      username,
-      website,
-      avatar_url: avatarUrl,
-      updated_at: new Date(),
-    };
-
-    const { error } = await supabase.from("profiles").upsert(updates);
-
-    if (error) {
-      alert(error.message);
-    } else {
-      setAvatarUrl(avatarUrl);
-    }
-    setLoading(false);
-  }
+  // Get table headers dynamically from the first holding object
+  const getHeaders = () => {
+    if (holdings.length === 0) return [];
+    return Object.keys(holdings[0]);
+  };
 
   return (
     <ContainerPage
@@ -215,50 +149,28 @@ export default function Dashboard({ session }) {
                 </div>
                 <div className="overflow-x-auto">
                   <TableContainer>
-                    <Table>
+                    <Table variant="simple">
                       <Thead>
                         <Tr>
-                          <Th>Data1</Th>
-                          <Th>Data2</Th>
-                          <Th>Data2</Th>
-                          <Th>Data2</Th>
-                          <Th>Data2</Th>
-                          <Th>Data2</Th>
+                          {getHeaders().map((header, index) => (
+                            <Th key={index}>
+                              {header.replace("_", " ").toUpperCase()}
+                            </Th>
+                          ))}
                         </Tr>
                       </Thead>
                       <Tbody>
-                        <Tr>
-                          <Td>12</Td>
-                          <Td>45.67</Td>
-                          <Td>-23.45</Td>
-                          <Td>78.90</Td>
-                          <Td>-12.34</Td>
-                          <Td>56.78</Td>
-                        </Tr>
-                        <Tr>
-                          <Td>34</Td>
-                          <Td>-67.89</Td>
-                          <Td>23.45</Td>
-                          <Td>-89.01</Td>
-                          <Td>45.67</Td>
-                          <Td>-12.34</Td>
-                        </Tr>
-                        <Tr>
-                          <Td>56</Td>
-                          <Td>12.34</Td>
-                          <Td>-45.67</Td>
-                          <Td>89.01</Td>
-                          <Td>-23.45</Td>
-                          <Td>67.89</Td>
-                        </Tr>
-                        <Tr>
-                          <Td>78</Td>
-                          <Td>-34.56</Td>
-                          <Td>56.78</Td>
-                          <Td>-12.34</Td>
-                          <Td>78.90</Td>
-                          <Td>-45.67</Td>
-                        </Tr>
+                        {holdings.map((holding, rowIndex) => (
+                          <Tr key={rowIndex}>
+                            {getHeaders().map((header, cellIndex) => (
+                              <Td key={cellIndex}>
+                                {typeof holding[header] === "number"
+                                  ? holding[header].toFixed(2)
+                                  : holding[header]}
+                              </Td>
+                            ))}
+                          </Tr>
+                        ))}
                       </Tbody>
                     </Table>
                   </TableContainer>
@@ -275,35 +187,42 @@ export default function Dashboard({ session }) {
 function BarchartChart(props) {
   return (
     <div {...props}>
-      <ResponsiveContainer
-        config={{
-          desktop: {
-            label: "Desktop",
-            color: "hsl(var(--chart-1))",
-          },
-        }}
-        className="min-h-[300px]"
-      >
+      <ResponsiveContainer width="100%" height={400}>
         <BarChart
-          accessibilityLayer
           data={[
-            { month: "January", desktop: 186 },
-            { month: "February", desktop: 305 },
-            { month: "March", desktop: 237 },
-            { month: "April", desktop: 73 },
-            { month: "May", desktop: 209 },
-            { month: "June", desktop: 214 },
+            { year: 2020, gain: 15.2 },
+            { year: 2021, gain: 22.8 },
+            { year: 2022, gain: -5.1 },
+            { year: 2023, gain: 18.3 },
+            { year: 2024, gain: 10.5 },
           ]}
+          margin={{
+            top: 20,
+            right: 30,
+            left: 20,
+            bottom: 5,
+          }}
         >
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="month"
-            tickLine={false}
-            tickMargin={10}
-            axisLine={false}
-            tickFormatter={(value) => value.slice(0, 3)}
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="year" />
+          <YAxis
+            yAxisId="left"
+            orientation="left"
+            stroke="#8884d8"
+            label={{
+              value: "Performance (%)",
+              angle: -90,
+              position: "insideLeft",
+            }}
           />
-          <Bar dataKey="desktop" fill="var(--color-desktop)" radius={8} />
+          <Tooltip />
+          <Legend />
+          <Bar
+            yAxisId="left"
+            dataKey="gain"
+            fill="#8884d8"
+            name="Annual Gain (%)"
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -402,51 +321,36 @@ function MenuIcon(props) {
 }
 
 function PiechartcustomChart(props) {
+  const mockData = [
+    { name: "Asset A", weight: 25.5 },
+    { name: "Asset B", weight: 30.2 },
+    { name: "Asset C", weight: 15.8 },
+    { name: "Asset D", weight: 28.5 },
+  ];
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
   return (
     <div {...props}>
-      <ResponsiveContainer
-        config={{
-          visitors: {
-            label: "Visitors",
-          },
-          chrome: {
-            label: "Chrome",
-            color: "hsl(var(--chart-1))",
-          },
-          safari: {
-            label: "Safari",
-            color: "hsl(var(--chart-2))",
-          },
-          firefox: {
-            label: "Firefox",
-            color: "hsl(var(--chart-3))",
-          },
-          edge: {
-            label: "Edge",
-            color: "hsl(var(--chart-4))",
-          },
-          other: {
-            label: "Other",
-            color: "hsl(var(--chart-5))",
-          },
-        }}
-      >
+      <ResponsiveContainer width="100%" height={400}>
         <PieChart>
           <Pie
-            data={[
-              { browser: "chrome", visitors: 275, fill: "var(--color-chrome)" },
-              { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
-              {
-                browser: "firefox",
-                visitors: 187,
-                fill: "var(--color-firefox)",
-              },
-              { browser: "edge", visitors: 173, fill: "var(--color-edge)" },
-              { browser: "other", visitors: 90, fill: "var(--color-other)" },
-            ]}
-            dataKey="visitors"
-            nameKey="browser"
-          />
+            data={mockData}
+            dataKey="weight"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            outerRadius={150}
+            fill="#8884d8"
+            label={(entry) => `${entry.name}: ${entry.weight.toFixed(2)}%`}
+          >
+            {mockData.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+              />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
+          <Legend />
         </PieChart>
       </ResponsiveContainer>
     </div>

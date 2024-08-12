@@ -20,6 +20,7 @@ use crate::ports::outbound::repository::ImportedPortfolio;
 use crate::{infra::stats, AppContext};
 
 mod auth;
+pub mod portfolio;
 pub mod user;
 
 static PORTFOLIO_SCHEMA_STR: &str =
