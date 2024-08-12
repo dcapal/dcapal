@@ -9,5 +9,5 @@ done
 # Run migrations
 sqlx migrate run
 
-# Start your application
+# Start the application
 exec /var/dcapal/dcapal-backend/bin/dcapal-backend
