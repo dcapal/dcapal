@@ -51,7 +51,3 @@ services:
       - /var/run:/var/run:rw
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-
-  postgres-db:
-    volumes:
-      - ./docker/scripts:/docker-entrypoint-initdb.d
