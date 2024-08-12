@@ -17,30 +17,19 @@ services:
       interval: 10s
       timeout: 10s
       retries: 3
-  postgres:
-    container_name: supabase-db
-    image: supabase/postgres:15.1.1.78
-    command:
-      - postgres
-      - -c
-      - config_file=/etc/postgresql/postgresql.conf
-      - -c
-      - log_min_messages=fatal # prevents Realtime polling queries from appearing in logs
-    restart: 'no'
-    ports:
-      # Pass down internal port because it's set dynamically by other services
-      - "5432:5432"
+  postgres-db:
+    image: "postgres:latest"
+    container_name: postgres-database
+    restart: always
+    networks:
+      - server-side
     environment:
-      POSTGRES_HOST: /var/run/postgresql
-      PGPORT: 5432
-      POSTGRES_PORT: 5432
-      PGPASSWORD: postgres
-      POSTGRES_PASSWORD: postgres
-      PGDATABASE: postgres
-      POSTGRES_DB: postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_HOST=postgres-db
+    ports:
+      - "5432:5432"
 
 networks:
   dcapalnetwork:
-
-volumes:
-  db-config:
