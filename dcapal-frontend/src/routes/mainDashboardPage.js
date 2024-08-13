@@ -47,6 +47,11 @@ export default function Dashboard({ session }) {
   const [username, setUsername] = useState(null);
   const [website, setWebsite] = useState(null);
   const [avatar_url, setAvatarUrl] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const handleShowChat = () => {
+    setIsChatOpen(!isChatOpen);
+  };
 
   const config = {
     headers: { Authorization: `Bearer ${session.access_token}` },
@@ -106,8 +111,13 @@ export default function Dashboard({ session }) {
               <PlusIcon className="h-4 w-4 mr-2" />
               Add New Portfolio
             </Button>
+            <Button size="sm" onClick={handleShowChat}>
+              Ask AI
+            </Button>
           </header>
-          <div className="flex-1 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-2 md:p-6 lg:gap-8 bg-gray-100">
+          <div
+            className={`flex-1 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-2 md:p-6 lg:gap-8 bg-gray-100 ${isChatOpen ? "mr-1/3" : ""}`}
+          >
             <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
               <div className="p-4 sm:p-6 flex-1">
                 <div className="flex items-center justify-between">
@@ -158,6 +168,7 @@ export default function Dashboard({ session }) {
               </div>
             </div>
           </div>
+          <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         </div>
       }
     />
@@ -376,5 +387,73 @@ function ViewIcon(props) {
       <path d="M21 17v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2" />
       <path d="M21 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2" />
     </svg>
+  );
+}
+
+function ChatPanel({ isOpen, onClose }) {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+
+  const handleSendMessage = async () => {
+    if (input.trim() === "") return;
+
+    const newMessage = { text: input, sender: "user" };
+    setMessages([...messages, newMessage]);
+    setInput("");
+
+    try {
+      const response = await api.post(
+        `${DCAPAL_API}/v1/chat`,
+        { message: input },
+        config
+      );
+      const aiResponse = { text: response.data.message, sender: "ai" };
+      setMessages((prevMessages) => [...prevMessages, aiResponse]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
+  return (
+    <div
+      className={`fixed right-0 top-0 h-full w-1/3 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "translate-x-full"}`}
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-medium">AI Chat</h3>
+          <Button size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`mb-2 ${msg.sender === "user" ? "text-right" : "text-left"}`}
+            >
+              <span
+                className={`inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"}`}
+              >
+                {msg.text}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="p-4 border-t">
+          <div className="flex">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="flex-1 p-2 border rounded-l-lg"
+              placeholder="Type your message..."
+            />
+            <Button onClick={handleSendMessage} className="rounded-r-lg">
+              Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
