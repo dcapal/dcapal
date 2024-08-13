@@ -107,13 +107,15 @@ export default function Dashboard({ session }) {
                 </MenuList>
               </Menu>
             </div>
-            <Button size="sm">
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add New Portfolio
-            </Button>
-            <Button size="sm" onClick={handleShowChat}>
-              Ask AI
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm">
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add New Portfolio
+              </Button>
+              <Button size="sm" onClick={handleShowChat}>
+                Ask AI
+              </Button>
+            </div>
           </header>
           <div className={`flex-1 ${isChatVisible ? "flex" : ""}`}>
             <div
@@ -203,16 +205,7 @@ function BarchartChart(props) {
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="year" />
-          <YAxis
-            yAxisId="left"
-            orientation="left"
-            stroke="#8884d8"
-            label={{
-              value: "Performance (%)",
-              angle: -90,
-              position: "insideLeft",
-            }}
-          />
+          <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
           <Tooltip />
           <Legend />
           <Bar
@@ -224,28 +217,6 @@ function BarchartChart(props) {
         </BarChart>
       </ResponsiveContainer>
     </div>
-  );
-}
-
-function ExpandIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m21 21-6-6m6 6v-4.8m0 4.8h-4.8" />
-      <path d="M3 16.2V21m0 0h4.8M3 21l6-6" />
-      <path d="M21 7.8V3m0 0h-4.8M21 3l-6 6" />
-      <path d="M3 7.8V3m0 0h4.8M3 3l6 6" />
-    </svg>
   );
 }
 
@@ -338,7 +309,7 @@ function PiechartcustomChart(props) {
             cy="50%"
             outerRadius={150}
             fill="#8884d8"
-            label={(entry) => `${entry.name}: ${entry.weight.toFixed(2)}%`}
+            // label={(entry) => `${entry.name}: ${entry.weight.toFixed(2)}%`}
           >
             {mockData.map((entry, index) => (
               <Cell
