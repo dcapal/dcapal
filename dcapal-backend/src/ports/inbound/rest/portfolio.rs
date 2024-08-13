@@ -45,6 +45,14 @@ pub async fn get_portfolio_holdings() -> crate::error::Result<Response> {
                 weight: 0.2,
                 total: 2000.0,
             },
+            PortfolioResponse {
+                name: "Vanguard FTSE All-World".to_string(),
+                ticker: "VWCE".to_string(),
+                price: 2.0,
+                quantity: 1000.0,
+                weight: 0.2,
+                total: 2000.0,
+            },
         ],
     })
     .into_response())
