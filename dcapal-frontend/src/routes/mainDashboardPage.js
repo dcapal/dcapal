@@ -47,10 +47,10 @@ export default function Dashboard({ session }) {
   const [username, setUsername] = useState(null);
   const [website, setWebsite] = useState(null);
   const [avatar_url, setAvatarUrl] = useState(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatVisible, setIsChatVisible] = useState(false);
 
   const handleShowChat = () => {
-    setIsChatOpen(!isChatOpen);
+    setIsChatVisible(!isChatVisible);
   };
 
   const config = {
@@ -115,60 +115,67 @@ export default function Dashboard({ session }) {
               Ask AI
             </Button>
           </header>
-          <div
-            className={`flex-1 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-2 md:p-6 lg:gap-8 bg-gray-100 ${isChatOpen ? "mr-1/3" : ""}`}
-          >
-            <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
-              <div className="p-4 sm:p-6 flex-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Pie Chart</h3>
+          <div className={`flex-1 ${isChatVisible ? "flex" : ""}`}>
+            <div
+              className={`grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:p-6 lg:gap-8 bg-gray-100 ${isChatVisible ? "w-2/3" : "w-full"}`}
+            >
+              <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
+                <div className="p-4 sm:p-6 flex-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Pie Chart</h3>
+                  </div>
+                  <PiechartcustomChart className="aspect-[9/4] w-full" />
                 </div>
-                <PiechartcustomChart className="aspect-[9/4] w-full" />
               </div>
-            </div>
-            <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
-              <div className="p-4 sm:p-6 flex-1">
-                <h3 className="text-lg font-medium">Bar Chart</h3>
-                <BarchartChart className="aspect-[9/4] w-full" />
-              </div>
-            </div>
-            <div className="bg-background bg-white rounded-lg shadow-lg col-span-1 sm:col-span-2">
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Holdings</h3>
+              <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
+                <div className="p-4 sm:p-6 flex-1">
+                  <h3 className="text-lg font-medium">Bar Chart</h3>
+                  <BarchartChart className="aspect-[9/4] w-full" />
                 </div>
-                <div className="overflow-x-auto">
-                  <TableContainer>
-                    <Table variant="simple">
-                      <Thead>
-                        <Tr>
-                          {getHeaders().map((header, index) => (
-                            <Th key={index}>
-                              {header.replace("_", " ").toUpperCase()}
-                            </Th>
-                          ))}
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {holdings.map((holding, rowIndex) => (
-                          <Tr key={rowIndex}>
-                            {getHeaders().map((header, cellIndex) => (
-                              <Td key={cellIndex}>
-                                {typeof holding[header] === "number"
-                                  ? holding[header].toFixed(2)
-                                  : holding[header]}
-                              </Td>
+              </div>
+              <div className="bg-background bg-white rounded-lg shadow-lg col-span-1 sm:col-span-2">
+                <div className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Holdings</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <TableContainer>
+                      <Table variant="simple">
+                        <Thead>
+                          <Tr>
+                            {getHeaders().map((header, index) => (
+                              <Th key={index}>
+                                {header.replace("_", " ").toUpperCase()}
+                              </Th>
                             ))}
                           </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
+                        </Thead>
+                        <Tbody>
+                          {holdings.map((holding, rowIndex) => (
+                            <Tr key={rowIndex}>
+                              {getHeaders().map((header, cellIndex) => (
+                                <Td key={cellIndex}>
+                                  {typeof holding[header] === "number"
+                                    ? holding[header].toFixed(2)
+                                    : holding[header]}
+                                </Td>
+                              ))}
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  </div>
                 </div>
               </div>
             </div>
+            {isChatVisible && (
+              <div className="w-1/3 bg-background bg-white rounded-lg shadow-lg flex flex-col p-4 sm:p-6">
+                <h3 className="text-lg font-medium mb-4">AI Chat</h3>
+                <ChatCard />
+              </div>
+            )}
           </div>
-          <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         </div>
       }
     />
@@ -390,7 +397,7 @@ function ViewIcon(props) {
   );
 }
 
-function ChatPanel({ isOpen, onClose }) {
+function ChatCard() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
 
@@ -415,43 +422,36 @@ function ChatPanel({ isOpen, onClose }) {
   };
 
   return (
-    <div
-      className={`fixed right-0 top-0 h-full w-1/3 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "translate-x-full"}`}
-    >
-      <div className="flex flex-col h-full">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-lg font-medium">AI Chat</h3>
-          <Button size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`mb-2 ${msg.sender === "user" ? "text-right" : "text-left"}`}
+    <div className="flex flex-col h-full">
+      <div
+        className="flex-1 overflow-y-auto mb-4"
+        style={{ height: "calc(100vh - 300px)" }}
+      >
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`mb-2 ${msg.sender === "user" ? "text-right" : "text-left"}`}
+          >
+            <span
+              className={`inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"}`}
             >
-              <span
-                className={`inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"}`}
-              >
-                {msg.text}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="p-4 border-t">
-          <div className="flex">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="flex-1 p-2 border rounded-l-lg"
-              placeholder="Type your message..."
-            />
-            <Button onClick={handleSendMessage} className="rounded-r-lg">
-              Send
-            </Button>
+              {msg.text}
+            </span>
           </div>
+        ))}
+      </div>
+      <div className="mt-auto">
+        <div className="flex">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="flex-1 p-2 border rounded-l-lg"
+            placeholder="Type your message..."
+          />
+          <Button onClick={handleSendMessage} className="rounded-r-lg">
+            Send
+          </Button>
         </div>
       </div>
     </div>
