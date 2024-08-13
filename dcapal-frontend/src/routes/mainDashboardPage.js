@@ -84,7 +84,7 @@ export default function Dashboard({ session }) {
             <div className="flex items-center gap-4">
               <Menu>
                 <MenuButton as={Button} rightIcon={<ChevronDownIcon />}>
-                  Menu
+                  Portfolio
                 </MenuButton>
                 <MenuList align="start">
                   <MenuItem>Dashboard</MenuItem>
@@ -97,9 +97,8 @@ export default function Dashboard({ session }) {
                   View
                 </MenuButton>
                 <MenuList align="start">
-                  <MenuItem>List</MenuItem>
-                  <MenuItem>Grid</MenuItem>
-                  <MenuItem>Calendar</MenuItem>
+                  <MenuItem>Main Dashboard</MenuItem>
+                  <MenuItem>Historical Value View</MenuItem>
                 </MenuList>
               </Menu>
             </div>
@@ -108,44 +107,25 @@ export default function Dashboard({ session }) {
               Add New Portfolio
             </Button>
           </header>
-          <div className="flex-1 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-2 md:p-6 lg:gap-8">
-            <div className="bg-background rounded-lg shadow-lg flex flex-col">
+          <div className="flex-1 grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-2 md:p-6 lg:gap-8 bg-gray-100">
+            <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
               <div className="p-4 sm:p-6 flex-1">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium">Pie Chart</h3>
-                  <div className="flex items-center gap-2 hidden sm:flex">
-                    <span className="text-sm text-muted-foreground">
-                      Legend:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-primary" />
-                      <span className="text-sm">1</span>
-                      <div className="w-3 h-3 rounded-full bg-secondary" />
-                      <span className="text-sm">2</span>
-                      <div className="w-3 h-3 rounded-full bg-accent" />
-                      <span className="text-sm">3</span>
-                      <div className="w-3 h-3 rounded-full bg-muted" />
-                      <span className="text-sm">4</span>
-                    </div>
-                  </div>
                 </div>
                 <PiechartcustomChart className="aspect-[9/4] w-full" />
               </div>
             </div>
-            <div className="bg-background rounded-lg shadow-lg flex flex-col">
+            <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
               <div className="p-4 sm:p-6 flex-1">
                 <h3 className="text-lg font-medium">Bar Chart</h3>
                 <BarchartChart className="aspect-[9/4] w-full" />
               </div>
             </div>
-            <div className="bg-background rounded-lg shadow-lg col-span-1 sm:col-span-2">
+            <div className="bg-background bg-white rounded-lg shadow-lg col-span-1 sm:col-span-2">
               <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">List1</h3>
-                  <Button variant="ghost" size="icon">
-                    <ExpandIcon className="h-5 w-5" />
-                    <span className="sr-only">More</span>
-                  </Button>
+                  <h3 className="text-lg font-medium">Holdings</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <TableContainer>
