@@ -119,60 +119,71 @@ export default function Dashboard({ session }) {
           </header>
           <div className={`flex-1 ${isChatVisible ? "flex" : ""}`}>
             <div
-              className={`grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-6 md:p-6 lg:gap-8 bg-gray-100 ${isChatVisible ? "w-2/3" : "w-full"}`}
+              className={`grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:gap-6 md:p-6 lg:gap-8 bg-gray-100 ${isChatVisible ? "w-2/3" : "w-full"}`}
             >
-              <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
-                <div className="p-4 sm:p-6 flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">Pie Chart</h3>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Pie Chart</h3>
+                </div>
+                <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
+                  <div className="p-1 sm:p-2 flex-1">
+                    <PiechartcustomChart className="aspect-[9/4] w-full" />
                   </div>
-                  <PiechartcustomChart className="aspect-[9/4] w-full" />
                 </div>
               </div>
-              <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
-                <div className="p-4 sm:p-6 flex-1">
-                  <h3 className="text-lg font-medium">Bar Chart</h3>
-                  <BarchartChart className="aspect-[9/4] w-full" />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">
+                    Model Portfolio Performance (by Year)
+                  </h3>
+                </div>
+                <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
+                  <div className="p-1 sm:p-2 flex-1 pb-2">
+                    <BarchartChart className="aspect-[9/4] w-full" />
+                  </div>
                 </div>
               </div>
-              <div className="bg-background bg-white rounded-lg shadow-lg col-span-1 sm:col-span-2">
-                <div className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">Holdings</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <TableContainer>
-                      <Table variant="simple">
-                        <Thead>
-                          <Tr>
-                            {getHeaders().map((header, index) => (
-                              <Th key={index}>
-                                {header.replace("_", " ").toUpperCase()}
-                              </Th>
-                            ))}
-                          </Tr>
-                        </Thead>
-                        <Tbody>
-                          {holdings.map((holding, rowIndex) => (
-                            <Tr key={rowIndex}>
-                              {getHeaders().map((header, cellIndex) => (
-                                <Td key={cellIndex}>
-                                  {typeof holding[header] === "number"
-                                    ? holding[header].toFixed(2)
-                                    : holding[header]}
-                                </Td>
+              <div className="space-y-1 col-span-1 sm:col-span-2">
+                <div className="flex items-center">
+                  <h3 className="text-lg font-medium">Holdings</h3>
+                </div>
+                <div className="bg-background bg-white rounded-lg shadow-lg">
+                  <div className="p-2 sm:p-2">
+                    <div className="overflow-x-auto">
+                      <TableContainer>
+                        <Table variant="simple">
+                          <Thead>
+                            <Tr>
+                              {getHeaders().map((header, index) => (
+                                <Th key={index}>
+                                  {header.replace("_", " ").toUpperCase()}
+                                </Th>
                               ))}
                             </Tr>
-                          ))}
-                        </Tbody>
-                      </Table>
-                    </TableContainer>
+                          </Thead>
+                          <Tbody>
+                            {holdings.map((holding, rowIndex) => (
+                              <Tr key={rowIndex}>
+                                {getHeaders().map((header, cellIndex) => (
+                                  <Td key={cellIndex}>
+                                    {typeof holding[header] === "number"
+                                      ? holding[header].toFixed(2)
+                                      : holding[header]}
+                                  </Td>
+                                ))}
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
             {isChatVisible && (
-              <div className="w-1/3 bg-background bg-white rounded-lg shadow-lg flex flex-col p-4 sm:p-6">
+              <div className="w-1/3 bg-background rounded-lg shadow-lg flex flex-col p-4 sm:p-6 my-6 mr-6 bg-gray-100">
                 <h3 className="text-lg font-medium mb-4">AI Chat</h3>
                 <ChatCard />
               </div>
@@ -207,7 +218,7 @@ function BarchartChart(props) {
           <XAxis dataKey="year" />
           <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
           <Tooltip />
-          <Legend />
+          {/*<Legend />*/}
           <Bar
             yAxisId="left"
             dataKey="gain"
