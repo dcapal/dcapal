@@ -22,6 +22,7 @@ import Account from "@routes/profilePage";
 import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
 import Dashboard from "@routes/mainDashboardPage";
+import HistoricalView from "@routes/historicalViewPage";
 
 import(/* webpackPrefetch: true */ "@app");
 
@@ -108,6 +109,19 @@ export const Router = () => {
             <AuthPage />
           ) : (
             <Dashboard key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "historical",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <HistoricalView key={session.user.id} session={session} />
           )}
         </div>
       ),
