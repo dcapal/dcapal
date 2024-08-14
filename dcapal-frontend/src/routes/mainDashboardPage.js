@@ -84,8 +84,8 @@ export default function Dashboard({ session }) {
       title={"Dashboard"}
       content={
         // w-full flex flex-col grow justify-center items-center text-center gap-8 bg-gray-100
-        <div className="w-screen grow">
-          <header className="bg-background shadow-sm sticky top-0 z-10 px-4 py-3 flex items-center justify-between sm:px-6">
+        <div className="w-screen grow bg-gray-100">
+          <header className="bg-background bg-white shadow-sm sticky top-0 z-10 px-4 py-3 flex items-center justify-between sm:px-6">
             <div className="flex items-center gap-4">
               <Menu>
                 <MenuButton as={Button} rightIcon={<ChevronDownIcon />}>
@@ -119,11 +119,11 @@ export default function Dashboard({ session }) {
           </header>
           <div className={`flex-1 ${isChatVisible ? "flex" : ""}`}>
             <div
-              className={`grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:gap-6 md:p-6 lg:gap-8 bg-gray-100 ${isChatVisible ? "w-2/3" : "w-full"}`}
+              className={`grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:gap-6 md:p-6 lg:gap-8  ${isChatVisible ? "w-2/3" : "w-full"}`}
             >
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Pie Chart</h3>
+                  <h3 className="text-lg font-medium">Asset Distribution</h3>
                 </div>
                 <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-1 sm:p-2 flex-1">
@@ -183,7 +183,7 @@ export default function Dashboard({ session }) {
             </div>
 
             {isChatVisible && (
-              <div className="w-1/3 bg-background rounded-lg shadow-lg flex flex-col p-4 sm:p-6 my-6 mr-6 bg-gray-100">
+              <div className="w-1/3 bg-background bg-white rounded-lg shadow-lg flex flex-col p-4 sm:p-6 my-6 mr-6 bg-gray-100">
                 <h3 className="text-lg font-medium mb-4">AI Chat</h3>
                 <ChatCard />
               </div>
@@ -196,17 +196,19 @@ export default function Dashboard({ session }) {
 }
 
 function BarchartChart(props) {
+  const data = [
+    { year: 2020, gain: 15.2 },
+    { year: 2021, gain: 22.8 },
+    { year: 2022, gain: -5.1 },
+    { year: 2023, gain: 18.3 },
+    { year: 2024, gain: 10.5 },
+  ];
+
   return (
     <div {...props}>
       <ResponsiveContainer width="100%" height={400}>
         <BarChart
-          data={[
-            { year: 2020, gain: 15.2 },
-            { year: 2021, gain: 22.8 },
-            { year: 2022, gain: -5.1 },
-            { year: 2023, gain: 18.3 },
-            { year: 2024, gain: 10.5 },
-          ]}
+          data={data}
           margin={{
             top: 20,
             right: 30,
@@ -218,13 +220,15 @@ function BarchartChart(props) {
           <XAxis dataKey="year" />
           <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
           <Tooltip />
-          {/*<Legend />*/}
-          <Bar
-            yAxisId="left"
-            dataKey="gain"
-            fill="#8884d8"
-            name="Annual Gain (%)"
-          />
+          {/* <Legend /> */}
+          <Bar yAxisId="left" dataKey="gain" name="Annual Gain (%)">
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.gain > 0 ? "green" : "red"}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
