@@ -38,10 +38,10 @@ import {
 
 export default function Dashboard({ session }) {
   const mockData = [
-    { name: "Asset A", weight: 25.5 },
-    { name: "Asset B", weight: 30.2 },
-    { name: "Asset C", weight: 15.8 },
-    { name: "Asset D", weight: 28.5 },
+    { name: "BTC", weight: 25.5 },
+    { name: "ETH", weight: 30.2 },
+    { name: "ADA", weight: 15.8 },
+    { name: "ALLWD", weight: 28.5 },
   ];
   const [holdings, setHoldings] = useState([]);
   const MAX_VISIBLE_ITEMS = 4;
@@ -240,14 +240,14 @@ function BarchartChart(props) {
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="year" />
-          <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+          <YAxis yAxisId="left" orientation="left" />
           <Tooltip />
           {/* <Legend /> */}
           <Bar yAxisId="left" dataKey="gain" name="Annual Gain (%)">
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={entry.gain > 0 ? "green" : "red"}
+                fill={entry.gain > 0 ? "#68D391" : "#FC8181"}
               />
             ))}
           </Bar>
@@ -328,12 +328,12 @@ function MenuIcon(props) {
 
 function PiechartcustomChart(props) {
   const mockData = [
-    { name: "Asset A", weight: 25.5 },
-    { name: "Asset B", weight: 30.2 },
-    { name: "Asset C", weight: 15.8 },
-    { name: "Asset D", weight: 28.5 },
+    { name: "BTC", weight: 30 },
+    { name: "ETH", weight: 30 },
+    { name: "ADA", weight: 20 },
+    { name: "ALLWD", weight: 10 },
   ];
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
+  const COLORS = ["#63B3ED", "#4FD1C5", "#FFBB28", "#F6E05E", "#F6AD55"];
   return (
     <div {...props}>
       <ResponsiveContainer width="100%" height={400}>

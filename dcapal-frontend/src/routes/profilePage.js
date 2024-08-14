@@ -1,13 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { DCAPAL_API } from "@app/config";
 import { api } from "@app/api";
-import { Button, Input, useToast } from "@chakra-ui/react";
 import { ContainerPage } from "./containerPage";
+import { useNavigate } from "react-router-dom";
+import { ChevronDownIcon } from "@chakra-ui/icons";
+import {
+  Button,
+  Input,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  useToast,
+} from "@chakra-ui/react";
 
 export default function Account({ session }) {
   const [profileData, setProfileData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const toast = useToast();
+  const navigate = useNavigate();
+
+  const handleMenuItemClick = (path) => {
+    navigate(path);
+  };
 
   const config = {
     headers: { Authorization: `Bearer ${session.access_token}` },
@@ -52,11 +67,30 @@ export default function Account({ session }) {
     <ContainerPage
       title={"Profile"}
       content={
-        // flex flex-col items-center justify-center min-h-screen bg-gray-100
         <div className="w-full flex flex-col grow justify-center items-center text-center gap-8 bg-gray-100">
           <div className="w-full max-w-4xl p-4 bg-white rounded-lg shadow-md">
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Personal Data</h2>
+              <Menu>
+                <MenuButton
+                  as="div"
+                  className="flex items-center cursor-pointer large-text"
+                  fontWeight="semibold"
+                >
+                  Personal Data
+                  <ChevronDownIcon ml={2} />
+                </MenuButton>
+                <MenuList>
+                  <MenuItem onClick={() => handleMenuItemClick("/profile")}>
+                    Profile
+                  </MenuItem>
+                  <MenuItem onClick={() => handleMenuItemClick("/settings")}>
+                    Settings
+                  </MenuItem>
+                  <MenuItem onClick={() => handleMenuItemClick("/privacy")}>
+                    Privacy
+                  </MenuItem>
+                </MenuList>
+              </Menu>
             </div>
             <div className="p-4 space-y-6">
               <div className="flex items-center space-x-4">
