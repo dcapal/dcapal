@@ -1,5 +1,6 @@
 use crate::app::domain::entity::User;
 use crate::app::infra::claim::Claims;
+use crate::app::infra::utils::create_date_response;
 use crate::error::Result;
 use crate::AppContext;
 use axum::extract::State;
@@ -7,7 +8,6 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use time::Date;
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
@@ -15,7 +15,7 @@ pub struct UserProfileResponse {
     pub first_name: String,
     pub last_name: Option<String>,
     pub email: String,
-    pub birth_date: Date,
+    pub birth_date: String,
 }
 
 impl From<User> for UserProfileResponse {
@@ -24,7 +24,7 @@ impl From<User> for UserProfileResponse {
             first_name: entity.first_name,
             last_name: entity.last_name,
             email: entity.email,
-            birth_date: entity.birth_date,
+            birth_date: create_date_response(entity.birth_date),
         }
     }
 }

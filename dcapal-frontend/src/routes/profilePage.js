@@ -1,79 +1,52 @@
 import React, { useEffect, useState } from "react";
-import { DCAPAL_API, supabase } from "@app/config";
+import { DCAPAL_API } from "@app/config";
 import { api } from "@app/api";
-import { Button, Input } from "@chakra-ui/react";
+import { Button, Input, useToast } from "@chakra-ui/react";
 import { ContainerPage } from "./containerPage";
 
 export default function Account({ session }) {
-  const [loading, setLoading] = useState(true);
-  const [firstname, setFirstname] = useState(null);
-  const [birthDate, setBirthDate] = useState(null);
-  const [email, setEmail] = useState(null);
-  const [website, setWebsite] = useState(null);
-  const [avatar_url, setAvatarUrl] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const toast = useToast();
 
   const config = {
     headers: { Authorization: `Bearer ${session.access_token}` },
   };
 
+  const fetchProfile = async () => {
+    try {
+      const response = await api.get(`${DCAPAL_API}/v1/user/profile`, config);
+      setProfileData(response.data);
+      console.log("Profile data:", response.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
   useEffect(() => {
-    let ignore = false;
+    fetchProfile();
+  }, []);
 
-    async function getProfile() {
-      setLoading(true);
-      const { user } = session;
-
-      const { data, error } = await api.get(
-        `${DCAPAL_API}/v1/user/profile`,
-        config
-      );
-
-      if (!ignore) {
-        if (error) {
-          console.warn(error);
-        } else if (data) {
-          //setUsername(data.username);
-          setEmail(data?.email);
-          setBirthDate(data?.birth_date);
-          setFirstname(data?.first_name);
-        }
-      }
-
-      setLoading(false);
+  const handleSave = async () => {
+    try {
+      await api.put(`${DCAPAL_API}/v1/user/profile`, userData);
+      setIsEditing(false);
+      toast({
+        title: "Profile updated",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Error updating profile",
+        description: error.message,
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
     }
-
-    getProfile();
-
-    return () => {
-      ignore = true;
-    };
-  }, [session]);
-
-  const [todos, setTodos] = useState([]);
-
-  async function updateProfile(event, avatarUrl) {
-    event.preventDefault();
-
-    setLoading(true);
-    const { user } = session;
-
-    const updates = {
-      id: user.id,
-      username,
-      website,
-      avatar_url: avatarUrl,
-      updated_at: new Date(),
-    };
-
-    const { error } = await supabase.from("profiles").upsert(updates);
-
-    if (error) {
-      alert(error.message);
-    } else {
-      setAvatarUrl(avatarUrl);
-    }
-    setLoading(false);
-  }
+  };
 
   return (
     <ContainerPage
@@ -89,23 +62,39 @@ export default function Account({ session }) {
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">Full name</label>
                 <Input
-                  placeholder={session.user.user_metadata.full_name}
+                  value={profileData?.first_name + " " + profileData?.last_name}
                   className="w-3/4"
+                  isReadOnly={!isEditing}
                 />
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">
                   Birth Date
                 </label>
-                <Input placeholder={birthDate} size="md" type="date" />
+                <Input
+                  value={profileData?.birth_date}
+                  className="w-3/4"
+                  isReadOnly={!isEditing}
+                  size="md"
+                  type="date"
+                />
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">Email</label>
-                <Input placeholder={email} className="w-3/4" type="email" />
+                <Input
+                  value={profileData?.email}
+                  className="w-3/4"
+                  isReadOnly={!isEditing}
+                  type="email"
+                />
               </div>
             </div>
             <div className="flex justify-end p-4 border-t">
-              <Button>Confirm</Button>
+              {isEditing ? (
+                <Button onClick={handleSave}>Confirm</Button>
+              ) : (
+                <Button onClick={() => setIsEditing(true)}>Edit</Button>
+              )}
             </div>
           </div>
         </div>
