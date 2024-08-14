@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { DCAPAL_API } from "@app/config";
 import { api } from "@app/api";
 import {
+  Box,
   Button,
   Menu,
   MenuButton,
@@ -15,6 +16,7 @@ import {
   Thead,
   Tr,
 } from "@chakra-ui/react";
+
 import { ContainerPage } from "./containerPage";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 
@@ -42,12 +44,24 @@ export default function Dashboard({ session }) {
     { name: "Asset D", weight: 28.5 },
   ];
   const [holdings, setHoldings] = useState([]);
+  const MAX_VISIBLE_ITEMS = 4;
 
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState(null);
   const [website, setWebsite] = useState(null);
   const [avatar_url, setAvatarUrl] = useState(null);
   const [isChatVisible, setIsChatVisible] = useState(false);
+  const [showScroll, setShowScroll] = useState(false);
+  const tableRef = useRef(null);
+
+  useEffect(() => {
+    setShowScroll(holdings.length > MAX_VISIBLE_ITEMS);
+  }, [holdings]);
+
+  const tableStyle = {
+    maxHeight: showScroll ? `${41 + MAX_VISIBLE_ITEMS * 53}px` : "auto",
+    overflowY: showScroll ? "auto" : "visible",
+  };
 
   const handleShowChat = () => {
     setIsChatVisible(!isChatVisible);
@@ -150,32 +164,39 @@ export default function Dashboard({ session }) {
                 <div className="bg-background bg-white rounded-lg shadow-lg">
                   <div className="p-2 sm:p-2">
                     <div className="overflow-x-auto">
-                      <TableContainer>
-                        <Table variant="simple">
-                          <Thead>
-                            <Tr>
-                              {getHeaders().map((header, index) => (
-                                <Th key={index}>
-                                  {header.replace("_", " ").toUpperCase()}
-                                </Th>
-                              ))}
-                            </Tr>
-                          </Thead>
-                          <Tbody>
-                            {holdings.map((holding, rowIndex) => (
-                              <Tr key={rowIndex}>
-                                {getHeaders().map((header, cellIndex) => (
-                                  <Td key={cellIndex}>
-                                    {typeof holding[header] === "number"
-                                      ? holding[header].toFixed(2)
-                                      : holding[header]}
-                                  </Td>
+                      <Box ref={tableRef} style={tableStyle}>
+                        <TableContainer>
+                          <Table variant="simple">
+                            <Thead
+                              position="sticky"
+                              top={0}
+                              bg="white"
+                              zIndex={1}
+                            >
+                              <Tr>
+                                {getHeaders().map((header, index) => (
+                                  <Th key={index}>
+                                    {header.replace("_", " ").toUpperCase()}
+                                  </Th>
                                 ))}
                               </Tr>
-                            ))}
-                          </Tbody>
-                        </Table>
-                      </TableContainer>
+                            </Thead>
+                            <Tbody>
+                              {holdings.map((holding, rowIndex) => (
+                                <Tr key={rowIndex}>
+                                  {getHeaders().map((header, cellIndex) => (
+                                    <Td key={cellIndex}>
+                                      {typeof holding[header] === "number"
+                                        ? holding[header].toFixed(2)
+                                        : holding[header]}
+                                    </Td>
+                                  ))}
+                                </Tr>
+                              ))}
+                            </Tbody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
                     </div>
                   </div>
                 </div>
@@ -197,6 +218,7 @@ export default function Dashboard({ session }) {
 
 function BarchartChart(props) {
   const data = [
+    { year: 2019, gain: -20.2 },
     { year: 2020, gain: 15.2 },
     { year: 2021, gain: 22.8 },
     { year: 2022, gain: -5.1 },
