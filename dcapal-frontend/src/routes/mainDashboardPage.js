@@ -133,7 +133,7 @@ export default function Dashboard({ session }) {
           </header>
           <div className={`flex-1 ${isChatVisible ? "flex" : ""}`}>
             <div
-              className={`grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 sm:gap-6 md:p-6 lg:gap-8  ${isChatVisible ? "w-2/3" : "w-full"}`}
+              className={`grid grid-cols-2 gap-2 p-2 sm:gap-6 md:p-6 lg:gap-8  ${isChatVisible ? "sm:grid-cols-3" : "w-full sm:grid-cols-2"}`}
             >
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
@@ -201,14 +201,13 @@ export default function Dashboard({ session }) {
                   </div>
                 </div>
               </div>
+              {isChatVisible && (
+                <div className="space-y-1 col-span-1 row-start-1 col-start-3 row-span-2">
+                  <h3 className="text-lg font-medium ">AI Chat</h3>
+                  <ChatCard config={config} isChatVisible={isChatVisible} />
+                </div>
+              )}
             </div>
-
-            {isChatVisible && (
-              <div className="w-1/3 bg-background bg-white rounded-lg shadow-lg flex flex-col p-4 sm:p-6 my-6 mr-6 bg-gray-100">
-                <h3 className="text-lg font-medium mb-4">AI Chat</h3>
-                <ChatCard config={config} />
-              </div>
-            )}
           </div>
         </div>
       }
@@ -406,14 +405,15 @@ function ViewIcon(props) {
 }
 
 function ChatCard(props) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState("help");
   const [messages, setMessages] = useState([]);
+  console.log(props.isChatVisible);
 
   const handleSendMessage = async () => {
     if (input.trim() === "") return;
 
     const newMessage = { text: input, sender: "user" };
-    setMessages([...messages, newMessage]);
+    // setMessages([...messages, newMessage]);
     setInput("");
 
     try {
@@ -429,10 +429,21 @@ function ChatCard(props) {
     }
   };
 
+  if (props.isChatVisible) {
+    handleSendMessage();
+  }
+
   return (
-    <div className="flex flex-col h-full">
+    <ResponsiveContainer
+      config={{
+        desktop: {
+          label: "Desktop",
+          color: "hsl(var(--chart-1))",
+        },
+      }}
+    >
       <div
-        className="flex-1 overflow-y-auto mb-4"
+        className="flex-1 overflow-y-auto mb-6 bg-white rounded-lg shadow-lg"
         style={{ height: "calc(100vh - 300px)" }}
       >
         {messages.map((msg, index) => (
@@ -441,14 +452,14 @@ function ChatCard(props) {
             className={`mb-2 ${msg.sender === "user" ? "text-right" : "text-left"}`}
           >
             <span
-              className={`inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"}`}
+              className={`mx-2 inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-white"}`}
             >
               {msg.text}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-auto">
+      {/*      <div className="mt-auto">
         <div className="flex">
           <input
             type="text"
@@ -461,7 +472,7 @@ function ChatCard(props) {
             Send
           </Button>
         </div>
-      </div>
-    </div>
+      </div>*/}
+    </ResponsiveContainer>
   );
 }
