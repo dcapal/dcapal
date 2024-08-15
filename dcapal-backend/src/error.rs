@@ -54,6 +54,8 @@ pub enum DcaError {
     UuidError(#[from] uuid::Error),
     #[error(transparent)]
     JwtError(#[from] jsonwebtoken::errors::Error),
+    #[error("OpenAI Error: {0}")]
+    OpenAIError(#[from] async_openai::error::OpenAIError),
 }
 
 impl Debug for DcaError {

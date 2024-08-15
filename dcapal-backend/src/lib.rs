@@ -7,6 +7,10 @@ use std::{
     time::Duration,
 };
 
+use async_openai::{
+    types::{CreateImageRequestArgs, ImageSize, ResponseFormat},
+    Client,
+};
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo,
     middleware,
@@ -26,10 +30,13 @@ use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
+use crate::app::services::ai::AiService;
 use crate::app::services::user::UserService;
 use crate::config::Postgres;
+use crate::ports::inbound::rest::ai::get_chatbot_advice;
 use crate::ports::inbound::rest::portfolio::get_portfolio_holdings;
 use crate::ports::inbound::rest::user::get_profile;
+use crate::ports::outbound::repository::ai::AiRepository;
 use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
     app::{
@@ -81,6 +88,7 @@ struct Services {
     mkt_data: Arc<MarketDataService>,
     ip2location: Option<Arc<Ip2LocationService>>,
     user: Arc<UserService>,
+    ai: Arc<AiService>,
 }
 
 #[derive(Clone)]
@@ -90,6 +98,7 @@ struct Repository {
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
     pub user: Arc<UserRepository>,
+    pub ai: Arc<AiRepository>,
 }
 
 pub struct DcaServer {
@@ -114,6 +123,8 @@ impl DcaServer {
 
         let postgres = build_postgres_pool(&config.server.postgres).await?;
 
+        let openai = Client::new();
+
         sqlx::migrate!().run(&postgres).await?;
 
         let repos = Arc::new(Repository {
@@ -122,6 +133,7 @@ impl DcaServer {
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
             user: Arc::new(UserRepository::new(postgres.clone())),
+            ai: Arc::new(AiRepository::new(openai.clone(), postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {
@@ -150,6 +162,7 @@ impl DcaServer {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             ip2location,
             user: Arc::new(UserService::new(repos.user.clone())),
+            ai: Arc::new(AiService::new(repos.ai.clone())),
         };
 
         let ctx = Arc::new(AppContextInner {
@@ -176,6 +189,7 @@ impl DcaServer {
                 "/v1/user/portfolios/:id/holdings",
                 get(get_portfolio_holdings),
             )
+            .route("/v1/ai/chatbot", post(get_chatbot_advice))
             .with_state(ctx.clone());
 
         let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);

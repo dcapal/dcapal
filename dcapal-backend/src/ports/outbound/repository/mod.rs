@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::{app::services::ip2location::GeoData, error::Result, DateTime};
 
+pub mod ai;
 pub mod dto;
 pub mod market_data;
 pub mod user;
