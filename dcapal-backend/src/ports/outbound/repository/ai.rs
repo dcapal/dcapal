@@ -30,11 +30,11 @@ impl AiRepository {
             .model("gpt-3.5-turbo")
             .messages([
                 ChatCompletionRequestSystemMessageArgs::default()
-                    .content("I will give you some data and with this you should tell me if my investment is suitable or not.")
+                    .content("I will give you some data and with this you should tell me if the investment is suitable or not.")
                     .build()?
                     .into(),
                 ChatCompletionRequestUserMessageArgs::default()
-                    .content("Bear in mind that you should also point that is not a financial advice.")
+                    .content("Bear in mind that you should also point that is not a financial advice and the answer should be directed to the user.")
                     .build()?
                     .into(),
                 ChatCompletionRequestAssistantMessageArgs::default()
