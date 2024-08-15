@@ -212,3 +212,8 @@ pub struct User {
     pub email: String,
     pub birth_date: Date,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Ai {
+    pub response: String,
+}

@@ -12,31 +12,31 @@ import {
 function LinechartChart(props) {
   const data = [
     {
-      name: "Page A",
-      uv: 4000,
+      name: "2018",
+      uv: 1000,
     },
     {
-      name: "Page B",
-      uv: 3000,
+      name: "2019",
+      uv: 1700,
     },
     {
-      name: "Page C",
+      name: "2020",
       uv: 2000,
     },
     {
-      name: "Page D",
+      name: "2021",
       uv: 2780,
     },
     {
-      name: "Page E",
+      name: "2022",
       uv: 1890,
     },
     {
-      name: "Page F",
+      name: "2023",
       uv: 2390,
     },
     {
-      name: "Page G",
+      name: "2024",
       uv: 3490,
     },
   ];

@@ -19,6 +19,7 @@ use crate::error::{DcaError, Result};
 use crate::ports::outbound::repository::ImportedPortfolio;
 use crate::{infra::stats, AppContext};
 
+pub mod ai;
 mod auth;
 pub mod portfolio;
 pub mod user;

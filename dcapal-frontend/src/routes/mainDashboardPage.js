@@ -206,7 +206,7 @@ export default function Dashboard({ session }) {
             {isChatVisible && (
               <div className="w-1/3 bg-background bg-white rounded-lg shadow-lg flex flex-col p-4 sm:p-6 my-6 mr-6 bg-gray-100">
                 <h3 className="text-lg font-medium mb-4">AI Chat</h3>
-                <ChatCard />
+                <ChatCard config={config} />
               </div>
             )}
           </div>
@@ -405,7 +405,7 @@ function ViewIcon(props) {
   );
 }
 
-function ChatCard() {
+function ChatCard(props) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
 
@@ -418,9 +418,9 @@ function ChatCard() {
 
     try {
       const response = await api.post(
-        `${DCAPAL_API}/v1/chat`,
+        `${DCAPAL_API}/v1/ai/chatbot`,
         { message: input },
-        config
+        props.config
       );
       const aiResponse = { text: response.data.message, sender: "ai" };
       setMessages((prevMessages) => [...prevMessages, aiResponse]);
