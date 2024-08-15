@@ -35,6 +35,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
 
 export default function Dashboard({ session }) {
   const mockData = [
@@ -44,7 +45,7 @@ export default function Dashboard({ session }) {
     { name: "ALLWD", weight: 28.5 },
   ];
   const [holdings, setHoldings] = useState([]);
-  const MAX_VISIBLE_ITEMS = 4;
+  const MAX_VISIBLE_ITEMS = 3;
 
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState(null);
@@ -53,6 +54,11 @@ export default function Dashboard({ session }) {
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [showScroll, setShowScroll] = useState(false);
   const tableRef = useRef(null);
+  const navigate = useNavigate();
+
+  const handleMenuItemClick = (path) => {
+    navigate(path);
+  };
 
   useEffect(() => {
     setShowScroll(holdings.length > MAX_VISIBLE_ITEMS);
@@ -116,8 +122,12 @@ export default function Dashboard({ session }) {
                   View
                 </MenuButton>
                 <MenuList align="start">
-                  <MenuItem>Main Dashboard</MenuItem>
-                  <MenuItem>Historical Value View</MenuItem>
+                  <MenuItem onClick={() => handleMenuItemClick("/dashboard")}>
+                    Main Dashboard
+                  </MenuItem>
+                  <MenuItem onClick={() => handleMenuItemClick("/historical")}>
+                    Historical Value View
+                  </MenuItem>
                 </MenuList>
               </Menu>
             </div>
@@ -227,7 +237,7 @@ function BarchartChart(props) {
 
   return (
     <div {...props}>
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={350}>
         <BarChart
           data={data}
           margin={{
@@ -335,7 +345,7 @@ function PiechartcustomChart(props) {
   const COLORS = ["#63B3ED", "#4FD1C5", "#FFBB28", "#F6E05E", "#F6AD55"];
   return (
     <div {...props}>
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={350}>
         <PieChart>
           <Pie
             data={mockData}
@@ -438,10 +448,10 @@ function ChatCard(props) {
   }, []); // Empty dependency array means this effect runs once on mount
 
   /*
-                                            if (props.isChatVisible) {
-                                              handleSendMessage();
-                                              }
-                                             */
+                                                    if (props.isChatVisible) {
+                                                      handleSendMessage();
+                                                      }
+                                                     */
 
   return (
     <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow-lg">

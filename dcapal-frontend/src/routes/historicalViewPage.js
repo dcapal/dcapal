@@ -122,11 +122,13 @@ export default function HistoricalView({ session }) {
             >
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Asset Distribution</h3>
+                  <h3 className="text-lg font-medium">
+                    Model Portfolio Performance (by Year)
+                  </h3>
                 </div>
                 <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-1 sm:p-2 flex-1">
-                    <LinechartChart className="aspect-[9/4] w-full" />
+                    <LinechartChart className=" w-full" />
                   </div>
                 </div>
               </div>
