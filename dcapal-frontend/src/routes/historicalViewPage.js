@@ -4,6 +4,7 @@ import { api } from "@app/api";
 import { Button, Menu, MenuButton, MenuItem, MenuList } from "@chakra-ui/react";
 
 import { ContainerPage } from "./containerPage";
+import { ChatCard } from "@components/core/aiChatCard";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 import LinechartChart from "@components/charts/LinechartChart";
 
@@ -116,27 +117,28 @@ export default function HistoricalView({ session }) {
               </Button>
             </div>
           </header>
-          <div className={`flex-1 ${isChatVisible ? "flex" : ""}`}>
+          <div
+            className={`grid gap-2 p-2 sm:gap-6 md:p-6 lg:gap-8 w-full ${
+              isChatVisible ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1"
+            }`}
+          >
             <div
-              className={`grid grid-cols-1 gap-2 p-2 sm:grid-cols-1 sm:gap-6 md:p-6 lg:gap-8  ${isChatVisible ? "w-2/3" : "w-full"}`}
+              className={`${isChatVisible ? "col-span-1 lg:col-span-2" : "col-span-1"}`}
             >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">
-                    Model Portfolio Performance (by Year)
-                  </h3>
-                </div>
-                <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
-                  <div className="p-1 sm:p-2 flex-1">
-                    <LinechartChart className=" w-full" />
-                  </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">
+                  Model Portfolio Performance (by Year)
+                </h3>
+              </div>
+              <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
+                <div className="p-1 sm:p-2 flex-1">
+                  <LinechartChart className=" w-full" />
                 </div>
               </div>
             </div>
-
             {isChatVisible && (
-              <div className="w-1/3 bg-background bg-white rounded-lg shadow-lg flex flex-col p-4 sm:p-6 my-6 mr-6 bg-gray-100">
-                <h3 className="text-lg font-medium mb-4">AI Chat</h3>
+              <div className="col-span-1 flex flex-col">
+                <h3 className="text-lg font-medium ">AI Assistant</h3>
                 <ChatCard />
               </div>
             )}
@@ -285,66 +287,5 @@ function ViewIcon(props) {
       <path d="M21 17v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2" />
       <path d="M21 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2" />
     </svg>
-  );
-}
-
-function ChatCard() {
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]);
-
-  const handleSendMessage = async () => {
-    if (input.trim() === "") return;
-
-    const newMessage = { text: input, sender: "user" };
-    setMessages([...messages, newMessage]);
-    setInput("");
-
-    try {
-      const response = await api.post(
-        `${DCAPAL_API}/v1/chat`,
-        { message: input },
-        config
-      );
-      const aiResponse = { text: response.data.message, sender: "ai" };
-      setMessages((prevMessages) => [...prevMessages, aiResponse]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      <div
-        className="flex-1 overflow-y-auto mb-4"
-        style={{ height: "calc(100vh - 300px)" }}
-      >
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`mb-2 ${msg.sender === "user" ? "text-right" : "text-left"}`}
-          >
-            <span
-              className={`inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"}`}
-            >
-              {msg.text}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-auto">
-        <div className="flex">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1 p-2 border rounded-l-lg"
-            placeholder="Type your message..."
-          />
-          <Button onClick={handleSendMessage} className="rounded-r-lg">
-            Send
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }
