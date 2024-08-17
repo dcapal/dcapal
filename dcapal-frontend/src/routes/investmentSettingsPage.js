@@ -3,18 +3,27 @@ import { DCAPAL_API } from "@app/config";
 import { api } from "@app/api";
 import { ContainerPage } from "./containerPage";
 import { useNavigate } from "react-router-dom";
-import { ChevronDownIcon } from "@chakra-ui/icons";
 import {
   Button,
-  Input,
+  FormControl,
+  FormLabel,
   Menu,
   MenuButton,
   MenuItem,
   MenuList,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  Select,
+  Switch,
+  Text,
   useToast,
 } from "@chakra-ui/react";
+import { ChevronDownIcon } from "@chakra-ui/icons";
 
-export default function Account({ session }) {
+export default function InvestmentSettings({ session }) {
   const [profileData, setProfileData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const toast = useToast();
@@ -65,9 +74,9 @@ export default function Account({ session }) {
 
   return (
     <ContainerPage
-      title={"Profile"}
+      title={"Investment Settings"}
       content={
-        <div className="w-full flex flex-col grow justify-center items-center text-center gap-8 bg-gray-100">
+        <div className="w-full flex flex-col grow justify-center items-center  gap-8 bg-gray-100">
           <div className="w-full max-w-4xl p-4 bg-white rounded-lg shadow-md">
             <div className="flex items-center justify-between p-4 border-b">
               <Menu>
@@ -76,7 +85,7 @@ export default function Account({ session }) {
                   className="flex items-center cursor-pointer large-text"
                   fontWeight="semibold"
                 >
-                  Personal Data
+                  Investment Settings
                   <ChevronDownIcon ml={2} />
                 </MenuButton>
                 <MenuList>
@@ -93,33 +102,73 @@ export default function Account({ session }) {
             </div>
             <div className="p-4 space-y-6">
               <div className="flex items-center space-x-4">
-                <label className="w-1/4 text-lg font-semibold">Full name</label>
-                <Input
+                <label className="w-1/4 text-lg font-semibold">
+                  Investment Mode
+                </label>
+                <Select
                   value={profileData?.first_name + " " + profileData?.last_name}
                   className="w-3/4"
                   isReadOnly={!isEditing}
-                />
+                >
+                  <option value="option1">Option 1</option>
+                  <option value="option2">Option 2</option>
+                  <option value="option3">Option 3</option>
+                </Select>
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">
-                  Birth Date
+                  Time Horizon
                 </label>
-                <Input
-                  value={profileData?.birth_date}
-                  className="w-3/4"
+                <NumberInput
+                  defaultValue={profileData?.birth_date}
+                  min={10}
+                  max={20}
+                  className="w-full"
                   isReadOnly={!isEditing}
-                  size="md"
-                  type="date"
-                />
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
               </div>
               <div className="flex items-center space-x-4">
-                <label className="w-1/4 text-lg font-semibold">Email</label>
-                <Input
-                  value={profileData?.email}
+                <label className="w-1/4 text-lg font-semibold">
+                  Risk Tolerance
+                </label>
+                <Select
+                  value={profileData?.first_name + " " + profileData?.last_name}
                   className="w-3/4"
                   isReadOnly={!isEditing}
-                  type="email"
-                />
+                >
+                  <option value="option1">Option 1</option>
+                  <option value="option2">Option 2</option>
+                  <option value="option3">Option 3</option>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-4">
+                <label className="w-1/4 text-lg font-semibold">
+                  Investment Goal
+                </label>
+                <Select
+                  value={profileData?.first_name + " " + profileData?.last_name}
+                  className="w-3/4"
+                  isReadOnly={!isEditing}
+                >
+                  <option value="option1">Option 1</option>
+                  <option value="option2">Option 2</option>
+                  <option value="option3">Option 3</option>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-4">
+                <label className="w-1/4 text-lg font-semibold">AI*</label>
+                <FormControl display="flex" alignItems="center">
+                  <FormLabel htmlFor="email-alerts" mb="0">
+                    Enable
+                  </FormLabel>
+                  <Switch id="email-alerts" isReadOnly={!isEditing} />
+                </FormControl>
               </div>
             </div>
             <div className="flex justify-end p-4 border-t">
@@ -129,6 +178,9 @@ export default function Account({ session }) {
                 <Button onClick={() => setIsEditing(true)}>Edit</Button>
               )}
             </div>
+            <Text fontSize="md" ml={5}>
+              *Requires Personal Data Usage
+            </Text>
           </div>
         </div>
       }

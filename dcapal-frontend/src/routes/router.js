@@ -23,6 +23,7 @@ import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
 import Dashboard from "@routes/mainDashboardPage";
 import HistoricalView from "@routes/historicalViewPage";
+import InvestmentSettings from "@routes/investmentSettingsPage";
 
 export const Router = () => {
   const [session, setSession] = useState(null);
@@ -92,6 +93,19 @@ export const Router = () => {
             <AuthPage />
           ) : (
             <Account key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "investment-settings",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <InvestmentSettings key={session.user.id} session={session} />
           )}
         </div>
       ),
