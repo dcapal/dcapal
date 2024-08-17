@@ -1,11 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { DCAPAL_API } from "@app/config";
 import { api } from "@app/api";
-import { Button, Menu, MenuButton, MenuItem, MenuList } from "@chakra-ui/react";
+import {
+  Button,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Tooltip as ChakraToolTip,
+} from "@chakra-ui/react";
 
 import { ContainerPage } from "./containerPage";
 import { ChatCard } from "@components/core/aiChatCard";
-import { ChevronDownIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, QuestionOutlineIcon } from "@chakra-ui/icons";
 import LinechartChart from "@components/charts/LinechartChart";
 
 import {
@@ -125,10 +132,18 @@ export default function HistoricalView({ session }) {
             <div
               className={`${isChatVisible ? "col-span-1 lg:col-span-2" : "col-span-1"}`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <h3 className="text-lg font-medium">
                   Model Portfolio Performance (by Year)
                 </h3>
+                <ChakraToolTip
+                  label="This graph shows the variation in the portfolio value over a period of time. The line represents the values, which generally increase with some ups and downs. Higher points indicate peaks, while lower points show declines."
+                  fontSize="md"
+                >
+                  <span className="ml-2">
+                    <QuestionOutlineIcon />
+                  </span>
+                </ChakraToolTip>
               </div>
               <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                 <div className="p-1 sm:p-2 flex-1">
