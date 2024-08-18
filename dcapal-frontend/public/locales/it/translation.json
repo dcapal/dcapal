@@ -56,7 +56,8 @@
       "amount": "Valore",
       "quantity": "Quantità",
       "targetWeight": "Allocazione Target",
-      "transactionFees": "Costi di transazione"
+      "transactionFees": "Costi di transazione",
+      "averageBuyPrice": "PMC"
     },
     "portfoliosStep": {
       "myPortfolios": "I miei portafogli",

@@ -349,6 +349,18 @@ export const portfolioSlice = createSlice({
         },
       };
     },
+    setAbp: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      pfolio.assets = {
+        ...pfolio.assets,
+        [action.payload.symbol]: {
+          ...pfolio.assets[action.payload.symbol],
+          abp: action.payload.abp || 0,
+        },
+      };
+    },
     setRefreshTime: (state, action) => {
       const pfolio = currentPortfolio(state);
       if (!pfolio) return;
@@ -557,6 +569,7 @@ export const {
   setQty,
   setPrice,
   setTargetWeight,
+  setAbp,
   setRefreshTime,
   setQuoteCurrency,
   setBudget,

@@ -56,7 +56,8 @@
       "amount": "Amount",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
-      "transactionFees": "Transaction fees"
+      "transactionFees": "Transaction fees",
+      "averageBuyPrice": "ABP"
     },
     "portfoliosStep": {
       "myPortfolios": "My Portfolios",

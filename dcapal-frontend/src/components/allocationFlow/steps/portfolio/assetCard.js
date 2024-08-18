@@ -21,6 +21,7 @@ export const AssetCard = ({
   aclass,
   price,
   qty,
+  abp,
   weight,
   targetWeight,
   isValidTargetWeight,
@@ -128,54 +129,68 @@ export const AssetCard = ({
         </div>
       )}
       {!isMobile && (
-        <div className="flex justify-between items-start">
-          <div className="flex flex-col">
-            <div className="flex items-center h-12">
-              <div className="w-12 mr-2 font-light text-xs">
-                {t("assetCard.quantity")}
+        <div>
+          <div className="flex justify-between items-start">
+            <div className="flex flex-col">
+              <div className="flex items-center h-12">
+                <div className="w-12 mr-2 font-light text-xs">
+                  {t("assetCard.quantity")}
+                </div>
+                <div className="w-40">
+                  <InputNumber
+                    textAlign={"text-left"}
+                    type={
+                       InputNumberType.DECIMAL
+                    }
+                    value={qty}
+                    onChange={props.setQty}
+                    isValid={true}
+                    min={0}
+                  />
+                </div>
               </div>
-              <div className="w-40">
+            </div>
+            <div className="flex items-center mr-2 h-12">
+              <div className="font-light text-xs">
+                {t("assetCard.targetWeight")}
+              </div>
+              <div className="w-28 ml-2">
                 <InputNumber
-                  textAlign={"text-left"}
+                  textAlign={"text-right"}
                   type={InputNumberType.DECIMAL}
-                  value={qty}
-                  onChange={props.setQty}
-                  isValid={true}
+                  value={targetWeight}
+                  onChange={props.setTargetWeight}
+                  isValid={isValidTargetWeight}
                   min={0}
+                  max={100}
+                  step=".000001"
                 />
               </div>
-            </div>
-            <div className="flex items-center h-6">
-              <div className="w-12 mr-2 font-light text-xs">
-                {t("assetCard.price")}
-              </div>
-              <div className="uppercase text-sm">{quoteCcy}</div>
-              <div className="ml-1 text-sm">
-                {price.toLocaleString(i18n.language, priceFmt)}
-              </div>
+              <div className="ml-1">%</div>
             </div>
           </div>
-          <div className="flex items-center mr-2 h-12">
-            <div className="font-light text-xs">
-              {t("assetCard.targetWeight")}
+          <div className="flex justify-between items-start">
+            <div className="flex flex-col">
+              <div className="flex items-center h-12">
+                <div className="w-12 mr-2 font-light text-xs">
+                  {t("assetCard.averageBuyPrice")}
+                </div>
+                <div className="w-40">
+                  <InputNumber
+                    textAlign={"text-left"}
+                    type={InputNumberType.DECIMAL}
+                    value={abp}
+                    onChange={props.setAbp}
+                    isValid={true}
+                    min={0}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="w-28 ml-2">
-              <InputNumber
-                textAlign={"text-right"}
-                type={InputNumberType.DECIMAL}
-                value={targetWeight}
-                onChange={props.setTargetWeight}
-                isValid={isValidTargetWeight}
-                min={0}
-                max={100}
-                step=".000001"
-              />
-            </div>
-            <div className="ml-1">%</div>
           </div>
         </div>
       )}
-      <div className="w-full mt-4 flex flex-col gap-3">
+      <div className="w-full mt-4 flex gap-3 justify-between">
         <div
           className="flex gap-1 items-center font-light text-xs"
           {...getToggleProps()}
@@ -194,6 +209,15 @@ export const AssetCard = ({
           {...getCollapseProps()}
         >
           <TransactionFees asset={symbol} />
+        </div>
+        <div className="flex items-center h-6">
+          <div className="w-12 mr-2 font-light text-xs">
+            {t("assetCard.price")}
+          </div>
+          <div className="uppercase text-sm">{quoteCcy}</div>
+          <div className="ml-1 text-sm">
+            {price.toLocaleString(i18n.language, priceFmt)}
+          </div>
         </div>
       </div>
     </div>
