@@ -14,13 +14,14 @@ import {
   Td,
   Th,
   Thead,
+  Tooltip as ChakraToolTip,
   Tr,
 } from "@chakra-ui/react";
 
 import { ChatCard } from "@components/core/aiChatCard";
 
 import { ContainerPage } from "./containerPage";
-import { ChevronDownIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, QuestionOutlineIcon } from "@chakra-ui/icons";
 
 import {
   Bar,
@@ -148,8 +149,16 @@ export default function Dashboard({ session }) {
               className={`grid grid-cols-2 gap-2 p-2 sm:gap-6 md:p-6 lg:gap-8  ${isChatVisible ? "sm:grid-cols-3" : "w-full sm:grid-cols-2"}`}
             >
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center">
                   <h3 className="text-lg font-medium">Asset Distribution</h3>
+                  <ChakraToolTip
+                    label="This graph shows the variation in the portfolio value over a period of time. The line represents the values, which generally increase with some ups and downs. Higher points indicate peaks, while lower points show declines."
+                    fontSize="md"
+                  >
+                    <span className="ml-2">
+                      <QuestionOutlineIcon />
+                    </span>
+                  </ChakraToolTip>
                 </div>
                 <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-1 sm:p-2 flex-1">
@@ -158,10 +167,18 @@ export default function Dashboard({ session }) {
                 </div>
               </div>
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center">
                   <h3 className="text-lg font-medium">
                     Model Portfolio Performance (by Year)
                   </h3>
+                  <ChakraToolTip
+                    label="This graph shows the variation in the portfolio value over a period of time. The line represents the values, which generally increase with some ups and downs. Higher points indicate peaks, while lower points show declines."
+                    fontSize="md"
+                  >
+                    <span className="ml-2">
+                      <QuestionOutlineIcon />
+                    </span>
+                  </ChakraToolTip>
                 </div>
                 <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-1 sm:p-2 flex-1 pb-2">
@@ -171,7 +188,15 @@ export default function Dashboard({ session }) {
               </div>
               <div className="space-y-1 col-span-1 sm:col-span-2">
                 <div className="flex items-center">
-                  <h3 className="text-lg font-medium">Holdings</h3>
+                  <h3 className="text-lg font-medium">Asset Distribution</h3>
+                  <ChakraToolTip
+                    label="This graph shows the variation in the portfolio value over a period of time. The line represents the values, which generally increase with some ups and downs. Higher points indicate peaks, while lower points show declines."
+                    fontSize="md"
+                  >
+                    <span className="ml-2">
+                      <QuestionOutlineIcon />
+                    </span>
+                  </ChakraToolTip>
                 </div>
                 <div className="bg-background bg-white rounded-lg shadow-lg">
                   <div className="p-2 sm:p-2">

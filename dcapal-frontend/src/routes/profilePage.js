@@ -67,7 +67,7 @@ export default function Account({ session }) {
     <ContainerPage
       title={"Profile"}
       content={
-        <div className="w-full flex flex-col grow justify-center items-center text-center gap-8 bg-gray-100">
+        <div className="w-full flex flex-col grow justify-center items-center gap-8 bg-gray-100">
           <div className="w-full max-w-4xl p-4 bg-white rounded-lg shadow-md">
             <div className="flex items-center justify-between p-4 border-b">
               <Menu>

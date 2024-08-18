@@ -28,6 +28,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
 
 export default function HistoricalView({ session }) {
   const mockData = [
@@ -46,6 +47,10 @@ export default function HistoricalView({ session }) {
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [showScroll, setShowScroll] = useState(false);
   const tableRef = useRef(null);
+  const navigate = useNavigate();
+  const handleMenuItemClick = (path) => {
+    navigate(path);
+  };
 
   useEffect(() => {
     setShowScroll(holdings.length > MAX_VISIBLE_ITEMS);
@@ -109,8 +114,12 @@ export default function HistoricalView({ session }) {
                   View
                 </MenuButton>
                 <MenuList align="start">
-                  <MenuItem>Main Dashboard</MenuItem>
-                  <MenuItem>Historical Value View</MenuItem>
+                  <MenuItem onClick={() => handleMenuItemClick("/dashboard")}>
+                    Main Dashboard
+                  </MenuItem>
+                  <MenuItem onClick={() => handleMenuItemClick("/historical")}>
+                    Historical Value View
+                  </MenuItem>
                 </MenuList>
               </Menu>
             </div>
