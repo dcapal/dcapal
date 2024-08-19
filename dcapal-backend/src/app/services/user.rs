@@ -1,6 +1,7 @@
 use crate::error::Result;
 
-use crate::app::domain::entity::User;
+use crate::app::domain::entity::{InvestmentPreferences, User};
+use crate::ports::inbound::rest::user::UpdateProfileRequest;
 use crate::ports::outbound::repository::user::UserRepository;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -32,6 +33,47 @@ impl UserService {
             }
             None => {
                 warn!("User not found: {}", user_id);
+                Ok(None)
+            }
+        }
+    }
+
+    pub async fn update_profile(&self, user_id: Uuid, req: UpdateProfileRequest) -> Result<()> {
+        info!("Update user profile with id: {user_id} request: {req:?}");
+        let _ = self
+            .user_repository
+            .update_current_user(user_id, req)
+            .await
+            .map_err(|e| {
+                error!("Failed to get user profile: {}", e);
+                e
+            });
+        Ok(())
+    }
+
+    pub async fn get_investment_preferences(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<InvestmentPreferences>> {
+        let investment_preferences = self
+            .user_repository
+            .get_investment_preferences(user_id)
+            .await
+            .map_err(|e| {
+                error!("Failed to get user profile: {}", e);
+                e
+            })?;
+
+        match investment_preferences {
+            Some(investment_preferences) => {
+                info!(
+                    "Successfully retrieved user investment preferences: {}",
+                    user_id
+                );
+                Ok(Some(investment_preferences))
+            }
+            None => {
+                warn!("Investment preferences not found for user_id: {}", user_id);
                 Ok(None)
             }
         }

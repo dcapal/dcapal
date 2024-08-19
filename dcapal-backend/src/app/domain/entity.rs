@@ -1,5 +1,6 @@
 use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::app::infra::utils::Expiring;
 use crate::DateTime;
@@ -211,6 +212,80 @@ pub struct User {
     pub last_name: Option<String>,
     pub email: String,
     pub birth_date: Date,
+}
+#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
+#[sqlx(type_name = "risk_tolerance", rename_all = "snake_case")]
+pub enum RiskTolerance {
+    Low,
+    Medium,
+    High,
+}
+
+impl fmt::Display for RiskTolerance {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                RiskTolerance::Low => "Low",
+                RiskTolerance::Medium => "Medium",
+                RiskTolerance::High => "High",
+            }
+        )
+    }
+}
+
+#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
+#[sqlx(type_name = "investment_mode", rename_all = "snake_case")]
+pub enum InvestmentMode {
+    Standard,
+    Expert,
+}
+
+impl fmt::Display for InvestmentMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                InvestmentMode::Standard => "Standard",
+                InvestmentMode::Expert => "Expert",
+            }
+        )
+    }
+}
+
+#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
+#[sqlx(type_name = "investment_goal", rename_all = "snake_case")]
+pub enum InvestmentGoal {
+    Retirement,
+    Education,
+    WealthBuilding,
+    Other,
+}
+
+impl fmt::Display for InvestmentGoal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                InvestmentGoal::Retirement => "Retirement",
+                InvestmentGoal::Education => "Education",
+                InvestmentGoal::WealthBuilding => "Wealth Building",
+                InvestmentGoal::Other => "Other",
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvestmentPreferences {
+    pub risk_tolerance: RiskTolerance,
+    pub investment_horizon: i32,
+    pub investment_mode: InvestmentMode,
+    pub investment_goal: InvestmentGoal,
+    pub ai_enabled: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

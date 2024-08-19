@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures::Future;
-use time::{format_description, Date};
+use time::{format_description, Date, PrimitiveDateTime};
 use tokio::sync::{watch, OnceCell, RwLock};
 
 pub struct ExpiringOnceCellValue<T> {
@@ -142,4 +142,10 @@ pub async fn should_stop(stop_rx: &mut StopToken) {
 pub fn create_date_response(date: Date) -> String {
     let format = format_description::parse("[year]-[month]-[day]").unwrap();
     date.format(&format).unwrap()
+}
+
+pub fn string_to_date(date_string: &str) -> Result<Date, time::Error> {
+    let format = format_description::parse("[year]-[month]-[day]")?;
+    let datetime = PrimitiveDateTime::parse(date_string, &format)?;
+    Ok(datetime.date())
 }

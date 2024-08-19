@@ -11,6 +11,7 @@ use async_openai::{
     types::{CreateImageRequestArgs, ImageSize, ResponseFormat},
     Client,
 };
+use axum::routing::put;
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo,
     middleware,
@@ -35,7 +36,7 @@ use crate::app::services::user::UserService;
 use crate::config::Postgres;
 use crate::ports::inbound::rest::ai::get_chatbot_advice;
 use crate::ports::inbound::rest::portfolio::get_portfolio_holdings;
-use crate::ports::inbound::rest::user::get_profile;
+use crate::ports::inbound::rest::user::{get_profile, update_profile};
 use crate::ports::outbound::repository::ai::AiRepository;
 use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
@@ -185,6 +186,11 @@ impl DcaServer {
 
         let authenticated_routes = Router::new()
             .route("/v1/user/profile", get(get_profile))
+            .route("/v1/user/profile", put(update_profile))
+            .route(
+                "/v1/user/investment-preferences",
+                get(rest::user::get_investment_preferences),
+            )
             .route(
                 "/v1/user/portfolios/:id/holdings",
                 get(get_portfolio_holdings),
