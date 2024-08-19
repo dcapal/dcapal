@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
 import { useTranslation } from "react-i18next";
+import { Box, Button, WrapItem } from "@chakra-ui/react";
 
 export const LaunchBtn = () => {
   const inputPfolio = useRef(null);
@@ -36,14 +37,18 @@ export const LaunchBtn = () => {
   };
 
   return (
-    <div className="w-full max-w-[26rem] flex flex-wrap-reverse sm:flex-wrap gap-x-4 gap-y-3 justify-center">
-      <div className="min-w-full sm:min-w-0">
-        <button
-          className="w-full px-3 py-2 flex justify-center items-center border border-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-black hover:text-white text-lg rounded"
-          onClick={onClickUpload}
-        >
+    <Box
+      display="flex"
+      flexWrap={{ base: "wrap-reverse", sm: "wrap" }}
+      columnGap="1rem"
+      rowGap="0.75rem"
+      justify="center"
+      as="ul"
+    >
+      <WrapItem minW={{ base: "full", sm: "0px" }}>
+        <Button size="lg" variant="outline" w="full" onClick={onClickUpload}>
           {t("importStep.importPortfolio")}
-        </button>
+        </Button>
         <input
           style={{ display: "none" }}
           type="file"
@@ -51,14 +56,17 @@ export const LaunchBtn = () => {
           ref={inputPfolio}
           onChange={onChangeInputPfolio}
         />
-      </div>
-      <button
-        data-testid="importStep.allocateYourSavings"
-        className="min-w-full sm:min-w-0 px-3 py-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded"
-        onClick={onClickStart}
-      >
-        {t("importStep.allocateYourSavings")}
-      </button>
-    </div>
+      </WrapItem>
+      <WrapItem minW={{ base: "full", sm: "0px" }}>
+        <Button
+          data-testid="importStep.allocateYourSavings"
+          size="lg"
+          w="full"
+          onClick={onClickStart}
+        >
+          {t("importStep.allocateYourSavings")}
+        </Button>
+      </WrapItem>
+    </Box>
   );
 };
