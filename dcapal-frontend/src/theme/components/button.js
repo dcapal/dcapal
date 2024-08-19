@@ -9,16 +9,16 @@ export const Button = {
     },
   },
   variants: {
-    'outline': {
-      color: 'black',
+    outline: {
+      color: "black",
       _hover: {
-        color: 'white',
-        backgroundColor: 'neutral.600'
+        color: "white",
+        backgroundColor: "neutral.600",
       },
       _active: {
-        color: 'white',
-        backgroundColor: 'neutral.800'
-      }
-    }
-  }
+        color: "white",
+        backgroundColor: "neutral.800",
+      },
+    },
+  },
 };
