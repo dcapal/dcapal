@@ -5,7 +5,6 @@ import { useMediaQuery } from "@react-hook/media-query";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import {
   currentPortfolio,
-  isWholeShares,
   removeAsset,
 } from "@components/allocationFlow/portfolioSlice";
 import { MEDIA_SMALL } from "@app/config";
@@ -102,11 +101,7 @@ export const AssetCard = ({
             <div className="grow">
               <InputNumber
                 textAlign={"text-right"}
-                type={
-                  isWholeShares(aclass)
-                    ? InputNumberType.INTEGRAL
-                    : InputNumberType.DECIMAL
-                }
+                type={InputNumberType.DECIMAL}
                 value={qty}
                 onChange={props.setQty}
                 isValid={true}
@@ -142,11 +137,7 @@ export const AssetCard = ({
               <div className="w-40">
                 <InputNumber
                   textAlign={"text-left"}
-                  type={
-                    isWholeShares(aclass)
-                      ? InputNumberType.INTEGRAL
-                      : InputNumberType.DECIMAL
-                  }
+                  type={InputNumberType.DECIMAL}
                   value={qty}
                   onChange={props.setQty}
                   isValid={true}
