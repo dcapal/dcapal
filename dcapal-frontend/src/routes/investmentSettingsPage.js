@@ -24,7 +24,7 @@ import {
 import { ChevronDownIcon } from "@chakra-ui/icons";
 
 export default function InvestmentSettings({ session }) {
-  const [profileData, setProfileData] = useState(null);
+  const [investmentSettingsData, setInvestmentSettingsData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
@@ -39,8 +39,11 @@ export default function InvestmentSettings({ session }) {
 
   const fetchProfile = async () => {
     try {
-      const response = await api.get(`${DCAPAL_API}/v1/user/profile`, config);
-      setProfileData(response.data);
+      const response = await api.get(
+        `${DCAPAL_API}/v1/user/investment-preferences`,
+        config
+      );
+      setInvestmentSettingsData(response.data);
       console.log("Profile data:", response.data);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -106,13 +109,12 @@ export default function InvestmentSettings({ session }) {
                   Investment Mode
                 </label>
                 <Select
-                  value={profileData?.first_name + " " + profileData?.last_name}
+                  value={investmentSettingsData?.investment_mode}
                   className="w-3/4"
                   isReadOnly={!isEditing}
                 >
-                  <option value="option1">Option 1</option>
-                  <option value="option2">Option 2</option>
-                  <option value="option3">Option 3</option>
+                  <option value="option1">Standard</option>
+                  <option value="option2">Expert</option>
                 </Select>
               </div>
               <div className="flex items-center space-x-4">
@@ -120,7 +122,7 @@ export default function InvestmentSettings({ session }) {
                   Time Horizon
                 </label>
                 <NumberInput
-                  defaultValue={profileData?.birth_date}
+                  value={investmentSettingsData?.investment_horizon}
                   min={10}
                   max={20}
                   className="w-full"
@@ -138,13 +140,13 @@ export default function InvestmentSettings({ session }) {
                   Risk Tolerance
                 </label>
                 <Select
-                  value={profileData?.first_name + " " + profileData?.last_name}
+                  value={investmentSettingsData?.risk_tolerance}
                   className="w-3/4"
                   isReadOnly={!isEditing}
                 >
-                  <option value="option1">Option 1</option>
-                  <option value="option2">Option 2</option>
-                  <option value="option3">Option 3</option>
+                  <option value="option1">Low</option>
+                  <option value="option2">Medium</option>
+                  <option value="option3">High</option>
                 </Select>
               </div>
               <div className="flex items-center space-x-4">
@@ -152,13 +154,14 @@ export default function InvestmentSettings({ session }) {
                   Investment Goal
                 </label>
                 <Select
-                  value={profileData?.first_name + " " + profileData?.last_name}
+                  value={investmentSettingsData?.investment_goal}
                   className="w-3/4"
                   isReadOnly={!isEditing}
                 >
-                  <option value="option1">Option 1</option>
-                  <option value="option2">Option 2</option>
-                  <option value="option3">Option 3</option>
+                  <option value="option1">Retirement</option>
+                  <option value="option2">Education</option>
+                  <option value="option3">Wealth Building</option>
+                  <option value="option3">Other</option>
                 </Select>
               </div>
               <div className="flex items-center space-x-4">
@@ -167,7 +170,11 @@ export default function InvestmentSettings({ session }) {
                   <FormLabel htmlFor="email-alerts" mb="0">
                     Enable
                   </FormLabel>
-                  <Switch id="email-alerts" isReadOnly={!isEditing} />
+                  <Switch
+                    id="email-alerts"
+                    isReadOnly={!isEditing}
+                    isChecked={investmentSettingsData?.ai_enabled}
+                  />
                 </FormControl>
               </div>
             </div>

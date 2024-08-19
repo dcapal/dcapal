@@ -32,7 +32,11 @@ export default function Account({ session }) {
     try {
       const response = await api.get(`${DCAPAL_API}/v1/user/profile`, config);
       setProfileData(response.data);
-      console.log("Profile data:", response.data);
+      setUserData({
+        full_name: `${response.data.first_name} ${response.data.last_name}`,
+        birth_date: response.data.birth_date,
+        email: response.data.email,
+      });
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -42,10 +46,26 @@ export default function Account({ session }) {
     fetchProfile();
   }, []);
 
+  const [userData, setUserData] = useState({
+    full_name: "",
+    birth_date: "",
+    email: "",
+  });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setUserData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
   const handleSave = async () => {
     try {
-      await api.put(`${DCAPAL_API}/v1/user/profile`, userData);
+      console.log("userData:", userData);
+      await api.put(`${DCAPAL_API}/v1/user/profile`, userData, config);
       setIsEditing(false);
+      fetchProfile(); // Refresh the data after updating
       toast({
         title: "Profile updated",
         status: "success",
@@ -95,9 +115,11 @@ export default function Account({ session }) {
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">Full name</label>
                 <Input
-                  value={profileData?.first_name + " " + profileData?.last_name}
+                  name="full_name"
+                  value={userData.full_name}
                   className="w-3/4"
-                  isReadOnly={!isEditing}
+                  readOnly={!isEditing}
+                  onChange={handleInputChange}
                 />
               </div>
               <div className="flex items-center space-x-4">
@@ -105,20 +127,24 @@ export default function Account({ session }) {
                   Birth Date
                 </label>
                 <Input
-                  value={profileData?.birth_date}
+                  name="birth_date"
+                  value={userData.birth_date}
                   className="w-3/4"
-                  isReadOnly={!isEditing}
+                  readOnly={!isEditing}
                   size="md"
                   type="date"
+                  onChange={handleInputChange}
                 />
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">Email</label>
                 <Input
-                  value={profileData?.email}
+                  name="email"
+                  value={userData.email}
                   className="w-3/4"
-                  isReadOnly={!isEditing}
+                  readOnly={!isEditing}
                   type="email"
+                  onChange={handleInputChange}
                 />
               </div>
             </div>

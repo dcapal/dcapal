@@ -12,6 +12,8 @@ import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
 import { TransactionFees } from "./transactionFees";
 import { useTranslation } from "react-i18next";
+import { Tooltip as ChakraTooltip } from "@chakra-ui/react";
+import { QuestionOutlineIcon } from "@chakra-ui/icons";
 
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 
@@ -174,6 +176,13 @@ export const AssetCard = ({
               <div className="flex items-center h-12">
                 <div className="w-12 mr-2 font-light text-xs">
                   {t("assetCard.averageBuyPrice")}
+                  <span> </span>
+                  <ChakraTooltip
+                    label="Average Buy Price (ABP): The average price at which you acquired this asset, weighted by purchase amounts."
+                    fontSize="md"
+                  >
+                    <QuestionOutlineIcon />
+                  </ChakraTooltip>
                 </div>
                 <div className="w-40">
                   <InputNumber
