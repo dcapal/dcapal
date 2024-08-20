@@ -21,7 +21,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 
-function LinechartChart({ investment_mode = "expert", ...props }) {
+function LinechartChart({ investment_mode = "standard", ...props }) {
   const [scale, setScale] = useState("linear");
 
   const data = [
@@ -57,7 +57,7 @@ function LinechartChart({ investment_mode = "expert", ...props }) {
 
   const renderStat = () => (
     <Stat>
-      <StatLabel>Final Price</StatLabel>
+      <StatLabel>Portfolio Value</StatLabel>
       <StatNumber fontSize="lg">${finalPrice.toLocaleString()}</StatNumber>
       <StatHelpText>
         <StatArrow type={performanceValue > 0 ? "increase" : "decrease"} />
@@ -68,9 +68,9 @@ function LinechartChart({ investment_mode = "expert", ...props }) {
 
   const renderAdvancedData = () => (
     <HStack spacing={4}>
-      <Text fontWeight="semibold">Advanced Data:</Text>
-      <Text>Highest: ${highestValue.toLocaleString()}</Text>
-      <Text>Lowest: ${lowestValue.toLocaleString()}</Text>
+      {/*<Text fontWeight="semibold">Advanced Data:</Text>*/}
+      <Text>High: ${highestValue.toLocaleString()}</Text>
+      <Text>Low: ${lowestValue.toLocaleString()}</Text>
       <Select
         size="xs"
         value={scale}
@@ -92,12 +92,10 @@ function LinechartChart({ investment_mode = "expert", ...props }) {
   return (
     <Flex direction="column" {...props}>
       <Flex
-        bg="gray.50"
+        bg="white"
         py={2}
         px={4}
-        borderRadius="md"
-        boxShadow="sm"
-        border="1px"
+        border="0px"
         borderColor="gray.200"
         fontSize="xs"
         justifyContent="space-between"
