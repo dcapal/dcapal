@@ -53,6 +53,19 @@ export default function HistoricalView({ session }) {
     navigate(path);
   };
 
+  const fetchInvestmentMode = async () => {
+    try {
+      const response = await api.get(
+        `${DCAPAL_API}/v1/user/investment-preferences`,
+        config
+      );
+      setInvestmentMode(response.data.investment_mode || "standard");
+      console.log("Investment mode:", response.data.investment_mode);
+    } catch (error) {
+      console.error("Error fetching investment mode:", error);
+    }
+  };
+
   useEffect(() => {
     setShowScroll(holdings.length > MAX_VISIBLE_ITEMS);
   }, [holdings]);
@@ -72,6 +85,7 @@ export default function HistoricalView({ session }) {
 
   useEffect(() => {
     fetchData();
+    fetchInvestmentMode();
   }, []);
 
   const fetchData = async () => {
@@ -159,7 +173,10 @@ export default function HistoricalView({ session }) {
               </div>
               <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                 <div className="p-1 sm:p-2 flex-1">
-                  <LinechartChart className=" w-full" />
+                  <LinechartChart
+                    className=" w-full"
+                    investment_mode={investmentMode}
+                  />
                 </div>
               </div>
             </div>

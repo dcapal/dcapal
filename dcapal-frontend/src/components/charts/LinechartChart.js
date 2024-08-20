@@ -21,7 +21,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 
-function LinechartChart({ investment_mode = "standard", ...props }) {
+function LinechartChart({ investment_mode, ...props }) {
   const [scale, setScale] = useState("linear");
 
   const data = [
@@ -104,7 +104,7 @@ function LinechartChart({ investment_mode = "standard", ...props }) {
         mb={2}
       >
         {renderStat()}
-        {investment_mode === "expert" && renderAdvancedData()}
+        {investment_mode === "Expert" && renderAdvancedData()}
       </Flex>
       <Box width="100%" height="600px">
         <ResponsiveContainer>
@@ -133,7 +133,7 @@ function LinechartChart({ investment_mode = "standard", ...props }) {
               type="monotone"
               dataKey="uv"
               stroke="#82ca9d"
-              isAnimationActive={investment_mode === "expert"}
+              isAnimationActive={investment_mode === "Expert"}
             />
           </LineChart>
         </ResponsiveContainer>
