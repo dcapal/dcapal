@@ -168,7 +168,7 @@ export default function Dashboard({ session }) {
                   <h3 className="text-lg font-medium">Asset Distribution</h3>
                   {investmentMode === "Standard" && (
                     <ChakraToolTip
-                      label="This graph shows the variation in the portfolio value over a period of time. The line represents the values, which generally increase with some ups and downs. Higher points indicate peaks, while lower points show declines."
+                      label="This pie chart illustrates the distribution of your investment portfolio across different assets. Each slice represents a specific asset or asset category, and its size shows the proportion of your total portfolio allocated to that asset."
                       fontSize="md"
                     >
                       <span className="ml-2">
