@@ -7,6 +7,7 @@ import {
   Button,
   FormControl,
   FormLabel,
+  Input,
   Menu,
   MenuButton,
   MenuItem,
@@ -108,61 +109,93 @@ export default function InvestmentSettings({ session }) {
                 <label className="w-1/4 text-lg font-semibold">
                   Investment Mode
                 </label>
-                <Select
-                  value={investmentSettingsData?.investment_mode}
-                  className="w-3/4"
-                  isReadOnly={!isEditing}
-                >
-                  <option value="option1">Standard</option>
-                  <option value="option2">Expert</option>
-                </Select>
+                {isEditing ? (
+                  <Select
+                    value={investmentSettingsData?.investment_mode}
+                    className="w-3/4"
+                    isReadOnly={!isEditing}
+                  >
+                    <option value="option1">Standard</option>
+                    <option value="option2">Expert</option>
+                  </Select>
+                ) : (
+                  <Input
+                    value={investmentSettingsData?.investment_mode}
+                    className="w-3/4"
+                    readOnly={true}
+                  />
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">
                   Time Horizon
                 </label>
-                <NumberInput
-                  value={investmentSettingsData?.investment_horizon}
-                  min={10}
-                  max={20}
-                  className="w-full"
-                  isReadOnly={!isEditing}
-                >
-                  <NumberInputField />
-                  <NumberInputStepper>
-                    <NumberIncrementStepper />
-                    <NumberDecrementStepper />
-                  </NumberInputStepper>
-                </NumberInput>
+                {isEditing ? (
+                  <NumberInput
+                    value={investmentSettingsData?.investment_horizon}
+                    min={10}
+                    max={20}
+                    className="w-full"
+                    isReadOnly={!isEditing}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                ) : (
+                  <Input
+                    value={investmentSettingsData?.investment_horizon}
+                    className="w-3/4"
+                    readOnly={true}
+                  />
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">
                   Risk Tolerance
                 </label>
-                <Select
-                  value={investmentSettingsData?.risk_tolerance}
-                  className="w-3/4"
-                  isReadOnly={!isEditing}
-                >
-                  <option value="option1">Low</option>
-                  <option value="option2">Medium</option>
-                  <option value="option3">High</option>
-                </Select>
+                {isEditing ? (
+                  <Select
+                    value={investmentSettingsData?.risk_tolerance}
+                    className="w-3/4"
+                    isReadOnly={!isEditing}
+                  >
+                    <option value="option1">Low</option>
+                    <option value="option2">Medium</option>
+                    <option value="option3">High</option>
+                  </Select>
+                ) : (
+                  <Input
+                    value={investmentSettingsData?.risk_tolerance}
+                    className="w-3/4"
+                    readOnly={true}
+                  />
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">
                   Investment Goal
                 </label>
-                <Select
-                  value={investmentSettingsData?.investment_goal}
-                  className="w-3/4"
-                  isReadOnly={!isEditing}
-                >
-                  <option value="option1">Retirement</option>
-                  <option value="option2">Education</option>
-                  <option value="option3">Wealth Building</option>
-                  <option value="option3">Other</option>
-                </Select>
+                {isEditing ? (
+                  <Select
+                    value={investmentSettingsData?.investment_goal}
+                    className="w-3/4"
+                    isReadOnly={!isEditing}
+                  >
+                    <option value="option1">Retirement</option>
+                    <option value="option2">Education</option>
+                    <option value="option3">Wealth Building</option>
+                    <option value="option3">Other</option>
+                  </Select>
+                ) : (
+                  <Input
+                    value={investmentSettingsData?.investment_goal}
+                    className="w-3/4"
+                    readOnly={true}
+                  />
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">AI*</label>
