@@ -15,7 +15,6 @@ import {
 } from "@chakra-ui/react";
 
 export default function Account({ session }) {
-  const [profileData, setProfileData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
@@ -31,7 +30,6 @@ export default function Account({ session }) {
   const fetchProfile = async () => {
     try {
       const response = await api.get(`${DCAPAL_API}/v1/user/profile`, config);
-      setProfileData(response.data);
       setUserData({
         full_name: `${response.data.first_name} ${response.data.last_name}`,
         birth_date: response.data.birth_date,

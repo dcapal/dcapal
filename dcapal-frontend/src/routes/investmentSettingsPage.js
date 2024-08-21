@@ -44,11 +44,32 @@ export default function InvestmentSettings({ session }) {
         `${DCAPAL_API}/v1/user/investment-preferences`,
         config
       );
-      setInvestmentSettingsData(response.data);
-      console.log("Profile data:", response.data);
+      setUserData({
+        risk_tolerance: response.data.risk_tolerance,
+        investment_horizon: response.data.investment_horizon,
+        investment_mode: response.data.investment_mode,
+        investment_goal: response.data.investment_goal,
+        ai_enabled: response.data.ai_enabled,
+      });
     } catch (error) {
       console.error("Error fetching data:", error);
     }
+  };
+
+  const [userData, setUserData] = useState({
+    risk_tolerance: "",
+    investment_horizon: "",
+    investment_mode: "",
+    investment_goal: "",
+    ai_enabled: false,
+  });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setUserData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
   };
 
   useEffect(() => {
@@ -57,8 +78,14 @@ export default function InvestmentSettings({ session }) {
 
   const handleSave = async () => {
     try {
-      await api.put(`${DCAPAL_API}/v1/user/profile`, userData);
+      console.log("userData:", userData);
+      await api.put(
+        `${DCAPAL_API}/v1/user/investment-preferences`,
+        userData,
+        config
+      );
       setIsEditing(false);
+      fetchProfile(); // Refresh the data after updating
       toast({
         title: "Profile updated",
         status: "success",
@@ -111,16 +138,18 @@ export default function InvestmentSettings({ session }) {
                 </label>
                 {isEditing ? (
                   <Select
-                    value={investmentSettingsData?.investment_mode}
+                    name="investment_mode"
+                    value={userData.investment_mode}
                     className="w-3/4"
                     isReadOnly={!isEditing}
+                    onChange={handleInputChange}
                   >
-                    <option value="option1">Standard</option>
-                    <option value="option2">Expert</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Expert">Expert</option>
                   </Select>
                 ) : (
                   <Input
-                    value={investmentSettingsData?.investment_mode}
+                    value={userData.investment_mode}
                     className="w-3/4"
                     readOnly={true}
                   />
@@ -132,11 +161,13 @@ export default function InvestmentSettings({ session }) {
                 </label>
                 {isEditing ? (
                   <NumberInput
-                    value={investmentSettingsData?.investment_horizon}
+                    name="investment_horizon"
+                    value={userData.investment_horizon}
                     min={10}
                     max={20}
                     className="w-full"
                     isReadOnly={!isEditing}
+                    onChange={handleInputChange}
                   >
                     <NumberInputField />
                     <NumberInputStepper>
@@ -146,7 +177,7 @@ export default function InvestmentSettings({ session }) {
                   </NumberInput>
                 ) : (
                   <Input
-                    value={investmentSettingsData?.investment_horizon}
+                    value={userData.investment_horizon}
                     className="w-3/4"
                     readOnly={true}
                   />
@@ -158,17 +189,19 @@ export default function InvestmentSettings({ session }) {
                 </label>
                 {isEditing ? (
                   <Select
-                    value={investmentSettingsData?.risk_tolerance}
+                    name="risk_tolerance"
+                    value={userData.risk_tolerance}
                     className="w-3/4"
                     isReadOnly={!isEditing}
+                    onChange={handleInputChange}
                   >
-                    <option value="option1">Low</option>
-                    <option value="option2">Medium</option>
-                    <option value="option3">High</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
                   </Select>
                 ) : (
                   <Input
-                    value={investmentSettingsData?.risk_tolerance}
+                    value={userData.risk_tolerance}
                     className="w-3/4"
                     readOnly={true}
                   />
@@ -180,18 +213,20 @@ export default function InvestmentSettings({ session }) {
                 </label>
                 {isEditing ? (
                   <Select
-                    value={investmentSettingsData?.investment_goal}
+                    name="investment_goal"
+                    value={userData.investment_goal}
                     className="w-3/4"
                     isReadOnly={!isEditing}
+                    onChange={handleInputChange}
                   >
-                    <option value="option1">Retirement</option>
-                    <option value="option2">Education</option>
-                    <option value="option3">Wealth Building</option>
-                    <option value="option3">Other</option>
+                    <option value="Retirement">Retirement</option>
+                    <option value="Education">Education</option>
+                    <option value="Wealth Building">Wealth Building</option>
+                    <option value="Other">Other</option>
                   </Select>
                 ) : (
                   <Input
-                    value={investmentSettingsData?.investment_goal}
+                    value={userData.investment_goal}
                     className="w-3/4"
                     readOnly={true}
                   />
@@ -206,7 +241,8 @@ export default function InvestmentSettings({ session }) {
                   <Switch
                     id="email-alerts"
                     isReadOnly={!isEditing}
-                    isChecked={investmentSettingsData?.ai_enabled}
+                    isChecked={userData.ai_enabled}
+                    onChange={handleInputChange}
                   />
                 </FormControl>
               </div>

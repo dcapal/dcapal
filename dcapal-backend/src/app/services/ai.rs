@@ -2,7 +2,7 @@ use crate::app::domain::entity::Ai;
 use crate::error::Result;
 use crate::ports::outbound::repository::ai::AiRepository;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 pub struct AiService {
