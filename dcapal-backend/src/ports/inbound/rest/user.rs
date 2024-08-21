@@ -9,6 +9,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use garde::Validate;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use tracing::info;
 use utoipa::ToSchema;
 
@@ -60,6 +61,41 @@ pub struct UpdateProfileRequest {
     pub birth_date: Option<String>,
     #[garde(email)]
     pub email: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Validate, Clone)]
+pub struct UpdateUserInvestmentPreferencesRequest {
+    #[garde(skip)]
+    pub risk_tolerance: String,
+    #[garde(range(min = 1, max = 50))]
+    pub investment_horizon: i32,
+    #[garde(skip)]
+    pub investment_mode: String,
+    #[garde(skip)]
+    pub investment_goal: String,
+    #[garde(skip)]
+    pub ai_enabled: bool,
+}
+
+impl Into<InvestmentPreferences> for UpdateUserInvestmentPreferencesRequest {
+    fn into(self) -> InvestmentPreferences {
+        InvestmentPreferences {
+            risk_tolerance: crate::app::domain::entity::RiskTolerance::from_str(
+                &self.risk_tolerance,
+            )
+            .unwrap(),
+            investment_horizon: self.investment_horizon,
+            investment_mode: crate::app::domain::entity::InvestmentMode::from_str(
+                &self.investment_mode,
+            )
+            .unwrap(),
+            investment_goal: crate::app::domain::entity::InvestmentGoal::from_str(
+                &self.investment_goal,
+            )
+            .unwrap(),
+            ai_enabled: self.ai_enabled,
+        }
+    }
 }
 
 /// Get user profile information.
@@ -141,6 +177,45 @@ pub async fn update_profile(
 ) -> Result<Response> {
     info!("Update profile user_id: {}.", claims.sub);
     match &ctx.services.user.update_profile(claims.sub, req).await {
+        Ok(_) => {
+            info!("Success update profile user user_id: {}.", claims.sub);
+            Ok(Json(MessageResponse::new("User profile updated.")).into_response())
+        }
+        Err(e) => {
+            info!("Unsuccessful update profile user: {e:?}");
+            Ok(StatusCode::BAD_REQUEST.into_response())
+        }
+    }
+}
+
+/// Update user investment preferences.
+#[utoipa::path(
+    put,
+    path = "/api/v1/user/investment-preferences",
+    request_body = UpdateProfileRequest,
+    responses(
+        (status = 200, description = "Success update profile information", body = [MessageResponse]),
+        (status = 400, description = "Invalid data input", body = [AppResponseError]),
+        (status = 401, description = "Unauthorized user", body = [AppResponseError]),
+        (status = 500, description = "Internal server error", body = [AppResponseError])
+    ),
+    security(("jwt" = []))
+)]
+pub async fn update_investment_preferences(
+    State(ctx): State<AppContext>,
+    claims: Claims,
+    Json(req): Json<UpdateUserInvestmentPreferencesRequest>,
+) -> Result<Response> {
+    info!("Update investment preferences for user_id: {}.", claims.sub);
+    match &ctx
+        .services
+        .user
+        .update_investment_preferences(
+            claims.sub,
+            crate::ports::inbound::rest::user::UpdateUserInvestmentPreferencesRequest::into(req),
+        )
+        .await
+    {
         Ok(_) => {
             info!("Success update profile user user_id: {}.", claims.sub);
             Ok(Json(MessageResponse::new("User profile updated.")).into_response())

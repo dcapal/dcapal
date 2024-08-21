@@ -87,4 +87,31 @@ impl UserRepository {
             ai_enabled: investment_preferences.ai_enabled,
         }))
     }
+
+    pub async fn update_investment_preferences(
+        &self,
+        user_id: Uuid,
+        req: InvestmentPreferences,
+    ) -> Result<()> {
+        let query = sqlx::query!(
+            r#"
+        UPDATE public.investment_preferences
+        SET risk_tolerance     = $2,
+            investment_horizon = $3,
+            investment_mode    = $4,
+            investment_goal    = $5,
+            ai_enabled         = $6
+        WHERE user_id = $1
+        "#,
+            user_id as _,
+            req.risk_tolerance as _,
+            req.investment_horizon as _,
+            req.investment_mode as _,
+            req.investment_goal as _,
+            req.ai_enabled as _
+        );
+
+        query.execute(&self.postgres).await?;
+        Ok(())
+    }
 }

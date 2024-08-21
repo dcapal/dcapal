@@ -1,9 +1,9 @@
+use crate::app::infra::utils::Expiring;
+use crate::DateTime;
 use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
-use crate::app::infra::utils::Expiring;
-use crate::DateTime;
+use std::str::FromStr;
 use time::Date;
 
 pub type AssetId = String;
@@ -221,6 +221,19 @@ pub enum RiskTolerance {
     High,
 }
 
+impl FromStr for RiskTolerance {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Low" => Ok(RiskTolerance::Low),
+            "Medium" => Ok(RiskTolerance::Medium),
+            "High" => Ok(RiskTolerance::High),
+            _ => Err(()),
+        }
+    }
+}
+
 impl fmt::Display for RiskTolerance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -240,6 +253,18 @@ impl fmt::Display for RiskTolerance {
 pub enum InvestmentMode {
     Standard,
     Expert,
+}
+
+impl FromStr for InvestmentMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Standard" => Ok(InvestmentMode::Standard),
+            "Expert" => Ok(InvestmentMode::Expert),
+            _ => Err(()),
+        }
+    }
 }
 
 impl fmt::Display for InvestmentMode {
@@ -262,6 +287,20 @@ pub enum InvestmentGoal {
     Education,
     WealthBuilding,
     Other,
+}
+
+impl FromStr for InvestmentGoal {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Retirement" => Ok(InvestmentGoal::Retirement),
+            "Education" => Ok(InvestmentGoal::Education),
+            "Wealth Building" => Ok(InvestmentGoal::WealthBuilding),
+            "Other" => Ok(InvestmentGoal::Other),
+            _ => Err(()),
+        }
+    }
 }
 
 impl fmt::Display for InvestmentGoal {
