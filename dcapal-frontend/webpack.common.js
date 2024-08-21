@@ -67,7 +67,6 @@ module.exports = (_env, argv) => {
           },
         ],
       }),
-      new webpack.HotModuleReplacementPlugin(),
     ],
     experiments: {
       asyncWebAssembly: true,

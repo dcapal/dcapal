@@ -13,6 +13,8 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import translationEN from "../public/locales/en/translation.json";
 import translationIT from "../public/locales/it/translation.json";
+import { ChakraProvider } from "@chakra-ui/react";
+import { theme } from "./theme";
 
 i18n
   .use(LanguageDetector)
@@ -32,11 +34,13 @@ const root = createRoot(document.getElementById("app"));
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <BrowserRouter>
-          <Router />
-        </BrowserRouter>
-      </PersistGate>
+      <ChakraProvider theme={theme}>
+        <PersistGate loading={null} persistor={persistor}>
+          <BrowserRouter>
+            <Router />
+          </BrowserRouter>
+        </PersistGate>
+      </ChakraProvider>
     </Provider>
   </React.StrictMode>
 );

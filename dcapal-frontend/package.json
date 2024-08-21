@@ -7,6 +7,8 @@
     "build": "webpack --config webpack.prod.js --mode production",
     "check": "prettier --check \"src/**/*.js\"",
     "format": "prettier --write \"src/**/*.js\"",
+    "theme": "chakra-cli tokens \"src/theme/index.js\"",
+    "theme:watch": "chakra-cli tokens \"src/theme/index.js\" --watch",
     "start": "webpack-dev-server --open --config webpack.dev.js --mode development"
   },
   "repository": {
@@ -21,11 +23,15 @@
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {
+    "@chakra-ui/react": "^2.8.2",
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
     "@react-hook/media-query": "^1.1.1",
     "@reduxjs/toolkit": "^2.2.7",
     "axios": "^1.7.4",
     "classnames": "^2.5.1",
     "dcapal-optimizer-wasm": "file:../dcapal-optimizer-wasm/pkg",
+    "framer-motion": "^11.3.28",
     "fuse.js": "^7.0.0",
     "i18next": "^23.14.0",
     "i18next-browser-languagedetector": "^8.0.0",
@@ -48,6 +54,7 @@
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/preset-react": "^7.24.7",
+    "@chakra-ui/cli": "^2.4.1",
     "@playwright/test": "^1.46.1",
     "@types/node": "^20.16.1",
     "autoprefixer": "^10.4.20",
