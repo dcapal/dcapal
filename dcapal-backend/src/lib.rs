@@ -18,12 +18,10 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use axum_extra::headers::UserAgent;
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
-use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -196,7 +194,7 @@ impl DcaServer {
                 get(get_portfolio_holdings),
             )
             .route(
-                "v1/user/investment-preferences",
+                "/v1/user/investment-preferences",
                 put(rest::user::update_investment_preferences),
             )
             .route("/v1/ai/chatbot", post(get_chatbot_advice))
