@@ -124,7 +124,9 @@ impl KrakenProvider {
         }
 
         let Some(ref mut result) = res.result else {
-            return Err(DcaError::Generic("Unexpected empty 'result' field".to_string()));
+            return Err(DcaError::Generic(
+                "Unexpected empty 'result' field".to_string(),
+            ));
         };
 
         if result.is_empty() || result.len() < 2 {
