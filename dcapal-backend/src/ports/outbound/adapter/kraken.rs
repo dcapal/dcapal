@@ -123,14 +123,18 @@ impl KrakenProvider {
             return Err(DcaError::Generic(format!("{:?}", res.error)));
         }
 
-        if res.result.is_empty() || res.result.len() < 2 {
+        let Some(ref mut result) = res.result else {
+            return Err(DcaError::Generic("Unexpected empty 'result' field".to_string()));
+        };
+
+        if result.is_empty() || result.len() < 2 {
             return Err(DcaError::Generic(format!(
                 "Malformed response. Unexpected empty result: {res:?}"
             )));
         }
 
-        res.result.remove("last"); // Drop fucking weird 'last' entry
-        let Payload::CandleSticks(csticks) = res.result.values().next().unwrap() else {
+        result.remove("last"); // Drop fucking weird 'last' entry
+        let Payload::CandleSticks(csticks) = result.values().next().unwrap() else {
             return Err(DcaError::Generic(format!(
                 "Malformed response. Cannot find candlesticks: {res:?}"
             )));
@@ -553,7 +557,7 @@ impl Into<Asset> for KAssetsDataCurrency {
 #[derive(Debug, Clone, Deserialize)]
 struct OHLCResult {
     error: Vec<String>,
-    result: HashMap<String, Payload>,
+    result: Option<HashMap<String, Payload>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
