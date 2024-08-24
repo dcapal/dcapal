@@ -36,15 +36,16 @@ create table public.portfolios
 );
 
 -- HOLDINGS
-create table public.holdings
+create table public.portfolio_holdings
 (
-    id            uuid primary key         default gen_random_uuid(),
-    portfolio     uuid references public.portfolios      not null,
-    instrument_id uuid references public.instruments     not null,
-    symbol        text                                   not null,
-    quantity      numeric(20, 10)                        not null,
-    created_at    timestamp with time zone default now() not null,
-    updated_at    timestamp with time zone default now() not null
+    id                uuid primary key         default gen_random_uuid(),
+    portfolio_id      uuid references public.portfolios      not null,
+    instrument_id     uuid references public.instruments     not null,
+    symbol            text                                   not null,
+    quantity          numeric(20, 10)                        not null,
+    average_buy_price numeric(20, 10)                        not null,
+    created_at        timestamp with time zone default now() not null,
+    updated_at        timestamp with time zone default now() not null
 );
 
 -- INVESTMENTS_PREFERENCES

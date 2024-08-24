@@ -30,12 +30,14 @@ use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
 use crate::app::services::ai::AiService;
+use crate::app::services::portfolio::PortfolioService;
 use crate::app::services::user::UserService;
 use crate::config::Postgres;
 use crate::ports::inbound::rest::ai::get_chatbot_advice;
 use crate::ports::inbound::rest::portfolio::get_portfolio_holdings;
 use crate::ports::inbound::rest::user::{get_profile, update_profile};
 use crate::ports::outbound::repository::ai::AiRepository;
+use crate::ports::outbound::repository::portfolio::PortfolioRepository;
 use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
     app::{
@@ -88,6 +90,7 @@ struct Services {
     ip2location: Option<Arc<Ip2LocationService>>,
     user: Arc<UserService>,
     ai: Arc<AiService>,
+    portfolio: Arc<PortfolioService>,
 }
 
 #[derive(Clone)]
@@ -98,6 +101,7 @@ struct Repository {
     pub imported: Arc<ImportedRepository>,
     pub user: Arc<UserRepository>,
     pub ai: Arc<AiRepository>,
+    pub portfolio: Arc<PortfolioRepository>,
 }
 
 pub struct DcaServer {
@@ -133,6 +137,7 @@ impl DcaServer {
             imported: Arc::new(ImportedRepository::new(redis.clone())),
             user: Arc::new(UserRepository::new(postgres.clone())),
             ai: Arc::new(AiRepository::new(openai.clone(), postgres.clone())),
+            portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {
@@ -162,6 +167,7 @@ impl DcaServer {
             ip2location,
             user: Arc::new(UserService::new(repos.user.clone())),
             ai: Arc::new(AiService::new(repos.ai.clone())),
+            portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
         };
 
         let ctx = Arc::new(AppContextInner {
@@ -193,6 +199,8 @@ impl DcaServer {
                 "/v1/user/portfolios/:id/holdings",
                 get(get_portfolio_holdings),
             )
+            .route("/v1/user/portfolios", post(rest::portfolio::save_portfolio))
+            .route("/v1/user/portfolios", get(rest::portfolio::get_portfolios))
             .route(
                 "/v1/user/investment-preferences",
                 put(rest::user::update_investment_preferences),
