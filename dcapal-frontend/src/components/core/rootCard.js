@@ -10,6 +10,8 @@ export const RootCard = ({ id, imgSrc, text, ...props }) => {
         <img
           alt="Icon homepage"
           className="w-full max-w-[4rem] p-1 rounded-full bg-neutral-600"
+          width={800}
+          height={800}
           src={imgSrc}
         />
       </div>
