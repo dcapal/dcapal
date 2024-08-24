@@ -1,20 +1,26 @@
 -- Custom types
-create type public.role_status as enum ('active', 'inactive');
-create type public.app_role as enum ('admin', 'authenticated');
-create type public.risk_tolerance as enum ('low', 'medium', 'high');
-create type public.data_source as enum ('yahoo');
-create type public.investment_mode as enum ('standard', 'expert');
-create type public.investment_goal as enum ('retirement', 'education', 'wealth_building', 'other');
-create type public.asset_type as enum ('etf', 'stock', 'bond', 'crypto', 'other');
+create
+    type public.role_status as enum ('active', 'inactive');
+create
+    type public.app_role as enum ('admin', 'authenticated');
+create
+    type public.risk_tolerance as enum ('low', 'medium', 'high');
+create
+    type public.data_source as enum ('yahoo');
+create
+    type public.investment_mode as enum ('standard', 'expert');
+create
+    type public.investment_goal as enum ('retirement', 'education', 'wealth_building', 'other');
+create
+    type public.asset_type as enum ('etf', 'stock', 'bond', 'crypto', 'other');
 
 -- USERS
 create table public.users
 (
     id         uuid references auth.users             not null primary key, -- UUID from auth.users
-    first_name text                                   not null,
-    last_name  text,
+    name       text                                   not null,
     email      text                                   not null unique,
-    birthdate  date                                   not null,
+    birth_date date                                   not null,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );

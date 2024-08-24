@@ -18,17 +18,16 @@ impl UserRepository {
 
     pub async fn get_current_user(&self, user_id: Uuid) -> Result<Option<User>> {
         let user = sqlx::query!(
-            r#"select first_name, last_name, email, birthdate from "users" where id = $1"#,
+            r#"select name, email, birth_date from "users" where id = $1"#,
             user_id
         )
         .fetch_one(&self.postgres)
         .await?;
 
         Ok(Some(User {
-            first_name: user.first_name,
-            last_name: user.last_name,
+            name: user.name,
             email: user.email,
-            birth_date: user.birthdate,
+            birth_date: user.birth_date,
         }))
     }
 
@@ -37,18 +36,18 @@ impl UserRepository {
         user_id: Uuid,
         req: UpdateProfileRequest,
     ) -> Result<()> {
-        let birth_date = req.birth_date.and_then(|date| string_to_date(&date).ok());
+        let birth_date = string_to_date(&req.birth_date).unwrap();
 
         let query = sqlx::query!(
             r#"
         UPDATE "users" 
         SET 
-            first_name = COALESCE($1, first_name),
-            email = COALESCE($2, email),
-            birthdate = COALESCE($3, birthdate)
+            name = $1,
+            email = $2,
+            birth_date = $3
         WHERE id = $4
         "#,
-            req.full_name,
+            req.name,
             req.email,
             birth_date,
             user_id

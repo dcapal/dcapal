@@ -31,8 +31,8 @@ export default function Account({ session }) {
     try {
       const response = await api.get(`${DCAPAL_API}/v1/user/profile`, config);
       setUserData({
-        full_name: `${response.data.first_name} ${response.data.last_name}`,
-        birth_date: response.data.birth_date,
+        name: response.data.name,
+        birthDate: response.data.birthDate,
         email: response.data.email,
       });
     } catch (error) {
@@ -45,8 +45,8 @@ export default function Account({ session }) {
   }, []);
 
   const [userData, setUserData] = useState({
-    full_name: "",
-    birth_date: "",
+    name: "",
+    birthDate: "",
     email: "",
   });
 
@@ -113,8 +113,8 @@ export default function Account({ session }) {
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">Full name</label>
                 <Input
-                  name="full_name"
-                  value={userData.full_name}
+                  name="name"
+                  value={userData.name}
                   className="w-3/4"
                   readOnly={!isEditing}
                   onChange={handleInputChange}
@@ -125,8 +125,8 @@ export default function Account({ session }) {
                   Birth Date
                 </label>
                 <Input
-                  name="birth_date"
-                  value={userData.birth_date}
+                  name="birthDate"
+                  value={userData.birthDate}
                   className="w-3/4"
                   readOnly={!isEditing}
                   size="md"

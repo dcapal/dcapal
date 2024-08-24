@@ -13,6 +13,8 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
+import { api } from "@app/api";
+import { DCAPAL_API, supabase } from "@app/config";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -139,6 +141,8 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const assets = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const fees = useSelector((state) => currentPortfolio(state).fees);
+  const pfname = useSelector((state) => currentPortfolio(state).name);
+  const pfid = useSelector((state) => currentPortfolio(state).id);
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
@@ -197,6 +201,46 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
     solve();
   }, []);
 
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+  }, []);
+
+  const config = {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  };
+
+  const [userData, setUserData] = useState({
+    id: pfid,
+    name: pfname,
+    currency: quoteCcy,
+  });
+
+  const onClickSavePortfolio = async () => {
+    try {
+      await api.put(`${DCAPAL_API}/v1/user/profile`, userData, config);
+      setIsEditing(false);
+      fetchProfile(); // Refresh the data after updating
+      toast({
+        title: "Profile updated",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Error updating profile",
+        description: error.message,
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
+    }
+  };
+
   const onClickGoBack = () => {
     dispatch(clearBudget({}));
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
@@ -237,6 +281,13 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
               />
             ))}
           </div>
+          <span
+            className="mt-6 font-medium underline cursor-pointer"
+            onClick={onClickSavePortfolio}
+          >
+            {t("endStep.savePortfolio")}
+          </span>
+
           <span
             className="mt-6 font-medium underline cursor-pointer"
             onClick={onClickGoBack}
