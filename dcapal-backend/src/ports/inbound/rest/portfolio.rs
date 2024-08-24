@@ -69,6 +69,33 @@ impl Into<PortfolioHoldings> for PortfolioHoldingsRequest {
     }
 }
 
+impl From<&Portfolio> for PortfolioRequest {
+    fn from(portfolio: &Portfolio) -> Self {
+        PortfolioRequest {
+            id: portfolio.id,
+            name: portfolio.name.clone(),
+            description: portfolio.description.clone(),
+            currency: portfolio.currency.clone(),
+            assets: portfolio
+                .assets
+                .iter()
+                .map(PortfolioHoldingsRequest::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<&PortfolioHoldings> for PortfolioHoldingsRequest {
+    fn from(holding: &PortfolioHoldings) -> Self {
+        PortfolioHoldingsRequest {
+            instrument_id: holding.instrument_id,
+            symbol: holding.symbol.clone(),
+            quantity: holding.quantity,
+            average_buy_price: holding.average_buy_price,
+        }
+    }
+}
+
 pub async fn get_portfolio_holdings() -> crate::error::Result<Response> {
     Ok(Json(PortfolioHoldingsResponse {
         holdings: vec![
@@ -161,9 +188,14 @@ pub async fn get_portfolios(
 ) -> crate::error::Result<Response> {
     info!("Get user portfolios user_id: {}.", claims.sub);
     match &ctx.services.portfolio.get_portfolios(claims.sub).await {
-        Ok(_) => {
-            info!("Success get user portfolios user user_id: {}.", claims.sub);
-            Ok(Json(MessageResponse::new("User profile updated.")).into_response())
+        Ok(portfolios) => {
+            info!(
+                "Successfully got user portfolios for user_id: {}.",
+                claims.sub
+            );
+            let portfolio_requests: Vec<PortfolioRequest> =
+                portfolios.iter().map(PortfolioRequest::from).collect();
+            Ok(Json(portfolio_requests).into_response())
         }
         Err(e) => {
             info!("Unsuccessful get user portfolios user: {e:?}");
