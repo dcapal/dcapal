@@ -1,7 +1,16 @@
+use crate::app::domain::entity::{Portfolio, PortfolioHoldings};
+use crate::app::infra::claim::Claims;
+use crate::ports::inbound::rest::user::{MessageResponse, UpdateProfileRequest};
+use crate::AppContext;
+use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use garde::Validate;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct PortfolioHoldingsResponse {
@@ -16,6 +25,48 @@ pub struct PortfolioResponse {
     pub quantity: f64,
     pub weight: f64,
     pub total: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioRequest {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub currency: String,
+    pub assets: Vec<PortfolioHoldingsRequest>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioHoldingsRequest {
+    pub instrument_id: Uuid,
+    pub symbol: String,
+    pub quantity: f64,
+    pub average_buy_price: f64,
+}
+
+impl Into<Portfolio> for PortfolioRequest {
+    fn into(self) -> Portfolio {
+        Portfolio {
+            id: self.id,
+            name: self.name,
+            description: self.description,
+            currency: self.currency,
+            assets: self.assets.into_iter().map(|x| x.into()).collect(),
+        }
+    }
+}
+
+impl Into<PortfolioHoldings> for PortfolioHoldingsRequest {
+    fn into(self) -> PortfolioHoldings {
+        PortfolioHoldings {
+            instrument_id: self.instrument_id,
+            symbol: self.symbol,
+            quantity: self.quantity,
+            average_buy_price: self.average_buy_price,
+        }
+    }
 }
 
 pub async fn get_portfolio_holdings() -> crate::error::Result<Response> {
@@ -56,4 +107,67 @@ pub async fn get_portfolio_holdings() -> crate::error::Result<Response> {
         ],
     })
     .into_response())
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/user/portfolios",
+    request_body = PortfolioRequest,
+    responses(
+        (status = 200, description = "Success update profile information", body = [MessageResponse]),
+        (status = 400, description = "Invalid data input", body = [AppResponseError]),
+        (status = 401, description = "Unauthorized user", body = [AppResponseError]),
+        (status = 500, description = "Internal server error", body = [AppResponseError])
+    ),
+    security(("jwt" = []))
+)]
+pub async fn save_portfolio(
+    State(ctx): State<AppContext>,
+    claims: Claims,
+    Json(req): Json<PortfolioRequest>,
+) -> crate::error::Result<Response> {
+    info!("Update profile user_id: {}.", claims.sub);
+    match &ctx
+        .services
+        .portfolio
+        .save_portfolio(claims.sub, req.into())
+        .await
+    {
+        Ok(_) => {
+            info!("Success update profile user user_id: {}.", claims.sub);
+            Ok(Json(MessageResponse::new("User profile updated.")).into_response())
+        }
+        Err(e) => {
+            info!("Unsuccessful update profile user: {e:?}");
+            Ok(StatusCode::BAD_REQUEST.into_response())
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/user/portfolios",
+    responses(
+        (status = 200, description = "Success get user portfolios", body = [PortfolioHoldingsResponse]),
+        (status = 400, description = "Invalid data input", body = [AppResponseError]),
+        (status = 401, description = "Unauthorized user", body = [AppResponseError]),
+        (status = 500, description = "Internal server error", body = [AppResponseError])
+    ),
+    security(("jwt" = []))
+)]
+pub async fn get_portfolios(
+    State(ctx): State<AppContext>,
+    claims: Claims,
+) -> crate::error::Result<Response> {
+    info!("Get user portfolios user_id: {}.", claims.sub);
+    match &ctx.services.portfolio.get_portfolios(claims.sub).await {
+        Ok(_) => {
+            info!("Success get user portfolios user user_id: {}.", claims.sub);
+            Ok(Json(MessageResponse::new("User profile updated.")).into_response())
+        }
+        Err(e) => {
+            info!("Unsuccessful get user portfolios user: {e:?}");
+            Ok(StatusCode::BAD_REQUEST.into_response())
+        }
+    }
 }

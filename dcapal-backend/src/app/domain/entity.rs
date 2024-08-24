@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 use time::Date;
+use uuid::Uuid;
 
 pub type AssetId = String;
 pub type MarketId = String;
@@ -329,4 +330,19 @@ pub struct InvestmentPreferences {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Ai {
     pub response: String,
+}
+
+pub struct Portfolio {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub currency: String,
+    pub assets: Vec<PortfolioHoldings>,
+}
+
+pub struct PortfolioHoldings {
+    pub instrument_id: Uuid,
+    pub symbol: String,
+    pub quantity: f64,
+    pub average_buy_price: f64,
 }

@@ -15,6 +15,7 @@ import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 import { api } from "@app/api";
 import { DCAPAL_API, supabase } from "@app/config";
+import { useToast } from "@chakra-ui/react";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -135,6 +136,7 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
+  const toast = useToast();
 
   const { t } = useTranslation();
   const budget = useSelector((state) => currentPortfolio(state).budget);
@@ -202,28 +204,44 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   }, []);
 
   const [session, setSession] = useState(null);
+  const [config, setConfig] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setConfig({
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
     });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const config = {
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  };
-
-  const [userData, setUserData] = useState({
-    id: pfid,
-    name: pfname,
-    currency: quoteCcy,
+  const assetsArray = useSelector((state) =>
+    Object.values(currentPortfolio(state).assets)
+  );
+  const [userData, setUserData] = useState(() => {
+    return {
+      id: pfid,
+      name: pfname,
+      description: "optional",
+      currency: quoteCcy,
+      assets: assetsArray.map((a) => ({
+        instrumentId: a.id || pfid, // Use asset's id if available, or create a unique identifier
+        symbol: a.symbol,
+        quantity: a.qty,
+        averageBuyPrice: a.price,
+      })),
+    };
   });
 
   const onClickSavePortfolio = async () => {
     try {
-      await api.put(`${DCAPAL_API}/v1/user/profile`, userData, config);
-      setIsEditing(false);
-      fetchProfile(); // Refresh the data after updating
+      await api.post(`${DCAPAL_API}/v1/user/portfolios`, userData, config);
       toast({
         title: "Profile updated",
         status: "success",

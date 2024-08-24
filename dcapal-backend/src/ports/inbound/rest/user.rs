@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use tracing::info;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
