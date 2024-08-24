@@ -68,16 +68,16 @@ export default function SignUpPage() {
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
                 <span>
-                  Access to your investment portfolios across all devices*
+                  Access to your investment portfolios across all devices
                 </span>
               </li>
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
-                <span>Dive into a fully customizable experience*</span>
+                <span>Dive into a fully customizable experience</span>
               </li>
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
-                <span>Access to the dashboard*</span>
+                <span>Access to the dashboard</span>
               </li>
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />

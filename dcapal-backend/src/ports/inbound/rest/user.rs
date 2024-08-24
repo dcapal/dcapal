@@ -14,9 +14,9 @@ use tracing::info;
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct UserProfileResponse {
-    pub first_name: String,
-    pub last_name: Option<String>,
+    pub name: String,
     pub email: String,
     pub birth_date: String,
 }
@@ -24,8 +24,7 @@ pub struct UserProfileResponse {
 impl From<User> for UserProfileResponse {
     fn from(entity: User) -> Self {
         Self {
-            first_name: entity.first_name,
-            last_name: entity.last_name,
+            name: entity.name,
             email: entity.email,
             birth_date: create_date_response(entity.birth_date),
         }
@@ -54,13 +53,14 @@ impl From<InvestmentPreferences> for UserInvestmentPreferencesResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema, Validate, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProfileRequest {
     #[garde(skip)]
-    pub full_name: Option<String>,
+    pub name: String,
     #[garde(length(min = 8))]
-    pub birth_date: Option<String>,
+    pub birth_date: String,
     #[garde(email)]
-    pub email: Option<String>,
+    pub email: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Validate, Clone)]
