@@ -29,7 +29,9 @@ export const Root = () => {
                 </p>
               </div>
               <img
-                className="w-full px-4 sm:max-w-[26rem]"
+                className="w-full px-4 sm:max-w-[26rem] h-auto"
+                width={835}
+                height={613}
                 alt="Investing front"
                 src={INVESTING_FRONT}
               />

@@ -17,7 +17,13 @@ import { Step, setAllocationFlowStep } from "@app/appSlice";
 const CloseBtn = ({ onClick }) => {
   return (
     <div className="cursor-pointer" onClick={onClick}>
-      <img className="w-full max-w-[32px]" alt="Close menu" src={CLOSE_MENU} />
+      <img
+        className="w-full max-w-[32px]"
+        width={800}
+        height={800}
+        alt="Close menu"
+        src={CLOSE_MENU}
+      />
     </div>
   );
 };
@@ -84,6 +90,8 @@ const MenuBtn = ({ onClick }) => {
     <div className="cursor-pointer" onClick={onClick}>
       <img
         className="w-full max-w-[32px]"
+        width={800}
+        height={800}
         alt="Hamburger"
         src={HAMBURGER_MENU}
       />
