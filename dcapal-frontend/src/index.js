@@ -30,6 +30,9 @@ i18n
     },
   });
 
+document.documentElement.lang = i18n.language;
+i18n.on("languageChanged", (lang) => (document.documentElement.lang = lang));
+
 const root = createRoot(document.getElementById("app"));
 root.render(
   <React.StrictMode>
