@@ -59,6 +59,8 @@ export default function Dashboard({ session }) {
   const tableRef = useRef(null);
   const [investmentMode, setInvestmentMode] = useState("Standard");
   const navigate = useNavigate();
+  const [portfolios, setPortfolios] = useState([]);
+  const [selectedPortfolio, setSelectedPortfolio] = useState(null);
 
   const fetchInvestmentMode = async () => {
     try {
@@ -95,44 +97,62 @@ export default function Dashboard({ session }) {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchPortfolios();
     fetchInvestmentMode();
   }, []);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (selectedPortfolio) {
+      setHoldings(selectedPortfolio.assets);
+    }
+  }, [selectedPortfolio]);
+
+  const fetchPortfolios = async () => {
     try {
       const response = await api.get(
-        `${DCAPAL_API}/v1/user/portfolios/uuid_v4/holdings`,
+        `${DCAPAL_API}/v1/user/portfolios`,
         config
       );
-      setHoldings(response.data.holdings);
+      setPortfolios(response.data);
+      if (response.data.length > 0) {
+        setSelectedPortfolio(response.data[0]);
+      }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching portfolios:", error);
     }
   };
 
-  // Get table headers dynamically from the first holding object
+  const handlePortfolioSelect = (portfolio) => {
+    setSelectedPortfolio(portfolio);
+  };
+
   const getHeaders = () => {
     if (holdings.length === 0) return [];
-    return Object.keys(holdings[0]);
+    return ["symbol", "quantity", "averageBuyPrice", "instrumentId"];
   };
 
   return (
     <ContainerPage
       title={"Dashboard"}
       content={
-        // w-full flex flex-col grow justify-center items-center text-center gap-8 bg-gray-100
         <div className="w-screen grow bg-gray-100">
           <header className="bg-background bg-white shadow-sm sticky top-0 z-10 px-4 py-3 flex items-center justify-between sm:px-6">
             <div className="flex items-center gap-4">
               <Menu>
                 <MenuButton as={Button} rightIcon={<ChevronDownIcon />}>
-                  Portfolio
+                  {selectedPortfolio
+                    ? selectedPortfolio.name
+                    : "Select Portfolio"}
                 </MenuButton>
                 <MenuList align="start">
-                  <MenuItem>Dashboard</MenuItem>
-                  <MenuItem>Analytics</MenuItem>
-                  <MenuItem>Settings</MenuItem>
+                  {portfolios.map((portfolio) => (
+                    <MenuItem
+                      key={portfolio.id}
+                      onClick={() => handlePortfolioSelect(portfolio)}
+                    >
+                      {portfolio.name}
+                    </MenuItem>
+                  ))}
                 </MenuList>
               </Menu>
               <Menu>
@@ -233,9 +253,7 @@ export default function Dashboard({ session }) {
                             >
                               <Tr>
                                 {getHeaders().map((header, index) => (
-                                  <Th key={index}>
-                                    {header.replace("_", " ").toUpperCase()}
-                                  </Th>
+                                  <Th key={index}>{header.toUpperCase()}</Th>
                                 ))}
                               </Tr>
                             </Thead>
