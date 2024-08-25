@@ -1,9 +1,9 @@
 const path = require("path");
-const webpack = require("webpack");
 const Dotenv = require("dotenv-webpack");
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = (_env, argv) => {
   const devMode = argv.mode !== "production";
@@ -32,7 +32,7 @@ module.exports = (_env, argv) => {
           use: ["style-loader", "css-loader", "postcss-loader"],
         },
         {
-          test: /\.(svg|jpg)$/,
+          test: /\.(svg|jpg|webp|png)$/,
           type: "asset/resource",
         },
       ],
@@ -68,6 +68,11 @@ module.exports = (_env, argv) => {
         ],
       }),
     ],
+    optimization: {
+      minimizer: [
+        new TerserPlugin(),
+      ],
+    },
     experiments: {
       asyncWebAssembly: true,
       syncWebAssembly: true,
