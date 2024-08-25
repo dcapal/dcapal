@@ -63,7 +63,7 @@ export const Root = () => {
                   <Trans
                     i18nKey="page.root.cardStep1"
                     components={{
-                      p1: <p />,
+                      p1: <span />,
                       bold: <span className="font-normal" />,
                     }}
                   />
@@ -75,7 +75,7 @@ export const Root = () => {
                   <Trans
                     i18nKey="page.root.cardStep2"
                     components={{
-                      p1: <p />,
+                      p1: <span />,
                       bold: <span className="font-normal" />,
                     }}
                   />
@@ -88,7 +88,7 @@ export const Root = () => {
                   <Trans
                     i18nKey="page.root.cardStep3"
                     components={{
-                      p1: <p />,
+                      p1: <span />,
                       bold1: <span className="font-normal" />,
                       bold2: <span className="font-normal" />,
                     }}
@@ -101,7 +101,7 @@ export const Root = () => {
                   <Trans
                     i18nKey="page.root.cardStep4"
                     components={{
-                      p1: <p />,
+                      p1: <span />,
                       bold: <span className="font-normal" />,
                     }}
                   />
