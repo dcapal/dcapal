@@ -34,6 +34,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
     targetWeight: a.targetWeight,
     fees: a.fees ? a.fees : pfolioFees,
     theoAlloc: null,
+    averageBuyPrice: a.abp,
   }));
 
   if (!solution?.amounts) return cards;
@@ -233,8 +234,14 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
       assets: assetsArray.map((a) => ({
         instrumentId: a.id || pfid, // Use asset's id if available, or create a unique identifier
         symbol: a.symbol,
-        quantity: a.qty,
-        averageBuyPrice: a.price,
+        name: a.name,
+        exchange: a.symbol,
+        dataSource: a.provider,
+        currency: a.currency,
+        quantity: roundAmount(a.qty),
+        price: roundAmount(a.price),
+        averageBuyPrice: roundAmount(a.abp),
+        weight: roundAmount(a.weight),
       })),
     };
   });
