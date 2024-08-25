@@ -1,5 +1,6 @@
 use crate::app::infra::utils::Expiring;
 use crate::DateTime;
+use bigdecimal::BigDecimal;
 use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -340,9 +341,31 @@ pub struct Portfolio {
     pub assets: Vec<PortfolioHoldings>,
 }
 
+pub enum Exchange {
+    Yahoo,
+}
+
+impl Exchange {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Yahoo" => Exchange::Yahoo,
+            _ => Exchange::Yahoo,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Exchange::Yahoo => "yahoo",
+        }
+    }
+}
+
 pub struct PortfolioHoldings {
-    pub instrument_id: Uuid,
     pub symbol: String,
-    pub quantity: f64,
-    pub average_buy_price: f64,
+    pub name: String,
+    pub quantity: BigDecimal,
+    pub price: BigDecimal,
+    pub average_buy_price: BigDecimal,
+    pub weight: BigDecimal,
+    pub total: BigDecimal,
 }

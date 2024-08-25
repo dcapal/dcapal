@@ -99,13 +99,7 @@ export default function Dashboard({ session }) {
   useEffect(() => {
     fetchPortfolios();
     fetchInvestmentMode();
-  }, []);
-
-  useEffect(() => {
-    if (portfolios.length === 0) {
-      navigate("/allocate");
-    }
-  }, [portfolios, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     if (selectedPortfolio) {
@@ -122,6 +116,8 @@ export default function Dashboard({ session }) {
       setPortfolios(response.data);
       if (response.data.length > 0) {
         setSelectedPortfolio(response.data[0]);
+      } else {
+        navigate("/allocate");
       }
     } catch (error) {
       console.error("Error fetching portfolios:", error);
@@ -134,7 +130,7 @@ export default function Dashboard({ session }) {
 
   const getHeaders = () => {
     if (holdings.length === 0) return [];
-    return ["symbol", "quantity", "averageBuyPrice", "instrumentId"];
+    return ["name", "symbol", "price", "quantity", "weight", "averageBuyPrice"];
   };
 
   return (

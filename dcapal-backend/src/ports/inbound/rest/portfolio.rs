@@ -1,4 +1,4 @@
-use crate::app::domain::entity::{Portfolio, PortfolioHoldings};
+use crate::app::domain::entity::{Exchange, Portfolio, PortfolioHoldings};
 use crate::app::infra::claim::Claims;
 use crate::ports::inbound::rest::user::{MessageResponse, UpdateProfileRequest};
 use crate::AppContext;
@@ -6,6 +6,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use bigdecimal::BigDecimal;
 use garde::Validate;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -40,10 +41,12 @@ pub struct PortfolioRequest {
 #[derive(Debug, Deserialize, Serialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioHoldingsRequest {
-    pub instrument_id: Uuid,
     pub symbol: String,
-    pub quantity: f64,
-    pub average_buy_price: f64,
+    pub name: String,
+    pub quantity: BigDecimal,
+    pub average_buy_price: BigDecimal,
+    pub weight: BigDecimal,
+    pub price: BigDecimal,
 }
 
 impl Into<Portfolio> for PortfolioRequest {
@@ -61,10 +64,13 @@ impl Into<Portfolio> for PortfolioRequest {
 impl Into<PortfolioHoldings> for PortfolioHoldingsRequest {
     fn into(self) -> PortfolioHoldings {
         PortfolioHoldings {
-            instrument_id: self.instrument_id,
             symbol: self.symbol,
+            name: self.name,
             quantity: self.quantity,
             average_buy_price: self.average_buy_price,
+            weight: self.weight,
+            total: BigDecimal::from(0), //TODO: set the proper total
+            price: self.price,
         }
     }
 }
@@ -88,10 +94,12 @@ impl From<&Portfolio> for PortfolioRequest {
 impl From<&PortfolioHoldings> for PortfolioHoldingsRequest {
     fn from(holding: &PortfolioHoldings) -> Self {
         PortfolioHoldingsRequest {
-            instrument_id: holding.instrument_id,
             symbol: holding.symbol.clone(),
-            quantity: holding.quantity,
-            average_buy_price: holding.average_buy_price,
+            name: holding.name.clone(),
+            quantity: holding.quantity.clone(),
+            average_buy_price: holding.average_buy_price.clone(),
+            weight: holding.weight.clone(),
+            price: holding.price.clone(),
         }
     }
 }

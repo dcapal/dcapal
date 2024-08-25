@@ -1,27 +1,30 @@
+---- FIXME: Add the following tables to the database after the initial testing
 -- INSTRUMENTS
-
-create table public.instruments
-(
-    id          uuid primary key         default gen_random_uuid(),
-    symbol      text                                   not null unique,
-    name        text                                   not null,
-    exchange    text                                   not null,
-    asset_type  asset_type                             not null,
-    data_source data_source                            not null,
-    created_at  timestamp with time zone default now() not null,
-    updated_at  timestamp with time zone default now() not null
-);
-
--- INSTRUMENT PRICES
-create table public.instrument_prices
-(
-    id            uuid primary key         default gen_random_uuid(),
-    instrument_id uuid references public.instruments     not null,
-    eod_price     numeric(20, 10)                        not null,
-    date          date                                   not null,
-    created_at    timestamp with time zone default now() not null,
-    updated_at    timestamp with time zone default now() not null
-);
+--
+--create table public.instruments
+--(
+--    id          uuid primary key         default gen_random_uuid(),
+--    symbol      text                                   not null unique,
+--    name        text                                   not null,
+--    exchange    text                                   not null,
+--    asset_type  asset_type                             not null,
+--    data_source data_source                            not null,
+--    currency    text                                   not null,
+--    created_at  timestamp with time zone default now() not null,
+--    updated_at  timestamp with time zone default now() not null,
+--    unique (symbol)
+--);
+--
+---- INSTRUMENT PRICES
+--create table public.instrument_prices
+--(
+--    id            uuid primary key         default gen_random_uuid(),
+--    instrument_id uuid references public.instruments     not null,
+--    eod_price     numeric(20, 10)                        not null,
+--    date          date                                   not null,
+--    created_at    timestamp with time zone default now() not null,
+--    updated_at    timestamp with time zone default now() not null
+--);
 
 -- PORTFOLIOS
 create table public.portfolios
@@ -40,9 +43,13 @@ create table public.portfolio_holdings
 (
     id                uuid primary key         default gen_random_uuid(),
     portfolio_id      uuid references public.portfolios      not null,
-    instrument_id     uuid references public.instruments     not null,
-    symbol            text                                   not null,
+ --    instrument_id     uuid references public.instruments     not null,
+    symbol            text                                   not null, -- remove this when adding instruments table
+    name             text                                   not null, -- remove this when adding instruments table
     quantity          numeric(20, 10)                        not null,
+    weight            numeric(20, 10)                        not null,
+    total        numeric(20, 10)                        not null,
+    price             numeric(20, 10)                        not null,
     average_buy_price numeric(20, 10)                        not null,
     created_at        timestamp with time zone default now() not null,
     updated_at        timestamp with time zone default now() not null

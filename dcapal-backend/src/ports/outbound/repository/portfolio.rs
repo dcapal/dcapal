@@ -1,5 +1,6 @@
 use crate::app::domain::entity::{Portfolio, PortfolioHoldings};
 use crate::error::Result;
+use bigdecimal::BigDecimal;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -35,14 +36,17 @@ impl PortfolioRepository {
         for holding in &portfolio.assets {
             sqlx::query!(
                 r#"
-            INSERT INTO "portfolio_holdings" (portfolio_id, instrument_id, symbol, quantity, average_buy_price)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO "portfolio_holdings" (portfolio_id, symbol, name, quantity, weight, total, price, average_buy_price)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
                 portfolio_row.id,
-                holding.instrument_id,
                 holding.symbol,
-                holding.quantity as f64,
-                holding.average_buy_price as f64
+                holding.name,
+                holding.quantity,
+                holding.weight,
+                holding.total,
+                holding.price,
+                holding.average_buy_price
             )
             .execute(&mut *tx)
             .await?;
@@ -78,14 +82,17 @@ impl PortfolioRepository {
         for portfolio in portfolios {
             let holdings = sqlx::query!(
                 r#"
-            SELECT 
-                instrument_id, 
-                symbol, 
-                quantity as "quantity!: f64", 
-                average_buy_price as "average_buy_price!: f64"
-            FROM "portfolio_holdings"
-            WHERE portfolio_id = $1
-            "#,
+                SELECT 
+                    symbol, 
+                    quantity,
+                    average_buy_price,
+                    name,
+                    price,
+                    weight,
+                    total
+                FROM "portfolio_holdings"
+                WHERE portfolio_id = $1
+                "#,
                 portfolio.id
             )
             .fetch_all(&mut *tx)
@@ -94,10 +101,13 @@ impl PortfolioRepository {
             let assets = holdings
                 .into_iter()
                 .map(|holding| PortfolioHoldings {
-                    instrument_id: holding.instrument_id,
                     symbol: holding.symbol,
                     quantity: holding.quantity,
+                    price: holding.price,
                     average_buy_price: holding.average_buy_price,
+                    weight: holding.weight,
+                    name: holding.name,
+                    total: BigDecimal::from(0), //TODO: set the proper total
                 })
                 .collect();
 

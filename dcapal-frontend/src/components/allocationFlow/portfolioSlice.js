@@ -258,6 +258,10 @@ export const portfolioSlice = createSlice({
           baseCcy: action.payload.baseCcy,
           price: roundPrice(action.payload.price) || 0,
           provider: action.payload.provider,
+          averageBuyPrice:
+            action.payload.averageBuyPrice ||
+            roundPrice(action.payload.price) ||
+            0,
           qty: 0,
           amount: 0,
           weight: 0,
