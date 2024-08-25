@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 import { LaunchBtn } from "@components/core/launchBtn";
 import { RootCard } from "@components/core/rootCard";
@@ -10,9 +10,57 @@ import ICON_AMOUNT from "@images/icons/amount.svg";
 import ICON_MARKET from "@images/icons/market.svg";
 import ICON_PORTFOLIO from "@images/icons/portfolio.svg";
 import ICON_REBALANCE from "@images/icons/rebalance.svg";
+import { DCAPAL_API, supabase } from "@app/config";
+import { api } from "@app/api";
+import InvestmentSettings from "@routes/investmentSettingsPage";
 
 export const Root = () => {
   const { t } = useTranslation();
+  const [session, setSession] = useState(null);
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setConfig({
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const [userData, setUserData] = useState({});
+
+  const fetchProfile = async () => {
+    try {
+      const response = await api.get(
+        `${DCAPAL_API}/v1/user/investment-preferences`,
+        config
+      );
+      setUserData({
+        risk_tolerance: response.data.risk_tolerance,
+        investment_horizon: response.data.investment_horizon,
+        investment_mode: response.data.investment_mode,
+        investment_goal: response.data.investment_goal,
+        ai_enabled: response.data.ai_enabled,
+      });
+    } catch (error) {
+      setUserData(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, [session]);
+
+  if (session != null && userData == null) {
+    return <InvestmentSettings session={session} editMode={true} />;
+  }
+
   return (
     <ContainerPage
       title={"DcaPal - A smart assistant for your periodic investments"}

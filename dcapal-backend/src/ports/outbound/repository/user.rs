@@ -87,21 +87,24 @@ impl UserRepository {
         }))
     }
 
-    pub async fn update_investment_preferences(
+    pub async fn upsert_investment_preferences(
         &self,
         user_id: Uuid,
         req: InvestmentPreferences,
     ) -> Result<()> {
         let query = sqlx::query!(
             r#"
-        UPDATE public.investment_preferences
-        SET risk_tolerance     = $2,
-            investment_horizon = $3,
-            investment_mode    = $4,
-            investment_goal    = $5,
-            ai_enabled         = $6
-        WHERE user_id = $1
-        "#,
+            INSERT INTO public.investment_preferences
+            (user_id, risk_tolerance, investment_horizon, investment_mode, investment_goal, ai_enabled)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (user_id) DO UPDATE
+            SET 
+                risk_tolerance     = $2,
+                investment_horizon = $3,
+                investment_mode    = $4,
+                investment_goal    = $5,
+                ai_enabled         = $6
+            "#,
             user_id as _,
             req.risk_tolerance as _,
             req.investment_horizon as _,

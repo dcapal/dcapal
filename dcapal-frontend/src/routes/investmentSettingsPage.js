@@ -24,9 +24,9 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 
-export default function InvestmentSettings({ session }) {
+export default function InvestmentSettings({ session, editMode = false }) {
   const [investmentSettingsData, setInvestmentSettingsData] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(editMode);
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -57,18 +57,33 @@ export default function InvestmentSettings({ session }) {
   };
 
   const [userData, setUserData] = useState({
-    risk_tolerance: "",
-    investment_horizon: "",
-    investment_mode: "",
-    investment_goal: "",
+    risk_tolerance: "Low",
+    investment_horizon: 1,
+    investment_mode: "Standard",
+    investment_goal: "Retirement",
     ai_enabled: false,
   });
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const handleInputChange = (nameOrEvent, value) => {
+    let inputName, inputValue;
+
+    if (typeof nameOrEvent === "string") {
+      // For NumberInput and Switch
+      inputName = nameOrEvent;
+      inputValue = value;
+    } else if (nameOrEvent && nameOrEvent.target) {
+      // For standard inputs
+      inputName = nameOrEvent.target.name;
+      inputValue = nameOrEvent.target.value;
+    } else {
+      // Fallback case
+      console.error("Unexpected input type");
+      return;
+    }
+
     setUserData((prevData) => ({
       ...prevData,
-      [name]: value,
+      [inputName]: inputValue,
     }));
   };
 
@@ -78,10 +93,17 @@ export default function InvestmentSettings({ session }) {
 
   const handleSave = async () => {
     try {
-      console.log("userData:", userData);
-      await api.put(
+      const dataToSend = {
+        risk_tolerance: userData.risk_tolerance,
+        investment_horizon: userData.investment_horizon,
+        investment_mode: userData.investment_mode,
+        investment_goal: userData.investment_goal,
+        ai_enabled: userData.ai_enabled,
+      };
+
+      await api.post(
         `${DCAPAL_API}/v1/user/investment-preferences`,
-        userData,
+        dataToSend,
         config
       );
       setIsEditing(false);
@@ -163,11 +185,13 @@ export default function InvestmentSettings({ session }) {
                   <NumberInput
                     name="investment_horizon"
                     value={userData.investment_horizon}
-                    min={10}
+                    min={1}
                     max={20}
                     className="w-full"
                     isReadOnly={!isEditing}
-                    onChange={handleInputChange}
+                    onChange={(valueString, valueNumber) =>
+                      handleInputChange("investment_horizon", valueNumber)
+                    }
                   >
                     <NumberInputField />
                     <NumberInputStepper>
@@ -235,14 +259,16 @@ export default function InvestmentSettings({ session }) {
               <div className="flex items-center space-x-4">
                 <label className="w-1/4 text-lg font-semibold">AI*</label>
                 <FormControl display="flex" alignItems="center">
-                  <FormLabel htmlFor="email-alerts" mb="0">
+                  <FormLabel htmlFor="ai_enabled" mb="0">
                     Enable
                   </FormLabel>
                   <Switch
-                    id="email-alerts"
+                    name="ai_enabled"
                     isReadOnly={!isEditing}
                     isChecked={userData.ai_enabled}
-                    onChange={handleInputChange}
+                    onChange={(isChecked) =>
+                      handleInputChange("ai_enabled", isChecked)
+                    }
                   />
                 </FormControl>
               </div>

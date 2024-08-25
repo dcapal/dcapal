@@ -203,7 +203,7 @@ impl DcaServer {
             .route("/v1/user/portfolios", get(rest::portfolio::get_portfolios))
             .route(
                 "/v1/user/investment-preferences",
-                put(rest::user::update_investment_preferences),
+                post(rest::user::upsert_investment_preferences),
             )
             .route("/v1/ai/chatbot", post(get_chatbot_advice))
             .with_state(ctx.clone());
