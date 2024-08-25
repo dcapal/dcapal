@@ -124,6 +124,14 @@ export default function Dashboard({ session }) {
     }
   };
 
+  // Function to prepare data for the pie chart
+  const preparePieChartData = (assets) => {
+    return assets.map((asset) => ({
+      name: asset.symbol.toUpperCase(),
+      weight: asset.quantity * asset.averageBuyPrice, // This calculates the value of each asset
+    }));
+  };
+
   const handlePortfolioSelect = (portfolio) => {
     setSelectedPortfolio(portfolio);
   };
@@ -201,7 +209,10 @@ export default function Dashboard({ session }) {
                 </div>
                 <div className="bg-background bg-white rounded-lg shadow-lg flex flex-col">
                   <div className="p-1 sm:p-2 flex-1">
-                    <PiechartcustomChart className="aspect-[9/4] w-full" />
+                    <PiechartcustomChart
+                      className="aspect-[9/4] w-full"
+                      data={preparePieChartData(holdings)}
+                    />
                   </div>
                 </div>
               </div>
@@ -403,36 +414,44 @@ function MenuIcon(props) {
   );
 }
 
-function PiechartcustomChart(props) {
-  const mockData = [
-    { name: "BTC", weight: 30 },
-    { name: "ETH", weight: 30 },
-    { name: "ADA", weight: 20 },
-    { name: "ALLWD", weight: 10 },
-  ];
+function PiechartcustomChart({ data, ...props }) {
   const COLORS = ["#63B3ED", "#4FD1C5", "#FFBB28", "#F6E05E", "#F6AD55"];
+
+  // Calculate total value for percentage calculation
+  const totalValue = data.reduce((sum, item) => sum + item.weight, 0);
+
+  // Prepare data with calculated percentages
+  const chartData = data.map((item) => ({
+    ...item,
+    percentage: (item.weight / totalValue) * 100,
+  }));
+
   return (
     <div {...props}>
       <ResponsiveContainer width="100%" height={350}>
         <PieChart>
           <Pie
-            data={mockData}
+            data={chartData}
             dataKey="weight"
             nameKey="name"
             cx="50%"
             cy="50%"
             outerRadius={150}
             fill="#8884d8"
-            // label={(entry) => `${entry.name}: ${entry.weight.toFixed(2)}%`}
           >
-            {mockData.map((entry, index) => (
+            {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={COLORS[index % COLORS.length]}
               />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
+          <Tooltip
+            formatter={(value, name, props) => [
+              `${props.payload.percentage.toFixed(2)}%`,
+              name,
+            ]}
+          />
           <Legend />
         </PieChart>
       </ResponsiveContainer>
