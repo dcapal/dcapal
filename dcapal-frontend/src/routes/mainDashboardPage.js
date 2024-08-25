@@ -102,6 +102,12 @@ export default function Dashboard({ session }) {
   }, []);
 
   useEffect(() => {
+    if (portfolios.length === 0) {
+      navigate("/allocate");
+    }
+  }, [portfolios, navigate]);
+
+  useEffect(() => {
     if (selectedPortfolio) {
       setHoldings(selectedPortfolio.assets);
     }

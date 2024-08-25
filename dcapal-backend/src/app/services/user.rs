@@ -1,9 +1,7 @@
 use crate::error::Result;
 
 use crate::app::domain::entity::{InvestmentPreferences, User};
-use crate::ports::inbound::rest::user::{
-    UpdateProfileRequest, UpdateUserInvestmentPreferencesRequest,
-};
+use crate::ports::inbound::rest::user::{UpdateProfileRequest, UserInvestmentPreferencesDto};
 use crate::ports::outbound::repository::user::UserRepository;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -81,7 +79,7 @@ impl UserService {
         }
     }
 
-    pub async fn update_investment_preferences(
+    pub async fn upsert_investment_preferences(
         &self,
         user_id: Uuid,
         req: InvestmentPreferences,
@@ -89,7 +87,7 @@ impl UserService {
         info!("Update user investment preferences with id: {user_id} request: {req:?}");
         let _ = self
             .user_repository
-            .update_investment_preferences(user_id, req)
+            .upsert_investment_preferences(user_id, req)
             .await
             .map_err(|e| {
                 error!("Failed to get user profile: {}", e);

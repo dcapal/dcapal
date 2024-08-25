@@ -65,7 +65,7 @@ pub struct UpdateProfileRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Validate, Clone)]
-pub struct UpdateUserInvestmentPreferencesRequest {
+pub struct UserInvestmentPreferencesDto {
     #[garde(skip)]
     pub risk_tolerance: String,
     #[garde(range(min = 1, max = 50))]
@@ -78,7 +78,7 @@ pub struct UpdateUserInvestmentPreferencesRequest {
     pub ai_enabled: bool,
 }
 
-impl Into<InvestmentPreferences> for UpdateUserInvestmentPreferencesRequest {
+impl Into<InvestmentPreferences> for UserInvestmentPreferencesDto {
     fn into(self) -> InvestmentPreferences {
         InvestmentPreferences {
             risk_tolerance: crate::app::domain::entity::RiskTolerance::from_str(
@@ -202,18 +202,18 @@ pub async fn update_profile(
     ),
     security(("jwt" = []))
 )]
-pub async fn update_investment_preferences(
+pub async fn upsert_investment_preferences(
     State(ctx): State<AppContext>,
     claims: Claims,
-    Json(req): Json<UpdateUserInvestmentPreferencesRequest>,
+    Json(req): Json<UserInvestmentPreferencesDto>,
 ) -> Result<Response> {
     info!("Update investment preferences for user_id: {}.", claims.sub);
     match &ctx
         .services
         .user
-        .update_investment_preferences(
+        .upsert_investment_preferences(
             claims.sub,
-            crate::ports::inbound::rest::user::UpdateUserInvestmentPreferencesRequest::into(req),
+            crate::ports::inbound::rest::user::UserInvestmentPreferencesDto::into(req),
         )
         .await
     {

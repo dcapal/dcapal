@@ -59,5 +59,6 @@ create table public.investment_preferences
     investment_goal    investment_goal                        not null,
     ai_enabled         boolean                                not null,
     created_at         timestamp with time zone default now() not null,
-    updated_at         timestamp with time zone default now() not null
+    updated_at         timestamp with time zone default now() not null,
+    unique (user_id)
 );
