@@ -80,6 +80,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
       targetWeight: 0,
       fees: null,
       theo_alloc: null,
+      averageBuyPrice: 0,
     });
   }
 
@@ -225,39 +226,56 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const assetsArray = useSelector((state) =>
     Object.values(currentPortfolio(state).assets)
   );
-  const [userData, setUserData] = useState(() => {
-    return {
-      id: pfid,
-      name: pfname,
-      description: "optional",
-      currency: quoteCcy,
-      assets: assetsArray.map((a) => ({
-        instrumentId: a.id || pfid, // Use asset's id if available, or create a unique identifier
-        symbol: a.symbol,
-        name: a.name,
-        exchange: a.symbol,
-        dataSource: a.provider,
-        currency: a.currency,
-        quantity: roundAmount(a.qty),
-        price: roundAmount(a.price),
-        averageBuyPrice: roundAmount(a.abp),
-        weight: roundAmount(a.weight),
-      })),
-    };
-  });
+
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    if (cards.length > 0) {
+      setUserData({
+        id: pfid,
+        name: pfname,
+        description: "optional",
+        currency: quoteCcy,
+        assets: cards
+          .filter((card) => card.name !== UNALLOCATED_CASH)
+          .map((a) => ({
+            symbol: a.symbol,
+            name: a.name,
+            exchange: a.symbol,
+            dataSource: a.provider,
+            currency: a.currency,
+            quantity: roundAmount(a.qty),
+            price: roundAmount(a.price),
+            averageBuyPrice: roundAmount(a.averageBuyPrice),
+            weight: roundAmount(a.weight),
+          })),
+      });
+    }
+  }, [cards, pfid, pfname, quoteCcy]);
 
   const onClickSavePortfolio = async () => {
+    if (!userData) {
+      toast({
+        title: "Error",
+        description: "Portfolio data is not ready yet",
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
     try {
       await api.post(`${DCAPAL_API}/v1/user/portfolios`, userData, config);
       toast({
-        title: "Profile updated",
+        title: "Portfolio updated",
         status: "success",
         duration: 2000,
         isClosable: true,
       });
     } catch (error) {
       toast({
-        title: "Error updating profile",
+        title: "Error updating the portfolio",
         description: error.message,
         status: "error",
         duration: 2000,
