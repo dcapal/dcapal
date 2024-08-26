@@ -16,7 +16,7 @@ deadpool-redis = { version = "0.16.0", features = ["serde"] }
 redis = { version = "0.26.1", features = ["tokio-comp"] }
 reqwest = { version = "0.12.6", features = ["gzip", "json"] }
 serde = "1.0.209"
-serde_json = "1.0.125"
+serde_json = "1.0.127"
 thiserror = "1.0.63"
 tokio = { version = "1.39.3", features = ["full"] }
 tower = "0.4.13"
