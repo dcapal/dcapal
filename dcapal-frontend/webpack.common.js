@@ -1,9 +1,11 @@
 const path = require("path");
-const webpack = require("webpack");
 const Dotenv = require("dotenv-webpack");
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
 module.exports = (_env, argv) => {
   const devMode = argv.mode !== "production";
@@ -24,15 +26,24 @@ module.exports = (_env, argv) => {
           options: { presets: ["@babel/env", "@babel/preset-react"] },
         },
         {
-          test: /\.css$/i,
+          test: /.s?css$/,
           include: [
             path.resolve(__dirname, "src"),
             path.resolve(__dirname, "node_modules/vanilla-cookieconsent/dist"),
           ],
-          use: ["style-loader", "css-loader", "postcss-loader"],
+          use: [
+            argv.mode === "production"
+              ? MiniCssExtractPlugin.loader
+              : "style-loader",
+            {
+              loader: "css-loader",
+              options: { importLoaders: 1 },
+            },
+            "postcss-loader",
+          ],
         },
         {
-          test: /\.(svg|jpg)$/,
+          test: /\.(svg|jpg|webp|png)$/,
           type: "asset/resource",
         },
       ],
@@ -67,7 +78,21 @@ module.exports = (_env, argv) => {
           },
         ],
       }),
+      new MiniCssExtractPlugin({
+        filename: "[name].[contenthash].css",
+        chunkFilename: "[id].[contenthash].css",
+      }),
     ],
+    optimization: {
+      minimizer: [
+        new TerserPlugin(),
+        new CssMinimizerPlugin({
+          minimizerOptions: {
+            preset: "advanced",
+          },
+        }),
+      ],
+    },
     experiments: {
       asyncWebAssembly: true,
       syncWebAssembly: true,

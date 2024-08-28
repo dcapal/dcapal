@@ -1,6 +1,5 @@
-import React, { useEffect } from "react";
+import React, { lazy, useEffect } from "react";
 import { useRoutes } from "react-router-dom";
-import { App } from "@app";
 
 import AboutPage from "./aboutPage";
 import DemoPage from "./demoPage";
@@ -16,6 +15,10 @@ import {
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
 } from "@app/config";
+
+import(/* webpackPrefetch: true */ "@app");
+
+const App = lazy(() => import("@app"));
 
 export const Router = () => {
   let routesConfig = [
