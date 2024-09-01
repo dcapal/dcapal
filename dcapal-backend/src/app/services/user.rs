@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct UserService {
     user_repository: Arc<UserRepository>,
 }

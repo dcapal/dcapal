@@ -1,4 +1,4 @@
-use crate::app::domain::entity::Ai;
+use crate::app::domain::entity::{Ai, Portfolio};
 use crate::error::Result;
 use crate::ports::outbound::repository::ai::AiRepository;
 use std::sync::Arc;
@@ -14,8 +14,16 @@ impl AiService {
         Self { ai_repository }
     }
 
-    pub async fn get_ai_response(&self, user_id: Uuid) -> Result<Option<Ai>> {
-        let ai_response = self.ai_repository.get_ai_response(user_id).await?;
+    pub async fn get_ai_response(
+        &self,
+        user_id: Uuid,
+        message: String,
+        portfolio: Portfolio,
+    ) -> Result<Option<Ai>> {
+        let ai_response = self
+            .ai_repository
+            .get_ai_response(user_id, message, portfolio)
+            .await?;
 
         match ai_response {
             Some(ai) => {

@@ -1,22 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api } from "@app/api";
 import { DCAPAL_API } from "@app/config";
+import { Button } from "@chakra-ui/react";
 
 export function ChatCard(props) {
-  const [input, setInput] = useState("help");
   const [messages, setMessages] = useState([]);
+  const messagesEndRef = useRef(null);
+  const [chatHeight, setChatHeight] = useState(0);
+  const chatContainerRef = useRef(null);
 
-  const handleSendMessage = async () => {
-    if (input.trim() === "") return;
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-    const newMessage = { text: input, sender: "user" };
-    // setMessages([...messages, newMessage]);
-    setInput("");
+  const handleSendMessage = async (message) => {
+    if (message.trim() === "") return;
+
+    const newMessage = { text: message, sender: "user" };
+    setMessages((prevMessages) => [...prevMessages, newMessage]);
 
     try {
       const response = await api.post(
         `${DCAPAL_API}/v1/ai/chatbot`,
-        { message: input },
+        { message: message, portfolio: props.portfolioId },
         props.config
       );
       const aiResponse = { text: response.data.message, sender: "ai" };
@@ -27,48 +33,87 @@ export function ChatCard(props) {
   };
 
   useEffect(() => {
-    const aiResponse = {
-      text: "Based on the data provided, it appears that you have a diversified investment portfolio with allocations to stocks, bonds, and cryptocurrencies. It's important to note that investment decisions should be based on your individual financial goals, risk tolerance, and time horizon. \nConsidering your age, income, and the current allocation of your investments, adding more investments into stocks, bonds, or other diversified assets might be more suitable to ensure a well-rounded portfolio. However, it's essential to consult with a financial advisor to assess your specific financial situation and investment objectives.\nPlease remember that this response is not financial advice, but rather a general assessment based on the information provided.",
-      sender: "ai",
+    const fetchInitialMessage = async () => {
+      try {
+        const response = await api.post(
+          `${DCAPAL_API}/v1/ai/chatbot`,
+          { message: "initial", portfolio: props.portfolioId },
+          props.config
+        );
+        const aiResponse = { text: response.data.message, sender: "ai" };
+        setMessages([aiResponse]);
+      } catch (error) {
+        console.error("Error fetching initial message:", error);
+        setMessages([
+          {
+            text: "Failed to load initial message. Please try again later.",
+            sender: "ai",
+          },
+        ]);
+      }
     };
 
-    setMessages([aiResponse]);
-  }, []); // Empty dependency array means this effect runs once on mount
+    fetchInitialMessage();
+  }, []);
 
-  /*
-                                                          if (props.isChatVisible) {
-                                                            handleSendMessage();
-                                                            }
-                                                           */
+  useEffect(scrollToBottom, [messages]);
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (chatContainerRef.current) {
+        const containerHeight = chatContainerRef.current.offsetHeight;
+        setChatHeight(containerHeight - 120); // Subtracting space for buttons
+      }
+    };
+
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow-lg">
-      {messages.map((msg, index) => (
-        <div
-          key={index}
-          className={`mb-2 ${msg.sender === "user" ? "text-right" : "text-left"}`}
-        >
-          <span
-            className={`mx-2 inline-block p-2 rounded-lg ${msg.sender === "user" ? "bg-blue-100" : "bg-white"}`}
+    <div
+      ref={chatContainerRef}
+      className="flex flex-col bg-white rounded-lg shadow-lg h-full"
+    >
+      <div
+        className="flex-1 overflow-y-scroll p-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+        style={{ height: `${chatHeight}px`, maxHeight: `${chatHeight}px` }}
+      >
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`mb-4 ${
+              msg.sender === "user" ? "text-right" : "text-left"
+            }`}
           >
-            {msg.text}
-          </span>
-        </div>
-      ))}
-      {/*      <div className="mt-auto">
-        <div className="flex">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1 p-2 border rounded-l-lg"
-            placeholder="Type your message..."
-          />
-          <Button onClick={handleSendMessage} className="rounded-r-lg">
-            Send
+            <span
+              className={`inline-block p-3 rounded-lg break-words max-w-[80%] ${
+                msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"
+              }`}
+            >
+              {msg.text}
+            </span>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+      <div className="p-4 border-t">
+        <div className="flex flex-col space-y-2">
+          <Button
+            onClick={() => handleSendMessage("market-news")}
+            className="w-full"
+          >
+            Market News
+          </Button>
+          <Button
+            onClick={() => handleSendMessage("rebalance-portfolio")}
+            className="w-full"
+          >
+            Rebalance Portfolio
           </Button>
         </div>
-      </div>*/}
+      </div>
     </div>
   );
 }

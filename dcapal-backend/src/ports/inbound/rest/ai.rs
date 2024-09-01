@@ -1,5 +1,6 @@
 use crate::app::domain::entity::Ai;
 use crate::app::infra::claim::Claims;
+use crate::ports::inbound::rest::portfolio::PortfolioRequest;
 use crate::AppContext;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -11,6 +12,12 @@ use utoipa::ToSchema;
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct AiResponse {
     pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct AiRequest {
+    pub message: String,
+    pub portfolio: PortfolioRequest,
 }
 
 impl From<Ai> for AiResponse {
@@ -34,8 +41,14 @@ impl From<Ai> for AiResponse {
 pub async fn get_chatbot_advice(
     State(ctx): State<AppContext>,
     claims: Claims,
+    Json(req): Json<AiRequest>,
 ) -> crate::error::Result<Response> {
-    match &ctx.services.ai.get_ai_response(claims.sub).await? {
+    match &ctx
+        .services
+        .ai
+        .get_ai_response(claims.sub, req.message, req.portfolio.into())
+        .await?
+    {
         Some(response) => Ok(Json(AiResponse::from(response.clone())).into_response()),
         None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
