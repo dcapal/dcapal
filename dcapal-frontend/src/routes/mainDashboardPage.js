@@ -293,7 +293,11 @@ export default function Dashboard({ session }) {
               {isChatVisible && (
                 <div className="space-y-1 col-span-1 row-start-1 col-start-3 row-span-2 h-full flex flex-col">
                   <h3 className="text-lg font-medium ">AI Assistant</h3>
-                  <ChatCard config={config} isChatVisible={isChatVisible} />
+                  <ChatCard
+                    config={config}
+                    isChatVisible={isChatVisible}
+                    portfolioId={selectedPortfolio}
+                  />
                 </div>
               )}
             </div>

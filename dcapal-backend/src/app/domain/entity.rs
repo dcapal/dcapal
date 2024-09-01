@@ -333,6 +333,7 @@ pub struct Ai {
     pub response: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Portfolio {
     pub id: Uuid,
     pub name: String,
@@ -360,6 +361,7 @@ impl Exchange {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PortfolioHoldings {
     pub symbol: String,
     pub name: String,
