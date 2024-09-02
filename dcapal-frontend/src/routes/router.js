@@ -1,4 +1,4 @@
-import React, { lazy,useEffect, useState } from "react";
+import React, { lazy, useEffect, useState } from "react";
 import { useRoutes } from "react-router-dom";
 import { App } from "@app";
 
