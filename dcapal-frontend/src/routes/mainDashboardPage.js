@@ -107,6 +107,14 @@ export default function Dashboard({ session }) {
     }
   }, [selectedPortfolio]);
 
+  const formatHeader = (header) => {
+    // First, split the camelCase string
+    const words = header.replace(/([A-Z])/g, " $1").trim();
+
+    // Then, convert to uppercase
+    return words.toUpperCase();
+  };
+
   const fetchPortfolios = async () => {
     try {
       const response = await api.get(
@@ -266,7 +274,7 @@ export default function Dashboard({ session }) {
                             >
                               <Tr>
                                 {getHeaders().map((header, index) => (
-                                  <Th key={index}>{header.toUpperCase()}</Th>
+                                  <Th key={index}>{formatHeader(header)}</Th>
                                 ))}
                               </Tr>
                             </Thead>

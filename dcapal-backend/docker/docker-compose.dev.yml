@@ -54,6 +54,6 @@ services:
 
   postgres-db:
     volumes:
-      - ./docker/scripts:/docker-entrypoint-initdb.d
+      - ./config/docker/scripts:/docker-entrypoint-initdb.d
 networks:
   server-side: { }
