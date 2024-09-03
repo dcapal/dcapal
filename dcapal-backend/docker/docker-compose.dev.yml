@@ -55,5 +55,3 @@ services:
   postgres-db:
     volumes:
       - ./config/postgres/scripts:/docker-entrypoint-initdb.d
-networks:
-  server-side: { }

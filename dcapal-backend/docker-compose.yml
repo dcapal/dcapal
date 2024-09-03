@@ -22,7 +22,7 @@ services:
     container_name: postgres-database
     restart: always
     networks:
-      - server-side
+      - dcapalnetwork
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
