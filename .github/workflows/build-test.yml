@@ -47,6 +47,8 @@ jobs:
           cargo clippy -- -D warnings
 
       - name: Build and Test
+        env:
+          SQLX_OFFLINE: true
         run: |
           cd dcapal-backend
           RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
