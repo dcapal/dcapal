@@ -33,11 +33,6 @@ jobs:
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features native-tls,postgres,offline
 
-      - name: Prepare sqlx
-        run: |
-          cd dcapal-backend
-          cargo sqlx prepare --check
-
       - name: Lint
         run: |
           cd dcapal-backend
