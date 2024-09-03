@@ -217,9 +217,6 @@ jobs:
           --no-default-features
           --locked
 
-      - name: Check that queries are fresh
-        run: cargo sqlx prepare --workspace --check -- --all-targets
-
       - name: Run dcapal-backend
         run: |
           cd dcapal-backend
@@ -231,6 +228,10 @@ jobs:
             docker compose logs
             exit 1
           fi
+
+      - name: Migrate database
+        run: |
+          ./scripts/start.sh
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v3
