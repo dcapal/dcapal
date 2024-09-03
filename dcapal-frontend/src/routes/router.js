@@ -1,6 +1,5 @@
 import React, { lazy, useEffect, useState } from "react";
 import { useRoutes } from "react-router-dom";
-import { App } from "@app";
 
 import AboutPage from "./aboutPage";
 import DemoPage from "./demoPage";
