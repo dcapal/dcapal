@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use crate::app::domain::entity::{
     InvestmentGoal, InvestmentMode, InvestmentPreferences, RiskTolerance, User,
 };
