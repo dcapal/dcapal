@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
+  SQLX_VERSION: 0.8.0
+  SQLX_FEATURES: "rustls,postgres"
 
 jobs:
   backend-build-test:
@@ -207,6 +209,13 @@ jobs:
             dcapal:
               image: localhost:5000/${DOCKER_REPO}:latest
           EOF
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli
+          --version=${{ env.SQLX_VERSION }}
+          --features ${{ env.SQLX_FEATURES }}
+          --no-default-features
+          --locked
 
       - name: Run dcapal-backend
         run: |
