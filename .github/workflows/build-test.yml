@@ -11,6 +11,7 @@ env:
   DOCKER_REPO: leonardoarcari/dcapal
   SQLX_VERSION: 0.8.0
   SQLX_FEATURES: "rustls,postgres"
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
 
 jobs:
   backend-build-test:
