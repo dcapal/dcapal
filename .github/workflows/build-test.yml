@@ -45,6 +45,8 @@ jobs:
           cd dcapal-backend
           cargo fmt --all -- --check
           cargo clippy -- -D warnings
+        env:
+          SQLX_OFFLINE: true
 
       - name: Build and Test
         run: |
