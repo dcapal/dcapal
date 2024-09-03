@@ -19,7 +19,11 @@ impl UserRepository {
 
     pub async fn get_current_user(&self, user_id: Uuid) -> Result<Option<User>> {
         let user = sqlx::query!(
-            r#"select name, email, birth_date from "users" where id = $1"#,
+            r#"select 
+                name, 
+                email,
+                birth_date 
+               from "users" where id = $1"#,
             user_id
         )
         .fetch_one(&self.postgres)

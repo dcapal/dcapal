@@ -139,9 +139,14 @@ pub async fn should_stop(stop_rx: &mut StopToken) {
     }
 }
 
-pub fn create_date_response(date: Date) -> String {
-    let format = format_description::parse("[year]-[month]-[day]").unwrap();
-    date.format(&format).unwrap()
+pub fn create_date_response(date: Option<Date>) -> String {
+    match date {
+        Some(date) => {
+            let format = format_description::parse("[year]-[month]-[day]").unwrap();
+            date.format(&format).unwrap()
+        }
+        None => "".to_string(),
+    }
 }
 
 pub fn string_to_date(date_string: &str) -> Result<Date, time::Error> {

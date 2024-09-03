@@ -212,7 +212,7 @@ impl Expiring for Market {
 pub struct User {
     pub name: String,
     pub email: String,
-    pub birth_date: Date,
+    pub birth_date: Option<Date>,
 }
 #[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
 #[sqlx(type_name = "risk_tolerance", rename_all = "snake_case")]
