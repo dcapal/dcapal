@@ -217,6 +217,9 @@ jobs:
           --no-default-features
           --locked
 
+      - name: Check that queries are fresh
+        run: cargo sqlx prepare --workspace --check -- --all-targets
+
       - name: Run dcapal-backend
         run: |
           cd dcapal-backend
