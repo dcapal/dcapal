@@ -141,9 +141,7 @@ export const AssetCard = ({
                 <div className="w-40">
                   <InputNumber
                     textAlign={"text-left"}
-                    type={
-                       InputNumberType.DECIMAL
-                    }
+                    type={InputNumberType.DECIMAL}
                     value={qty}
                     onChange={props.setQty}
                     isValid={true}
