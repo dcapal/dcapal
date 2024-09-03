@@ -210,7 +210,7 @@ jobs:
 
       - name: Run dcapal-backend
         env:
-          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           cd dcapal-backend
           if ! docker compose -f docker-compose.yml \

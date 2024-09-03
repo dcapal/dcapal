@@ -1,6 +1,4 @@
-use crate::app::domain::entity::{
-    Ai, InvestmentGoal, InvestmentMode, InvestmentPreferences, Portfolio, RiskTolerance,
-};
+use crate::app::domain::entity::{Ai, InvestmentPreferences, Portfolio};
 use crate::error::Result;
 use async_openai::config::OpenAIConfig;
 use async_openai::{
