@@ -40,6 +40,11 @@ jobs:
           --no-default-features
           --locked
 
+      - name: Prepare sqlx data
+        run: |
+          cd dcapal-backend
+          cargo sqlx prepare --check
+
       - name: Lint
         env:
           SQLX_OFFLINE: true
