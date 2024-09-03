@@ -109,7 +109,7 @@ jobs:
           cache-dependency-path: dcapal-frontend/package-lock.json
 
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -211,7 +211,7 @@ jobs:
           up --no-build --wait
 
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
