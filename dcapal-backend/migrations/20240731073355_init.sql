@@ -20,7 +20,7 @@ create table public.users
     id         uuid references auth.users             not null primary key, -- UUID from auth.users
     name       text                                   not null,
     email      text                                   not null unique,
-    birth_date date                                   not null,
+    birth_date date                                   ,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );

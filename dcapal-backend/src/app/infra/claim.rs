@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::app::services;
 use uuid::Uuid;
 
 const JWT_AUDIENCE_DOMAIN: &str = "authenticated";
@@ -31,6 +32,16 @@ pub struct Claims {
     pub session_id: Uuid,
     // role user
     pub role: String,
+    // audience
+    pub aud: String,
+    // user metadata
+    pub user_metadata: UserMetadataClaim,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserMetadataClaim {
+    pub email: String,
+    pub full_name: String,
 }
 
 impl Claims {
@@ -59,7 +70,7 @@ impl FromRequestParts<AppContext> for Claims {
             &DecodingKey::from_secret(jwt_secret.as_ref()),
         )?
         .claims;
-        //service::session::check(&state.redis, &user_claims).await?;
+        services::session::save_user_if_not_present(&state.postgres, &user_claims).await?;
         Ok(user_claims)
     }
 }
