@@ -209,6 +209,8 @@ jobs:
           EOF
 
       - name: Run dcapal-backend
+        env:
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"
         run: |
           cd dcapal-backend
           if ! docker compose -f docker-compose.yml \
