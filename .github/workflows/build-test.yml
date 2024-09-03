@@ -31,11 +31,12 @@ jobs:
           cargo clippy --version
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli
-          --version=${{ env.SQLX_VERSION }}
-          --features ${{ env.SQLX_FEATURES }}
-          --no-default-features
-          --locked
+        run: cargo install sqlx-cli --no-default-features --features native-tls,postgres
+
+      - name: Prepare sqlx
+        run: |
+          cd dcapal-backend
+          cargo sqlx prepare --check
 
       - name: Lint
         run: |
