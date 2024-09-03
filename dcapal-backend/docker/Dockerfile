@@ -34,6 +34,6 @@ COPY --from=builder /var/dcapal/target/release-with-debug/dcapal-backend /var/dc
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
 COPY ./dcapal-backend/migrations ./migrations
 # Create start script
-COPY ./dcapal-backend/docker/start.sh ./start.sh
+COPY ./dcapal-backend/scripts/start.sh ./start.sh
 RUN chmod +x ./start.sh
 CMD ["./start.sh"]
