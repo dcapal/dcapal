@@ -7,10 +7,7 @@ use std::{
     time::Duration,
 };
 
-use async_openai::{
-    types::{CreateImageRequestArgs, ImageSize, ResponseFormat},
-    Client,
-};
+use async_openai::Client;
 use axum::routing::put;
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo,

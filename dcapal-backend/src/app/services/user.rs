@@ -1,7 +1,7 @@
 use crate::error::Result;
 
 use crate::app::domain::entity::{InvestmentPreferences, User};
-use crate::ports::inbound::rest::user::{UpdateProfileRequest, UserInvestmentPreferencesDto};
+use crate::ports::inbound::rest::user::UpdateProfileRequest;
 use crate::ports::outbound::repository::user::UserRepository;
 use std::sync::Arc;
 use tracing::{error, info, warn};

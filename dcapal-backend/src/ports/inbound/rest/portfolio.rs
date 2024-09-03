@@ -1,13 +1,12 @@
-use crate::app::domain::entity::{Exchange, Portfolio, PortfolioHoldings};
+use crate::app::domain::entity::{Portfolio, PortfolioHoldings};
 use crate::app::infra::claim::Claims;
-use crate::ports::inbound::rest::user::{MessageResponse, UpdateProfileRequest};
+use crate::ports::inbound::rest::user::MessageResponse;
 use crate::AppContext;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use bigdecimal::BigDecimal;
-use garde::Validate;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use utoipa::ToSchema;
