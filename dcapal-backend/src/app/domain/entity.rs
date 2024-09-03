@@ -342,25 +342,6 @@ pub struct Portfolio {
     pub assets: Vec<PortfolioHoldings>,
 }
 
-pub enum Exchange {
-    Yahoo,
-}
-
-impl Exchange {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "Yahoo" => Exchange::Yahoo,
-            _ => Exchange::Yahoo,
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Exchange::Yahoo => "yahoo",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PortfolioHoldings {
     pub symbol: String,

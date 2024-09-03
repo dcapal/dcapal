@@ -77,23 +77,23 @@ pub struct UserInvestmentPreferencesDto {
     pub ai_enabled: bool,
 }
 
-impl Into<InvestmentPreferences> for UserInvestmentPreferencesDto {
-    fn into(self) -> InvestmentPreferences {
+impl From<UserInvestmentPreferencesDto> for InvestmentPreferences {
+    fn from(dto: UserInvestmentPreferencesDto) -> Self {
         InvestmentPreferences {
             risk_tolerance: crate::app::domain::entity::RiskTolerance::from_str(
-                &self.risk_tolerance,
+                &dto.risk_tolerance,
             )
             .unwrap(),
-            investment_horizon: self.investment_horizon,
+            investment_horizon: dto.investment_horizon,
             investment_mode: crate::app::domain::entity::InvestmentMode::from_str(
-                &self.investment_mode,
+                &dto.investment_mode,
             )
             .unwrap(),
             investment_goal: crate::app::domain::entity::InvestmentGoal::from_str(
-                &self.investment_goal,
+                &dto.investment_goal,
             )
             .unwrap(),
-            ai_enabled: self.ai_enabled,
+            ai_enabled: dto.ai_enabled,
         }
     }
 }

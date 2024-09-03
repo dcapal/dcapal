@@ -48,28 +48,28 @@ pub struct PortfolioHoldingsRequest {
     pub price: BigDecimal,
 }
 
-impl Into<Portfolio> for PortfolioRequest {
-    fn into(self) -> Portfolio {
+impl From<PortfolioRequest> for Portfolio {
+    fn from(req: PortfolioRequest) -> Self {
         Portfolio {
-            id: self.id,
-            name: self.name,
-            description: self.description,
-            currency: self.currency,
-            assets: self.assets.into_iter().map(|x| x.into()).collect(),
+            id: req.id,
+            name: req.name,
+            description: req.description,
+            currency: req.currency,
+            assets: req.assets.into_iter().map(|x| x.into()).collect(),
         }
     }
 }
 
-impl Into<PortfolioHoldings> for PortfolioHoldingsRequest {
-    fn into(self) -> PortfolioHoldings {
+impl From<PortfolioHoldingsRequest> for PortfolioHoldings {
+    fn from(req: PortfolioHoldingsRequest) -> Self {
         PortfolioHoldings {
-            symbol: self.symbol,
-            name: self.name,
-            quantity: self.quantity,
-            average_buy_price: self.average_buy_price,
-            weight: self.weight,
+            symbol: req.symbol,
+            name: req.name,
+            quantity: req.quantity,
+            average_buy_price: req.average_buy_price,
+            weight: req.weight,
             total: BigDecimal::from(0), //TODO: set the proper total
-            price: self.price,
+            price: req.price,
         }
     }
 }
