@@ -31,7 +31,7 @@ jobs:
           cargo clippy --version
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli --no-default-features --features native-tls,postgres
+        run: cargo install sqlx-cli --no-default-features --features native-tls,postgres,offline
 
       - name: Prepare sqlx
         run: |
