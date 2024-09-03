@@ -31,8 +31,6 @@ jobs:
           cargo clippy --version
 
       - name: Install sqlx-cli
-        env:
-          SQLX_OFFLINE: true
         run:
           cargo install sqlx-cli
           --version=${{ env.SQLX_VERSION }}
