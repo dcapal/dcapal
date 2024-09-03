@@ -219,7 +219,7 @@ jobs:
 
       - name: Migrate database
         run: |
-          ./scripts/start.sh
+          ./dcapal-backend/scripts/start.sh
 
       - name: Run dcapal-backend
         run: |
