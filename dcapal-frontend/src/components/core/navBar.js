@@ -138,7 +138,9 @@ export const NavBar = () => {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        user.user_metadata["name"] && setUser(user.user_metadata["name"]);
+        user.user_metadata["name"]
+          ? setUser(user.user_metadata["name"])
+          : setUser(user.email || user.user_metadata["email"]);
       } else {
         setUser(null);
       }

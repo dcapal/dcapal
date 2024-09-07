@@ -210,7 +210,7 @@ impl Expiring for Market {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct User {
-    pub name: String,
+    pub name: Option<String>,
     pub email: String,
     pub birth_date: Option<Date>,
 }

@@ -41,7 +41,7 @@ pub struct Claims {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserMetadataClaim {
     pub email: String,
-    pub full_name: String,
+    pub full_name: Option<String>,
 }
 
 impl Claims {

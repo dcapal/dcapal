@@ -19,17 +19,29 @@ export const Root = () => {
   const [session, setSession] = useState(null);
   const [config, setConfig] = useState(null);
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setConfig({
-        headers: { Authorization: `Bearer ${session.access_token}` },
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session) {
+          setSession(session);
+          setConfig({
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching session:", error);
+        // Handle the error appropriately, e.g., redirect to login page
       });
-    });
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+      if (session) {
+        setSession(session);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 

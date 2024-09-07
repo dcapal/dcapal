@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfileResponse {
-    pub name: String,
+    pub name: Option<String>,
     pub email: String,
     pub birth_date: String,
 }
@@ -32,6 +32,7 @@ impl From<User> for UserProfileResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct UserInvestmentPreferencesResponse {
     pub risk_tolerance: String,
     pub investment_horizon: i32,
@@ -64,6 +65,7 @@ pub struct UpdateProfileRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Validate, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct UserInvestmentPreferencesDto {
     #[garde(skip)]
     pub risk_tolerance: String,

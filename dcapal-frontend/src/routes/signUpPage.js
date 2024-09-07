@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
+import { useNavigate } from "react-router-dom";
 
 const containerStyle = {
   backgroundColor: "#F3F4F6", // light gray
@@ -44,6 +45,22 @@ const linkStyle = {
 
 // Media query styles
 export default function SignUpPage() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN") {
+          navigate("/");
+        }
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [navigate]);
+
   return (
     <div style={containerStyle}>
       <div className="grid md:grid-cols-2 w-full min-h-screen">
