@@ -190,6 +190,7 @@ export const AssetCard = ({
                     onChange={props.setAbp}
                     isValid={true}
                     min={0}
+                    isRequired={true}
                   />
                 </div>
               </div>

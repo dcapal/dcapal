@@ -110,8 +110,14 @@ export default function InvestmentSettings({ session, editMode = false }) {
         dataToSend,
         config
       );
-      setIsEditing(false);
-      fetchProfile(); // Refresh the data after updating
+
+      if (editMode) {
+        navigate("/"); // Redirect to homepage
+      } else {
+        setIsEditing(false);
+        fetchProfile(); // Refresh the data after updating
+      }
+
       toast({
         title: "Profile updated",
         status: "success",
@@ -169,7 +175,7 @@ export default function InvestmentSettings({ session, editMode = false }) {
             )}
             <div className="p-4 space-y-6">
               <div className="flex items-center space-x-4">
-                <Tooltip label="Choose between Standard mode for automated investing or Expert mode for more control">
+                <Tooltip label="Choose between Standard mode for guided investing or Expert mode for more control">
                   <label className="w-1/4 text-lg font-semibold">
                     Investment Mode
                   </label>
@@ -194,7 +200,7 @@ export default function InvestmentSettings({ session, editMode = false }) {
                 )}
               </div>
               <div className="flex items-center space-x-4">
-                <Tooltip label="Choose between Standard mode for automated investing or Expert mode for more control">
+                <Tooltip label="Select the duration over which you expect to achieve your financial or investment goals. This helps to assess the level of risk and suitable strategies for your plan.">
                   <label className="w-1/4 text-lg font-semibold">
                     Time Horizon
                   </label>
@@ -226,7 +232,7 @@ export default function InvestmentSettings({ session, editMode = false }) {
                 )}
               </div>
               <div className="flex items-center space-x-4">
-                <Tooltip label="Choose between Standard mode for automated investing or Expert mode for more control">
+                <Tooltip label="Indicate the level of risk you are comfortable taking with your investments. This helps to tailor strategies to your risk preferences, whether conservative, moderate, or aggressive.">
                   <label className="w-1/4 text-lg font-semibold">
                     Risk Tolerance
                   </label>
@@ -252,7 +258,7 @@ export default function InvestmentSettings({ session, editMode = false }) {
                 )}
               </div>
               <div className="flex items-center space-x-4">
-                <Tooltip label="Choose between Standard mode for automated investing or Expert mode for more control">
+                <Tooltip label="Specify the primary objective of your investment, such as capital Retirement, Education, Wealth Building or Other. This helps to align your strategy with your financial objectives.">
                   <label className="w-1/4 text-lg font-semibold">
                     Investment Goal
                   </label>
@@ -279,7 +285,7 @@ export default function InvestmentSettings({ session, editMode = false }) {
                 )}
               </div>
               <div className="flex items-center space-x-4">
-                <Tooltip label="Choose between Standard mode for automated investing or Expert mode for more control">
+                <Tooltip label="Enable this option to allow AI-powered tools to assist in optimizing your financial strategies and decision-making processes.">
                   <label className="w-1/4 text-lg font-semibold">AI*</label>
                 </Tooltip>
                 <FormControl display="flex" alignItems="center">

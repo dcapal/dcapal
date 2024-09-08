@@ -59,8 +59,8 @@ export default function HistoricalView({ session }) {
         `${DCAPAL_API}/v1/user/investment-preferences`,
         config
       );
-      setInvestmentMode(response.data.investment_mode || "standard");
-      console.log("Investment mode:", response.data.investment_mode);
+      setInvestmentMode(response.data.investmentMode || "Standard");
+      console.log("Investment mode:", response.data.investmentMode);
     } catch (error) {
       console.error("Error fetching investment mode:", error);
     }
