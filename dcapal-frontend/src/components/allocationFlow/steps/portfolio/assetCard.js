@@ -156,11 +156,11 @@ export const AssetCard = ({
               </div>
               <div className="w-28 ml-2">
                 <InputNumber
-                  textAlign={"text-left"}
+                  textAlign={"text-right"}
                   type={InputNumberType.DECIMAL}
-                  value={qty}
+                  value={targetWeight}
                   onChange={props.setTargetWeight}
-                  isValid={true}
+                  isValid={isValidTargetWeight}
                   min={0}
                   max={100}
                   step=".000001"

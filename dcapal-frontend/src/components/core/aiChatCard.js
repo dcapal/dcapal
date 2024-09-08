@@ -71,6 +71,15 @@ export function ChatCard(props) {
     return () => window.removeEventListener("resize", updateHeight);
   }, []);
 
+  const formatMessage = (text) => {
+    return text.split(/(\*\*.*?\*\*)/).map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={index}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
   return (
     <div
       ref={chatContainerRef}
@@ -92,7 +101,7 @@ export function ChatCard(props) {
                 msg.sender === "user" ? "bg-blue-100" : "bg-gray-100"
               }`}
             >
-              {msg.text}
+              {formatMessage(msg.text)}
             </span>
           </div>
         ))}
@@ -103,12 +112,14 @@ export function ChatCard(props) {
           <Button
             onClick={() => handleSendMessage("market-news")}
             className="w-full"
+            borderRadius="xl"
           >
             Market News
           </Button>
           <Button
             onClick={() => handleSendMessage("rebalance-portfolio")}
             className="w-full"
+            borderRadius="xl"
           >
             Rebalance Portfolio
           </Button>
