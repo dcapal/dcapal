@@ -15,7 +15,7 @@ hyper = { version = "1.4.1", features = ["full"] }
 deadpool-redis = { version = "0.16.0", features = ["serde"] }
 redis = { version = "0.26.1", features = ["tokio-comp"] }
 reqwest = { version = "0.12.7", features = ["gzip", "json"] }
-serde = "1.0.209"
+serde = "1.0.210"
 serde_json = "1.0.127"
 thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["full"] }
