@@ -113,7 +113,7 @@ export default function InvestmentSettings({ session, editMode = false }) {
 
       console.log("edit mode:", editMode); // Add this for debugging
       if (editMode) {
-        navigate("/investment-settings");
+        window.location.reload();
       } else {
         setIsEditing(false);
         fetchProfile(); // Refresh the data after updating
