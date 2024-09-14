@@ -194,6 +194,8 @@ jobs:
               priceProvider: kraken
               cwApiKey: CW_API_KEY
               ipApiKey: IP_API_KEY
+            auth:
+              jwtSecret: JWT_SECRET
 
             log:
               level: dcapal_backend=info,tower_http=debug
