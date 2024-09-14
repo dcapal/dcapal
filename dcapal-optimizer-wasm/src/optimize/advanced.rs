@@ -424,6 +424,7 @@ fn refresh_open_assets<'a>(
     assets: &'a mut HashMap<String, Asset>,
     budget_left: &Decimal,
 ) -> Vec<&'a mut Asset> {
+    #[allow(clippy::manual_inspect)]
     assets
         .values_mut()
         .filter(|a| {
