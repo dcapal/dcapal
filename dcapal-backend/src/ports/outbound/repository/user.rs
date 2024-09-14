@@ -30,7 +30,7 @@ impl UserRepository {
         .await?;
 
         Ok(Some(User {
-            name: user.name,
+            name: Some(user.name),
             email: user.email,
             birth_date: user.birth_date,
         }))
