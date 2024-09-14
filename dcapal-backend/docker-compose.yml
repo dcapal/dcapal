@@ -19,7 +19,7 @@ services:
       retries: 3
   postgres-db:
     image: "postgres:latest"
-    container_name: postgres-database
+    container_name: postgres-db
     restart: always
     networks:
       - dcapalnetwork

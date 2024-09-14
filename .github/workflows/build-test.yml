@@ -208,7 +208,7 @@ jobs:
               user: dcapal
               password: dcapal
             postgres:
-              hostname: 127.0.0.1
+              hostname: postgres-db
               port: 5432
               user: postgres
               password: postgres
