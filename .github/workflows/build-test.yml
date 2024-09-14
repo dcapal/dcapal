@@ -133,12 +133,6 @@ jobs:
           cd dcapal-frontend
           npm ci
 
-      - name: Add variables into .env.production file
-        run: |
-          cd dcapal-frontend
-          echo VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL_DEV }} >> .env.production
-          echo VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }} >> .env.production
-
       - name: Build
         run: |
           cd dcapal-frontend
