@@ -19,7 +19,7 @@ impl Ip2LocationService {
     }
 
     pub fn lookup(&self, ip: IpAddr) -> Option<GeoData> {
-        let mut db = self.db.lock();
+        let db = self.db.lock();
         let record = db.ip_lookup(ip);
 
         match record {

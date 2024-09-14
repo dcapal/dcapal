@@ -39,7 +39,7 @@ impl RedisMarket for Market {
     async fn store(&self, conn: &mut impl redis::AsyncCommands) -> Result<bool> {
         let dto = MarketDto::from(self.clone());
         let json = serde_json::to_string(&dto).unwrap();
-        conn.hset(MARKET_KEY, &self.id, &json).await?;
+        let _: () = conn.hset(MARKET_KEY, &self.id, &json).await?;
 
         debug!("Successfully stored '{} {}': {}", MARKET_KEY, self.id, json);
         Ok(true)

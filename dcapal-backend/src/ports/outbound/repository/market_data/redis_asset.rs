@@ -29,7 +29,7 @@ pub trait RedisAsset {
 impl RedisAsset for Asset {
     async fn store(&self, conn: &mut impl redis::AsyncCommands) -> Result<bool> {
         let json = serde_json::to_string(self).unwrap();
-        redis::pipe()
+        let _: () = redis::pipe()
             .atomic()
             .hset(ASSET_KEY, self.id(), &json)
             .zadd(self.kind().as_index(), self.id(), 0)
