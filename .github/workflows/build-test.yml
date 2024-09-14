@@ -133,6 +133,13 @@ jobs:
           cd dcapal-frontend
           npm ci
 
+      - name: Create .env file
+        run: |
+          cat > dcapal-frontend/.env << EOF
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL_DEV }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+          EOF
+
       - name: Build
         run: |
           cd dcapal-frontend
