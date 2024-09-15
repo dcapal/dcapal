@@ -27,9 +27,19 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
-      - POSTGRES_HOST=postgres-db
     ports:
       - "5432:5432"
+  pgadmin:
+      image: dpage/pgadmin4
+      container_name: pgadmin
+      restart: always
+      networks:
+        - dcapalnetwork
+      ports:
+        - "5020:80"
+      environment:
+        PGADMIN_DEFAULT_EMAIL: dcapal@email.com
+        PGADMIN_DEFAULT_PASSWORD: dcapal-user
 
 networks:
   dcapalnetwork:
