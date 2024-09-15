@@ -30,7 +30,7 @@ impl UserRepository {
         .await?;
 
         Ok(Some(User {
-            name: Option::from(user.name),
+            name: user.name,
             email: user.email,
             birth_date: user.birth_date,
         }))
