@@ -28,6 +28,8 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
       - POSTGRES_HOST=postgres-db
+      - DATABASE_URL=postgres://postgres:postgres@postgres-db/postgres
+      - SQLX_OFFLINE=true
     ports:
       - "5432:5432"
     healthcheck:
@@ -35,7 +37,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: ["postgres", "-c", "listen_addresses=*"]
   pgadmin:
       image: dpage/pgadmin4
       container_name: pgadmin

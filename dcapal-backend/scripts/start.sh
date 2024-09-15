@@ -8,6 +8,7 @@ SUPERUSER_PWD="${SUPERUSER_PWD:=postgres}"
 APP_USER="${APP_USER:=postgres}"
 APP_USER_PWD="${APP_USER_PWD:=postgres}"
 APP_DB_NAME="${APP_DB_NAME:=postgres}"
+DB_HOST="${DB_HOST:=postgres-db}"
 
 # Wait for the database to be ready
 until PGPASSWORD=$POSTGRES_PASSWORD psql -h "$DB_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c '\q'; do
@@ -18,7 +19,7 @@ done
 echo >&2 "Postgres is up - executing command"
 
 # Create the application database
-DATABASE_URL=postgres://${APP_USER}:${APP_USER_PWD}@localhost:${DB_PORT}/${APP_DB_NAME}
+DATABASE_URL=postgres://${APP_USER}:${APP_USER_PWD}@postgres-db:${DB_PORT}/${APP_DB_NAME}
 export DATABASE_URL
 # Run migrations
 sqlx migrate run
