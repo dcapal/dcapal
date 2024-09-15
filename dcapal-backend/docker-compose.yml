@@ -30,6 +30,8 @@ services:
       - POSTGRES_HOST=postgres-db
       - DATABASE_URL=postgres://postgres:postgres@postgres-db/postgres
       - SQLX_OFFLINE=true
+    volumes:
+      - ./config/postgres/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
     healthcheck:
