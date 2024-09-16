@@ -30,7 +30,7 @@ jobs:
           wasm-pack build --release dcapal-optimizer-wasm
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -47,7 +47,7 @@ jobs:
           cache-dependency-path: dcapal-frontend/package-lock.json
 
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -57,13 +57,24 @@ jobs:
           cd dcapal-frontend
           npm ci
 
+      - name: Configure .env.production
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+        run: |
+          cat > dcapal-frontend/.env.production << EOF
+          REACT_APP_ENABLE_COOKIE_BUTTON=0
+          VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+          VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+          EOF
+
       - name: Build
         run: |
           cd dcapal-frontend
           npm run build
 
       - name: Archive dcapal-frontend
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dcapal-frontend-dist
           path: dcapal-frontend/dist
@@ -78,7 +89,7 @@ jobs:
           node-version: 20
 
       - name: Download dcapal-frontend
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dcapal-frontend-dist
           path: dcapal-frontend/dist
@@ -91,7 +102,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-frontend/dist
-          target: ${{ secrets.WEB_DIR }}
+          target: ${{ secrets.WEB_DIR_DEV }}
           strip_components: 2
 
       - name: Download IP2Location database
@@ -111,13 +122,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-backend/data/dcapal
-          target: ${{ secrets.DCAPAL_DIR }}
+          target: ${{ secrets.DCAPAL_DIR_DEV }}
           strip_components: 1
 
       - name: Unpack IP2Location database
         uses: appleboy/ssh-action@master
         env:
-          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR }}
+          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR_DEV }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
@@ -135,7 +146,7 @@ jobs:
 
       - name: Configure docker-compose.yml
         env:
-          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT_DEV }}
         run: |
           cat > dcapal-backend/docker-compose.yml << EOF
           version: "3.9"
@@ -164,14 +175,15 @@ jobs:
 
       - name: Configure docker-compose.prod.yml
         env:
-          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
-          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
+          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT_DEV }}
+          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT_DEV }}
         run: |
           cat > dcapal-backend/docker/docker-compose.prod.yml << EOF
           version: "3.9"
           services:
             dcapal:
-              image: leonardoarcari/dcapal:latest
+              image: leonardoarcari/dcapal:dev
+              env_file: dcapal.env
               restart: always
               ports:
                 - ${DCAPAL_API_PORT}:8080
@@ -209,16 +221,16 @@ jobs:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
           DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
           DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
-          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
-          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT_DEV }}
+          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT_DEV }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_DEV }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER_DEV }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
           app:
@@ -261,11 +273,11 @@ jobs:
 
       - name: Configure dotenv
         env:
-          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER_DEV }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/dcapal.env << EOF
           DB_HOST: ${POSTGRES_HOSTNAME}
@@ -283,13 +295,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-backend/config,dcapal-backend/docker/docker-compose.prod.yml,dcapal-backend/docker-compose.yml,dcapal-backend/dcapal.yml,dcapal-backend/dcapal.env
-          target: ${{ secrets.DCAPAL_DIR }}
+          target: ${{ secrets.DCAPAL_DIR_DEV }}
           strip_components: 1
 
       - name: Deploy dcapal-backend
         uses: appleboy/ssh-action@master
         env:
-          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR }}
+          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR_DEV }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
