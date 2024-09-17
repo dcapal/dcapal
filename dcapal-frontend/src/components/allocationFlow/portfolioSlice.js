@@ -258,6 +258,10 @@ export const portfolioSlice = createSlice({
           baseCcy: action.payload.baseCcy,
           price: roundPrice(action.payload.price) || 0,
           provider: action.payload.provider,
+          averageBuyPrice:
+            action.payload.averageBuyPrice ||
+            roundPrice(action.payload.price) ||
+            0,
           qty: 0,
           amount: 0,
           weight: 0,
@@ -346,6 +350,18 @@ export const portfolioSlice = createSlice({
         [action.payload.symbol]: {
           ...pfolio.assets[action.payload.symbol],
           targetWeight: action.payload.weight || 0,
+        },
+      };
+    },
+    setAbp: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      pfolio.assets = {
+        ...pfolio.assets,
+        [action.payload.symbol]: {
+          ...pfolio.assets[action.payload.symbol],
+          abp: action.payload.abp || 0,
         },
       };
     },
@@ -557,6 +573,7 @@ export const {
   setQty,
   setPrice,
   setTargetWeight,
+  setAbp,
   setRefreshTime,
   setQuoteCurrency,
   setBudget,

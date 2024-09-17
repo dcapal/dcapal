@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT \n                    symbol, \n                    quantity,\n                    average_buy_price,\n                    name,\n                    price,\n                    weight,\n                    total\n                FROM \"portfolio_holdings\"\n                WHERE portfolio_id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "symbol",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "quantity",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "average_buy_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "weight",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "total",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a1c885d5599506e3645cc3a4f70ae7670ecc75613044329a4f4fddbc15736b8e"
+}

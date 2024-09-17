@@ -23,9 +23,11 @@
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {
+    "@chakra-ui/icons": "^2.1.1",
     "@chakra-ui/react": "^2.10.4",
-    "@emotion/react": "^11.14.0",
+    "@emotion/react": "^11.14.3",
     "@emotion/styled": "^11.14.0",
+    "@clerk/clerk-react": "^5.2.3",
     "@react-hook/media-query": "^1.1.1",
     "@reduxjs/toolkit": "^2.5.0",
     "axios": "^1.7.9",
@@ -49,7 +51,13 @@
     "redux-persist": "^6.0.0",
     "redux-persist-expire": "^1.1.1",
     "threads": "^1.7.0",
-    "vanilla-cookieconsent": "^3.0.1"
+    "vanilla-cookieconsent": "^3.0.1",
+    "@heroicons/react": "^2.1.5",
+    "@nivo/core": "^0.87.0",
+    "@supabase/auth-ui-react": "^0.4.7",
+    "@supabase/auth-ui-shared": "^0.1.8",
+    "@supabase/supabase-js": "^2.44.2",
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",

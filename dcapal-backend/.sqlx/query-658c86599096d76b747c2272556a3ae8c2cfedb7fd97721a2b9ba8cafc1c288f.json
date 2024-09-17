@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select \n                name, \n                email,\n                birth_date \n               from \"users\" where id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "birth_date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "658c86599096d76b747c2272556a3ae8c2cfedb7fd97721a2b9ba8cafc1c288f"
+}
