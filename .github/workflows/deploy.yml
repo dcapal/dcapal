@@ -211,8 +211,14 @@ jobs:
           DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
           DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
           DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
           app:
@@ -221,6 +227,8 @@ jobs:
               cwApiKey: ${DCAPAL_CW_API_KEY}
               ipApiKey: ${DCAPAL_IP_API_KEY}
               cmcApiKey: ${DCAPAL_CMC_API_KEY}
+            auth:
+              jwtSecret: ${JWT_SECRET}
 
             services:
               ip:
@@ -243,6 +251,28 @@ jobs:
               port: 6379
               user: ${REDIS_USER}
               password: ${REDIS_PASSWORD}
+            postgres:
+              hostname: ${POSTGRES_HOSTNAME}
+              port: ${POSTGRES_PORT}
+              user: ${POSTGRES_USER}
+              password: ${POSTGRES_PASSWORD}
+              database: ${POSTGRES_DATABASE}
+          EOF
+
+      - name: Configure dotenv
+        env:
+          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+        run: |
+          cat > dcapal-backend/dcapal.env << EOF
+          DB_HOST: ${POSTGRES_HOSTNAME}
+          DB_PORT: ${POSTGRES_PORT}
+          APP_USER: ${POSTGRES_USER}
+          APP_USER_PWD: ${POSTGRES_PASSWORD}
+          APP_DB_NAME: ${POSTGRES_DATABASE}
           EOF
 
       - name: Deploy dcapal-backend config
@@ -252,7 +282,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
-          source: dcapal-backend/config,dcapal-backend/docker/docker-compose.prod.yml,dcapal-backend/docker-compose.yml,dcapal-backend/dcapal.yml
+          source: dcapal-backend/config,dcapal-backend/docker/docker-compose.prod.yml,dcapal-backend/docker-compose.yml,dcapal-backend/dcapal.yml,dcapal-backend/dcapal.env
           target: ${{ secrets.DCAPAL_DIR }}
           strip_components: 1
 

@@ -2,13 +2,6 @@
 
 use std::time::Duration;
 
-use crate::app::domain::entity::AssetKind;
-use crate::app::infra::utils::Expiring;
-use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
-use crate::error::{DcaError, Result};
-use crate::ports::outbound::repository::ImportedPortfolio;
-use crate::{infra::stats, AppContext};
-
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -18,6 +11,18 @@ use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
+
+use crate::app::domain::entity::AssetKind;
+use crate::app::infra::utils::Expiring;
+use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
+use crate::error::{DcaError, Result};
+use crate::ports::outbound::repository::ImportedPortfolio;
+use crate::{infra::stats, AppContext};
+
+pub mod ai;
+mod auth;
+pub mod portfolio;
+pub mod user;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../docs/schema/portfolio/v1/schema.json");
@@ -133,6 +138,6 @@ pub async fn get_imported_portfolio(
 
     match repo.find_portfolio(&id).await? {
         Some(portfolio) => Ok(Json(portfolio).into_response()),
-        None => Ok((StatusCode::NOT_FOUND).into_response()),
+        None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
 }

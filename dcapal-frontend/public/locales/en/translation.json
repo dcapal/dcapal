@@ -16,9 +16,11 @@
     },
     "navbar": {
       "myPortfolios": "My portfolios",
+      "dashboard": "Dashboard",
       "about": "About",
       "docs": "Docs",
-      "exportPortfolio": "Export Portfolio"
+      "exportPortfolio": "Export Portfolio",
+      "login": "Sign in"
     },
     "currencyStep": {
       "chooseCurrency": "Choose your portfolio currency"
@@ -46,6 +48,7 @@
       "budgetAllocated": "Hang on! We are allocating your budget",
       "allocationReady": "Great Success! Your allocation is ready",
       "backToPortfolio": "Back to Portfolio",
+      "savePortfolio": "Save Portfolio",
       "opsBadHappened": "Oops! Something bad happened.",
       "reviewPortfolio": "Please review your portfolio."
     },
@@ -54,7 +57,8 @@
       "amount": "Amount",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
-      "transactionFees": "Transaction fees"
+      "transactionFees": "Transaction fees",
+      "averageBuyPrice": "ABP"
     },
     "portfoliosStep": {
       "myPortfolios": "My Portfolios",

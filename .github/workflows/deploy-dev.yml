@@ -1,0 +1,318 @@
+name: Deploy
+
+on: workflow_dispatch
+
+env:
+  CARGO_TERM_COLOR: always
+  DOCKER_REPO: leonardoarcari/dcapal
+  IP2LOCATION_FILENAME: IP2LOCATION-LITE-DB5.IPV6.BIN
+
+jobs:
+  optimizer-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Toolchain info
+        run: |
+          cargo --version --verbose
+          rustc --version
+
+      - name: Build
+        run: |
+          wasm-pack build --release dcapal-optimizer-wasm
+
+      - name: Archive dcapal-optimizer-wasm pkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+  frontend-build:
+    runs-on: ubuntu-22.04
+    needs: optimizer-build
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: dcapal-frontend/package-lock.json
+
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v4
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+      - name: Install dependencies
+        run: |
+          cd dcapal-frontend
+          npm ci
+
+      - name: Configure .env.production
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+        run: |
+          cat > dcapal-frontend/.env.production << EOF
+          REACT_APP_ENABLE_COOKIE_BUTTON=0
+          VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+          VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+          EOF
+
+      - name: Build
+        run: |
+          cd dcapal-frontend
+          npm run build
+
+      - name: Archive dcapal-frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: dcapal-frontend-dist
+          path: dcapal-frontend/dist
+
+  deploy:
+    runs-on: ubuntu-22.04
+    needs: frontend-build
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Download dcapal-frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: dcapal-frontend-dist
+          path: dcapal-frontend/dist
+
+      - name: Deploy dcapal-frontend
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          source: dcapal-frontend/dist
+          target: ${{ secrets.WEB_DIR_DEV }}
+          strip_components: 2
+
+      - name: Download IP2Location database
+        uses: cloudflare/wrangler-action@v3
+        with:
+          packageManager: "npm"
+          apiToken: ${{ secrets.CF_R2_API_TOKEN }}
+          accountId: ${{ secrets.CF_R2_ACCOUNT_ID }}
+          workingDirectory: dcapal-backend/data/dcapal
+          command: r2 object get ip2location-db/${{ env.IP2LOCATION_FILENAME }}.zip
+
+      - name: Deploy IP2Location database
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          source: dcapal-backend/data/dcapal
+          target: ${{ secrets.DCAPAL_DIR_DEV }}
+          strip_components: 1
+
+      - name: Unpack IP2Location database
+        uses: appleboy/ssh-action@master
+        env:
+          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR_DEV }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: DCAPAL_DIR,IP2LOCATION_FILENAME
+          script: |
+            cd ${DCAPAL_DIR}/data/dcapal
+            ls -la
+            unzip ${IP2LOCATION_FILENAME}.zip -d ip2location
+            mv ip2location/${IP2LOCATION_FILENAME} .
+            rm -rf ip2location
+            rm ${IP2LOCATION_FILENAME}.zip
+            ls -la
+
+      - name: Configure docker-compose.yml
+        env:
+          REDIS_PORT: ${{ secrets.REDIS_PORT_DEV }}
+        run: |
+          cat > dcapal-backend/docker-compose.yml << EOF
+          version: "3.9"
+          services:
+            redis:
+              image: redis/redis-stack-server
+              container_name: redis
+              restart: always
+              ports:
+                - ${REDIS_PORT}:6379
+              networks:
+                - dcapalnetwork
+              volumes:
+                - ./config/redis/redis-stack.conf:/redis-stack.conf
+                - ./config/redis/users.acl:/etc/redis/users.acl
+                - ./data/redis/:/data
+              healthcheck:
+                test: redis-cli --raw ping
+                interval: 10s
+                timeout: 10s
+                retries: 3
+
+          networks:
+            dcapalnetwork:
+          EOF
+
+      - name: Configure docker-compose.prod.yml
+        env:
+          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT_DEV }}
+          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT_DEV }}
+        run: |
+          cat > dcapal-backend/docker/docker-compose.prod.yml << EOF
+          version: "3.9"
+          services:
+            dcapal:
+              image: leonardoarcari/dcapal:dev
+              env_file: dcapal.env
+              restart: always
+              ports:
+                - ${DCAPAL_API_PORT}:8080
+                - ${DCAPAL_METRICS_PORT}:9000
+              networks:
+                - dcapalnetwork
+              volumes:
+                - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
+                - ./data/dcapal:/var/dcapal/dcapal-backend/data
+              depends_on:
+                redis:
+                  condition: service_healthy
+              healthcheck:
+                test: curl --fail http://localhost:8080 || exit 1
+                interval: 10s
+                timeout: 10s
+                retries: 5
+          EOF
+
+      - name: Configure Redis ACL
+        env:
+          REDIS_USER: ${{ secrets.REDIS_USER }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_ADMIN: ${{ secrets.REDIS_ADMIN }}
+          REDIS_ADMIN_PASSWORD: ${{ secrets.REDIS_ADMIN_PASSWORD }}
+        run: |
+          cat > dcapal-backend/config/redis/users.acl << EOF
+          user ${REDIS_USER} +@all -@dangerous ~* on >${REDIS_PASSWORD}
+          user ${REDIS_ADMIN} ~* &* +@all on >${REDIS_ADMIN_PASSWORD}
+          user default off
+          EOF
+
+      - name: Configure dcapal.yml
+        env:
+          DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
+          DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
+          DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
+          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT_DEV }}
+          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT_DEV }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_DEV }}
+          REDIS_USER: ${{ secrets.REDIS_USER }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER_DEV }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
+        run: |
+          cat > dcapal-backend/dcapal.yml << EOF
+          app:
+            providers:
+              priceProvider: kraken
+              cwApiKey: ${DCAPAL_CW_API_KEY}
+              ipApiKey: ${DCAPAL_IP_API_KEY}
+              cmcApiKey: ${DCAPAL_CMC_API_KEY}
+            auth:
+              jwtSecret: ${JWT_SECRET}
+
+            services:
+              ip:
+                dbPath: data/${IP2LOCATION_FILENAME}
+
+            log:
+              level: dcapal_backend=info,tower_http=debug
+              file: data/dcapal.log
+              enableStdout: false
+
+          server:
+            web:
+              hostname: 0.0.0.0
+              port: ${DCAPAL_API_PORT}
+            metrics:
+              hostname: 0.0.0.0
+              port: ${DCAPAL_METRICS_PORT}
+            redis:
+              hostname: redis
+              port: 6379
+              user: ${REDIS_USER}
+              password: ${REDIS_PASSWORD}
+            postgres:
+              hostname: ${POSTGRES_HOSTNAME}
+              port: ${POSTGRES_PORT}
+              user: ${POSTGRES_USER}
+              password: ${POSTGRES_PASSWORD}
+              database: ${POSTGRES_DATABASE}
+          EOF
+
+      - name: Configure dotenv
+        env:
+          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER_DEV }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
+        run: |
+          cat > dcapal-backend/dcapal.env << EOF
+          DB_HOST: ${POSTGRES_HOSTNAME}
+          DB_PORT: ${POSTGRES_PORT}
+          APP_USER: ${POSTGRES_USER}
+          APP_USER_PWD: ${POSTGRES_PASSWORD}
+          APP_DB_NAME: ${POSTGRES_DATABASE}
+          EOF
+
+      - name: Deploy dcapal-backend config
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          source: dcapal-backend/config,dcapal-backend/docker/docker-compose.prod.yml,dcapal-backend/docker-compose.yml,dcapal-backend/dcapal.yml,dcapal-backend/dcapal.env
+          target: ${{ secrets.DCAPAL_DIR_DEV }}
+          strip_components: 1
+
+      - name: Deploy dcapal-backend
+        uses: appleboy/ssh-action@master
+        env:
+          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR_DEV }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: DCAPAL_DIR
+          script: |
+            cd ${DCAPAL_DIR}
+            ls -la
+            mkdir -p ./data/dcapal
+            touch ./data/dcapal/dcapal.log
+            docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml pull
+            docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml down
+            docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml up -d

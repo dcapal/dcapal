@@ -12,8 +12,16 @@ services:
     volumes:
       - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
       - ./data/dcapal:/var/dcapal/dcapal-backend/data/dcapal
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres-db/postgres
+      - SQLX_OFFLINE=true
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     depends_on:
       redis:
+        condition: service_healthy
+      postgres-db:
         condition: service_healthy
     healthcheck:
       test: |

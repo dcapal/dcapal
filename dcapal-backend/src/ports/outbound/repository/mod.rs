@@ -1,8 +1,5 @@
 //! The [`repository`](self) module contains interfaces to persistent storage services, like Redis.
 
-pub mod dto;
-pub mod market_data;
-
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -11,6 +8,12 @@ use redis::AsyncCommands;
 use uuid::Uuid;
 
 use crate::{app::services::ip2location::GeoData, error::Result, DateTime};
+
+pub mod ai;
+pub mod dto;
+pub mod market_data;
+pub mod portfolio;
+pub mod user;
 
 const REDIS_BASE: &str = "dcapal:be";
 
@@ -43,7 +46,7 @@ impl MiscRepository {
         let mut redis = self.redis.get().await?;
 
         let ts = ts.timestamp();
-        redis.hset(Self::ENTITY, Self::CW_LAST_FETCHED, ts).await?;
+        let _: () = redis.hset(Self::ENTITY, Self::CW_LAST_FETCHED, ts).await?;
 
         Ok(())
     }
@@ -147,7 +150,7 @@ impl ImportedRepository {
         let key = Self::redis_imported_key(id.simple());
         let value = serde_json::to_string(&pfolio).unwrap();
 
-        redis.set_ex(&key, value, 60).await?;
+        let _: () = redis.set_ex(&key, value, 60).await?;
 
         let expires_at: i64 = redis::cmd("EXPIRETIME")
             .arg(&key)

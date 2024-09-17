@@ -2,13 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [ "master", "rc/**" ]
+    branches: [ "master", "dev", "rc/**" ]
   pull_request:
-    branches: [ "master", "rc/**" ]
+    branches: [ "master", "dev", "rc/**" ]
 
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
+  SQLX_VERSION: 0.8.0
+  SQLX_FEATURES: "rustls,postgres"
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
 
 jobs:
   backend-build-test:
@@ -27,13 +30,25 @@ jobs:
           rustc --version
           cargo clippy --version
 
+      - name: Install sqlx-cli
+        run:
+          cargo install sqlx-cli
+          --version=${{ env.SQLX_VERSION }}
+          --features ${{ env.SQLX_FEATURES }}
+          --no-default-features
+          --locked
+
       - name: Lint
+        env:
+          SQLX_OFFLINE: true
         run: |
           cd dcapal-backend
           cargo fmt --all -- --check
           cargo clippy -- -D warnings
 
       - name: Build and Test
+        env:
+          SQLX_OFFLINE: true
         run: |
           cd dcapal-backend
           RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
@@ -173,6 +188,8 @@ jobs:
               priceProvider: kraken
               cwApiKey: CW_API_KEY
               ipApiKey: IP_API_KEY
+            auth:
+              jwtSecret: JWT_SECRET
 
             log:
               level: dcapal_backend=info,tower_http=debug
@@ -191,6 +208,12 @@ jobs:
               port: 6379
               user: dcapal
               password: dcapal
+            postgres:
+              hostname: postgres-db
+              port: 5432
+              user: postgres
+              password: postgres
+              database: postgres
           EOF
 
       - name: Use local registry image
@@ -204,11 +227,15 @@ jobs:
 
       - name: Run dcapal-backend
         run: |
-          cd dcapal-backend && \
-          docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
-          up --no-build --wait
+          cd dcapal-backend
+          if ! docker compose -f docker-compose.yml \
+                              -f ./docker/docker-compose.local.yml \
+                              -f docker-compose.override.yml \
+                              up --no-build --wait; then
+            echo "Docker Compose failed. Printing logs:"
+            docker compose logs
+            exit 1
+          fi
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v3

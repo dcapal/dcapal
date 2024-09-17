@@ -13,6 +13,9 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
+import { api } from "@app/api";
+import { DCAPAL_API, supabase } from "@app/config";
+import { useToast } from "@chakra-ui/react";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -31,6 +34,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
     targetWeight: a.targetWeight,
     fees: a.fees ? a.fees : pfolioFees,
     theoAlloc: null,
+    averageBuyPrice: a.abp,
   }));
 
   if (!solution?.amounts) return cards;
@@ -76,6 +80,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
       targetWeight: 0,
       fees: null,
       theo_alloc: null,
+      averageBuyPrice: 0,
     });
   }
 
@@ -133,12 +138,15 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const dispatch = useDispatch();
+  const toast = useToast();
 
   const { t } = useTranslation();
   const budget = useSelector((state) => currentPortfolio(state).budget);
   const assets = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const fees = useSelector((state) => currentPortfolio(state).fees);
+  const pfname = useSelector((state) => currentPortfolio(state).name);
+  const pfid = useSelector((state) => currentPortfolio(state).id);
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
@@ -197,6 +205,85 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
     solve();
   }, []);
 
+  const [session, setSession] = useState(null);
+  const [config, setConfig] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setConfig({
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const assetsArray = useSelector((state) =>
+    Object.values(currentPortfolio(state).assets)
+  );
+
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    if (cards.length > 0) {
+      setUserData({
+        id: pfid,
+        name: pfname,
+        description: "optional",
+        currency: quoteCcy,
+        assets: cards
+          .filter((card) => card.name !== UNALLOCATED_CASH)
+          .map((a) => ({
+            symbol: a.symbol,
+            name: a.name,
+            exchange: a.symbol,
+            dataSource: a.provider,
+            currency: a.currency,
+            quantity: roundAmount(a.qty),
+            price: roundAmount(a.price),
+            averageBuyPrice: roundAmount(a.averageBuyPrice),
+            weight: roundAmount(a.weight),
+          })),
+      });
+    }
+  }, [cards, pfid, pfname, quoteCcy]);
+
+  const onClickSavePortfolio = async () => {
+    if (!userData) {
+      toast({
+        title: "Error",
+        description: "Portfolio data is not ready yet",
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      await api.post(`${DCAPAL_API}/v1/user/portfolios`, userData, config);
+      toast({
+        title: "Portfolio updated",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: "Error updating the portfolio",
+        description: error.message,
+        status: "error",
+        duration: 2000,
+        isClosable: true,
+      });
+    }
+  };
+
   const onClickGoBack = () => {
     dispatch(clearBudget({}));
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
@@ -237,6 +324,13 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
               />
             ))}
           </div>
+          <span
+            className="mt-6 font-medium underline cursor-pointer"
+            onClick={onClickSavePortfolio}
+          >
+            {t("endStep.savePortfolio")}
+          </span>
+
           <span
             className="mt-6 font-medium underline cursor-pointer"
             onClick={onClickGoBack}
