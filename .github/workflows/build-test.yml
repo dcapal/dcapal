@@ -90,7 +90,7 @@ jobs:
           wasm-pack build
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -124,7 +124,7 @@ jobs:
           cache-dependency-path: dcapal-frontend/package-lock.json
 
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -238,7 +238,7 @@ jobs:
           fi
 
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -260,7 +260,7 @@ jobs:
                          -f docker-compose.override.yml \
           down
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
