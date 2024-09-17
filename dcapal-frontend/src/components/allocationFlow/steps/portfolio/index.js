@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
 import toast from "react-hot-toast";
@@ -11,6 +11,7 @@ import {
   addAsset,
   currentPortfolio,
   selectPortfolio,
+  setAbp,
   setPrice,
   setQty,
   setRefreshTime,
@@ -188,6 +189,15 @@ export const PortfolioStep = ({ ...props }) => {
             );
           };
 
+          const setInputAverageBuyPrice = (abp) => {
+            dispatch(
+              setAbp({
+                symbol: a.symbol,
+                abp: abp,
+              })
+            );
+          };
+
           return (
             <AssetCard
               key={a.symbol}
@@ -197,6 +207,8 @@ export const PortfolioStep = ({ ...props }) => {
               price={a.price}
               qty={a.qty}
               setQty={setAssetQty}
+              abp={a.abp}
+              setAbp={setInputAverageBuyPrice}
               weight={a.weight}
               targetWeight={a.targetWeight}
               setTargetWeight={setAssetTargetWeight}

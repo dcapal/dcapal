@@ -15,6 +15,16 @@ pub struct ProblemOptions {
     pub assets: HashMap<String, ProblemAsset>,
 }
 
+pub struct AverageBuyPriceProblem {
+    pub(crate) options: AverageBuyPriceProblemOptions,
+}
+
+#[derive(Debug, Clone)]
+pub struct AverageBuyPriceProblemOptions {
+    pub assets: HashMap<String, AverageBuyPriceAsset>,
+    pub investment_amount: Decimal,
+}
+
 #[derive(Debug, Clone)]
 pub struct ProblemAsset {
     pub symbol: String,
@@ -32,6 +42,12 @@ pub struct Solution {
 }
 
 #[derive(Debug, Clone)]
+pub struct AverageBuyPriceSolution {
+    pub assets: HashMap<String, AverageBuyPriceAsset>,
+    pub amount_to_invest: Decimal,
+}
+
+#[derive(Debug, Clone)]
 pub struct Asset {
     pub symbol: String,
     pub price: Decimal,
@@ -44,6 +60,14 @@ pub struct Asset {
     pub shares: Decimal,
     pub amount: Decimal,
     pub weight: Decimal,
+}
+
+#[derive(Debug, Clone)]
+pub struct AverageBuyPriceAsset {
+    pub symbol: String,
+    pub price: Decimal,
+    pub target_weight: Decimal,
+    pub abp: Decimal,
 }
 
 impl Asset {
@@ -88,6 +112,25 @@ impl Asset {
     }
 }
 
+impl AverageBuyPriceAsset {
+    pub fn new(asset: AverageBuyPriceAsset) -> Self {
+        let AverageBuyPriceAsset {
+            symbol,
+            price,
+            target_weight,
+            abp,
+            ..
+        } = asset;
+
+        Self {
+            symbol,
+            price,
+            target_weight,
+            abp,
+        }
+    }
+}
+
 impl Solution {
     pub fn new(options: ProblemOptions) -> Self {
         let pfolio_amount = options.current_pfolio_amount;
@@ -106,6 +149,19 @@ impl Solution {
     }
 }
 
+impl AverageBuyPriceSolution {
+    pub fn new(options: AverageBuyPriceProblemOptions) -> Self {
+        Self {
+            assets: options
+                .assets
+                .into_iter()
+                .map(|(aid, asset)| (aid, AverageBuyPriceAsset::new(asset)))
+                .collect::<HashMap<_, _>>(),
+            amount_to_invest: options.investment_amount,
+        }
+    }
+}
+
 impl Problem {
     pub fn new(options: ProblemOptions) -> Self {
         Self { options }
@@ -117,6 +173,51 @@ impl Problem {
         let assets = solution.assets.values_mut().collect::<Vec<_>>();
 
         calculate_allocation_amount(assets)
+    }
+}
+
+impl AverageBuyPriceProblem {
+    pub fn new(options: AverageBuyPriceProblemOptions) -> Self {
+        Self { options }
+    }
+
+    pub fn suggest_invest_amount(&self) -> Decimal {
+        let mut solution = AverageBuyPriceSolution::new(self.options.clone());
+
+        let assets = solution.assets.values_mut().collect::<Vec<_>>();
+        let investment_amount_requested = self.options.investment_amount;
+
+        calculate_suggestion_amount(assets, investment_amount_requested)
+    }
+}
+
+pub fn calculate_suggestion_amount(
+    assets: Vec<&mut AverageBuyPriceAsset>,
+    investment_amount_requested: Decimal,
+) -> Decimal {
+    let weighted_average_buy_price = assets.iter().fold(Decimal::ZERO, |acc, asset| {
+        let term =
+            ((asset.abp - asset.price) / asset.price) * Decimal::from(100) * asset.target_weight;
+        acc + term
+    });
+
+    match weighted_average_buy_price {
+        _125_percent
+            if weighted_average_buy_price <= Decimal::from(-10)
+                && weighted_average_buy_price >= Decimal::from(-15) =>
+        {
+            investment_amount_requested * Decimal::new(125, 2)
+        }
+        _150_percent
+            if weighted_average_buy_price <= Decimal::from(-15)
+                && weighted_average_buy_price >= Decimal::from(-20) =>
+        {
+            investment_amount_requested * Decimal::new(150, 2)
+        }
+        _175_percent if weighted_average_buy_price <= Decimal::from(-20) => {
+            investment_amount_requested * Decimal::new(175, 2)
+        }
+        _ => investment_amount_requested,
     }
 }
 
@@ -152,7 +253,10 @@ mod tests {
 
     use rust_decimal_macros::dec;
 
-    use crate::optimize::suggestions::{Problem, ProblemAsset, ProblemOptions};
+    use crate::optimize::suggestions::{
+        AverageBuyPriceAsset, AverageBuyPriceProblem, AverageBuyPriceProblemOptions, Problem,
+        ProblemAsset, ProblemOptions,
+    };
     use crate::AMOUNT_DECIMALS;
 
     #[test_log::test]
@@ -165,6 +269,18 @@ mod tests {
 
         // Expect
         assert_eq!(solution, dec!(72.5));
+    }
+
+    #[test_log::test]
+    fn it_solves_60_40_portfolio_with_some_amount() {
+        // Given
+        let (problem, _assets) = build_60_40_portfolio_with_abp();
+
+        // When
+        let solution = problem.suggest_invest_amount();
+
+        // Expect
+        assert_eq!(solution, dec!(150));
     }
 
     fn build_60_40_portfolio_no_allocation() -> (Problem, Vec<String>) {
@@ -204,5 +320,37 @@ mod tests {
         };
 
         (Problem::new(options), vec![vwce, aggh])
+    }
+
+    fn build_60_40_portfolio_with_abp() -> (AverageBuyPriceProblem, Vec<String>) {
+        let vwce = "VWCE".to_string();
+        let aggh = "AGGH".to_string();
+        let assets = HashMap::from([
+            (
+                vwce.clone(),
+                AverageBuyPriceAsset {
+                    symbol: vwce.clone(),
+                    price: dec!(100.0),
+                    target_weight: dec!(0.1),
+                    abp: dec!(90),
+                },
+            ),
+            (
+                aggh.clone(),
+                AverageBuyPriceAsset {
+                    symbol: aggh.clone(),
+                    price: dec!(100.0),
+                    target_weight: dec!(0.9),
+                    abp: dec!(80),
+                },
+            ),
+        ]);
+
+        let options = AverageBuyPriceProblemOptions {
+            assets,
+            investment_amount: dec!(100.0),
+        };
+
+        (AverageBuyPriceProblem::new(options), vec![vwce, aggh])
     }
 }

@@ -1,4 +1,4 @@
-import React, { lazy, useEffect } from "react";
+import React, { lazy, useEffect, useState } from "react";
 import { useRoutes } from "react-router-dom";
 
 import AboutPage from "./aboutPage";
@@ -12,15 +12,37 @@ import UnderConstructionPage from "./underConstruction";
 import {
   DEMO_PF_60_40,
   DEMO_PF_ALL_SEASONS,
-  DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
+  DEMO_PF_MR_RIP,
+  supabase,
 } from "@app/config";
+import AuthPage from "@routes/loginPage";
+import Account from "@routes/profilePage";
+import SignUpPage from "@routes/signUpPage";
+import ResetPasswordPage from "@routes/resetPassword";
+import Dashboard from "@routes/mainDashboardPage";
+import HistoricalView from "@routes/historicalViewPage";
+import InvestmentSettings from "@routes/investmentSettingsPage";
 
 import(/* webpackPrefetch: true */ "@app");
 
 const App = lazy(() => import("@app"));
 
 export const Router = () => {
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   let routesConfig = [
     {
       path: "*",
@@ -49,6 +71,73 @@ export const Router = () => {
     {
       path: "import",
       element: <ImportPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "login",
+      element: <AuthPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "signup",
+      element: <SignUpPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "reset-password",
+      element: <ResetPasswordPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "profile",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <Account key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "investment-settings",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <InvestmentSettings key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "dashboard",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <Dashboard key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "historical",
+      element: (
+        <div>
+          {!session ? (
+            <AuthPage />
+          ) : (
+            <HistoricalView key={session.user.id} session={session} />
+          )}
+        </div>
+      ),
       errorElement: <ErrorPage />,
     },
   ];

@@ -5,6 +5,7 @@ use config::ConfigError;
 use deadpool_redis::PoolError;
 use hyper::StatusCode;
 use redis::RedisError;
+use sqlx::migrate::MigrateError;
 use tracing::error;
 
 use crate::app::domain::entity::{AssetId, MarketId};
@@ -43,6 +44,18 @@ pub enum DcaError {
     Reqwest(#[from] reqwest::Error),
     #[error("IP2Location internal error: {0:?}")]
     Ip2Location(ip2location::error::Error),
+    #[error("MigrateError: {0:?}")]
+    Execute(#[from] MigrateError),
+    #[error("SQLx Error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error(transparent)]
+    TypeHeaderError(#[from] axum_extra::typed_header::TypedHeaderRejection),
+    #[error(transparent)]
+    UuidError(#[from] uuid::Error),
+    #[error(transparent)]
+    JwtError(#[from] jsonwebtoken::errors::Error),
+    #[error("OpenAI Error: {0}")]
+    OpenAIError(#[from] async_openai::error::OpenAIError),
 }
 
 impl Debug for DcaError {

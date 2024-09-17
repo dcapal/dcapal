@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO public.investment_preferences\n            (user_id, risk_tolerance, investment_horizon, investment_mode, investment_goal, ai_enabled)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (user_id) DO UPDATE\n            SET \n                risk_tolerance     = $2,\n                investment_horizon = $3,\n                investment_mode    = $4,\n                investment_goal    = $5,\n                ai_enabled         = $6\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "risk_tolerance",
+            "kind": {
+              "Enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        },
+        "Int4",
+        {
+          "Custom": {
+            "name": "investment_mode",
+            "kind": {
+              "Enum": [
+                "standard",
+                "expert"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "investment_goal",
+            "kind": {
+              "Enum": [
+                "retirement",
+                "education",
+                "wealth_building",
+                "other"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "48b3af8a7ea767e45d89b05f35d2127d6aae61f0178abc4690f046eb4c46fc8f"
+}

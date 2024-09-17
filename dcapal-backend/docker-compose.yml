@@ -17,6 +17,39 @@ services:
       interval: 10s
       timeout: 10s
       retries: 3
+  postgres-db:
+    image: "postgres:latest"
+    container_name: postgres-db
+    restart: always
+    networks:
+      - dcapalnetwork
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_HOST=postgres-db
+      - DATABASE_URL=postgres://postgres:postgres@postgres-db/postgres
+      - SQLX_OFFLINE=true
+    volumes:
+      - ./config/postgres/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d postgres -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  pgadmin:
+      image: dpage/pgadmin4
+      container_name: pgadmin
+      restart: always
+      networks:
+        - dcapalnetwork
+      ports:
+        - "5020:80"
+      environment:
+        PGADMIN_DEFAULT_EMAIL: dcapal@email.com
+        PGADMIN_DEFAULT_PASSWORD: dcapal-user
 
 networks:
   dcapalnetwork:

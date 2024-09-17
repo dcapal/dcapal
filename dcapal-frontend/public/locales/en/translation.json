@@ -16,9 +16,11 @@
     },
     "navbar": {
       "myPortfolios": "My portfolios",
+      "dashboard": "Dashboard",
       "about": "About",
       "docs": "Docs",
-      "exportPortfolio": "Export Portfolio"
+      "exportPortfolio": "Export Portfolio",
+      "login": "Sign in"
     },
     "currencyStep": {
       "chooseCurrency": "Choose your portfolio currency"
@@ -59,7 +61,8 @@
       "amount": "Amount",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
-      "transactionFees": "Transaction fees"
+      "transactionFees": "Transaction fees",
+      "averageBuyPrice": "ABP"
     },
     "portfoliosStep": {
       "myPortfolios": "My Portfolios",

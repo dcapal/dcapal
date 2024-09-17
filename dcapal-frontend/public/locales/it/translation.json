@@ -16,9 +16,11 @@
     },
     "navbar": {
       "myPortfolios": "I miei portafogli",
+      "dashboard": "Dashboard",
       "about": "Chi siamo",
       "docs": "Documentazione",
-      "exportPortfolio": "Esporta Portafoglio"
+      "exportPortfolio": "Esporta Portafoglio",
+      "login": "Accedi"
     },
     "currencyStep": {
       "chooseCurrency": "Seleziona la valuta del tuo portafoglio"
@@ -59,7 +61,8 @@
       "amount": "Valore",
       "quantity": "Quantità",
       "targetWeight": "Allocazione Target",
-      "transactionFees": "Costi di transazione"
+      "transactionFees": "Costi di transazione",
+      "averageBuyPrice": "PMC"
     },
     "portfoliosStep": {
       "myPortfolios": "I miei portafogli",

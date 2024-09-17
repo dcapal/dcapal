@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                risk_tolerance as \"risk_tolerance: RiskTolerance\",\n                investment_horizon,\n                investment_mode as \"investment_mode: InvestmentMode\",\n                investment_goal as \"investment_goal: InvestmentGoal\",\n                ai_enabled\n            FROM investment_preferences\n            WHERE user_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "risk_tolerance: RiskTolerance",
+        "type_info": {
+          "Custom": {
+            "name": "risk_tolerance",
+            "kind": {
+              "Enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "investment_horizon",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "investment_mode: InvestmentMode",
+        "type_info": {
+          "Custom": {
+            "name": "investment_mode",
+            "kind": {
+              "Enum": [
+                "standard",
+                "expert"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "investment_goal: InvestmentGoal",
+        "type_info": {
+          "Custom": {
+            "name": "investment_goal",
+            "kind": {
+              "Enum": [
+                "retirement",
+                "education",
+                "wealth_building",
+                "other"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ai_enabled",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e3d6e41ff69438853a9c374f5235d06645bd49bacfcc8ecc4a1055b7e7e18d67"
+}
