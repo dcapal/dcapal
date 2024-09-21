@@ -153,12 +153,12 @@ jobs:
           services:
             redis:
               image: redis/redis-stack-server
-              container_name: redis
+              container_name: redis-dev
               restart: always
               ports:
                 - ${REDIS_PORT}:6379
               networks:
-                - dcapalnetwork
+                - dcapal-dev-network
               volumes:
                 - ./config/redis/redis-stack.conf:/redis-stack.conf
                 - ./config/redis/users.acl:/etc/redis/users.acl
@@ -170,7 +170,7 @@ jobs:
                 retries: 3
 
           networks:
-            dcapalnetwork:
+            dcapal-dev-network:
           EOF
 
       - name: Configure docker-compose.prod.yml
@@ -189,7 +189,7 @@ jobs:
                 - ${DCAPAL_API_PORT}:8080
                 - ${DCAPAL_METRICS_PORT}:9000
               networks:
-                - dcapalnetwork
+                - dcapal-dev-network
               volumes:
                 - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
                 - ./data/dcapal:/var/dcapal/dcapal-backend/data
