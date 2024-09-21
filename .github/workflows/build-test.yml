@@ -85,7 +85,7 @@ jobs:
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
@@ -102,7 +102,7 @@ jobs:
     needs: [ frontend-check, optimizer-build-test ]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
@@ -135,7 +135,7 @@ jobs:
           - 5000:5000
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
