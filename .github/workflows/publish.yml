@@ -1,11 +1,11 @@
 name: Publish
 
 on:
-  workflow_run:
-    workflows: [ CI ]
-    types: [ completed ]
-    branches: [ master ]
+  workflow_dispatch:
   push:
+    branches:
+      - master
+      - dev
     tags:
       - v[0-9]+.[0-9]+.[0-9]+
       - v[0-9]+.[0-9]+.[0-9]+-*
@@ -18,7 +18,7 @@ jobs:
   extract-tag-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Extract tag version
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Echo tag version
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [ extract-tag-version ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
