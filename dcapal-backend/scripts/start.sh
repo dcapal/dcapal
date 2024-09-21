@@ -11,7 +11,7 @@ APP_DB_NAME="${APP_DB_NAME:=postgres}"
 DB_HOST="${DB_HOST:=postgres-db}"
 
 # Wait for the database to be ready
-until PGPASSWORD=$POSTGRES_PASSWORD psql -h "$DB_HOST" -U "$APP_USER" -d "$APP_DB_NAME" -c '\q'; do
+until PGPASSWORD=$APP_USER_PWD psql -h "$DB_HOST" -U "$APP_USER" -d "$APP_DB_NAME" -c '\q'; do
   echo >&2 "Postgres is unavailable - sleeping"
   sleep 1
 done
