@@ -12,8 +12,8 @@ anyhow = "1.0.89"
 axum = { version = "0.7.5", features = ["macros"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
 hyper = { version = "1.4.1", features = ["full"] }
-deadpool-redis = { version = "0.17.0", features = ["serde"] }
-redis = { version = "0.26.1", features = ["tokio-comp"] }
+deadpool-redis = { version = "0.18.0", features = ["serde"] }
+redis = { version = "0.27.2", features = ["tokio-comp"] }
 reqwest = { version = "0.12.7", features = ["gzip", "json"] }
 serde = "1.0.210"
 serde_json = "1.0.128"
