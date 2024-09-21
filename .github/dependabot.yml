@@ -5,19 +5,23 @@
 
 version: 2
 updates:
-   # Enable version updates for cargo
+  # Enable version updates for cargo
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
     # Allow up to 10 open pull requests
-    open-pull-requests-limit: 10 
+    open-pull-requests-limit: 10
     labels:
       - "A-backend"
       - "A-optimizer"
       - "C-dependency"
+    groups:
+      redis:
+        patterns:
+          - "*redis*"
 
-   # Enable version updates for npm
+    # Enable version updates for npm
   - package-ecosystem: "npm"
     # Look for `package.json` and `lock` files in the `root` directory
     directory: "/dcapal-frontend"
@@ -26,16 +30,22 @@ updates:
       interval: "weekly"
     # Allow up to 10 open pull requests
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "dcapal-optimizer-wasm"
     labels:
       - "A-frontend"
       - "C-dependency"
     groups:
       babel:
         patterns:
-        - "@babel*"
+          - "@babel*"
       playwright:
         patterns:
-        - "*playwright*"
+          - "*playwright*"
       i18next:
         patterns:
-        - "*i18next*"
+          - "*i18next*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
