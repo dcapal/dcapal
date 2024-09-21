@@ -49,3 +49,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "A-ops"
+      - "C-dependency"  

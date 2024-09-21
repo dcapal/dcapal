@@ -156,7 +156,7 @@ jobs:
       
       # Prebuild backend Docker image to leverage cached layers
       - name: Build dcapal-backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./dcapal-backend/docker/Dockerfile
