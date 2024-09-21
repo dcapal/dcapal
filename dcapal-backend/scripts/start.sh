@@ -17,7 +17,7 @@ done
 echo >&2 "Postgres is up - executing command"
 
 # Create the application database
-DATABASE_URL=postgres://${APP_USER}:${APP_USER_PWD}@${$DB_HOST}:${DB_PORT}/${APP_DB_NAME}
+DATABASE_URL=postgres://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${APP_DB_NAME}
 export DATABASE_URL
 # Run migrations
 sqlx migrate run
