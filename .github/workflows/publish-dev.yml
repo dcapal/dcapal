@@ -9,14 +9,20 @@ on:
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
+  PUBLISH_REF: ${{ github.event.workflow_run.head_branch }}  
 
 jobs:
   extract-tag-version:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Extract tag version
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        with:
+          ref: ${{ env.PUBLISH_REF }}
+      - name: Extract tag version 
+        run: |
+          echo "$PUBLISH_REF"
+          echo "RELEASE_VERSION=${PUBLISH_REF#refs/*/}" >> $GITHUB_ENV
       - name: Echo tag version
         run: |
           echo $RELEASE_VERSION
@@ -27,6 +33,8 @@ jobs:
     needs: [extract-tag-version]
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.PUBLISH_REF }}
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
