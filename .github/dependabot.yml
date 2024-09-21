@@ -41,3 +41,7 @@ updates:
       i18next:
         patterns:
           - "*i18next*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
