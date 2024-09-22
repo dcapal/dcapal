@@ -209,8 +209,6 @@ jobs:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
           DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
           DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
-          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
-          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
@@ -234,10 +232,10 @@ jobs:
           server:
             web:
               hostname: 0.0.0.0
-              port: ${DCAPAL_API_PORT}
+              port: 8080
             metrics:
               hostname: 0.0.0.0
-              port: ${DCAPAL_METRICS_PORT}
+              port: 9000
             redis:
               hostname: redis
               port: 6379
