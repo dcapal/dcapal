@@ -100,7 +100,7 @@ jobs:
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
@@ -117,7 +117,7 @@ jobs:
     needs: [ frontend-check, optimizer-build-test ]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
@@ -150,7 +150,7 @@ jobs:
           - 5000:5000
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
@@ -162,7 +162,7 @@ jobs:
         with:
           driver-opts: network=host
       - name: Cache Docker layers
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -171,7 +171,7 @@ jobs:
       
       # Prebuild backend Docker image to leverage cached layers
       - name: Build dcapal-backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./dcapal-backend/docker/Dockerfile

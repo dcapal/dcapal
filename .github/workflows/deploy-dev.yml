@@ -40,7 +40,7 @@ jobs:
     needs: optimizer-build
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
@@ -84,7 +84,7 @@ jobs:
     needs: frontend-build
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
@@ -221,8 +221,6 @@ jobs:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
           DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
           DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
-          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT_DEV }}
-          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT_DEV }}
           JWT_SECRET: ${{ secrets.JWT_SECRET_DEV }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
@@ -254,10 +252,10 @@ jobs:
           server:
             web:
               hostname: 0.0.0.0
-              port: ${DCAPAL_API_PORT}
+              port: 8080
             metrics:
               hostname: 0.0.0.0
-              port: ${DCAPAL_METRICS_PORT}
+              port: 9000
             redis:
               hostname: redis
               port: 6379
