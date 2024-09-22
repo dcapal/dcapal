@@ -1,4 +1,4 @@
-use jsonschema::JSONSchema;
+use jsonschema::Validator;
 
 use crate::{
     app::domain::entity::{Asset, AssetId},
@@ -43,8 +43,8 @@ pub struct ImportPortfolioCmd {
 }
 
 impl ImportPortfolioCmd {
-    pub fn try_new(payload: serde_json::Value, schema: &JSONSchema) -> Result<Self> {
-        if !schema.is_valid(&payload) {
+    pub fn try_new(payload: serde_json::Value, validator: &Validator) -> Result<Self> {
+        if !validator.is_valid(&payload) {
             return Err(DcaError::BadRequest(
                 "Input portfolio does not match portfolio schema requirements".to_string(),
             ));

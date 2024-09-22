@@ -14,7 +14,6 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use axum_extra::{headers::CacheControl, TypedHeader};
 use hyper::StatusCode;
-use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
@@ -26,10 +25,10 @@ lazy_static! {
     static ref ASSETS_CACHE_CONTROL: CacheControl = CacheControl::new()
         .with_public()
         .with_max_age(Duration::from_secs(5 * 60));
-    static ref PORTFOLIO_JSON_SCHEMA: JSONSchema = JSONSchema::options()
-        .with_draft(Draft::Draft7)
-        .compile(&serde_json::from_str::<serde_json::Value>(PORTFOLIO_SCHEMA_STR).unwrap())
-        .unwrap();
+    static ref PORTFOLIO_JSON_SCHEMA: serde_json::Value =
+        serde_json::from_str(PORTFOLIO_SCHEMA_STR).unwrap();
+    static ref PORTFOLIO_SCHEMA_VALIDATOR: jsonschema::Validator =
+        jsonschema::draft7::new(&PORTFOLIO_JSON_SCHEMA).unwrap();
 }
 
 pub async fn get_assets_fiat(State(ctx): State<AppContext>) -> Result<Response> {
@@ -111,7 +110,7 @@ pub async fn import_portfolio(
     let repo = &ctx.repos.imported;
     let stats_repo = &ctx.repos.stats;
 
-    let cmd = ImportPortfolioCmd::try_new(payload, &PORTFOLIO_JSON_SCHEMA)?;
+    let cmd = ImportPortfolioCmd::try_new(payload, &PORTFOLIO_SCHEMA_VALIDATOR)?;
     let imported = repo.store_portfolio(&cmd.pfolio).await?;
 
     counter!(stats::IMPORTED_PORTFOLIOS_TOTAL).increment(1);
