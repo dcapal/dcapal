@@ -39,5 +39,5 @@ regex = "1.10.6"
 itertools = "0.13.0"
 failsafe = "1.3.0"
 ip2location = "0.5.3"
-jsonschema = "0.20.0"
+jsonschema = "0.21.0"
 uuid = { version = "1.10.0", features = ["v4"] }
