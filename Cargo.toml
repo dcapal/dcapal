@@ -8,6 +8,9 @@ authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 edition = "2021"
 rust-version = "1.79"
 
+[profile.release]
+lto = true
+
 [profile.release-with-debug]
 inherits = "release"
 debug = true
