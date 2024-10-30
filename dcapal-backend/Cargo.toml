@@ -26,7 +26,7 @@ tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 const_format = "0.2.33"
-futures = "0.3.30"
+futures = "0.3.31"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 config = "0.13.4"
