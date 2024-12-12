@@ -219,7 +219,7 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
         dispatch(
           setQty({
             symbol: card.symbol,
-            qty: card.qty, // Use the original quantity, not the new card quantity
+            qty: card.qty,
           })
         );
       });
