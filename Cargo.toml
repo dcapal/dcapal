@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.79"
 
 [profile.release]
-lto = true
+lto = "thin"
 
 [profile.release-with-debug]
 inherits = "release"
