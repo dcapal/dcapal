@@ -4,12 +4,14 @@ import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
+import { toast } from "react-hot-toast";
 import {
   ACLASS,
   clearBudget,
   currentPortfolio,
   feeTypeToString,
   isWholeShares,
+  setQty,
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
@@ -132,6 +134,7 @@ const buildProblemInput = (budget, assets, fees, useWholeShares) => {
 export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdated, setIsUpdated] = useState(false);
   const dispatch = useDispatch();
 
   const { t } = useTranslation();
@@ -197,6 +200,53 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
     solve();
   }, []);
 
+  const onClickUpdate = () => {
+    // Prevent multiple updates
+    if (isUpdated) {
+      toast.success(t("endStep.portfolioAlreadyUpdated"), {
+        position: "top-right",
+        duration: 2000,
+      });
+      return;
+    }
+
+    const updatedAssets = cards.filter(
+      (card) => card.qty !== card.oldQty && card.qty !== -1
+    );
+
+    if (updatedAssets.length > 0) {
+      updatedAssets.forEach((card) => {
+        dispatch(
+          setQty({
+            symbol: card.symbol,
+            qty: card.qty,
+          })
+        );
+      });
+
+      // Set updated state
+      setIsUpdated(true);
+
+      // Success toast
+      toast.success(
+        `${t("endStep.portfolioUpdated")}: ${updatedAssets.length} ${t("endStep.assetsUpdated")}`,
+        {
+          position: "top-right",
+          duration: 3000,
+        }
+      );
+    } else {
+      // No changes toast
+      toast.success(t("endStep.noAssetsToUpdate"), {
+        position: "top-right",
+        duration: 2000,
+      });
+    }
+
+    dispatch(clearBudget({}));
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+  };
+
   const onClickGoBack = () => {
     dispatch(clearBudget({}));
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
@@ -237,12 +287,20 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
               />
             ))}
           </div>
-          <span
-            className="mt-6 font-medium underline cursor-pointer"
-            onClick={onClickGoBack}
-          >
-            {t("endStep.backToPortfolio")}
-          </span>
+          <div className="w-full mt-12 flex justify-between items-center">
+            <span
+              className="font-medium underline cursor-pointer"
+              onClick={onClickGoBack}
+            >
+              {t("endStep.backToPortfolio")}
+            </span>
+            <span
+              className="font-medium cursor-pointer bg-neutral-500 hover:bg-neutral-600 text-white px-4 py-2 rounded"
+              onClick={onClickUpdate}
+            >
+              {t("endStep.updatePortfolio")}
+            </span>
+          </div>
         </>
       )}
       {!isLoading && !solution && (
