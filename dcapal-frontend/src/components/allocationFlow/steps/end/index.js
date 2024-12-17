@@ -237,7 +237,7 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
       );
     } else {
       // No changes toast
-      toast.info(t("endStep.noAssetsToUpdate"), {
+      toast.success(t("endStep.noAssetsToUpdate"), {
         position: "top-right",
         duration: 2000,
       });
@@ -287,18 +287,20 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
               />
             ))}
           </div>
-          <span
-            className="mt-6 font-medium underline cursor-pointer"
-            onClick={onClickUpdate}
-          >
-            {t("endStep.updatePortfolio")}
-          </span>
-          <span
-            className="mt-6 font-medium underline cursor-pointer"
-            onClick={onClickGoBack}
-          >
-            {t("endStep.backToPortfolio")}
-          </span>
+          <div className="w-full mt-12 flex justify-between items-center">
+            <span
+              className="font-medium underline cursor-pointer"
+              onClick={onClickGoBack}
+            >
+              {t("endStep.backToPortfolio")}
+            </span>
+            <span
+              className="font-medium cursor-pointer bg-neutral-500 hover:bg-neutral-600 text-white px-4 py-2 rounded"
+              onClick={onClickUpdate}
+            >
+              {t("endStep.updatePortfolio")}
+            </span>
+          </div>
         </>
       )}
       {!isLoading && !solution && (
