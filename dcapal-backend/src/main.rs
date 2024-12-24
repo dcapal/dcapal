@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
 
     init_prometheus_exporter(&config.server.metrics)?;
 
-    let mut server = DcaServer::try_new(config)?;
+    let mut server = DcaServer::try_new(config).await?;
 
     Ok(server.start(shutdown_signal().boxed()).await?)
 }
