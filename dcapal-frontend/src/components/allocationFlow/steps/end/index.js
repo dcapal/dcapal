@@ -15,6 +15,9 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
+import { api } from "@app/api";
+import { DCAPAL_API, supabase } from "@app/config";
+import { useToast } from "@chakra-ui/react";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -33,6 +36,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
     targetWeight: a.targetWeight,
     fees: a.fees ? a.fees : pfolioFees,
     theoAlloc: null,
+    averageBuyPrice: a.abp,
   }));
 
   if (!solution?.amounts) return cards;
@@ -78,6 +82,7 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
       targetWeight: 0,
       fees: null,
       theo_alloc: null,
+      averageBuyPrice: 0,
     });
   }
 
@@ -136,12 +141,15 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdated, setIsUpdated] = useState(false);
   const dispatch = useDispatch();
+  const toast = useToast();
 
   const { t } = useTranslation();
   const budget = useSelector((state) => currentPortfolio(state).budget);
   const assets = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const fees = useSelector((state) => currentPortfolio(state).fees);
+  const pfname = useSelector((state) => currentPortfolio(state).name);
+  const pfid = useSelector((state) => currentPortfolio(state).id);
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
