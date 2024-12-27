@@ -4,18 +4,17 @@ import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
+import { toast } from "react-hot-toast";
 import {
   ACLASS,
   clearBudget,
   currentPortfolio,
   feeTypeToString,
   isWholeShares,
+  setQty,
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
-import { api } from "@app/api";
-import { DCAPAL_API, supabase } from "@app/config";
-import { useToast } from "@chakra-ui/react";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -34,7 +33,6 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
     targetWeight: a.targetWeight,
     fees: a.fees ? a.fees : pfolioFees,
     theoAlloc: null,
-    averageBuyPrice: a.abp,
   }));
 
   if (!solution?.amounts) return cards;
@@ -80,7 +78,6 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
       targetWeight: 0,
       fees: null,
       theo_alloc: null,
-      averageBuyPrice: 0,
     });
   }
 
@@ -137,16 +134,14 @@ const buildProblemInput = (budget, assets, fees, useWholeShares) => {
 export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdated, setIsUpdated] = useState(false);
   const dispatch = useDispatch();
-  const toast = useToast();
 
   const { t } = useTranslation();
   const budget = useSelector((state) => currentPortfolio(state).budget);
   const assets = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const fees = useSelector((state) => currentPortfolio(state).fees);
-  const pfname = useSelector((state) => currentPortfolio(state).name);
-  const pfid = useSelector((state) => currentPortfolio(state).id);
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
@@ -205,83 +200,51 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
     solve();
   }, []);
 
-  const [session, setSession] = useState(null);
-  const [config, setConfig] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setConfig({
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-    });
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const assetsArray = useSelector((state) =>
-    Object.values(currentPortfolio(state).assets)
-  );
-
-  const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    if (cards.length > 0) {
-      setUserData({
-        id: pfid,
-        name: pfname,
-        description: "optional",
-        currency: quoteCcy,
-        assets: cards
-          .filter((card) => card.name !== UNALLOCATED_CASH)
-          .map((a) => ({
-            symbol: a.symbol,
-            name: a.name,
-            exchange: a.symbol,
-            dataSource: a.provider,
-            currency: a.currency,
-            quantity: roundAmount(a.qty),
-            price: roundAmount(a.price),
-            averageBuyPrice: roundAmount(a.averageBuyPrice),
-            weight: roundAmount(a.weight),
-          })),
-      });
-    }
-  }, [cards, pfid, pfname, quoteCcy]);
-
-  const onClickSavePortfolio = async () => {
-    if (!userData) {
-      toast({
-        title: "Error",
-        description: "Portfolio data is not ready yet",
-        status: "error",
+  const onClickUpdate = () => {
+    // Prevent multiple updates
+    if (isUpdated) {
+      toast.success(t("endStep.portfolioAlreadyUpdated"), {
+        position: "top-right",
         duration: 2000,
-        isClosable: true,
       });
       return;
     }
 
-    try {
-      await api.post(`${DCAPAL_API}/v1/user/portfolios`, userData, config);
-      toast({
-        title: "Portfolio updated",
-        status: "success",
-        duration: 2000,
-        isClosable: true,
+    const updatedAssets = cards.filter(
+      (card) => card.qty !== card.oldQty && card.qty !== -1
+    );
+
+    if (updatedAssets.length > 0) {
+      updatedAssets.forEach((card) => {
+        dispatch(
+          setQty({
+            symbol: card.symbol,
+            qty: card.qty,
+          })
+        );
       });
-    } catch (error) {
-      toast({
-        title: "Error updating the portfolio",
-        description: error.message,
-        status: "error",
+
+      // Set updated state
+      setIsUpdated(true);
+
+      // Success toast
+      toast.success(
+        `${t("endStep.portfolioUpdated")}: ${updatedAssets.length} ${t("endStep.assetsUpdated")}`,
+        {
+          position: "top-right",
+          duration: 3000,
+        }
+      );
+    } else {
+      // No changes toast
+      toast.success(t("endStep.noAssetsToUpdate"), {
+        position: "top-right",
         duration: 2000,
-        isClosable: true,
       });
     }
+
+    dispatch(clearBudget({}));
+    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
   };
 
   const onClickGoBack = () => {
@@ -324,19 +287,20 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
               />
             ))}
           </div>
-          <span
-            className="mt-6 font-medium underline cursor-pointer"
-            onClick={onClickSavePortfolio}
-          >
-            {t("endStep.savePortfolio")}
-          </span>
-
-          <span
-            className="mt-6 font-medium underline cursor-pointer"
-            onClick={onClickGoBack}
-          >
-            {t("endStep.backToPortfolio")}
-          </span>
+          <div className="w-full mt-12 flex justify-between items-center">
+            <span
+              className="font-medium underline cursor-pointer"
+              onClick={onClickGoBack}
+            >
+              {t("endStep.backToPortfolio")}
+            </span>
+            <span
+              className="font-medium cursor-pointer bg-neutral-500 hover:bg-neutral-600 text-white px-4 py-2 rounded"
+              onClick={onClickUpdate}
+            >
+              {t("endStep.updatePortfolio")}
+            </span>
+          </div>
         </>
       )}
       {!isLoading && !solution && (
