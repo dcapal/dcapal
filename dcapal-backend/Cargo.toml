@@ -17,7 +17,7 @@ redis = { version = "0.27.6", features = ["tokio-comp"] }
 reqwest = { version = "0.12.9", features = ["gzip", "json"] }
 serde = "1.0.216"
 serde_json = "1.0.133"
-thiserror = "2.0.7"
+thiserror = "2.0.9"
 tokio = { version = "1.42.0", features = ["full"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace"] }
