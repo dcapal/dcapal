@@ -97,7 +97,7 @@ export const AllocateCard = ({
       diffQty: diffQty,
       action: action,
       fees: theoAlloc.fees,
-      amount: theoAlloc.amount,
+      amount: theoAlloc.amount - oldAmount,
       feeImpact: feeImpact,
     };
   })();
