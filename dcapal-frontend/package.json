@@ -21,6 +21,7 @@
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {
+    "@radix-ui/react-select": "^2.1.4",
     "@radix-ui/react-slot": "^1.1.1",
     "@react-hook/media-query": "^1.1.1",
     "@reduxjs/toolkit": "^2.5.0",
