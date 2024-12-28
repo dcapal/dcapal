@@ -23,6 +23,17 @@ module.exports = (_env, argv) => {
           test: /\.(js|jsx)$/,
           exclude: /node_modules/,
           loader: "babel-loader",
+          options: {
+            presets: [
+              "@babel/preset-env",
+              [
+                "@babel/preset-react",
+                {
+                  runtime: "automatic",
+                },
+              ],
+            ],
+          },
         },
         {
           test: /.s?css$/,
@@ -48,7 +59,7 @@ module.exports = (_env, argv) => {
       ],
     },
     resolve: {
-      extensions: ['*', '.js', '.jsx'],
+      extensions: ["*", ".js", ".jsx"],
       alias: {
         "@": path.resolve(__dirname, "src"),
         "@app": path.resolve(__dirname, "src/app"),

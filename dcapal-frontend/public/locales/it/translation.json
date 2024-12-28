@@ -46,8 +46,13 @@
       "budgetAllocated": "Un momento. Stiamo allocando il tuo budget",
       "allocationReady": "Fatto! La tua allocazione è pronta",
       "backToPortfolio": "Torna al Portafoglio",
+      "updatePortfolio": "Aggiorna il Portafoglio",
       "opsBadHappened": "Oops! Qualcosa è andato storto.",
-      "reviewPortfolio": "Per favore, rivedi il tuo portafoglio."
+      "reviewPortfolio": "Per favore, rivedi il tuo portafoglio.",
+      "portfolioUpdated": "Portfoglio aggiornato",
+      "portfolioAlreadyUpdated": "Il portafoglio è già stato aggiornato",
+      "assetsUpdated": "asset aggiornati",
+      "noAssetsToUpdate": "Nessun asset da aggiornare"
     },
     "assetCard": {
       "price": "Prezzo",

@@ -39,12 +39,7 @@ export const LaunchBtn = () => {
   return (
     <div className="w-full flex flex-wrap-reverse sm:flex-wrap gap-x-4 gap-y-3 justify-center">
       <div className="min-w-full sm:min-w-0">
-        <Button
-          variant="outline"
-          size="lg"
-          className="w-full"
-          onClick={onClickUpload}
-        >
+        <Button variant="outline" className="w-full" onClick={onClickUpload}>
           {t("importStep.importPortfolio")}
         </Button>
         <input
@@ -58,7 +53,6 @@ export const LaunchBtn = () => {
       <Button
         data-testid="importStep.allocateYourSavings"
         className="min-w-full sm:min-w-0"
-        size="lg"
         onClick={onClickStart}
       >
         {t("importStep.allocateYourSavings")}
