@@ -16,6 +16,7 @@ import {
   selectPortfolio,
 } from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
+import { Button } from "@/components/ui/button";
 
 export const PortfoliosStep = () => {
   const { t } = useTranslation();
@@ -59,12 +60,14 @@ export const PortfoliosStep = () => {
         })}
       </div>
       {!showNewPfolio && (
-        <span
-          className="mt-5 font-medium underline cursor-pointer"
+        <Button
+          variant="link"
+          size="link"
+          className="mt-5"
           onClick={onClickNewPortfolio}
         >
           {t("portfoliosStep.newPortfolio")}
-        </span>
+        </Button>
       )}
       {showNewPfolio && pfoliosCount > 0 && (
         <p className="w-full mt-10 mb-3 text-2xl font-thin">
@@ -162,19 +165,16 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
         </div>
       </div>
       <div className="w-full mt-6 flex justify-between items-center">
-        <span
-          className="font-medium underline cursor-pointer"
+        <Button
+          variant="link"
+          size="link"
           onClick={pfoliosCount > 0 ? cancelCb : onClickGoBack}
         >
           {t("common.cancel")}
-        </span>
-        <button
-          className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
-          onClick={onClickNext}
-          disabled={!isFormValid}
-        >
+        </Button>
+        <Button onClick={onClickNext} disabled={!isFormValid}>
           {t("common.next")}
-        </button>
+        </Button>
       </div>
     </div>
   );

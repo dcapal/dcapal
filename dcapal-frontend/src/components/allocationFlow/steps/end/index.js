@@ -15,6 +15,7 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -288,18 +289,12 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
             ))}
           </div>
           <div className="w-full mt-12 flex justify-between items-center">
-            <span
-              className="font-medium underline cursor-pointer"
-              onClick={onClickGoBack}
-            >
+            <Button variant="link" size="link" onClick={onClickGoBack}>
               {t("endStep.backToPortfolio")}
-            </span>
-            <span
-              className="font-medium cursor-pointer bg-neutral-500 hover:bg-neutral-600 text-white px-4 py-2 rounded"
-              onClick={onClickUpdate}
-            >
+            </Button>
+            <Button onClick={onClickUpdate}>
               {t("endStep.updatePortfolio")}
-            </span>
+            </Button>
           </div>
         </>
       )}

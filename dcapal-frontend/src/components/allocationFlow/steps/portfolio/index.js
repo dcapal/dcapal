@@ -27,6 +27,7 @@ import PIECHART from "@images/icons/piechart.svg";
 import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
@@ -135,14 +136,9 @@ export const PortfolioStep = ({ ...props }) => {
     isShowFees ? setShowFees(false) : setShowFees(true);
   };
 
-  const feeBtnClass = classNames(
-    "p-3 z-30 flex justify-center items-center text-2xl font-medium rounded-md shadow-md border border-gray-300",
-    {
-      "bg-white hover:bg-neutral-600 hover:text-white hover:border-gray-600 active:bg-neutral-800":
-        !isShowFees,
-      "bg-neutral-600 text-white": isShowFees,
-    }
-  );
+  const feeBtnClass = classNames({
+    "bg-accent text-accent-foreground": isShowFees,
+  });
 
   return (
     <div className="w-full flex flex-col pt-2 items-center">
@@ -155,9 +151,13 @@ export const PortfolioStep = ({ ...props }) => {
       </div>
       {assets && assets.length > 0 && (
         <div className="relative w-full flex flex-col items-end justify-center mt-2">
-          <button className={feeBtnClass} onClick={onClickTransactionFees}>
+          <Button
+            className={feeBtnClass}
+            variant="outline"
+            onClick={onClickTransactionFees}
+          >
             <img src={SETTINGS} className="w-full max-w-[20px]" />
-          </button>
+          </Button>
           {isShowFees && (
             <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
               <p className="font-light text-2xl">
@@ -287,19 +287,12 @@ export const PortfolioStep = ({ ...props }) => {
             {new Date(lastRefreshTime).toLocaleString(i18n.language)}
           </p>
           <div className="w-full mt-6 flex justify-between items-center">
-            <span
-              className="font-medium underline cursor-pointer"
-              onClick={onClickGoBack}
-            >
+            <Button variant="link" size="link" onClick={onClickGoBack}>
               {t("common.goBack")}
-            </span>
-            <button
-              className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
-              onClick={onClickAddLiquidity}
-              disabled={!isAllAllocated}
-            >
+            </Button>
+            <Button onClick={onClickAddLiquidity} disabled={!isAllAllocated}>
               {t("common.next")}
-            </button>
+            </Button>
           </div>
         </>
       )}
