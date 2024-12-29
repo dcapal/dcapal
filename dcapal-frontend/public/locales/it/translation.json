@@ -68,6 +68,8 @@
       "copy": "(copia)"
     },
     "portfolioStep": {
+      "preferences": "Impostazioni",
+      "preferencesDescription": "Configura le impostazioni del tuo portafoglio e del tuo broker. Potrebbero influenzare l'allocazione suggerita.",
       "transactionFees": "Costi di transazione",
       "quantity": "Quantità",
       "targetWeight": "Allocazione Target",
