@@ -34,7 +34,7 @@ rust_decimal_macros = "1.36.0"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.49"
-env_logger = "0.11.5"
+env_logger = "0.11.6"
 test-log = { version = "0", features = ["log"] }
 glob = "0.3.1"
 serde_json = "1.0.133"
