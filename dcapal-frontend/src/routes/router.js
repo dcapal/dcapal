@@ -15,6 +15,8 @@ import {
   DEMO_PF_MR_RIP,
   DEMO_PF_HODLX,
 } from "@app/config";
+import { PortfoliosPage } from "./portfoliosPage";
+import { PortfolioPage } from "./portfolio";
 
 import(/* webpackPrefetch: true */ "@app");
 
@@ -34,6 +36,16 @@ export const Router = () => {
     {
       path: "allocate",
       element: <App />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "portfolios",
+      element: <PortfoliosPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "portfolio",
+      element: <PortfolioPage />,
       errorElement: <ErrorPage />,
     },
     {

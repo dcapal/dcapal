@@ -59,7 +59,7 @@ const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
           <CloseBtn onClick={toggleMenu} />
         </div>
         <div className="grow flex flex-col px-8 py-3 gap-y-6">
-          <Link to={"/allocate"} onClick={onClickMyPortfolios}>
+          <Link to={"/portfolios"} onClick={onClickMyPortfolios}>
             <div className="w-full text-2xl font-light text-white">
               {t("navbar.myPortfolios")}
             </div>
@@ -121,7 +121,7 @@ export const NavBar = () => {
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
   };
 
-  const isAllocate = location.pathname === "/allocate";
+  const isPortfolioPage = location.pathname === "/portfolio";
 
   return (
     <div className="w-full h-14 min-h-[3.5rem] px-4 py-2 flex justify-between items-center bg-[#333333]">
@@ -155,7 +155,7 @@ export const NavBar = () => {
       <div className="flex gap-x-2 items-center">
         {!isMobile && <LanguageSwitcher></LanguageSwitcher>}
 
-        {isAllocate && <ExportBtn />}
+        {isPortfolioPage && <ExportBtn />}
         {isMobile && <MenuBtn onClick={toggleMenuVisible} />}
       </div>
     </div>

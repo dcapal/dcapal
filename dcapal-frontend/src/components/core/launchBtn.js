@@ -24,7 +24,7 @@ export const LaunchBtn = () => {
       reader.onload = function (event) {
         dispatch(setPfolioFile({ file: event.target.result }));
         dispatch(setAllocationFlowStep({ step: Step.IMPORT }));
-        navigate("/allocate");
+        navigate("/portfolios");
       };
       reader.readAsText(e.target.files[0]);
     }
@@ -32,8 +32,7 @@ export const LaunchBtn = () => {
 
   const onClickStart = () => {
     dispatch(setPfolioFile({ file: "" }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
-    navigate("/allocate");
+    navigate("/portfolios");
   };
 
   return (

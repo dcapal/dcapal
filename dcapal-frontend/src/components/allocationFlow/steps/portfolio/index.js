@@ -10,6 +10,7 @@ import { AssetCard } from "./assetCard";
 import {
   addAsset,
   currentPortfolio,
+  hasSelectedPortfolio,
   selectPortfolio,
   setPrice,
   setQty,
@@ -28,6 +29,7 @@ import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
@@ -59,6 +61,7 @@ export const PortfolioStep = ({ ...props }) => {
   const [isShowFees, setShowFees] = useState(false);
 
   const { t, i18n } = useTranslation();
+  const hasSelectedPfolio = useSelector((state) => hasSelectedPortfolio(state));
   const pfolioName = useSelector((state) => currentPortfolio(state).name);
   const assetStore = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
@@ -69,6 +72,13 @@ export const PortfolioStep = ({ ...props }) => {
 
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!hasSelectedPfolio) {
+      navigate("/portfolios");
+    }
+  }, [hasSelectedPfolio]);
 
   useEffect(() => {
     let timeout = null;

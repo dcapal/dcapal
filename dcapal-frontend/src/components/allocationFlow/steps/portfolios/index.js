@@ -139,7 +139,7 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
     dispatch(addPortfolio({ pfolio: pfolio }));
     dispatch(selectPortfolio({ id: pfolio.id }));
     dispatch(setPreferredCurrency({ ccy: selectedCcy }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    navigate("/portfolio");
   };
 
   const onClickGoBack = () => {

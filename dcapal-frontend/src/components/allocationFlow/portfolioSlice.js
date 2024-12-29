@@ -184,6 +184,10 @@ export const currentPortfolio = (state) => {
   return getPortfolio(state.selected, state.pfolios);
 };
 
+export const hasSelectedPortfolio = (state) => {
+  return currentPortfolio(state) !== null;
+};
+
 const getPortfolio = (id, pfolios) => {
   if (!id || !(id in pfolios)) return null;
 

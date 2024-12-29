@@ -13,6 +13,7 @@ import { Step, setAllocationFlowStep } from "@app/appSlice";
 import EDIT_SVG from "@images/icons/edit.svg";
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const orderByWeightDesc = (a, b) => b.weight - a.weight;
 
@@ -36,11 +37,12 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const [newName, setNewName] = useState(name);
 
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
 
   const onClickPortfolio = () => {
     dispatch(selectPortfolio({ id: id }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    navigate("/portfolio");
   };
 
   const onClickEdit = () => {
