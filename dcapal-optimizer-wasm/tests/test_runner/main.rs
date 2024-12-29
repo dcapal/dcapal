@@ -22,9 +22,13 @@ const SCENARIOS_PATH: &str = "./tests/scenarios";
 fn test_runner() -> anyhow::Result<()> {
     info!("==> 🚀  DcaPal Test Runner - Engine ignited");
 
-    let path = Path::new(SCENARIOS_PATH).canonicalize()?;
-    let pattern = format!("{}/**/*.json", SCENARIOS_PATH);
-    info!("==> ⚙️  Loading test scenarios from \"{}\"", path.display());
+    let pattern = if let Ok(single_test_path) = std::env::var("SINGLE_TEST") {
+        single_test_path
+    } else {
+        let path = Path::new(SCENARIOS_PATH).canonicalize()?;
+        info!("==> ⚙️  Loading test scenarios from \"{}\"", path.display());
+        format!("{}/**/*.json", SCENARIOS_PATH)
+    };
 
     let scenarios = glob(&pattern)?.filter_map(|e| e.ok()).collect::<Vec<_>>();
     for path in &scenarios {

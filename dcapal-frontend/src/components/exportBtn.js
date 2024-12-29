@@ -8,6 +8,8 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 import { ignoreNullReplacer } from "@utils";
+import { Button } from "./ui/button";
+import { Save } from "lucide-react";
 
 const pad = (n) => `${n}`.padStart(2, "0");
 
@@ -88,12 +90,13 @@ export const ExportBtn = () => {
   };
 
   return (
-    <button
+    <Button
       style={{ display: isDisplay ? "flex" : "none" }}
-      className="px-3 py-2 flex justify-center items-center whitespace-nowrap bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
+      variant="outline"
+      size="icon"
       onClick={onClick}
     >
-      {t("navbar.exportPortfolio")}
-    </button>
+      <Save />
+    </Button>
   );
 };

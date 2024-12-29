@@ -2,7 +2,7 @@ import { useMediaQuery } from "@react-hook/media-query";
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { MEDIA_SMALL } from "@app/config";
+import { MEDIA_MEDIUM } from "@app/config";
 import { ExportBtn } from "@components/exportBtn";
 
 import classNames from "classnames";
@@ -106,7 +106,7 @@ export const NavBar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = !useMediaQuery(MEDIA_SMALL);
+  const isMobile = !useMediaQuery(MEDIA_MEDIUM);
 
   const toggleMenuVisible = () => {
     setMenuVisible(!menuVisible);

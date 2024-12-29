@@ -12,6 +12,7 @@ import { Step, setAllocationFlowStep } from "@app/appSlice";
 
 import EDIT_SVG from "@images/icons/edit.svg";
 import CLOSE_SVG from "@images/icons/close-menu.svg";
+import { Button } from "@/components/ui/button";
 
 const orderByWeightDesc = (a, b) => b.weight - a.weight;
 
@@ -109,28 +110,22 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
               isValid={newName}
             />
           </div>
-          <div className="w-full mt-5 pl-1 flex justify-between items-center">
-            <span
-              className="font-medium underline cursor-pointer"
-              onClick={onClickDelete}
-            >
+          <div className="w-full mt-5 flex justify-between items-center">
+            <Button variant="link" size="sm" onClick={onClickDelete}>
               {t("portfoliosStep.deletePortfolio")}
-            </span>
+            </Button>
             <div className="flex gap-1">
-              <button
-                className="px-3 pt-0.5 pb-1 flex justify-center items-center shadow-sm border focus-visible:outline-1 border-neutral-300 hover:text-white hover:bg-neutral-500 hover:border-neutral-500 active:text-white active:bg-neutral-600 focus-visible:outline-neutral-600 text-lg rounded-md disabled:pointer-events-none disabled:opacity-60"
+              <Button
+                variant="outline"
+                size="sm"
                 disabled={!newName}
                 onClick={onClickDuplicate}
               >
                 {t("common.duplicate")}
-              </button>
-              <button
-                className="px-3 pt-0.5 pb-1 flex justify-center items-center shadow-sm bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md disabled:pointer-events-none disabled:opacity-60"
-                disabled={!newName}
-                onClick={onClickSave}
-              >
+              </Button>
+              <Button size="sm" disabled={!newName} onClick={onClickSave}>
                 {t("common.save")}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
