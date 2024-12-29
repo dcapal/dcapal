@@ -18,7 +18,10 @@ function LanguageSwitcher() {
         i18n.changeLanguage(newLang);
       }}
     >
-      <SelectTrigger className="w-32" aria-label="Change language">
+      <SelectTrigger
+        className="min-w-[4rem] w-auto"
+        aria-label="Change language"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
