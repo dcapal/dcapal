@@ -1,5 +1,6 @@
 import classNames from "classnames";
 import React, { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
 
 export const InputNumberType = Object.freeze({
   INTEGRAL: 0,
@@ -57,15 +58,12 @@ export const InputNumber = ({
   const placeholder = type === InputNumberType.INTEGRAL ? "0" : "0.0";
 
   return (
-    <input
+    <Input
       style={{
         fontSize: textSize ? `${textSize}` : "unset",
       }}
       className={classNames(className, {
-        "border-gray-300 hover:border-gray-500 focus-visible:outline-gray-600":
-          isValid,
-        "border-2 border-red-400 hover:border-red-500 focus-visible:outline-red-600 ":
-          !isValid,
+        "border-destructive focus-visible:outline-destructive": !isValid,
         "leading-none": leadingNone,
         "leading-normal": !leadingNone,
       })}
