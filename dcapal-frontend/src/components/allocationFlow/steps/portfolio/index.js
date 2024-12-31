@@ -21,13 +21,12 @@ import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 
-import SETTINGS from "@images/icons/settings.svg";
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
-import { TransactionFees } from "./transactionFees";
 import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { PreferencesDialog } from "./preferencesDialog";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
@@ -56,7 +55,6 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
 
 export const PortfolioStep = ({ ...props }) => {
   const [searchText, setSearchText] = useState("");
-  const [isShowFees, setShowFees] = useState(false);
 
   const { t, i18n } = useTranslation();
   const pfolioName = useSelector((state) => currentPortfolio(state).name);
@@ -132,14 +130,6 @@ export const PortfolioStep = ({ ...props }) => {
     dispatch(setAllocationFlowStep({ step: Step.INVEST }));
   };
 
-  const onClickTransactionFees = () => {
-    isShowFees ? setShowFees(false) : setShowFees(true);
-  };
-
-  const feeBtnClass = classNames({
-    "bg-accent text-accent-foreground": isShowFees,
-  });
-
   return (
     <div className="w-full flex flex-col pt-2 items-center">
       <div className="w-full my-2">
@@ -151,21 +141,7 @@ export const PortfolioStep = ({ ...props }) => {
       </div>
       {assets && assets.length > 0 && (
         <div className="relative w-full flex flex-col items-end justify-center mt-2">
-          <Button
-            className={feeBtnClass}
-            variant="outline"
-            onClick={onClickTransactionFees}
-          >
-            <img src={SETTINGS} className="w-full max-w-[20px]" />
-          </Button>
-          {isShowFees && (
-            <div className="w-full max-w-lg relative -top-4 px-3 pt-2 pb-3 flex flex-col gap-2 bg-white shadow-md ring-1 ring-black/5 rounded-md">
-              <p className="font-light text-2xl">
-                💸 {t("portfolioStep.transactionFees")}
-              </p>
-              <TransactionFees />
-            </div>
-          )}
+          <PreferencesDialog />
         </div>
       )}
       {assets && assets.length > 0 && (
