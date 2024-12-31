@@ -2,10 +2,10 @@
 
 Follow
 the [Supabase local development guide](https://supabase.com/docs/guides/local-development?queryGroups=package-manager&package-manager=npm)
-to set up the Supabase environment.
+to set up the local Supabase environment.
 
 Once the docker instance is started, copy the displayed anon key and replace the `VITE_SUPABASE_ANON_KEY` in the
-`.env.development`
+`.env`
 file.
 
 ```dotenv

@@ -134,13 +134,6 @@ jobs:
           cd dcapal-frontend
           npm ci
 
-      - name: Install Supabase
-        run: |
-          npm install supabase --save-dev
-          npx supabase init
-          npx supabase start
-
-
       - name: Build
         run: |
           cd dcapal-frontend
@@ -232,6 +225,16 @@ jobs:
               image: localhost:5000/${DOCKER_REPO}:latest
           EOF
 
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
+
+      - name: Install Supabase
+        run: |
+          npm install supabase --save-dev
+          npx supabase init
+          npx supabase start
+
       - name: Run dcapal-backend
         run: |
           cd dcapal-backend
@@ -243,10 +246,6 @@ jobs:
             docker compose logs
             exit 1
           fi
-
-      - name: Connect Supabase to Dcapal Docker Network
-        run: |
-          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v4
