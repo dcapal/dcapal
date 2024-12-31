@@ -138,7 +138,7 @@ jobs:
         run: |
           npm install supabase --save-dev
           npx supabase init
-          supabase start
+          npx supabase start
 
       - name: Connect Supabase to Dcapal Docker Network
         run: |
