@@ -69,7 +69,7 @@
     },
     "portfolioStep": {
       "preferences": "Preferences",
-      "preferencesDescription": "Configure your portfolio and broker options here. These may influence your suggested allocation",
+      "preferencesDescription": "Configure your portfolio and broker options here. These may influence your suggested allocation.",
       "transactionFees": "Transaction fees",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
