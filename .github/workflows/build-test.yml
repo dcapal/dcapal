@@ -142,7 +142,7 @@ jobs:
 
       - name: Connect Supabase to Dcapal Docker Network
         run: |
-          docker network connect dcapalnetwork supabase_db_dcapal
+          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
 
       - name: Build
