@@ -33,7 +33,7 @@ export const InputText = ({
       style={{
         fontSize: textSize ? `${textSize}` : "unset",
       }}
-      className={classNames(className, {
+      className={classNames({
         "border-destructive focus-visible:outline-destructive": !isValid,
         "leading-none": leadingNone,
         "leading-normal": !leadingNone,

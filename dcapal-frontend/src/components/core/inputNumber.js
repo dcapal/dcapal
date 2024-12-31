@@ -54,7 +54,6 @@ export const InputNumber = ({
     onChange(newValue);
   };
 
-  const className = `w-full px-2 pt-1 pb-1.5 border focus-visible:outline-1 rounded-md ${textAlign}`;
   const placeholder = type === InputNumberType.INTEGRAL ? "0" : "0.0";
 
   return (
@@ -62,7 +61,7 @@ export const InputNumber = ({
       style={{
         fontSize: textSize ? `${textSize}` : "unset",
       }}
-      className={classNames(className, {
+      className={classNames(`${textAlign}`, {
         "border-destructive focus-visible:outline-destructive": !isValid,
         "leading-none": leadingNone,
         "leading-normal": !leadingNone,
