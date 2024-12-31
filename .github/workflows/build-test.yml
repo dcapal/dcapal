@@ -225,15 +225,16 @@ jobs:
               image: localhost:5000/${DOCKER_REPO}:latest
           EOF
 
-      - name: Connect Supabase to Dcapal Docker Network
-        run: |
-          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Install Supabase
         run: |
           npm install supabase --save-dev
           npx supabase init
           npx supabase start
+
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Run dcapal-backend
         run: |
