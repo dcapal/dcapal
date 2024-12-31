@@ -38,16 +38,6 @@ jobs:
           --no-default-features
           --locked
 
-      - name: Install Supabase
-        run: |
-          brew install supabase/tap/supabase
-          supabase init
-          supabase start
-
-      - name: Connect Supabase to Dcapal Docker Network
-        run: |
-          docker network connect dcapalnetwork supabase_db_dcapal
-
       - name: Lint
         env:
           SQLX_OFFLINE: true
@@ -143,6 +133,17 @@ jobs:
         run: |
           cd dcapal-frontend
           npm ci
+
+      - name: Install Supabase
+        run: |
+          npm install supabase --save-dev
+          npx supabase init
+          supabase start
+
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapalnetwork supabase_db_dcapal
+
 
       - name: Build
         run: |
