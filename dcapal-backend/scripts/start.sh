@@ -6,18 +6,22 @@ DB_PORT="${DB_PORT:=5432}"
 APP_USER="${APP_USER:=postgres}"
 APP_USER_PWD="${APP_USER_PWD:=postgres}"
 APP_DB_NAME="${APP_DB_NAME:=postgres}"
-DB_HOST="${DB_HOST:=postgres-db}"
+DB_HOST="${DB_HOST:=supabase_db_dcapal}"
 
 # Wait for the database to be ready
-until PGPASSWORD=$APP_USER_PWD psql -h "$DB_HOST" -U "$APP_USER" -d "$APP_DB_NAME" -c '\q'; do
-  echo >&2 "Postgres is unavailable - sleeping"
-  sleep 1
+# Set the password first
+export PGPASSWORD="${APP_USER_PWD}"
+
+# Then remove PGPASSWORD from the psql command
+until psql -h "$DB_HOST" -p "$DB_PORT" -U "$APP_USER" -d "$APP_DB_NAME" -c '\q'; do
+    echo >&2 "Postgres is unavailable - sleeping"
+    sleep 1
 done
 
 echo >&2 "Postgres is up - executing command"
 
 # Create the application database
-DATABASE_URL=postgres://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${APP_DB_NAME}
+DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${APP_DB_NAME}
 export DATABASE_URL
 # Run migrations
 sqlx migrate run

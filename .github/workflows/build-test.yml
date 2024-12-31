@@ -11,7 +11,7 @@ env:
   DOCKER_REPO: leonardoarcari/dcapal
   SQLX_VERSION: 0.8.0
   SQLX_FEATURES: "rustls,postgres"
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+  DATABASE_URL: postgres://postgres:postgres@supabase_db_dcapal:5432/postgres
 
 jobs:
   backend-build-test:
@@ -37,6 +37,16 @@ jobs:
           --features ${{ env.SQLX_FEATURES }}
           --no-default-features
           --locked
+
+      - name: Install Supabase
+        run: |
+          brew install supabase/tap/supabase
+          supabase init
+          supabase start
+
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapalnetwork supabase_db_dcapal
 
       - name: Lint
         env:
@@ -209,7 +219,7 @@ jobs:
               user: dcapal
               password: dcapal
             postgres:
-              hostname: postgres-db
+              hostname: supabase_db_dcapal
               port: 5432
               user: postgres
               password: postgres

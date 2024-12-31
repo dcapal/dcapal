@@ -29,8 +29,8 @@ server:
     user: dcapal
     password: dcapal
   postgres:
-    hostname: 127.0.0.1
-    port: 54322
+    hostname: supabase_db_dcapal
+    port: 5432
     user: postgres
     password: postgres
     database: postgres
