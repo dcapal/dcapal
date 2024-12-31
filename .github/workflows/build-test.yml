@@ -140,10 +140,6 @@ jobs:
           npx supabase init
           npx supabase start
 
-      - name: Connect Supabase to Dcapal Docker Network
-        run: |
-          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
-
 
       - name: Build
         run: |
@@ -247,6 +243,10 @@ jobs:
             docker compose logs
             exit 1
           fi
+
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v4
