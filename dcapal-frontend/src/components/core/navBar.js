@@ -1,7 +1,8 @@
 import { useMediaQuery } from "@react-hook/media-query";
-import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MEDIA_SMALL, supabase } from "@app/config";
+import React, { useEffect,useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { MEDIA_MEDIUM,supabase } from "@app/config";
 import { ExportBtn } from "@components/exportBtn";
 
 import classNames from "classnames";
@@ -11,7 +12,7 @@ import LanguageSwitcher from "@components/languageSwitcher";
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
 import { useDispatch } from "react-redux";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { Step, setAllocationFlowStep } from "@app/appSlice";
 
 const CloseBtn = ({ onClick }) => {
   return (
@@ -110,7 +111,7 @@ export const NavBar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = !useMediaQuery(MEDIA_SMALL);
+  const isMobile = !useMediaQuery(MEDIA_MEDIUM);
 
   const toggleMenuVisible = () => {
     setMenuVisible(!menuVisible);

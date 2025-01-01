@@ -11,6 +11,7 @@ import {
 import { Trans, useTranslation } from "react-i18next";
 import { spawn, Thread, Worker } from "threads";
 import { replacer } from "@utils/index.js";
+import { Button } from "@/components/ui/button";
 
 const amtDecimals = 2;
 
@@ -205,12 +206,13 @@ export const InvestStep = ({
         />
         {Number(solution) !== 0 ? (
           <>
-            <button
+            <Button
+              variant="link"
+              className="p-0 pr-1"
               onClick={handleButtonClick}
-              style={{ textDecoration: "underline", marginRight: "0.5rem" }}
             >
               {t("investStep.clickHere")}
-            </button>
+            </Button>
             <span>{t("investStep.toInsertAmount")}</span>
           </>
         ) : null}
@@ -335,19 +337,15 @@ export const InvestStep = ({
       </div>
 
       <div className="w-full mt-6 flex items-center justify-between">
-        <span
-          className="font-medium underline cursor-pointer"
-          onClick={onClickGoBack}
-        >
+        <Button variant="link" size="link" onClick={onClickGoBack}>
           {t("common.goBack")}{" "}
-        </span>
-        <button
-          className="px-3 pt-1.5 pb-2 flex justify-center items-center bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 text-white text-lg rounded-md shadow-md disabled:pointer-events-none disabled:opacity-60"
+        </Button>
+        <Button
           onClick={onClickRunAllocation}
           disabled={isRunAllocationDisabled}
         >
           {t("investStep.runAllocation")}{" "}
-        </button>
+        </Button>
       </div>
     </div>
   );

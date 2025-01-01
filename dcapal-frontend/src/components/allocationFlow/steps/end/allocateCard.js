@@ -90,14 +90,15 @@ export const AllocateCard = ({
     const diffQty = Math.abs(theoAlloc.shares - oldQty);
     const action =
       theoAlloc.shares > oldQty ? "endStep.bought" : "endStep.sold";
-    const feeImpact =
-      (theoAlloc.fees / Math.abs(theoAlloc.amount - (oldAmount || 0))) * 100;
+
+    const diffAmount = Math.abs(theoAlloc.amount - (oldAmount || 0));
+    const feeImpact = (theoAlloc.fees / diffAmount) * 100;
 
     return {
       diffQty: diffQty,
       action: action,
       fees: theoAlloc.fees,
-      amount: theoAlloc.amount,
+      amount: diffAmount,
       feeImpact: feeImpact,
     };
   })();

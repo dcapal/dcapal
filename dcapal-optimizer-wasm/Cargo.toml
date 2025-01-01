@@ -24,7 +24,7 @@ minilp = "0.2.2"
 serde = { version = "1.0.216", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
 futures = "0.3.31"
-anyhow = "1.0.94"
+anyhow = "1.0.95"
 thiserror = "2"
 lazy_static = "1.5.0"
 rand = "0.8.5"
@@ -34,7 +34,7 @@ rust_decimal_macros = "1.36.0"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.49"
-env_logger = "0.11.5"
+env_logger = "0.11.6"
 test-log = { version = "0", features = ["log"] }
-glob = "0.3.1"
-serde_json = "1.0.133"
+glob = "0.3.2"
+serde_json = "1.0.134"
