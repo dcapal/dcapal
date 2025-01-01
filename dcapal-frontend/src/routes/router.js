@@ -60,6 +60,11 @@ export const Router = () => {
       errorElement: <ErrorPage />,
     },
     {
+      path: "dashboard",
+      element: <UnderConstructionPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
       path: "docs",
       element: <UnderConstructionPage />,
       errorElement: <ErrorPage />,

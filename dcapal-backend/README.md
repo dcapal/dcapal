@@ -17,14 +17,21 @@ docker compose -f docker-compose.yml -f ./docker/docker-compose.local.yml build
 
 ```yml
 app:
-    # App configs
+# App configs
 
 server:
 redis:
-    hostname: redis # IMPORTANT!
-    port: 6379
-    user: dcapal
-    password: dcapal
+  hostname: redis # IMPORTANT!
+  port: 6379
+  user: dcapal
+  password: dcapal
+postgres:
+  hostname: supabase_db_dcapal # IMPORTANT!
+  port: 5432 # IMPORTANT!
+  user: postgres
+  password: postgres
+  database: postgres
+
 ```
 
 - Start the container stack

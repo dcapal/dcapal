@@ -1,13 +1,6 @@
 #[macro_use]
 extern crate const_format;
 
-use std::{
-    net::{AddrParseError, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-
-use async_openai::Client;
 use axum::routing::put;
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo,
@@ -21,19 +14,21 @@ use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use std::{
+    net::{AddrParseError, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
-use crate::app::services::ai::AiService;
 use crate::app::services::portfolio::PortfolioService;
 use crate::app::services::user::UserService;
 use crate::config::Postgres;
-use crate::ports::inbound::rest::ai::get_chatbot_advice;
 use crate::ports::inbound::rest::portfolio::get_portfolio_holdings;
 use crate::ports::inbound::rest::user::{get_profile, update_profile};
-use crate::ports::outbound::repository::ai::AiRepository;
 use crate::ports::outbound::repository::portfolio::PortfolioRepository;
 use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
@@ -86,7 +81,6 @@ struct Services {
     mkt_data: Arc<MarketDataService>,
     ip2location: Option<Arc<Ip2LocationService>>,
     user: Arc<UserService>,
-    ai: Arc<AiService>,
     portfolio: Arc<PortfolioService>,
 }
 
@@ -97,7 +91,6 @@ struct Repository {
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
     pub user: Arc<UserRepository>,
-    pub ai: Arc<AiRepository>,
     pub portfolio: Arc<PortfolioRepository>,
 }
 
@@ -123,15 +116,12 @@ impl DcaServer {
 
         let postgres = build_postgres_pool(&config.server.postgres).await?;
 
-        let openai = Client::new();
-
         let repos = Arc::new(Repository {
             misc: Arc::new(MiscRepository::new(redis.clone())),
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
             user: Arc::new(UserRepository::new(postgres.clone())),
-            ai: Arc::new(AiRepository::new(openai.clone(), postgres.clone())),
             portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
         });
 
@@ -161,7 +151,6 @@ impl DcaServer {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             ip2location,
             user: Arc::new(UserService::new(repos.user.clone())),
-            ai: Arc::new(AiService::new(repos.ai.clone())),
             portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
         };
 
@@ -196,11 +185,6 @@ impl DcaServer {
             )
             .route("/v1/user/portfolios", post(rest::portfolio::save_portfolio))
             .route("/v1/user/portfolios", get(rest::portfolio::get_portfolios))
-            .route(
-                "/v1/user/investment-preferences",
-                post(rest::user::upsert_investment_preferences),
-            )
-            .route("/v1/ai/chatbot", post(get_chatbot_advice))
             .with_state(ctx.clone());
 
         let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);
