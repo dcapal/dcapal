@@ -91,7 +91,7 @@ pub struct Postgres {
 impl Postgres {
     pub fn connection_url(&self) -> String {
         format!(
-            "postgres://{}:{}@{}:{}/{}",
+            "postgresql://{}:{}@{}:{}/{}",
             self.user, self.password, self.hostname, self.port, self.database
         )
     }

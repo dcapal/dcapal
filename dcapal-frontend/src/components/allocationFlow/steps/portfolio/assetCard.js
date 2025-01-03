@@ -12,8 +12,6 @@ import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
 import { TransactionFees } from "./transactionFees";
 import { useTranslation } from "react-i18next";
-import { Tooltip as ChakraTooltip } from "@chakra-ui/react";
-import { QuestionOutlineIcon } from "@chakra-ui/icons";
 
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 
@@ -23,7 +21,6 @@ export const AssetCard = ({
   aclass,
   price,
   qty,
-  abp,
   weight,
   targetWeight,
   isValidTargetWeight,
@@ -131,74 +128,54 @@ export const AssetCard = ({
         </div>
       )}
       {!isMobile && (
-        <div>
-          <div className="flex justify-between items-start">
-            <div className="flex flex-col">
-              <div className="flex items-center h-12">
-                <div className="w-12 mr-2 font-light text-xs">
-                  {t("assetCard.quantity")}
-                </div>
-                <div className="w-40">
-                  <InputNumber
-                    textAlign={"text-left"}
-                    type={InputNumberType.DECIMAL}
-                    value={qty}
-                    onChange={props.setQty}
-                    isValid={true}
-                    min={0}
-                  />
-                </div>
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col">
+            <div className="flex items-center h-12">
+              <div className="w-12 mr-2 font-light text-xs">
+                {t("assetCard.quantity")}
               </div>
-            </div>
-            <div className="flex items-center mr-2 h-12">
-              <div className="font-light text-xs">
-                {t("assetCard.targetWeight")}
-              </div>
-              <div className="w-28 ml-2">
+              <div className="w-40">
                 <InputNumber
-                  textAlign={"text-right"}
+                  textAlign={"text-left"}
                   type={InputNumberType.DECIMAL}
-                  value={targetWeight}
-                  onChange={props.setTargetWeight}
-                  isValid={isValidTargetWeight}
+                  value={qty}
+                  onChange={props.setQty}
+                  isValid={true}
                   min={0}
-                  max={100}
-                  step=".000001"
                 />
               </div>
-              <div className="ml-1">%</div>
             </div>
-          </div>
-          <div className="flex justify-between items-start">
-            <div className="flex flex-col">
-              <div className="flex items-center h-12">
-                <div className="w-12 mr-2 font-light text-xs">
-                  {t("assetCard.averageBuyPrice")}
-                  <span> </span>
-                  <ChakraTooltip
-                    label="Average Buy Price (ABP): The average price at which you acquired this asset, weighted by purchase amounts."
-                    fontSize="md"
-                  >
-                    <QuestionOutlineIcon />
-                  </ChakraTooltip>
-                </div>
-                <div className="w-40">
-                  <InputNumber
-                    textAlign={"text-left"}
-                    type={InputNumberType.DECIMAL}
-                    value={abp}
-                    onChange={props.setAbp}
-                    isValid={true}
-                    min={0}
-                    isRequired={true}
-                  />
-                </div>
+            <div className="flex items-center h-6">
+              <div className="w-12 mr-2 font-light text-xs">
+                {t("assetCard.price")}
+              </div>
+              <div className="uppercase text-sm">{quoteCcy}</div>
+              <div className="ml-1 text-sm">
+                {price.toLocaleString(i18n.language, priceFmt)}
               </div>
             </div>
+          </div>
+          <div className="flex items-center mr-2 h-12">
+            <div className="font-light text-xs">
+              {t("assetCard.targetWeight")}
+            </div>
+            <div className="w-28 ml-2">
+              <InputNumber
+                textAlign={"text-right"}
+                type={InputNumberType.DECIMAL}
+                value={targetWeight}
+                onChange={props.setTargetWeight}
+                isValid={isValidTargetWeight}
+                min={0}
+                max={100}
+                step=".000001"
+              />
+            </div>
+            <div className="ml-1">%</div>
           </div>
         </div>
       )}
-      <div className="w-full mt-4 flex gap-3 justify-between">
+      <div className="w-full mt-4 flex flex-col gap-3">
         <div
           className="flex gap-1 items-center font-light text-xs"
           {...getToggleProps()}
@@ -217,15 +194,6 @@ export const AssetCard = ({
           {...getCollapseProps()}
         >
           <TransactionFees asset={symbol} />
-        </div>
-        <div className="flex items-center h-6">
-          <div className="w-12 mr-2 font-light text-xs">
-            {t("assetCard.price")}
-          </div>
-          <div className="uppercase text-sm">{quoteCcy}</div>
-          <div className="ml-1 text-sm">
-            {price.toLocaleString(i18n.language, priceFmt)}
-          </div>
         </div>
       </div>
     </div>

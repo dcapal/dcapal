@@ -11,7 +11,6 @@ import {
   addAsset,
   currentPortfolio,
   selectPortfolio,
-  setAbp,
   setPrice,
   setQty,
   setRefreshTime,
@@ -165,15 +164,6 @@ export const PortfolioStep = ({ ...props }) => {
             );
           };
 
-          const setInputAverageBuyPrice = (abp) => {
-            dispatch(
-              setAbp({
-                symbol: a.symbol,
-                abp: abp,
-              })
-            );
-          };
-
           return (
             <AssetCard
               key={a.symbol}
@@ -183,8 +173,6 @@ export const PortfolioStep = ({ ...props }) => {
               price={a.price}
               qty={a.qty}
               setQty={setAssetQty}
-              abp={a.abp}
-              setAbp={setInputAverageBuyPrice}
               weight={a.weight}
               targetWeight={a.targetWeight}
               setTargetWeight={setAssetTargetWeight}

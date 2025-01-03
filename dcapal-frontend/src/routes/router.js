@@ -17,12 +17,8 @@ import {
   supabase,
 } from "@app/config";
 import AuthPage from "@routes/loginPage";
-import Account from "@routes/profilePage";
 import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
-import Dashboard from "@routes/mainDashboardPage";
-import HistoricalView from "@routes/historicalViewPage";
-import InvestmentSettings from "@routes/investmentSettingsPage";
 
 import(/* webpackPrefetch: true */ "@app");
 
@@ -64,6 +60,11 @@ export const Router = () => {
       errorElement: <ErrorPage />,
     },
     {
+      path: "dashboard",
+      element: <UnderConstructionPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
       path: "docs",
       element: <UnderConstructionPage />,
       errorElement: <ErrorPage />,
@@ -86,58 +87,6 @@ export const Router = () => {
     {
       path: "reset-password",
       element: <ResetPasswordPage />,
-      errorElement: <ErrorPage />,
-    },
-    {
-      path: "profile",
-      element: (
-        <div>
-          {!session ? (
-            <AuthPage />
-          ) : (
-            <Account key={session.user.id} session={session} />
-          )}
-        </div>
-      ),
-      errorElement: <ErrorPage />,
-    },
-    {
-      path: "investment-settings",
-      element: (
-        <div>
-          {!session ? (
-            <AuthPage />
-          ) : (
-            <InvestmentSettings key={session.user.id} session={session} />
-          )}
-        </div>
-      ),
-      errorElement: <ErrorPage />,
-    },
-    {
-      path: "dashboard",
-      element: (
-        <div>
-          {!session ? (
-            <AuthPage />
-          ) : (
-            <Dashboard key={session.user.id} session={session} />
-          )}
-        </div>
-      ),
-      errorElement: <ErrorPage />,
-    },
-    {
-      path: "historical",
-      element: (
-        <div>
-          {!session ? (
-            <AuthPage />
-          ) : (
-            <HistoricalView key={session.user.id} session={session} />
-          )}
-        </div>
-      ),
       errorElement: <ErrorPage />,
     },
   ];

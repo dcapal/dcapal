@@ -11,7 +11,7 @@ env:
   DOCKER_REPO: leonardoarcari/dcapal
   SQLX_VERSION: 0.8.0
   SQLX_FEATURES: "rustls,postgres"
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+  DATABASE_URL: postgres://postgres:postgres@supabase_db_dcapal:5432/postgres
 
 jobs:
   backend-build-test:
@@ -209,7 +209,7 @@ jobs:
               user: dcapal
               password: dcapal
             postgres:
-              hostname: postgres-db
+              hostname: supabase_db_dcapal
               port: 5432
               user: postgres
               password: postgres
@@ -225,6 +225,13 @@ jobs:
               image: localhost:5000/${DOCKER_REPO}:latest
           EOF
 
+
+      - name: Install Supabase
+        run: |
+          npm install supabase --save-dev
+          npx supabase init
+          npx supabase start
+
       - name: Run dcapal-backend
         run: |
           cd dcapal-backend
@@ -236,6 +243,10 @@ jobs:
             docker compose logs
             exit 1
           fi
+
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v4
