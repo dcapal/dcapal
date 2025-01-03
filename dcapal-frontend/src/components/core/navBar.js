@@ -1,8 +1,8 @@
 import { useMediaQuery } from "@react-hook/media-query";
-import React, { useEffect,useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { MEDIA_MEDIUM,supabase } from "@app/config";
+import { MEDIA_MEDIUM, supabase } from "@app/config";
 import { ExportBtn } from "@components/exportBtn";
 
 import classNames from "classnames";
