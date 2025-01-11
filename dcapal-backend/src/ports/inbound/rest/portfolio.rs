@@ -145,7 +145,7 @@ pub async fn get_portfolio_holdings() -> crate::error::Result<Response> {
 
 #[utoipa::path(
     post,
-    path = "/api/v1/user/portfolios",
+    path = "/v1/user/portfolios",
     request_body = PortfolioRequest,
     responses(
         (status = 200, description = "Success update profile information", body = [MessageResponse]),
