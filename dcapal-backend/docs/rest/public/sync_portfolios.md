@@ -1,6 +1,6 @@
-# Import portfolio
+# Sync portfolios
 
-Sync user's portfolios with DcaPal backend
+Sync user's portfolios with DcaPal
 
 **URL** : `/sync/portfolios`
 
@@ -8,11 +8,11 @@ Sync user's portfolios with DcaPal backend
 
 **Auth required** : YES
 
-**Permissions required** : CREATE_PORTFOLIO
+**Permissions required** : SYNC_PORTFOLIO
 
 **Data constraints**
 
-Request body must be a JSON payload matching the [`portfolio`](../../../schema/portfolio/v1/schema.json) JSON schema.
+Request body must be a JSON payload matching the [`portfolio`](../../../schema/portfolio/v1/schema.json) JSON schema. The ID should be provided, if not the request will be rejected.
 
 **Header constraints** : None
 
@@ -43,8 +43,12 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
           "qty": 0.1,
           "targetWeight": 100.0
         }
-      ]
+      ],
+      "lastUpdatedAt": "2023-11-24 18:30:01 UTC"
     }
+  ],
+  "deletedPortfolios": [
+    "5035c98b63b4451380f08c4978166bcc"
   ]
 }
 ```
@@ -55,12 +59,37 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
 
 **Code** : `201 CREATED`
 
-**Content example** : Response contains an `id` of the uploaded portfolio and an expiration time. Expired resources get evicted and needs to be imported again with this endpoint.
+**Content example** :Response contains just updated (if the server has a greater lastUpdated) or missing portfolios for the user.
 
 ```json
 {
-    "id": "5035c98b63b4451380f08c4978166bec",
-    "expires_at": "2023-11-24 18:30:01 UTC"
+  "portfolios": [
+    {
+      "id": "5035c98b63b4451380f08c4978166bec",
+      "name": "My Portfolio",
+      "quoteCcy": "usd",
+      "fees": {
+        "feeStructure": {
+          "type": "variable",
+          "feeRate": 0.19,
+          "minFee": 2.95
+        }
+      },
+      "assets": [
+        {
+          "symbol": "btc",
+          "name": "Bitcoin",
+          "aclass": "CRYPTO",
+          "baseCcy": "btc",
+          "provider": "DCAPal",
+          "price": 37190.1,
+          "qty": 0.1,
+          "targetWeight": 100.0
+        }
+      ],
+      "lastUpdated": "2023-11-24 18:35:01 UTC"
+    }
+  ]
 }
 ```
 
@@ -75,7 +104,3 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
 ```
 Bad Request: Input portfolio does not match portfolio schema requirements
 ```
-
-## Notes
-
-- You can get further examples of valid portfolio formats by **exporting** a JSON portfolio built in DcaPal app.
