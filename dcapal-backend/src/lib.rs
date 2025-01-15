@@ -25,12 +25,7 @@ use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
 use crate::app::services::portfolio::PortfolioService;
-use crate::app::services::user::UserService;
 use crate::config::Postgres;
-use crate::ports::inbound::rest::portfolio::get_portfolio_holdings;
-use crate::ports::inbound::rest::user::{get_profile, update_profile};
-use crate::ports::outbound::repository::portfolio::PortfolioRepository;
-use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
     app::{
         infra,
@@ -50,6 +45,7 @@ use crate::{
         },
     },
 };
+use crate::ports::outbound::repository::portfolio::PortfolioRepository;
 
 pub mod app;
 pub mod config;
@@ -80,7 +76,6 @@ pub type AppContext = Arc<AppContextInner>;
 struct Services {
     mkt_data: Arc<MarketDataService>,
     ip2location: Option<Arc<Ip2LocationService>>,
-    user: Arc<UserService>,
     portfolio: Arc<PortfolioService>,
 }
 
@@ -90,7 +85,6 @@ struct Repository {
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
-    pub user: Arc<UserRepository>,
     pub portfolio: Arc<PortfolioRepository>,
 }
 
@@ -121,7 +115,6 @@ impl DcaServer {
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
-            user: Arc::new(UserRepository::new(postgres.clone())),
             portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
         });
 
@@ -150,7 +143,6 @@ impl DcaServer {
         let services = Services {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             ip2location,
-            user: Arc::new(UserService::new(repos.user.clone())),
             portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
         };
 
@@ -173,18 +165,7 @@ impl DcaServer {
             .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
 
         let authenticated_routes = Router::new()
-            .route("/v1/user/profile", get(get_profile))
-            .route("/v1/user/profile", put(update_profile))
-            .route(
-                "/v1/user/investment-preferences",
-                get(rest::user::get_investment_preferences),
-            )
-            .route(
-                "/v1/user/portfolios/:id/holdings",
-                get(get_portfolio_holdings),
-            )
-            .route("/v1/user/portfolios", post(rest::portfolio::save_portfolio))
-            .route("/v1/user/portfolios", get(rest::portfolio::get_portfolios))
+            .route("/v1/sync/portfolios", post(rest::request::sync_portfolios))
             .with_state(ctx.clone());
 
         let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);

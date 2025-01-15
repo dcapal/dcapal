@@ -22,15 +22,16 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
 {
   "portfolios": [
     {
-      "id": "5035c98b63b4451380f08c4978166bec",
+      "id": "f2479b20-a873-48fd-84c3-12fd979afebd",
       "name": "My Portfolio",
-      "quoteCcy": "usd",
+      "currency": "usd",
       "fees": {
         "feeStructure": {
           "type": "variable",
           "feeRate": 0.19,
           "minFee": 2.95
-        }
+        },
+        "maxFeeImpact": 0.5
       },
       "assets": [
         {
@@ -48,7 +49,7 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
     }
   ],
   "deletedPortfolios": [
-    "5035c98b63b4451380f08c4978166bcc"
+    "6585fe4c-912b-4597-8c52-7970ead6e1d1"
   ]
 }
 ```

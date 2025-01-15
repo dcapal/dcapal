@@ -18,6 +18,25 @@ create table public.portfolios
     updated_at     timestamp with time zone default now() not null
 );
 
+-- PORTFOLIO ASSETS
+create table public.portfolio_assets
+(
+    id             uuid primary key         default gen_random_uuid(),
+    portfolio_id   uuid references public.portfolios      not null,
+    asset_id       uuid references public.assets          not null,
+    quantity       numeric(20, 10)                        not null,
+    target_weight  numeric(20, 10)                        not null,
+    price          numeric(20, 10)                        not null,
+    max_fee_impact numeric(20, 10)                        null,
+    fee_type       text                                   not null,
+    fee_amount     numeric(20, 10)                        null,
+    fee_rate       numeric(20, 10)                        null,
+    min_fee        numeric(20, 10)                        null,
+    max_fee        numeric(20, 10)                        null,
+    created_at     timestamp with time zone default now() not null,
+    updated_at     timestamp with time zone default now() not null
+);
+
 -- ASSETS
 create table public.assets
 (
@@ -41,23 +60,4 @@ create table public.asset_prices
     date          date                                   not null,
     created_at    timestamp with time zone default now() not null,
     updated_at    timestamp with time zone default now() not null
-);
-
--- PORTFOLIO ASSETS
-create table public.portfolio_assets
-(
-    id             uuid primary key         default gen_random_uuid(),
-    portfolio_id   uuid references public.portfolios      not null,
-    asset_id       uuid references public.assets          not null,
-    quantity       numeric(20, 10)                        not null,
-    target_weight  numeric(20, 10)                        not null,
-    price          numeric(20, 10)                        not null,
-    max_fee_impact numeric(20, 10)                        null,
-    fee_type       text                                   not null,
-    fee_amount     numeric(20, 10)                        null,
-    fee_rate       numeric(20, 10)                        null,
-    min_fee        numeric(20, 10)                        null,
-    max_fee        numeric(20, 10)                        null,
-    created_at     timestamp with time zone default now() not null,
-    updated_at     timestamp with time zone default now() not null
 );

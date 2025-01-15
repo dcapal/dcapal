@@ -1,4 +1,4 @@
-use crate::app::domain::entity::{Portfolio, PortfolioHoldings};
+use crate::app::domain::entity::{Portfolio, PortfolioAsset};
 use crate::error::Result;
 use bigdecimal::BigDecimal;
 use uuid::Uuid;
@@ -61,11 +61,10 @@ impl PortfolioRepository {
             name: portfolio_row.name,
             description: portfolio_row.description,
             currency: portfolio_row.currency,
-            assets: portfolio.assets,
         })
     }
 
-    pub async fn find_all(&self, user_id: Uuid) -> Result<Vec<Portfolio>> {
+    pub async fn find_all_by_user_id(&self, user_id: Uuid) -> Result<Vec<Portfolio>> {
         let mut tx = self.postgres.begin().await?;
         let portfolios = sqlx::query!(
             r#"
@@ -100,7 +99,7 @@ impl PortfolioRepository {
 
             let assets = holdings
                 .into_iter()
-                .map(|holding| PortfolioHoldings {
+                .map(|holding| PortfolioAsset {
                     symbol: holding.symbol,
                     quantity: holding.quantity,
                     price: holding.price,
