@@ -88,7 +88,7 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
           "targetWeight": 100.0
         }
       ],
-      "lastUpdated": "2023-11-24 18:35:01 UTC"
+      "lastUpdatedAt": "2023-11-24 18:35:01 UTC"
     }
   ]
 }

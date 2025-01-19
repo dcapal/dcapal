@@ -1,4 +1,4 @@
-use crate::app::domain::entity::{Portfolio, PortfolioAsset};
+use crate::app::domain::entity::{FeeStructure, Portfolio, PortfolioAsset};
 use crate::app::infra::claim::Claims;
 use crate::AppContext;
 use axum::extract::State;
@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 use utoipa::ToSchema;
 use uuid::Uuid;
+use crate::app::domain::db::fee::FeeStructure;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct PortfolioHoldingsResponse {
@@ -38,14 +39,15 @@ pub struct SyncPortfoliosRequest {
 pub struct PortfoliosRequest {
     pub id: Uuid,
     pub name: String,
-    pub description: Option<String>,
-    pub currency: String,
-    pub assets: Vec<PortfolioHoldingsRequest>,
+    pub quote_ccy: String,
+    pub fees: Option<TransactionFeesRequest>,
+    pub assets: Vec<PortfolioAssetRequest>,
+    pub last_updated_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PortfolioHoldingsRequest {
+pub struct PortfolioAssetRequest {
     pub symbol: String,
     pub name: String,
     pub aclass: String,
@@ -54,6 +56,14 @@ pub struct PortfolioHoldingsRequest {
     pub qty: BigDecimal,
     pub target_weight: BigDecimal,
     pub price: BigDecimal,
+    pub fees: Option<TransactionFeesRequest>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionFeesRequest {
+    pub max_fee_impact: BigDecimal,
+    pub fee_type: FeeStructure,
 }
 
 impl From<PortfoliosRequest> for Portfolio {
@@ -61,32 +71,37 @@ impl From<PortfoliosRequest> for Portfolio {
         Portfolio {
             id: req.id,
             name: req.name,
-            description: req.description,
-            currency: req.currency,
+            currency: req.quote_ccy,
+            deleted: false, // When creating a new portfolio, it is not deleted
+            last_updated_at: req.last_updated_at,
+            max_fee_impact: req.fees.as_ref().map(|x| x.max_fee_impact).unwrap(),
+            fee_type: req.fees.as_ref().map(|x| x.fee_type).unwrap(),
+            fee_amount: req.fees.as_ref().and_then(|x| x.fee_type.fee_amount()),
+            fee_rate: req.fees.as_ref().and_then(|x| x.fee_type.fee_rate()),
+            min_fee: req.fees.as_ref().and_then(|x| x.fee_type.min_fee()),
+            max_fee: req.fees.as_ref().and_then(|x| x.fee_type.max_fee()),
             assets: req.assets.into_iter().map(|x| x.into()).collect(),
         }
     }
 }
 
-impl From<PortfolioHoldingsRequest> for PortfolioAsset {
-    fn from(req: PortfolioHoldingsRequest) -> Self {
+impl From<PortfolioAssetRequest> for PortfolioAsset {
+    fn from(req: PortfolioAssetRequest) -> Self {
         PortfolioAsset {
             symbol: req.symbol,
             name: req.name,
+            asset_class: req.aclass.into(),
+            base_ccy: req.base_ccy,
+            provider: req.provider,
             quantity: req.qty,
-            weight: req.target_weight,
             price: req.price,
-        }
-    }
-}
-
-impl From<&PortfolioAsset> for PortfolioHoldingsRequest {
-    fn from(holding: &PortfolioAsset) -> Self {
-        PortfolioHoldingsRequest {
-            symbol: holding.symbol.clone(),
-            name: holding.name.clone(),
-            quantity: holding.quantity.clone(),
-            price: holding.price.clone(),
+            max_fee_impact: req.fees.as_ref().map(|x| x.max_fee_impact),
+            fee_type: req.fees.as_ref().map(|x| x.fee_type),
+            fee_amount: req.fees.as_ref().and_then(|x| x.fee_type.fee_amount()),
+            fee_rate: req.fees.as_ref().and_then(|x| x.fee_type.fee_rate()),
+            min_fee: req.fees.as_ref().and_then(|x| x.fee_type.min_fee()),
+            target_weight: req.target_weight,
+            max_fee: req.fees.as_ref().and_then(|x| x.fee_type.max_fee()),
         }
     }
 }

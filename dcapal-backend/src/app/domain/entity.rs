@@ -1,10 +1,13 @@
+mod fee;
+mod portfolio;
+mod portfolioasset;
+
 use crate::app::infra::utils::Expiring;
 use crate::DateTime;
-use bigdecimal::BigDecimal;
 use chrono::{Duration, Timelike, Utc};
+use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use uuid::Uuid;
 
 pub type AssetId = String;
 pub type MarketId = String;
@@ -206,58 +209,10 @@ impl Expiring for Market {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Portfolio {
-    pub id: Uuid,
-    pub name: String,
-    pub currency: String,
-    pub deleted: bool,
-    pub last_updated_at: DateTime,
-    pub max_fee_impact: BigDecimal,
-    pub fee_type: FeeStructure,
-    pub fee_amount: Option<BigDecimal>,
-    pub fee_rate: Option<BigDecimal>,
-    pub min_fee: Option<BigDecimal>,
-    pub max_fee: Option<BigDecimal>,
-    pub assets: Vec<PortfolioAsset>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "type")]
-pub enum FeeStructure {
-    ZeroFee,
-    Fixed {
-        fee_amount: BigDecimal,
-    },
-    Variable {
-        fee_rate: BigDecimal,
-        min_fee: BigDecimal,
-        max_fee: Option<BigDecimal>,
-    },
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum AssetClass {
     Equity,
     Crypto,
     Currency,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PortfolioAsset {
-    pub symbol: String,
-    pub name: String,
-    pub asset_class: AssetClass,
-    pub base_ccy: String,
-    pub provider: String,
-    pub quantity: BigDecimal,
-    pub target_weight: BigDecimal,
-    pub price: BigDecimal,
-    pub max_fee_impact: Option<BigDecimal>,
-    pub fee_type: FeeStructure,
-    pub fee_amount: Option<BigDecimal>,
-    pub fee_rate: Option<BigDecimal>,
-    pub min_fee: Option<BigDecimal>,
-    pub max_fee: Option<BigDecimal>,
 }

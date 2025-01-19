@@ -20,7 +20,7 @@ impl PortfolioService {
         user_id: Uuid,
         portfolio: SyncPortfoliosRequest,
     ) -> Result<Vec<PortfoliosRequest>> {
-        let all_user_portfolios = self.portfolio_repository.find_all_by_user_id(user_id).await?;
+        let all_user_portfolios = self.portfolio_repository.get_user_portfolios_with_assets(user_id).await?;
         
         self.portfolio_repository.save(user_id, portfolio).await
     }

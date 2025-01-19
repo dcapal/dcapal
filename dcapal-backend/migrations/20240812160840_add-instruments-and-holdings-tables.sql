@@ -18,8 +18,22 @@ create table public.portfolios
     updated_at     timestamp with time zone default now() not null
 );
 
+-- ASSETS
+create table public.assets
+(
+    id          uuid primary key         default gen_random_uuid(),
+    symbol      text                                   not null unique,
+    name        text                                   not null,
+    asset_class text                                   not null,
+    currency    text                                   not null,
+    provider    text                                   not null,
+    created_at  timestamp with time zone default now() not null,
+    updated_at  timestamp with time zone default now() not null,
+    unique (symbol)
+);
+
 -- PORTFOLIO ASSETS
-create table public.portfolio_assets
+create table public.portfolio_asset
 (
     id             uuid primary key         default gen_random_uuid(),
     portfolio_id   uuid references public.portfolios      not null,
@@ -35,20 +49,6 @@ create table public.portfolio_assets
     max_fee        numeric(20, 10)                        null,
     created_at     timestamp with time zone default now() not null,
     updated_at     timestamp with time zone default now() not null
-);
-
--- ASSETS
-create table public.assets
-(
-    id          uuid primary key         default gen_random_uuid(),
-    symbol      text                                   not null unique,
-    name        text                                   not null,
-    asset_class text                                   not null,
-    currency    text                                   not null,
-    provider    text                                   not null,
-    created_at  timestamp with time zone default now() not null,
-    updated_at  timestamp with time zone default now() not null,
-    unique (symbol)
 );
 
 -- ASSET PRICES
