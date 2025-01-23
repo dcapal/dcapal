@@ -1,16 +1,17 @@
-use crate::app::domain::entity::{FeeStructure, Portfolio, PortfolioAsset};
+use crate::app::domain::db::fee::FeeStructure;
+use crate::app::domain::db::{portfolio, portfolioasset};
 use crate::app::infra::claim::Claims;
-use crate::AppContext;
+use crate::{app, AppContext};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use bigdecimal::BigDecimal;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use utoipa::ToSchema;
 use uuid::Uuid;
-use crate::app::domain::db::fee::FeeStructure;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct PortfolioHoldingsResponse {
@@ -42,7 +43,7 @@ pub struct PortfoliosRequest {
     pub quote_ccy: String,
     pub fees: Option<TransactionFeesRequest>,
     pub assets: Vec<PortfolioAssetRequest>,
-    pub last_updated_at: Option<String>,
+    pub last_updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -66,42 +67,36 @@ pub struct TransactionFeesRequest {
     pub fee_type: FeeStructure,
 }
 
-impl From<PortfoliosRequest> for Portfolio {
-    fn from(req: PortfoliosRequest) -> Self {
-        Portfolio {
+impl From<(PortfoliosRequest, Uuid)> for portfolio::Model {
+    fn from((req, user_id): (PortfoliosRequest, Uuid)) -> Self {
+        portfolio::Model {
             id: req.id,
+            user_id: user_id,
             name: req.name,
             currency: req.quote_ccy,
             deleted: false, // When creating a new portfolio, it is not deleted
             last_updated_at: req.last_updated_at,
             max_fee_impact: req.fees.as_ref().map(|x| x.max_fee_impact).unwrap(),
-            fee_type: req.fees.as_ref().map(|x| x.fee_type).unwrap(),
-            fee_amount: req.fees.as_ref().and_then(|x| x.fee_type.fee_amount()),
-            fee_rate: req.fees.as_ref().and_then(|x| x.fee_type.fee_rate()),
-            min_fee: req.fees.as_ref().and_then(|x| x.fee_type.min_fee()),
-            max_fee: req.fees.as_ref().and_then(|x| x.fee_type.max_fee()),
-            assets: req.assets.into_iter().map(|x| x.into()).collect(),
+            fee_structure: req.fees.as_ref().map(|x| x.fee_type),
         }
     }
 }
 
-impl From<PortfolioAssetRequest> for PortfolioAsset {
-    fn from(req: PortfolioAssetRequest) -> Self {
-        PortfolioAsset {
+impl From<(PortfolioAssetRequest, Uuid)> for portfolioasset::Model {
+    fn from((req, porfolio_id): (PortfolioAssetRequest, Uuid)) -> Self {
+        portfolioasset::Model {
+            id: Default::default(),
             symbol: req.symbol,
             name: req.name,
             asset_class: req.aclass.into(),
-            base_ccy: req.base_ccy,
+            currency: req.base_ccy,
             provider: req.provider,
             quantity: req.qty,
             price: req.price,
             max_fee_impact: req.fees.as_ref().map(|x| x.max_fee_impact),
-            fee_type: req.fees.as_ref().map(|x| x.fee_type),
-            fee_amount: req.fees.as_ref().and_then(|x| x.fee_type.fee_amount()),
-            fee_rate: req.fees.as_ref().and_then(|x| x.fee_type.fee_rate()),
-            min_fee: req.fees.as_ref().and_then(|x| x.fee_type.min_fee()),
             target_weight: req.target_weight,
-            max_fee: req.fees.as_ref().and_then(|x| x.fee_type.max_fee()),
+            portfolio_id: porfolio_id,
+            fee_structure: req.fees.as_mut(),
         }
     }
 }

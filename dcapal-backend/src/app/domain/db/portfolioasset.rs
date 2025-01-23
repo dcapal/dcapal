@@ -10,6 +10,7 @@ use crate::app::domain::db::fee::FeeStructure;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
+    pub symbol: String,
     pub portfolio_id: Uuid,
     pub name: String,
     pub asset_class: String,

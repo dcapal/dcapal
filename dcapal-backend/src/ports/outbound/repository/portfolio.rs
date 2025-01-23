@@ -19,11 +19,39 @@ impl PortfolioRepository {
         &self,
         user_id: Uuid,
     ) -> Result<Vec<(portfolio::Model, Vec<portfolioasset::Model>)>> {
+
         let portfolios_with_assets = portfolio::Entity::find()
             .filter(portfolio::Column::UserId.eq(user_id))
             .find_with_related(PortfolioAsset)
             .all(&self.db_conn)
             .await?;
+
         Ok(portfolios_with_assets)
+    }
+
+    pub async fn upsert(
+        &self,
+        user_id: Uuid,
+        portfolio: portfolio::ActiveModel,
+    ) -> Result<portfolio::Model> {
+
+        let portfolio = portfolio
+            .upsert()
+            .filter(portfolio::Column::UserId.eq(user_id))
+            .exec(&self.db_conn)
+            .await?;
+
+        Ok(portfolio)
+    }
+
+    pub async fn soft_delete(&self, user_id: Uuid, portfolio_id: Uuid) -> Result<()> {
+        portfolio::Entity::update()
+            .set(portfolio::Column::Deleted, true)
+            .filter(portfolio::Column::UserId.eq(user_id))
+            .filter(portfolio::Column::Id.eq(portfolio_id))
+            .exec(&self.db_conn)
+            .await?;
+
+        Ok(())
     }
 }
