@@ -1,13 +1,12 @@
 use crate::app::domain::db::fee::FeeStructure;
-use crate::app::domain::db::{portfolio, portfolioasset};
+use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::app::infra::claim::Claims;
-use crate::{app, AppContext};
+use crate::{app, AppContext, DateTime};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use bigdecimal::BigDecimal;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use utoipa::ToSchema;
@@ -43,7 +42,7 @@ pub struct PortfoliosRequest {
     pub quote_ccy: String,
     pub fees: Option<TransactionFeesRequest>,
     pub assets: Vec<PortfolioAssetRequest>,
-    pub last_updated_at: DateTime<Utc>,
+    pub last_updated_at: DateTime,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -82,9 +81,9 @@ impl From<(PortfoliosRequest, Uuid)> for portfolio::Model {
     }
 }
 
-impl From<(PortfolioAssetRequest, Uuid)> for portfolioasset::Model {
+impl From<(PortfolioAssetRequest, Uuid)> for portfolio_asset::Model {
     fn from((req, porfolio_id): (PortfolioAssetRequest, Uuid)) -> Self {
-        portfolioasset::Model {
+        portfolio_asset::Model {
             id: Default::default(),
             symbol: req.symbol,
             name: req.name,
@@ -96,7 +95,7 @@ impl From<(PortfolioAssetRequest, Uuid)> for portfolioasset::Model {
             max_fee_impact: req.fees.as_ref().map(|x| x.max_fee_impact),
             target_weight: req.target_weight,
             portfolio_id: porfolio_id,
-            fee_structure: req.fees.as_mut(),
+            fee_structure: req.fees.as_ref().map(|x| x.fee_type),
         }
     }
 }

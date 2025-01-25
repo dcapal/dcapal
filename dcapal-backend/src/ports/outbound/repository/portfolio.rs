@@ -1,5 +1,5 @@
 use crate::app::domain::db::portfolio::Relation::PortfolioAsset;
-use crate::app::domain::db::{portfolio, portfolioasset};
+use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::error::Result;
 use sea_orm::{sqlx, DatabaseConnection, EntityTrait, QueryFilter, SqlxPostgresConnector};
 use uuid::Uuid;
@@ -18,7 +18,7 @@ impl PortfolioRepository {
     pub async fn get_user_portfolios_with_assets(
         &self,
         user_id: Uuid,
-    ) -> Result<Vec<(portfolio::Model, Vec<portfolioasset::Model>)>> {
+    ) -> Result<Vec<(portfolio::Model, Vec<portfolio_asset::Model>)>> {
 
         let portfolios_with_assets = portfolio::Entity::find()
             .filter(portfolio::Column::UserId.eq(user_id))

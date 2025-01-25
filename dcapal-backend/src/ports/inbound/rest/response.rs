@@ -1,14 +1,15 @@
 use bigdecimal::BigDecimal;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 use crate::app::domain::db::fee::FeeStructure;
-use crate::app::domain::db::{portfolio, portfolioasset};
+use crate::app::domain::db::{portfolio, portfolio_asset};
+use crate::DateTime;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct UserPortfoliosResponse {
-    pub portfolios: Vec<PortfolioResponse>,
+pub struct SyncPortfoliosResponse {
+    pub updated_portfolios: Vec<PortfolioResponse>,
+    pub deleted_portfolios: Vec<Uuid>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -18,7 +19,7 @@ pub struct PortfolioResponse {
     pub quote_ccy: String,
     pub fees: Option<TransactionFeesResponse>,
     pub assets: Vec<PortfolioAssetResponse>,
-    pub last_updated_at: DateTime<Utc>,
+    pub last_updated_at: DateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -40,8 +41,8 @@ pub struct TransactionFeesResponse {
     pub fee_type: FeeStructure,
 }
 
-impl From<(Vec<portfolio::Model>, Vec<portfolioasset::Model>)> for UserPortfoliosResponse {
-    fn from(input: (Vec<portfolio::Model>, Vec<portfolioasset::Model>)) -> Self {
+impl From<(Vec<portfolio::Model>, Vec<portfolio_asset::Model>)> for SyncPortfoliosResponse {
+    fn from(input: (Vec<portfolio::Model>, Vec<portfolio_asset::Model>)) -> Self {
         let (portfolios_data, assets_data) = input;
         let mut portfolios = Vec::new();
 
@@ -82,6 +83,6 @@ impl From<(Vec<portfolio::Model>, Vec<portfolioasset::Model>)> for UserPortfolio
             });
         }
 
-        Self { portfolios }
+        Self { updated_portfolios: portfolios }
     }
 }

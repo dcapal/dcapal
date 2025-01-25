@@ -1,6 +1,8 @@
 use crate::error::Result;
-use crate::ports::inbound::rest::request::SyncPortfoliosRequest;
+use crate::ports::inbound::rest::request::{PortfoliosRequest, SyncPortfoliosRequest};
+use crate::ports::inbound::rest::response::SyncPortfoliosResponse;
 use crate::ports::outbound::repository::portfolio::PortfolioRepository;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -18,31 +20,48 @@ impl PortfolioService {
     pub async fn sync_portfolios(
         &self,
         user_id: Uuid,
-        portfolio: SyncPortfoliosRequest,
-    ) -> Result<Vec<UserPortfoliosResponse>> {
-
-        let all_user_portfolios = self
+        req: SyncPortfoliosRequest,
+    ) -> Result<SyncPortfoliosResponse> {
+        let db_portfolios = self
             .portfolio_repository
             .get_user_portfolios_with_assets(user_id)
             .await?;
 
-        let portfolios_to_sync = portfolio
-            .portfolios
-            .iter()
-            .filter(|p| {
-                p.last_updated_at.gt(&all_user_portfolios
-                    .iter()
-                    .filter(|(p, _)| p.id == p.id)
-                    .map(|(p, _)| p.last_updated_at))
-            })
-            .collect();
+        let mut client_map: HashMap<Uuid, PortfoliosRequest> =
+            req.portfolios.iter().map(|pf| (pf.id, pf)).collect();
 
-        self.portfolio_repository
-            .upsert(user_id, portfolios_to_sync)
-            .await?;
+        // Response data
+        let mut updated_portfolios = Vec::new();
+        let mut deleted_portfolios = Vec::new();
 
-        self.portfolio_repository
-            .soft_delete(user_id, portfolio.deleted_portfolios)
-            .await?;
+        // Process server-side portfolios
+        for db_pf in db_portfolios {
+            if let Some(client_pf) = client_map.get(&db_pf.0.id) {
+                if db_pf.deleted {
+                    deleted_portfolios.push(db_pf.0.id);
+                } else if db_pf.0.last_updated_at > client_pf.last_updated_at {
+                    updated_portfolios.push(db_pf);
+                }
+                // portfolios not on client side
+            } else {
+                if db_pf.0.deleted {
+                    deleted_portfolios.push(db_pf.0.id);
+                } else {
+                    updated_portfolios.push(db_pf);
+                }
+            }
+        }
+
+        // Process client-side portfolios
+        for client_pf in req.portfolios {
+            if !db_portfolios.iter().any(|db_pf| db_pf.0.id == client_pf.id) {
+                self.portfolio_repository.upsert(user_id, client_pf.into()).await?;
+            }
+        }
+
+        Ok(SyncPortfoliosResponse {
+            updated_portfolios,
+            deleted_portfolios,
+        })
     }
 }
