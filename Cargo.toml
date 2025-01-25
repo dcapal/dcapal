@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["dcapal-backend", "dcapal-optimizer-wasm"]
+members = ["dcapal-backend", "dcapal-optimizer-wasm", "dcapal-backend/migration"]
 
 [workspace.package]
 version = "0.8.0"

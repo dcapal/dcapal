@@ -1,7 +1,6 @@
-use crate::app::domain::entity::fee::FeeStructure;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
-use sea_orm::{DeriveEntityModel, Related, RelationDef};
+use sea_orm::{DeriveEntityModel, DeriveRelation, EnumIter, Related, RelationDef};
 use uuid::Uuid;
 use crate::app::domain::db::fee::FeeStructure;
 
@@ -23,7 +22,7 @@ pub struct Model {
     pub fee_structure: FeeStructure,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::portfolio::Entity",

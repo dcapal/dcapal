@@ -51,18 +51,18 @@ impl From<(Vec<portfolio::Model>, Vec<portfolio_asset::Model>)> for SyncPortfoli
                 .iter()
                 .filter(|asset| asset.portfolio_id == portfolio.id)
                 .map(|asset| {
-                    let fees = asset.fees.as_ref().map(|fees| TransactionFeesResponse {
-                        max_fee_impact: fees.max_fee_impact.clone(),
-                        fee_type: fees.fee_type.clone(),
-                    });
+                    let fees = TransactionFeesResponse {
+                        max_fee_impact: asset.max_fee_impact,
+                        fee_type: asset.fee_structure,
+                    };
 
                     PortfolioAssetResponse {
                         symbol: asset.symbol.clone(),
                         name: asset.name.clone(),
-                        aclass: asset.aclass.clone(),
-                        base_ccy: asset.base_ccy.clone(),
+                        aclass: asset.asset_class.clone(),
+                        base_ccy: asset.currency.clone(),
                         provider: asset.provider.clone(),
-                        qty: asset.qty.clone(),
+                        qty: asset.quantity.clone(),
                         target_weight: asset.target_weight.clone(),
                         price: asset.price.clone(),
                         fees,
@@ -73,11 +73,11 @@ impl From<(Vec<portfolio::Model>, Vec<portfolio_asset::Model>)> for SyncPortfoli
             portfolios.push(PortfolioResponse {
                 id: portfolio.id,
                 name: portfolio.name.clone(),
-                quote_ccy: portfolio.quote_ccy.clone(),
-                fees: portfolio.fees.as_ref().map(|fees| TransactionFeesResponse {
-                    max_fee_impact: fees.max_fee_impact.clone(),
-                    fee_type: fees.fee_type.clone(),
-                }),
+                quote_ccy: portfolio.currency.clone(),
+                fees: TransactionFeesResponse {
+                    max_fee_impact: portfolio.max_fee_impact,
+                    fee_type: portfolio.fee_structure,
+                },
                 assets: portfolio_assets,
                 last_updated_at: portfolio.last_updated_at,
             });

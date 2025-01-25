@@ -12,13 +12,13 @@ use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
-use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
     time::Duration,
 };
+use sea_orm::sqlx::PgPool;
+use sea_orm::sqlx::postgres::PgPoolOptions;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;

@@ -1,6 +1,7 @@
+use sea_orm::sqlx;
+use sea_orm::sqlx::PgPool;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
-use sqlx::PgPool;
 
 pub async fn save_user_if_not_present(postgres: &PgPool, claims: &Claims) -> Result<()> {
     let mut tx = postgres.begin().await?;
