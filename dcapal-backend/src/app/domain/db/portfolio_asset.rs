@@ -1,7 +1,6 @@
 use bigdecimal::BigDecimal;
-use chrono::{DateTime, Utc};
-use sea_orm::{DeriveEntityModel, DeriveRelation, EnumIter, Related, RelationDef};
 use uuid::Uuid;
+use sea_orm::entity::prelude::*;
 use crate::app::domain::db::fee::FeeStructure;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -43,3 +42,5 @@ impl Related<super::portfolio::Entity> for Entity {
         Some(super::portfolio::Relation::PortfolioAsset.def().rev())
     }
 }
+
+impl ActiveModelBehavior for ActiveModel {}

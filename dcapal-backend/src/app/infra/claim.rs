@@ -9,8 +9,6 @@ use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde::Serialize;
-
-use crate::app::services;
 use uuid::Uuid;
 
 const JWT_AUDIENCE_DOMAIN: &str = "authenticated";
@@ -70,7 +68,7 @@ impl FromRequestParts<AppContext> for Claims {
             &DecodingKey::from_secret(jwt_secret.as_ref()),
         )?
         .claims;
-        services::session::save_user_if_not_present(&state.postgres, &user_claims).await?;
+        // services::session::save_user_if_not_present(&state.postgres, &user_claims).await?; TODO: implement this feature
         Ok(user_claims)
     }
 }

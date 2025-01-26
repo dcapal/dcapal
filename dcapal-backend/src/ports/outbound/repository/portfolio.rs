@@ -1,10 +1,10 @@
-use crate::app::domain::db::portfolio::Relation::PortfolioAsset;
 use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::error::Result;
-use sea_orm::{sqlx, DatabaseConnection, EntityTrait, QueryFilter, SqlxPostgresConnector};
+use sea_orm::{
+    sqlx, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, SqlxPostgresConnector,
+};
 use uuid::Uuid;
 
-#[derive(Clone)]
 pub struct PortfolioRepository {
     pub db_conn: DatabaseConnection,
 }
@@ -19,10 +19,9 @@ impl PortfolioRepository {
         &self,
         user_id: Uuid,
     ) -> Result<Vec<(portfolio::Model, Vec<portfolio_asset::Model>)>> {
-
         let portfolios_with_assets = portfolio::Entity::find()
             .filter(portfolio::Column::UserId.eq(user_id))
-            .find_with_related(PortfolioAsset)
+            .find_with_related(portfolio_asset::Entity)
             .all(&self.db_conn)
             .await?;
 
@@ -34,7 +33,6 @@ impl PortfolioRepository {
         user_id: Uuid,
         portfolio: portfolio::ActiveModel,
     ) -> Result<portfolio::Model> {
-
         let portfolio = portfolio
             .upsert()
             .filter(portfolio::Column::UserId.eq(user_id))
@@ -44,13 +42,16 @@ impl PortfolioRepository {
         Ok(portfolio)
     }
 
-    pub async fn soft_delete(&self, user_id: Uuid, portfolio_id: Uuid) -> Result<()> {
-        portfolio::Entity::update()
-            .set(portfolio::Column::Deleted, true)
-            .filter(portfolio::Column::UserId.eq(user_id))
-            .filter(portfolio::Column::Id.eq(portfolio_id))
-            .exec(&self.db_conn)
+    pub async fn soft_delete(&self, portfolio_id: Uuid) -> Result<()> {
+        let portfolio: Option<portfolio::Model> = portfolio::Entity::find_by_id(portfolio_id)
+            .one(&self.db_conn)
             .await?;
+
+        let mut portfolio: portfolio::ActiveModel = portfolio.unwrap().into();
+
+        portfolio.deleted = Set(true);
+
+        let portfolio: portfolio::ActiveModel = portfolio.update(&self.db_conn).await?;
 
         Ok(())
     }

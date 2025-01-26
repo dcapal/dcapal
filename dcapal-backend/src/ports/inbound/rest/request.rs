@@ -1,7 +1,7 @@
 use crate::app::domain::db::fee::FeeStructure;
 use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::app::infra::claim::Claims;
-use crate::{app, AppContext, DateTime};
+use crate::{AppContext, DateTime};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -34,7 +34,7 @@ pub struct SyncPortfoliosRequest {
     pub deleted_portfolios: Vec<Uuid>,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfoliosRequest {
     pub id: Uuid,
@@ -43,6 +43,21 @@ pub struct PortfoliosRequest {
     pub fees: Option<TransactionFeesRequest>,
     pub assets: Vec<PortfolioAssetRequest>,
     pub last_updated_at: DateTime,
+}
+
+impl From <PortfoliosRequest> for portfolio::ActiveModel {
+    fn from(req: PortfoliosRequest) -> Self {
+        portfolio::ActiveModel {
+            id: req.id,
+            user_id: Default::default(),
+            name: req.name,
+            currency: req.quote_ccy,
+            deleted: false,
+            last_updated_at: req.last_updated_at,
+            max_fee_impact: req.fees.as_ref().map(|x| x.max_fee_impact).unwrap(),
+            fee_structure: req.fees.as_ref().map(|x| x.fee_type),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]

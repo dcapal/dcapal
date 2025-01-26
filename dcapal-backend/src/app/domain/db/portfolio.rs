@@ -1,11 +1,10 @@
-use bigdecimal::BigDecimal;
-use sea_orm::{DeriveEntityModel, DeriveRelation, EnumIter, Related, RelationDef};
-use time::Date;
-use uuid::Uuid;
 use crate::app::domain::db::fee::FeeStructure;
 use crate::DateTime;
+use bigdecimal::BigDecimal;
+use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "portfolio")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -15,7 +14,7 @@ pub struct Model {
     pub currency: String,
     pub deleted: bool,
     pub last_updated_at: DateTime,
-    pub max_fee_impact: BigDecimal,
+    pub max_fee_impact: Option<BigDecimal>,
     pub fee_structure: FeeStructure,
 }
 
@@ -23,6 +22,12 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::portfolio_asset::Entity")]
     PortfolioAsset,
+    #[sea_orm(
+        belongs_to = "super::user::Entity",
+        from = "Column::UserId",
+        to = "super::user::Column::Id"
+    )]
+    User,
 }
 
 impl Related<super::portfolio_asset::Entity> for Entity {
@@ -30,3 +35,11 @@ impl Related<super::portfolio_asset::Entity> for Entity {
         Relation::PortfolioAsset.def()
     }
 }
+
+impl Related<super::user::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::User.def()
+    }
+}
+
+impl ActiveModelBehavior for ActiveModel {}

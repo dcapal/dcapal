@@ -3,7 +3,6 @@ use crate::DateTime;
 use chrono::{Duration, Timelike, Utc};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 pub type AssetId = String;
 pub type MarketId = String;

@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate const_format;
 
-use axum::routing::put;
 use axum::{
     extract::connect_info::IntoMakeServiceWithConnectInfo,
     middleware,
@@ -12,13 +11,14 @@ use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use metrics::{counter, describe_counter, describe_histogram, Unit};
+use sea_orm::sqlx;
+use sea_orm::sqlx::postgres::PgPoolOptions;
+use sea_orm::sqlx::PgPool;
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
     time::Duration,
 };
-use sea_orm::sqlx::PgPool;
-use sea_orm::sqlx::postgres::PgPoolOptions;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
@@ -26,6 +26,8 @@ use tracing::{error, info};
 
 use crate::app::services::portfolio::PortfolioService;
 use crate::config::Postgres;
+use crate::ports::outbound::repository::portfolio::PortfolioRepository;
+use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
     app::{
         infra,
@@ -45,7 +47,6 @@ use crate::{
         },
     },
 };
-use crate::ports::outbound::repository::portfolio::PortfolioRepository;
 
 pub mod app;
 pub mod config;
@@ -86,6 +87,7 @@ struct Repository {
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
     pub portfolio: Arc<PortfolioRepository>,
+    pub user: Arc<UserRepository>,
 }
 
 pub struct DcaServer {
@@ -116,6 +118,7 @@ impl DcaServer {
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
             portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
+            user: Arc::new(UserRepository::new(postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {

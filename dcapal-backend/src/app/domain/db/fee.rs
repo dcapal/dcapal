@@ -1,8 +1,8 @@
 use bigdecimal::BigDecimal;
-use sea_orm::DeriveActiveEnum;
+use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, DeriveActiveEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
 pub enum FeeStructure {
