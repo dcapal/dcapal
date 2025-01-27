@@ -55,7 +55,7 @@ impl PortfolioService {
         // Process client-side portfolios
         for client_pf in req.portfolios {
             if !db_portfolios.clone().iter().any(|db_pf| db_pf.0.id == client_pf.id) {
-                self.portfolio_repository.upsert(user_id, client_pf.into()).await?;
+                self.portfolio_repository.upsert(client_pf.into()).await?;
             }
         }
 

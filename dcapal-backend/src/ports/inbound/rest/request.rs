@@ -60,7 +60,7 @@ impl From <PortfoliosRequest> for portfolio::ActiveModel {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetRequest {
     pub symbol: String,
@@ -74,7 +74,7 @@ pub struct PortfolioAssetRequest {
     pub fees: Option<TransactionFeesRequest>,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesRequest {
     pub max_fee_impact: BigDecimal,

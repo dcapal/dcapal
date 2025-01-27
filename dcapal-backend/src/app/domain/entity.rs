@@ -1,7 +1,6 @@
 use crate::app::infra::utils::Expiring;
 use crate::DateTime;
 use chrono::{Duration, Timelike, Utc};
-use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub type AssetId = String;

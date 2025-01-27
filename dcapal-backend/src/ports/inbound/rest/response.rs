@@ -64,10 +64,10 @@ impl From <(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespons
             id: portfolio.id,
             name: portfolio.name.clone(),
             quote_ccy: portfolio.currency.clone(),
-            fees: Some(TransactionFeesResponse {
+            fees: TransactionFeesResponse {
                 max_fee_impact: portfolio.max_fee_impact,
                 fee_type: portfolio.fee_structure,
-            }),
+            },
             assets: portfolio_assets,
             last_updated_at: portfolio.last_updated_at,
         }
