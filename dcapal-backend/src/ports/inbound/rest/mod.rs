@@ -6,6 +6,7 @@ use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use axum_extra::{headers::CacheControl, TypedHeader};
+use bigdecimal::BigDecimal;
 use hyper::StatusCode;
 use lazy_static::lazy_static;
 use metrics::counter;
@@ -138,3 +139,17 @@ pub async fn get_imported_portfolio(
         None => Ok(StatusCode::NOT_FOUND.into_response()),
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum FeeStructure {
+    ZeroFee,
+    Fixed {
+        fee_amount: BigDecimal,
+    },
+    Variable {
+        fee_rate: BigDecimal,
+        min_fee: BigDecimal,
+        max_fee: Option<BigDecimal>,
+    },
+}
+

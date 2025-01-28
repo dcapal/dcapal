@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::ports::inbound::rest::request::{PortfoliosRequest, SyncPortfoliosRequest};
+use crate::ports::inbound::rest::request::{PortfolioRequest, SyncPortfoliosRequest};
 use crate::ports::inbound::rest::response::{PortfolioResponse, SyncPortfoliosResponse};
 use crate::ports::outbound::repository::portfolio::PortfolioRepository;
 use std::collections::HashMap;
@@ -27,7 +27,7 @@ impl PortfolioService {
             .get_user_portfolios_with_assets(user_id)
             .await?;
 
-        let client_map: HashMap<Uuid, PortfoliosRequest> =
+        let client_map: HashMap<Uuid, PortfolioRequest> =
             req.portfolios.iter().map(|pf| (pf.id, pf.clone())).collect();
 
         // Response data

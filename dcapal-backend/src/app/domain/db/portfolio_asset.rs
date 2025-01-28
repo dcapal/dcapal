@@ -1,7 +1,7 @@
 use bigdecimal::BigDecimal;
 use uuid::Uuid;
 use sea_orm::entity::prelude::*;
-use crate::app::domain::db::fee::FeeStructure;
+use crate::app::domain::db::fee_type::FeeType;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "portfolio_asset")]
@@ -18,7 +18,11 @@ pub struct Model {
     pub target_weight: BigDecimal,
     pub price: BigDecimal,
     pub max_fee_impact: Option<BigDecimal>,
-    pub fee_structure: FeeStructure,
+    pub fee_type: Option<FeeType>,
+    pub fee_amount: Option<BigDecimal>,
+    pub fee_rate: Option<BigDecimal>,
+    pub min_fee: Option<BigDecimal>,
+    pub max_fee: Option<BigDecimal>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

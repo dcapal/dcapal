@@ -5,6 +5,7 @@ use sea_orm::{
     SqlxPostgresConnector,
 };
 use uuid::Uuid;
+use crate::ports::inbound::rest::request::PortfolioRequest;
 
 pub struct PortfolioRepository {
     pub db_conn: DatabaseConnection,
@@ -29,7 +30,9 @@ impl PortfolioRepository {
         Ok(portfolios_with_assets)
     }
 
-    pub async fn upsert(&self, portfolio: portfolio::ActiveModel) -> Result<portfolio::ActiveModel> {
+    pub async fn upsert(&self, user_id: Uuid, portfolio: PortfolioRequest) -> Result<portfolio::ActiveModel> {
+
+
         let portfolio = portfolio.save(&self.db_conn).await?;
 
         Ok(portfolio)

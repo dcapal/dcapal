@@ -1,8 +1,8 @@
-use crate::app::domain::db::fee::FeeStructure;
 use crate::DateTime;
 use bigdecimal::BigDecimal;
 use sea_orm::entity::prelude::*;
 use uuid::Uuid;
+use crate::app::domain::db::fee_type::FeeType;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "portfolio")]
@@ -15,7 +15,11 @@ pub struct Model {
     pub deleted: bool,
     pub last_updated_at: DateTime,
     pub max_fee_impact: Option<BigDecimal>,
-    pub fee_structure: FeeStructure,
+    pub fee_type: Option<FeeType>,
+    pub fee_amount: Option<BigDecimal>,
+    pub fee_rate: Option<BigDecimal>,
+    pub min_fee: Option<BigDecimal>,
+    pub max_fee: Option<BigDecimal>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
