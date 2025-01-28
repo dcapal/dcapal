@@ -1,11 +1,13 @@
 use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::error::Result;
+use crate::ports::inbound::rest::request::PortfolioRequest;
+use crate::ports::inbound::rest::FeeStructure;
+use bigdecimal::BigDecimal;
 use sea_orm::{
     entity::*, sqlx, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     SqlxPostgresConnector,
 };
 use uuid::Uuid;
-use crate::ports::inbound::rest::request::PortfolioRequest;
 
 pub struct PortfolioRepository {
     pub db_conn: DatabaseConnection,
@@ -30,10 +32,71 @@ impl PortfolioRepository {
         Ok(portfolios_with_assets)
     }
 
-    pub async fn upsert(&self, user_id: Uuid, portfolio: PortfolioRequest) -> Result<portfolio::ActiveModel> {
+    //TODO: refactoring
+    pub async fn upsert(
+        &self,
+        user_id: Uuid,
+        portfolio: PortfolioRequest,
+    ) -> Result<portfolio::ActiveModel> {
+        let (max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee) =
+            if let Some(fees) = portfolio.fees {
+                match fees.fee_type {
+                    FeeStructure::ZeroFee => (
+                        Set(fees.max_fee_impact),
+                        Set("zero".to_string()),
+                        Set(BigDecimal::from(0)),
+                        Set(BigDecimal::from(0)),
+                        Set(BigDecimal::from(0)),
+                        Set(None),
+                    ),
+                    FeeStructure::Fixed { fee_amount } => (
+                        Set(fees.max_fee_impact),
+                        Set("fixed".to_string()),
+                        Set(fee_amount),
+                        Set(BigDecimal::from(0)),
+                        Set(BigDecimal::from(0)),
+                        Set(None),
+                    ),
+                    FeeStructure::Variable {
+                        fee_rate,
+                        min_fee,
+                        max_fee,
+                    } => (
+                        Set(fees.max_fee_impact),
+                        Set("variable".to_string()),
+                        Set(BigDecimal::from(0)),
+                        Set(fee_rate),
+                        Set(min_fee),
+                        Set(max_fee),
+                    ),
+                }
+            } else {
+                (
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                )
+            };
 
+        let portfolio_model = portfolio::ActiveModel {
+            id: Set(portfolio.id),
+            user_id: Set(user_id),
+            name: Set(portfolio.name.clone()),
+            currency,
+            deleted: Set(false), // When creating a new portfolio, it is not deleted
+            last_updated_at: Set(portfolio.last_updated_at),
+            max_fee_impact,
+            fee_type,
+            fee_amount,
+            fee_rate,
+            min_fee,
+            max_fee,
+        };
 
-        let portfolio = portfolio.save(&self.db_conn).await?;
+        let portfolio = portfolio_model.save(&self.db_conn).await?;
 
         Ok(portfolio)
     }

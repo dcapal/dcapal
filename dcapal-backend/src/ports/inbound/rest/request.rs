@@ -1,4 +1,3 @@
-use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::app::infra::claim::Claims;
 use crate::ports::inbound::rest::FeeStructure;
 use crate::{AppContext, DateTime};
