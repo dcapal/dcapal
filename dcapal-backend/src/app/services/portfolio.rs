@@ -27,8 +27,11 @@ impl PortfolioService {
             .get_user_portfolios_with_assets(user_id)
             .await?;
 
-        let client_map: HashMap<Uuid, PortfolioRequest> =
-            req.portfolios.iter().map(|pf| (pf.id, pf.clone())).collect();
+        let client_map: HashMap<Uuid, PortfolioRequest> = req
+            .portfolios
+            .iter()
+            .map(|pf| (pf.id, pf.clone()))
+            .collect();
 
         // Response data
         let mut updated_portfolios: Vec<PortfolioResponse> = Vec::new();
@@ -54,8 +57,14 @@ impl PortfolioService {
 
         // Process client-side portfolios
         for client_pf in req.portfolios {
-            if !db_portfolios.clone().iter().any(|db_pf| db_pf.0.id == client_pf.id) {
-                self.portfolio_repository.upsert(client_pf.into()).await?;
+            if !db_portfolios
+                .clone()
+                .iter()
+                .any(|db_pf| db_pf.0.id == client_pf.id)
+            {
+                self.portfolio_repository
+                    .upsert(user_id, client_pf.into())
+                    .await?;
             }
         }
 
