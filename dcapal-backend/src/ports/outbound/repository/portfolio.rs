@@ -65,10 +65,10 @@ impl PortfolioRepository {
                     } => (
                         Set(fees.max_fee_impact),
                         Set(Some(FeeType::Variable)),
-                        Set(BigDecimal::from(0)),
-                        Set(fee_rate),
-                        Set(min_fee),
-                        Set(max_fee),
+                        Set(None),
+                        Set(Some(fee_rate)),
+                        Set(Some(min_fee)),
+                        Set(Some(max_fee)),
                     ),
                 }
             } else {
