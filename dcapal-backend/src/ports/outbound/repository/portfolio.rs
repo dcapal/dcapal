@@ -68,7 +68,7 @@ impl PortfolioRepository {
                         Set(None),
                         Set(Some(fee_rate)),
                         Set(Some(min_fee)),
-                        Set(Some(max_fee)),
+                        Set(max_fee),
                     ),
                 }
             } else {
