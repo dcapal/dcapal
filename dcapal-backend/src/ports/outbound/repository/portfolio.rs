@@ -8,6 +8,7 @@ use sea_orm::{
     SqlxPostgresConnector,
 };
 use uuid::Uuid;
+use crate::app::domain::db::fee_type::FeeType;
 
 pub struct PortfolioRepository {
     pub db_conn: DatabaseConnection,
@@ -43,18 +44,18 @@ impl PortfolioRepository {
                 match fees.fee_type {
                     FeeStructure::ZeroFee => (
                         Set(fees.max_fee_impact),
-                        Set("zero".to_string()),
-                        Set(BigDecimal::from(0)),
-                        Set(BigDecimal::from(0)),
-                        Set(BigDecimal::from(0)),
+                        Set(Some(FeeType::ZeroFee)),
+                        Set(None),
+                        Set(None),
+                        Set(None),
                         Set(None),
                     ),
                     FeeStructure::Fixed { fee_amount } => (
                         Set(fees.max_fee_impact),
-                        Set("fixed".to_string()),
-                        Set(fee_amount),
-                        Set(BigDecimal::from(0)),
-                        Set(BigDecimal::from(0)),
+                        Set(Some(FeeType::Fixed)),
+                        Set(Some(fee_amount)),
+                        Set(None),
+                        Set(None),
                         Set(None),
                     ),
                     FeeStructure::Variable {
@@ -63,7 +64,7 @@ impl PortfolioRepository {
                         max_fee,
                     } => (
                         Set(fees.max_fee_impact),
-                        Set("variable".to_string()),
+                        Set(Some(FeeType::Variable)),
                         Set(BigDecimal::from(0)),
                         Set(fee_rate),
                         Set(min_fee),
@@ -85,7 +86,7 @@ impl PortfolioRepository {
             id: Set(portfolio.id),
             user_id: Set(user_id),
             name: Set(portfolio.name.clone()),
-            currency,
+            currency: Set(portfolio.quote_ccy.clone()),
             deleted: Set(false), // When creating a new portfolio, it is not deleted
             last_updated_at: Set(portfolio.last_updated_at),
             max_fee_impact,

@@ -147,6 +147,7 @@ pub enum FeeStructure {
         fee_amount: BigDecimal,
     },
     Variable {
+        //TODO: fee amount missing?
         fee_rate: BigDecimal,
         min_fee: BigDecimal,
         max_fee: Option<BigDecimal>,

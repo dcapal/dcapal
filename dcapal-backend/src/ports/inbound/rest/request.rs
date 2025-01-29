@@ -61,7 +61,7 @@ pub struct PortfolioAssetRequest {
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesRequest {
-    pub max_fee_impact: BigDecimal,
+    pub max_fee_impact: Option<BigDecimal>,
     pub fee_type: FeeStructure,
 }
 
