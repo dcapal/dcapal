@@ -43,13 +43,13 @@ impl PortfolioService {
                 if db_pf.0.deleted {
                     deleted_portfolios.push(db_pf.0.id);
                 } else if db_pf.0.last_updated_at > client_pf.last_updated_at {
-                    updated_portfolios.push(db_pf.into());
+                    updated_portfolios.push(db_pf.try_into()?);
                 }
                 // portfolios not on client side
             } else if db_pf.0.deleted {
                 deleted_portfolios.push(db_pf.0.id);
             } else {
-                updated_portfolios.push(db_pf.into());
+                updated_portfolios.push(db_pf.try_into()?);
             }
         }
 

@@ -140,7 +140,7 @@ pub async fn get_imported_portfolio(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeeStructure {
     ZeroFee,
     Fixed {

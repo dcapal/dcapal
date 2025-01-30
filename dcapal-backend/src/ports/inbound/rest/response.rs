@@ -6,6 +6,7 @@ use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+use crate::error::DcaError;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SyncPortfoliosResponse {
@@ -36,43 +37,45 @@ pub struct PortfolioAssetResponse {
     pub fees: TransactionFeesResponse,
 }
 
-impl From<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse {
-    fn from(input: (portfolio::Model, Vec<portfolio_asset::Model>)) -> Self {
+impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse {
+    type Error = DcaError;
+
+    fn try_from(input: (portfolio::Model, Vec<portfolio_asset::Model>)) -> Result<Self, Self::Error> {
         let (portfolio, assets) = input;
         let portfolio_assets: Vec<PortfolioAssetResponse> = assets
             .iter()
             .map(|asset| {
                 let fees = TransactionFeesResponse {
-                    max_fee_impact: asset.max_fee_impact,
+                    max_fee_impact: asset.max_fee_impact.clone(),
                     fee_structure: match asset.fee_type {
                         Some(FeeType::ZeroFee) => FeeStructure::ZeroFee,
                         Some(FeeType::Fixed) => {
-                            if let Some(fee_amount) = asset.fee_amount {
+                            if let Some(fee_amount) = asset.fee_amount.clone() {
                                 FeeStructure::Fixed { fee_amount }
                             } else {
-                                return Err("Fixed fee requires fee_amount to be Some.".to_string());
+                                return Err(DcaError::Generic("Fixed fee requires fee_amount to be Some.".to_string()));
                             }
                         }
                         Some(FeeType::Variable) => {
-                            if let (Some(fee_rate), Some(min_fee)) = (asset.fee_rate, asset.min_fee)
+                            if let (Some(fee_rate), Some(min_fee)) = (asset.fee_rate.clone(), asset.min_fee.clone())
                             {
                                 FeeStructure::Variable {
                                     fee_rate,
                                     min_fee,
-                                    max_fee: asset.max_fee, // `max_fee` is optional, so we can pass it directly
+                                    max_fee: asset.max_fee.clone(), // `max_fee` is optional, so we can pass it directly
                                 }
                             } else {
                                 return Err(
-                                    "Variable fee requires fee_rate and min_fee to be Some."
-                                        .to_string(),
+                                    DcaError::Generic("Variable fee requires fee_rate and min_fee to be Some."
+                                        .to_string()),
                                 );
                             }
                         }
-                        _ => return Err("Fee type is not specified.".to_string()),
+                        _ => return Err(DcaError::Generic("Fee type is not specified.".to_string())),
                     },
                 };
 
-                PortfolioAssetResponse {
+                Ok(PortfolioAssetResponse {
                     symbol: asset.symbol.clone(),
                     name: asset.name.clone(),
                     aclass: asset.asset_class.clone(),
@@ -82,11 +85,11 @@ impl From<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse
                     target_weight: asset.target_weight.clone(),
                     price: asset.price.clone(),
                     fees,
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Self {
+        Ok(Self {
             id: portfolio.id,
             name: portfolio.name.clone(),
             quote_ccy: portfolio.currency.clone(),
@@ -98,11 +101,12 @@ impl From<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse
                         if let Some(fee_amount) = portfolio.fee_amount {
                             FeeStructure::Fixed { fee_amount }
                         } else {
-                            return Err("Fixed fee requires fee_amount to be Some.".to_string());
+                            return Err(DcaError::Generic("Fixed fee requires fee_amount to be Some.".to_string()));
                         }
                     }
                     Some(FeeType::Variable) => {
-                        if let (Some(fee_rate), Some(min_fee)) = (portfolio.fee_rate, portfolio.min_fee)
+                        if let (Some(fee_rate), Some(min_fee)) =
+                            (portfolio.fee_rate, portfolio.min_fee)
                         {
                             FeeStructure::Variable {
                                 fee_rate,
@@ -110,17 +114,16 @@ impl From<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse
                                 max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
                             }
                         } else {
-                            return Err(
-                                "Variable fee requires fee_rate and min_fee to be Some.".to_string(),
-                            );
+                            return Err(DcaError::Generic("Variable fee requires fee_rate and min_fee to be Some."
+                                .to_string()));
                         }
                     }
-                    _ => return Err("Fee type is not specified.".to_string()),
+                    _ => return Err(DcaError::Generic("Fee type is not specified.".to_string())),
                 },
             },
             assets: portfolio_assets,
             last_updated_at: portfolio.last_updated_at,
-        }
+        })
     }
 }
 
@@ -128,53 +131,4 @@ impl From<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse
 pub struct TransactionFeesResponse {
     pub max_fee_impact: Option<BigDecimal>,
     pub fee_structure: FeeStructure,
-}
-
-impl From<(Vec<portfolio::Model>, Vec<portfolio_asset::Model>)> for SyncPortfoliosResponse {
-    fn from(input: (Vec<portfolio::Model>, Vec<portfolio_asset::Model>)) -> Self {
-        let (portfolios_data, assets_data) = input;
-        let mut portfolios = Vec::new();
-
-        for portfolio in portfolios_data {
-            let portfolio_assets: Vec<PortfolioAssetResponse> = assets_data
-                .iter()
-                .filter(|asset| asset.portfolio_id == portfolio.id)
-                .map(|asset| {
-                    let fees = TransactionFeesResponse {
-                        max_fee_impact: asset.clone().max_fee_impact,
-                        fee_type: asset.clone().fee_structure,
-                    };
-
-                    PortfolioAssetResponse {
-                        symbol: asset.symbol.clone(),
-                        name: asset.name.clone(),
-                        aclass: asset.asset_class.clone(),
-                        base_ccy: asset.currency.clone(),
-                        provider: asset.provider.clone(),
-                        qty: asset.quantity.clone(),
-                        target_weight: asset.target_weight.clone(),
-                        price: asset.price.clone(),
-                        fees,
-                    }
-                })
-                .collect();
-
-            portfolios.push(PortfolioResponse {
-                id: portfolio.id,
-                name: portfolio.name.clone(),
-                quote_ccy: portfolio.currency.clone(),
-                fees: TransactionFeesResponse {
-                    max_fee_impact: portfolio.max_fee_impact,
-                    fee_type: portfolio.fee_structure,
-                },
-                assets: portfolio_assets,
-                last_updated_at: portfolio.last_updated_at,
-            });
-        }
-
-        Self {
-            updated_portfolios: portfolios,
-            deleted_portfolios: vec![],
-        } //TODO: check if this is correct
-    }
 }

@@ -2,7 +2,6 @@ use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::error::Result;
 use crate::ports::inbound::rest::request::PortfolioRequest;
 use crate::ports::inbound::rest::FeeStructure;
-use bigdecimal::BigDecimal;
 use sea_orm::{
     entity::*, sqlx, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     SqlxPostgresConnector,

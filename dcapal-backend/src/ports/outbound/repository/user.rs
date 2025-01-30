@@ -1,7 +1,7 @@
 use crate::app::domain::db::user;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
-use sea_orm::{sqlx, DatabaseConnection, EntityTrait, SqlxPostgresConnector};
+use sea_orm::{sqlx, DatabaseConnection, SqlxPostgresConnector};
 
 pub struct UserRepository {
     pub db_conn: DatabaseConnection,
