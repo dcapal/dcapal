@@ -68,7 +68,11 @@ impl FromRequestParts<AppContext> for Claims {
             &DecodingKey::from_secret(jwt_secret.as_ref()),
         )?
         .claims;
-        // services::session::save_user_if_not_present(&state.postgres, &user_claims).await?; TODO: implement this feature
+        state
+            .repos
+            .user
+            .save_user_if_not_present(&user_claims)
+            .await?;
         Ok(user_claims)
     }
 }
