@@ -60,8 +60,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                             }
                         }
                         Some(val) if val == *"Variable" => {
-                            if let (Some(fee_rate), Some(min_fee)) =
-                                (asset.fee_rate, asset.min_fee)
+                            if let (Some(fee_rate), Some(min_fee)) = (asset.fee_rate, asset.min_fee)
                             {
                                 FeeStructure::Variable {
                                     fee_rate,
