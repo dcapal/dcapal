@@ -11,21 +11,6 @@ use tracing::info;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
-pub struct PortfolioHoldingsResponse {
-    pub holdings: Vec<PortfolioResponse>,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
-pub struct PortfolioResponse {
-    pub name: String,
-    pub ticker: String,
-    pub price: f64,
-    pub quantity: f64,
-    pub weight: f64,
-    pub total: f64,
-}
-
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncPortfoliosRequest {
