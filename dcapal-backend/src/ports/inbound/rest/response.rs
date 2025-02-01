@@ -1,12 +1,12 @@
 use crate::app::domain::db::fee_type::FeeType;
 use crate::app::domain::db::{portfolio, portfolio_asset};
+use crate::error::DcaError;
 use crate::ports::inbound::rest::FeeStructure;
 use crate::DateTime;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
-use crate::error::DcaError;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SyncPortfoliosResponse {
@@ -40,7 +40,9 @@ pub struct PortfolioAssetResponse {
 impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse {
     type Error = DcaError;
 
-    fn try_from(input: (portfolio::Model, Vec<portfolio_asset::Model>)) -> Result<Self, Self::Error> {
+    fn try_from(
+        input: (portfolio::Model, Vec<portfolio_asset::Model>),
+    ) -> Result<Self, Self::Error> {
         let (portfolio, assets) = input;
         let portfolio_assets: Vec<PortfolioAssetResponse> = assets
             .iter()
@@ -53,11 +55,14 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                             if let Some(fee_amount) = asset.fee_amount.clone() {
                                 FeeStructure::Fixed { fee_amount }
                             } else {
-                                return Err(DcaError::Generic("Fixed fee requires fee_amount to be Some.".to_string()));
+                                return Err(DcaError::Generic(
+                                    "Fixed fee requires fee_amount to be Some.".to_string(),
+                                ));
                             }
                         }
                         Some(FeeType::Variable) => {
-                            if let (Some(fee_rate), Some(min_fee)) = (asset.fee_rate.clone(), asset.min_fee.clone())
+                            if let (Some(fee_rate), Some(min_fee)) =
+                                (asset.fee_rate.clone(), asset.min_fee.clone())
                             {
                                 FeeStructure::Variable {
                                     fee_rate,
@@ -65,13 +70,15 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                                     max_fee: asset.max_fee.clone(), // `max_fee` is optional, so we can pass it directly
                                 }
                             } else {
-                                return Err(
-                                    DcaError::Generic("Variable fee requires fee_rate and min_fee to be Some."
-                                        .to_string()),
-                                );
+                                return Err(DcaError::Generic(
+                                    "Variable fee requires fee_rate and min_fee to be Some."
+                                        .to_string(),
+                                ));
                             }
                         }
-                        _ => return Err(DcaError::Generic("Fee type is not specified.".to_string())),
+                        _ => {
+                            return Err(DcaError::Generic("Fee type is not specified.".to_string()))
+                        }
                     },
                 };
 
@@ -101,7 +108,9 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                         if let Some(fee_amount) = portfolio.fee_amount {
                             FeeStructure::Fixed { fee_amount }
                         } else {
-                            return Err(DcaError::Generic("Fixed fee requires fee_amount to be Some.".to_string()));
+                            return Err(DcaError::Generic(
+                                "Fixed fee requires fee_amount to be Some.".to_string(),
+                            ));
                         }
                     }
                     Some(FeeType::Variable) => {
@@ -114,8 +123,10 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                                 max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
                             }
                         } else {
-                            return Err(DcaError::Generic("Variable fee requires fee_rate and min_fee to be Some."
-                                .to_string()));
+                            return Err(DcaError::Generic(
+                                "Variable fee requires fee_rate and min_fee to be Some."
+                                    .to_string(),
+                            ));
                         }
                     }
                     _ => return Err(DcaError::Generic("Fee type is not specified.".to_string())),

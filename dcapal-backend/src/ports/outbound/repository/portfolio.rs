@@ -1,3 +1,4 @@
+use crate::app::domain::db::fee_type::FeeType;
 use crate::app::domain::db::{portfolio, portfolio_asset};
 use crate::error::Result;
 use crate::ports::inbound::rest::request::PortfolioRequest;
@@ -7,7 +8,6 @@ use sea_orm::{
     SqlxPostgresConnector,
 };
 use uuid::Uuid;
-use crate::app::domain::db::fee_type::FeeType;
 
 pub struct PortfolioRepository {
     pub db_conn: DatabaseConnection,

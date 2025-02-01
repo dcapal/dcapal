@@ -60,9 +60,7 @@ impl PortfolioService {
                 .iter()
                 .any(|db_pf| db_pf.0.id == client_pf.id)
             {
-                self.portfolio_repository
-                    .upsert(user_id, client_pf)
-                    .await?;
+                self.portfolio_repository.upsert(user_id, client_pf).await?;
             }
         }
 

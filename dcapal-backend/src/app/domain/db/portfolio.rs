@@ -1,8 +1,8 @@
+use crate::app::domain::db::fee_type::FeeType;
 use crate::DateTime;
 use bigdecimal::BigDecimal;
 use sea_orm::entity::prelude::*;
 use uuid::Uuid;
-use crate::app::domain::db::fee_type::FeeType;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "portfolio")]

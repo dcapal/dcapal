@@ -152,4 +152,3 @@ pub enum FeeStructure {
         max_fee: Option<BigDecimal>,
     },
 }
-

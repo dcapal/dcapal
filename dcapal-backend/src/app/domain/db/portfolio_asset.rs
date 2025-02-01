@@ -1,7 +1,7 @@
-use bigdecimal::BigDecimal;
-use uuid::Uuid;
-use sea_orm::entity::prelude::*;
 use crate::app::domain::db::fee_type::FeeType;
+use bigdecimal::BigDecimal;
+use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "portfolio_asset")]

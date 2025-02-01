@@ -1,6 +1,6 @@
 use crate::DateTime;
-use uuid::Uuid;
 use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "user")]
