@@ -1,5 +1,6 @@
 //! The [`rest`](self) module implements the REST API of the system
 
+use std::fmt::Display;
 use std::time::Duration;
 
 use axum::extract::{Path, Query, State};
@@ -153,12 +154,12 @@ pub enum FeeStructure {
     },
 }
 
-impl ToString for FeeStructure {
-    fn to_string(&self) -> String {
+impl Display for FeeStructure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FeeStructure::ZeroFee => "ZeroFee".to_string(),
-            FeeStructure::Fixed { .. } => "Fixed".to_string(),
-            FeeStructure::Variable { .. } => "Variable".to_string(),
+            FeeStructure::ZeroFee => write!(f, "ZeroFee"),
+            FeeStructure::Fixed { .. } => write!(f, "Fixed"),
+            FeeStructure::Variable { .. } => write!(f, "Variable"),
         }
     }
 }
