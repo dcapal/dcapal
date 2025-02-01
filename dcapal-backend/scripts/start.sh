@@ -24,8 +24,9 @@ echo >&2 "Postgres is up - executing command"
 DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${APP_DB_NAME}
 export DATABASE_URL
 # Run migrations
-cd migrations
+cd /var/dcapal/dcapal-backend/migration
 cargo run up
 
 # Start the application
+cd /var/dcapal/dcapal-backend
 exec /var/dcapal/dcapal-backend/bin/dcapal-backend
