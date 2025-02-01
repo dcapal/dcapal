@@ -33,6 +33,8 @@ RUN mkdir data
 COPY --from=builder /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/dcapal-backend/bin
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
 COPY ./dcapal-backend/migration ./migration
+COPY ./dcapal-backend/migration/Cargo.toml ./migration/Cargo.toml
+COPY ./dcapal-backend/migration/src ./migration/src
 # Create start script
 COPY ./dcapal-backend/scripts/start.sh ./start.sh
 RUN chmod +x ./start.sh

@@ -1,8 +1,8 @@
 use crate::app::domain::db::users;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
-use sea_orm::{sqlx, DatabaseConnection, SqlxPostgresConnector};
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use sea_orm::{sqlx, DatabaseConnection, NotSet, SqlxPostgresConnector};
+use sea_orm::{ActiveModelTrait, Set};
 
 pub struct UserRepository {
     pub db_conn: DatabaseConnection,
@@ -15,28 +15,16 @@ impl UserRepository {
     }
 
     pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::Model> {
-        let existing = users::Entity::find_by_id(claims.sub)
-            .one(&self.db_conn)
-            .await?;
-        match existing {
-            Some(usr) => {
-                let mut active_user: users::ActiveModel = usr.into();
-                active_user.email = Set(claims.user_metadata.email.clone());
-                active_user.updated_at = Set(chrono::Utc::now().into());
-                Ok(active_user.update(&self.db_conn).await?)
-            }
-            None => {
-                let new_user = users::ActiveModel {
-                    id: Set(claims.sub),
-                    username: Set(claims.user_metadata.full_name.clone()),
-                    email: Set(claims.user_metadata.email.clone()),
-                    role: Set(claims.role.clone()),
-                    created_at: Set(chrono::Utc::now().into()),
-                    updated_at: Set(chrono::Utc::now().into()),
-                };
-                Ok(new_user.insert(&self.db_conn).await?)
-            }
-        }
+        let user = users::ActiveModel {
+            id: Set(claims.sub), // We know the ID, so we set it
+            username: Set(claims.user_metadata.full_name.clone()),
+            email: Set(claims.user_metadata.email.clone()),
+            role: Set(claims.role.clone()),
+            created_at: NotSet, // Let the database handle this if it's a new record
+            updated_at: Set(chrono::Utc::now().into()),
+        };
+
+        Ok(user.save(&self.db_conn).await?)
     }
 }
 
