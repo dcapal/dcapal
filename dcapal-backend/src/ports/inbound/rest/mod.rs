@@ -3,6 +3,12 @@
 use std::fmt::Display;
 use std::time::Duration;
 
+use crate::app::domain::entity::AssetKind;
+use crate::app::infra::utils::Expiring;
+use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
+use crate::error::{DcaError, Result};
+use crate::ports::outbound::repository::ImportedPortfolio;
+use crate::{infra::stats, AppContext};
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -12,13 +18,7 @@ use lazy_static::lazy_static;
 use metrics::counter;
 use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
-
-use crate::app::domain::entity::AssetKind;
-use crate::app::infra::utils::Expiring;
-use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
-use crate::error::{DcaError, Result};
-use crate::ports::outbound::repository::ImportedPortfolio;
-use crate::{infra::stats, AppContext};
+use utoipa::ToSchema;
 
 pub mod request;
 pub mod response;
@@ -141,15 +141,25 @@ pub async fn get_imported_portfolio(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum FeeStructure {
+    #[serde(rename = "zeroFee")]
     ZeroFee,
+
+    #[serde(rename = "fixed")]
     Fixed {
+        #[serde(rename = "feeAmount")]
         fee_amount: Decimal,
     },
+
+    #[serde(rename = "variable")]
     Variable {
+        #[serde(rename = "feeRate")]
         fee_rate: Decimal,
+        #[serde(rename = "minFee")]
         min_fee: Decimal,
+        #[serde(rename = "maxFee", skip_serializing_if = "Option::is_none")]
         max_fee: Option<Decimal>,
     },
 }

@@ -39,10 +39,10 @@ impl PortfolioRepository {
     ) -> Result<portfolios::ActiveModel> {
         let (max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee) =
             if let Some(fees) = portfolio.fees {
-                match fees.fee_type {
+                match fees.fee_structure {
                     FeeStructure::ZeroFee => (
                         Set(fees.max_fee_impact),
-                        Set(Some(fees.fee_type.to_string())),
+                        Set(Some(fees.fee_structure.to_string())),
                         Set(None),
                         Set(None),
                         Set(None),
@@ -50,7 +50,7 @@ impl PortfolioRepository {
                     ),
                     FeeStructure::Fixed { fee_amount } => (
                         Set(fees.max_fee_impact),
-                        Set(Some(fees.fee_type.to_string())),
+                        Set(Some(fees.fee_structure.to_string())),
                         Set(Some(fee_amount)),
                         Set(None),
                         Set(None),
@@ -62,7 +62,7 @@ impl PortfolioRepository {
                         max_fee,
                     } => (
                         Set(fees.max_fee_impact),
-                        Set(Some(fees.fee_type.to_string())),
+                        Set(Some(fees.fee_structure.to_string())),
                         Set(None),
                         Set(Some(fee_rate)),
                         Set(Some(min_fee)),

@@ -46,8 +46,9 @@ pub struct PortfolioAssetRequest {
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee_impact: Option<Decimal>,
-    pub fee_type: FeeStructure,
+    pub fee_structure: FeeStructure,
 }
 
 pub async fn sync_portfolios(
@@ -71,4 +72,19 @@ pub async fn sync_portfolios(
             Ok(StatusCode::BAD_REQUEST.into_response())
         }
     }
+}
+
+#[test]
+fn test_fee_structure_deserialization() {
+    let json = r#"{
+        "feeStructure": {
+            "type": "variable",
+            "feeRate": 0.19,
+            "minFee": 2.95
+        },
+        "maxFeeImpact": 0.5
+    }"#;
+
+    let fees: TransactionFeesRequest = serde_json::from_str(json).unwrap();
+    assert!(matches!(fees.fee_structure, FeeStructure::Variable { .. }));
 }
