@@ -47,11 +47,11 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
             .iter()
             .map(|asset| {
                 let fees = TransactionFeesResponse {
-                    max_fee_impact: asset.max_fee_impact.clone(),
+                    max_fee_impact: asset.max_fee_impact,
                     fee_structure: match asset.fee_type.clone() {
-                        Some(val) if val == "ZeroFee".to_string() => FeeStructure::ZeroFee,
-                        Some(val) if val == "Fixed".to_string() => {
-                            if let Some(fee_amount) = asset.fee_amount.clone() {
+                        Some(val) if val == *"ZeroFee" => FeeStructure::ZeroFee,
+                        Some(val) if val == *"Fixed" => {
+                            if let Some(fee_amount) = asset.fee_amount {
                                 FeeStructure::Fixed { fee_amount }
                             } else {
                                 return Err(DcaError::Generic(
@@ -59,14 +59,14 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                                 ));
                             }
                         }
-                        Some(val) if val == "Variable".to_string() => {
+                        Some(val) if val == *"Variable" => {
                             if let (Some(fee_rate), Some(min_fee)) =
-                                (asset.fee_rate.clone(), asset.min_fee.clone())
+                                (asset.fee_rate, asset.min_fee)
                             {
                                 FeeStructure::Variable {
                                     fee_rate,
                                     min_fee,
-                                    max_fee: asset.max_fee.clone(), // `max_fee` is optional, so we can pass it directly
+                                    max_fee: asset.max_fee, // `max_fee` is optional, so we can pass it directly
                                 }
                             } else {
                                 return Err(DcaError::Generic(
@@ -87,9 +87,9 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                     aclass: asset.asset_class.clone(),
                     base_ccy: asset.currency.clone(),
                     provider: asset.provider.clone(),
-                    qty: asset.quantity.clone(),
-                    target_weight: asset.target_weight.clone(),
-                    price: asset.price.clone(),
+                    qty: asset.quantity,
+                    target_weight: asset.target_weight,
+                    price: asset.price,
                     fees,
                 })
             })
@@ -102,8 +102,8 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
             fees: TransactionFeesResponse {
                 max_fee_impact: portfolio.max_fee_impact,
                 fee_structure: match portfolio.fee_type {
-                    Some(val) if val == "ZeroFee".to_string() => FeeStructure::ZeroFee,
-                    Some(val) if val == "Fixed".to_string() => {
+                    Some(val) if val == *"ZeroFee" => FeeStructure::ZeroFee,
+                    Some(val) if val == *"Fixed" => {
                         if let Some(fee_amount) = portfolio.fee_amount {
                             FeeStructure::Fixed { fee_amount }
                         } else {
@@ -112,7 +112,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                             ));
                         }
                     }
-                    Some(val) if val == "Variable".to_string() => {
+                    Some(val) if val == *"Variable" => {
                         if let (Some(fee_rate), Some(min_fee)) =
                             (portfolio.fee_rate, portfolio.min_fee)
                         {
