@@ -17,7 +17,7 @@ import {
 } from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
 import { Button } from "@/components/ui/button";
-import {supabase} from "@app/config";
+import { supabase } from "@app/config";
 
 export const PortfoliosStep = () => {
   const { t } = useTranslation();
