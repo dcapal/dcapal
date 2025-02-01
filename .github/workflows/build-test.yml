@@ -30,13 +30,9 @@ jobs:
           rustc --version
           cargo clippy --version
 
-      - name: Install sqlx-cli
+      - name: Install SeaORM CLI
         run:
-          cargo install sqlx-cli
-          --version=${{ env.SQLX_VERSION }}
-          --features ${{ env.SQLX_FEATURES }}
-          --no-default-features
-          --locked
+          cargo install sea-orm-cli@1.1.0
 
       - name: Lint
         env:
