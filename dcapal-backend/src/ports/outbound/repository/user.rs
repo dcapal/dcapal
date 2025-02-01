@@ -14,7 +14,7 @@ impl UserRepository {
         Self { db_conn }
     }
 
-    pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::Model> {
+    pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::ActiveModel> {
         let user = users::ActiveModel {
             id: Set(claims.sub), // We know the ID, so we set it
             username: Set(claims.user_metadata.full_name.clone()),
