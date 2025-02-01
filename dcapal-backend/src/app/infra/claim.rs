@@ -68,7 +68,7 @@ impl FromRequestParts<AppContext> for Claims {
             &DecodingKey::from_secret(jwt_secret.as_ref()),
         )?
         .claims;
-        state
+        let _ = state
             .repos
             .user
             .save_user_if_not_present(&user_claims)

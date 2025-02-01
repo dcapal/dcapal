@@ -59,7 +59,7 @@ pub async fn sync_portfolios(
     match &ctx
         .services
         .portfolio
-        .sync_portfolios(claims.sub, req.into())
+        .sync_portfolios(claims.sub, req)
         .await
     {
         Ok(resp) => {
