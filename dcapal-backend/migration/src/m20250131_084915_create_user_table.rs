@@ -9,20 +9,25 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(User::Table)
+                    .table(Users::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(User::Id).uuid().not_null().primary_key())
-                    .col(ColumnDef::new(User::Name).string())
-                    .col(ColumnDef::new(User::Email).string().not_null().unique_key())
-                    .col(ColumnDef::new(User::BirthDate).date())
+                    .col(ColumnDef::new(Users::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(Users::Username).string())
                     .col(
-                        ColumnDef::new(User::CreatedAt)
+                        ColumnDef::new(Users::Email)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(ColumnDef::new(Users::Role).string().not_null())
+                    .col(
+                        ColumnDef::new(Users::CreatedAt)
                             .timestamp_with_time_zone()
                             .not_null()
                             .default(Expr::current_timestamp()),
                     )
                     .col(
-                        ColumnDef::new(User::UpdatedAt)
+                        ColumnDef::new(Users::UpdatedAt)
                             .timestamp_with_time_zone()
                             .not_null()
                             .default(Expr::current_timestamp()),
@@ -34,18 +39,18 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(User::Table).to_owned())
+            .drop_table(Table::drop().table(Users::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum User {
+enum Users {
     Table,
     Id,
-    Name,
+    Username,
     Email,
-    BirthDate,
+    Role,
     CreatedAt,
     UpdatedAt,
 }

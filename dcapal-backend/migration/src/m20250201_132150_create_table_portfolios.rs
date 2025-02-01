@@ -75,7 +75,7 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk_portfolios_user_id")
                             .from(Portfolios::Table, Portfolios::UserId)
-                            .to(User::Table, User::Id),
+                            .to(Users::Table, Users::Id),
                     )
                     .to_owned(),
             )
@@ -109,7 +109,7 @@ enum Portfolios {
 }
 
 #[derive(DeriveIden)]
-enum User {
+enum Users {
     Table,
     Id,
 }
