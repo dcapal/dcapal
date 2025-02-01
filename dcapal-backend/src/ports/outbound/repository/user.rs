@@ -1,4 +1,4 @@
-use crate::app::domain::db::user;
+use crate::app::domain::db::users;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
 use sea_orm::{sqlx, DatabaseConnection, SqlxPostgresConnector};
@@ -14,25 +14,25 @@ impl UserRepository {
         Self { db_conn }
     }
 
-    pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<user::Model> {
-        let existing = user::Entity::find_by_id(claims.sub)
+    pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::Model> {
+        let existing = users::Entity::find_by_id(claims.sub)
             .one(&self.db_conn)
             .await?;
         match existing {
             Some(usr) => {
-                let mut active_user: user::ActiveModel = usr.into();
+                let mut active_user: users::ActiveModel = usr.into();
                 active_user.email = Set(claims.user_metadata.email.clone());
-                active_user.updated_at = Set(chrono::Utc::now());
+                active_user.updated_at = Set(chrono::Utc::now().into());
                 Ok(active_user.update(&self.db_conn).await?)
             }
             None => {
-                let new_user = user::ActiveModel {
+                let new_user = users::ActiveModel {
                     id: Set(claims.sub),
-                    username: Set(claims.user_metadata.full_name.clone().unwrap_or_default()),
+                    username: Set(claims.user_metadata.full_name.clone()),
                     email: Set(claims.user_metadata.email.clone()),
                     role: Set(claims.role.clone()),
-                    created_at: Set(chrono::Utc::now()),
-                    updated_at: Set(chrono::Utc::now()),
+                    created_at: Set(chrono::Utc::now().into()),
+                    updated_at: Set(chrono::Utc::now().into()),
                 };
                 Ok(new_user.insert(&self.db_conn).await?)
             }
@@ -63,7 +63,7 @@ mod tests {
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
             // First query returns the existing DB user
-            .append_query_results(vec![vec![user::Model {
+            .append_query_results(vec![vec![users::Model {
                 id: user_id,
                 username: "Existing User".to_string(),
                 email: "old-email@example.com".to_string(),
@@ -72,7 +72,7 @@ mod tests {
                 updated_at: Default::default(),
             }]])
             // Next query result after update
-            .append_query_results(vec![vec![user::Model {
+            .append_query_results(vec![vec![users::Model {
                 id: user_id,
                 username: "Existing User".to_string(),
                 email: "updated-email@example.com".to_string(),

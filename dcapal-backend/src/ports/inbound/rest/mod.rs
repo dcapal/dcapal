@@ -6,10 +6,10 @@ use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use axum_extra::{headers::CacheControl, TypedHeader};
-use bigdecimal::BigDecimal;
 use hyper::StatusCode;
 use lazy_static::lazy_static;
 use metrics::counter;
+use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::app::domain::entity::AssetKind;
@@ -144,11 +144,21 @@ pub async fn get_imported_portfolio(
 pub enum FeeStructure {
     ZeroFee,
     Fixed {
-        fee_amount: BigDecimal,
+        fee_amount: Decimal,
     },
     Variable {
-        fee_rate: BigDecimal,
-        min_fee: BigDecimal,
-        max_fee: Option<BigDecimal>,
+        fee_rate: Decimal,
+        min_fee: Decimal,
+        max_fee: Option<Decimal>,
     },
+}
+
+impl ToString for FeeStructure {
+    fn to_string(&self) -> String {
+        match self {
+            FeeStructure::ZeroFee => "ZeroFee".to_string(),
+            FeeStructure::Fixed { .. } => "Fixed".to_string(),
+            FeeStructure::Variable { .. } => "Variable".to_string(),
+        }
+    }
 }

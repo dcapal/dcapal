@@ -1141,7 +1141,6 @@ dependencies = [
  "async-openai",
  "axum 0.7.9",
  "axum-extra",
- "bigdecimal",
  "chrono",
  "config",
  "const_format",

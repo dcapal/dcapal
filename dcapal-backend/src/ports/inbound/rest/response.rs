@@ -1,9 +1,8 @@
-use crate::app::domain::db::fee_type::FeeType;
-use crate::app::domain::db::{portfolio, portfolio_asset};
+use crate::app::domain::db::{portfolio_asset, portfolios};
 use crate::error::DcaError;
 use crate::ports::inbound::rest::FeeStructure;
 use crate::DateTime;
-use bigdecimal::BigDecimal;
+use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -31,17 +30,17 @@ pub struct PortfolioAssetResponse {
     pub aclass: String,
     pub base_ccy: String,
     pub provider: String,
-    pub qty: BigDecimal,
-    pub target_weight: BigDecimal,
-    pub price: BigDecimal,
+    pub qty: Decimal,
+    pub target_weight: Decimal,
+    pub price: Decimal,
     pub fees: TransactionFeesResponse,
 }
 
-impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse {
+impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse {
     type Error = DcaError;
 
     fn try_from(
-        input: (portfolio::Model, Vec<portfolio_asset::Model>),
+        input: (portfolios::Model, Vec<portfolio_asset::Model>),
     ) -> Result<Self, Self::Error> {
         let (portfolio, assets) = input;
         let portfolio_assets: Vec<PortfolioAssetResponse> = assets
@@ -49,9 +48,9 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
             .map(|asset| {
                 let fees = TransactionFeesResponse {
                     max_fee_impact: asset.max_fee_impact.clone(),
-                    fee_structure: match asset.fee_type {
-                        Some(FeeType::ZeroFee) => FeeStructure::ZeroFee,
-                        Some(FeeType::Fixed) => {
+                    fee_structure: match asset.fee_type.clone() {
+                        Some(val) if val == "ZeroFee".to_string() => FeeStructure::ZeroFee,
+                        Some(val) if val == "Fixed".to_string() => {
                             if let Some(fee_amount) = asset.fee_amount.clone() {
                                 FeeStructure::Fixed { fee_amount }
                             } else {
@@ -60,7 +59,7 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                                 ));
                             }
                         }
-                        Some(FeeType::Variable) => {
+                        Some(val) if val == "Variable".to_string() => {
                             if let (Some(fee_rate), Some(min_fee)) =
                                 (asset.fee_rate.clone(), asset.min_fee.clone())
                             {
@@ -103,8 +102,8 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
             fees: TransactionFeesResponse {
                 max_fee_impact: portfolio.max_fee_impact,
                 fee_structure: match portfolio.fee_type {
-                    Some(FeeType::ZeroFee) => FeeStructure::ZeroFee,
-                    Some(FeeType::Fixed) => {
+                    Some(val) if val == "ZeroFee".to_string() => FeeStructure::ZeroFee,
+                    Some(val) if val == "Fixed".to_string() => {
                         if let Some(fee_amount) = portfolio.fee_amount {
                             FeeStructure::Fixed { fee_amount }
                         } else {
@@ -113,7 +112,7 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                             ));
                         }
                     }
-                    Some(FeeType::Variable) => {
+                    Some(val) if val == "Variable".to_string() => {
                         if let (Some(fee_rate), Some(min_fee)) =
                             (portfolio.fee_rate, portfolio.min_fee)
                         {
@@ -133,13 +132,13 @@ impl TryFrom<(portfolio::Model, Vec<portfolio_asset::Model>)> for PortfolioRespo
                 },
             },
             assets: portfolio_assets,
-            last_updated_at: portfolio.last_updated_at,
+            last_updated_at: portfolio.last_updated_at.into(),
         })
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TransactionFeesResponse {
-    pub max_fee_impact: Option<BigDecimal>,
+    pub max_fee_impact: Option<Decimal>,
     pub fee_structure: FeeStructure,
 }

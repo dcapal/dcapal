@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use bigdecimal::BigDecimal;
+use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use utoipa::ToSchema;
@@ -37,16 +37,16 @@ pub struct PortfolioAssetRequest {
     pub aclass: String,
     pub base_ccy: String,
     pub provider: String,
-    pub qty: BigDecimal,
-    pub target_weight: BigDecimal,
-    pub price: BigDecimal,
+    pub qty: Decimal,
+    pub target_weight: Decimal,
+    pub price: Decimal,
     pub fees: Option<TransactionFeesRequest>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesRequest {
-    pub max_fee_impact: Option<BigDecimal>,
+    pub max_fee_impact: Option<Decimal>,
     pub fee_type: FeeStructure,
 }
 

@@ -1,5 +1,4 @@
-use crate::app::domain::db::fee_type::FeeType;
-use crate::app::domain::db::{portfolio, portfolio_asset};
+use crate::app::domain::db::{portfolio_asset, portfolios};
 use crate::error::Result;
 use crate::ports::inbound::rest::request::PortfolioRequest;
 use crate::ports::inbound::rest::FeeStructure;
@@ -22,9 +21,9 @@ impl PortfolioRepository {
     pub async fn get_user_portfolios_with_assets(
         &self,
         user_id: Uuid,
-    ) -> Result<Vec<(portfolio::Model, Vec<portfolio_asset::Model>)>> {
-        let portfolios_with_assets = portfolio::Entity::find()
-            .filter(portfolio::Column::UserId.eq(user_id))
+    ) -> Result<Vec<(portfolios::Model, Vec<portfolio_asset::Model>)>> {
+        let portfolios_with_assets = portfolios::Entity::find()
+            .filter(portfolios::Column::UserId.eq(user_id))
             .find_with_related(portfolio_asset::Entity)
             .all(&self.db_conn)
             .await?;
@@ -37,13 +36,13 @@ impl PortfolioRepository {
         &self,
         user_id: Uuid,
         portfolio: PortfolioRequest,
-    ) -> Result<portfolio::ActiveModel> {
+    ) -> Result<portfolios::ActiveModel> {
         let (max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee) =
             if let Some(fees) = portfolio.fees {
                 match fees.fee_type {
                     FeeStructure::ZeroFee => (
                         Set(fees.max_fee_impact),
-                        Set(Some(FeeType::ZeroFee)),
+                        Set(Some(fees.fee_type.to_string())),
                         Set(None),
                         Set(None),
                         Set(None),
@@ -51,7 +50,7 @@ impl PortfolioRepository {
                     ),
                     FeeStructure::Fixed { fee_amount } => (
                         Set(fees.max_fee_impact),
-                        Set(Some(FeeType::Fixed)),
+                        Set(Some(fees.fee_type.to_string())),
                         Set(Some(fee_amount)),
                         Set(None),
                         Set(None),
@@ -63,7 +62,7 @@ impl PortfolioRepository {
                         max_fee,
                     } => (
                         Set(fees.max_fee_impact),
-                        Set(Some(FeeType::Variable)),
+                        Set(Some(fees.fee_type.to_string())),
                         Set(None),
                         Set(Some(fee_rate)),
                         Set(Some(min_fee)),
@@ -81,19 +80,21 @@ impl PortfolioRepository {
                 )
             };
 
-        let portfolio_model = portfolio::ActiveModel {
+        let portfolio_model = portfolios::ActiveModel {
             id: Set(portfolio.id),
             user_id: Set(user_id),
             name: Set(portfolio.name.clone()),
             currency: Set(portfolio.quote_ccy.clone()),
             deleted: Set(false), // When creating a new portfolio, it is not deleted
-            last_updated_at: Set(portfolio.last_updated_at),
+            last_updated_at: Set(portfolio.last_updated_at.into()),
             max_fee_impact,
             fee_type,
             fee_amount,
             fee_rate,
             min_fee,
             max_fee,
+            created_at: Default::default(),
+            updated_at: Default::default(),
         };
 
         let portfolio = portfolio_model.save(&self.db_conn).await?;
@@ -102,11 +103,11 @@ impl PortfolioRepository {
     }
 
     pub async fn soft_delete(&self, portfolio_id: Uuid) -> Result<()> {
-        let portfolio_db: Option<portfolio::Model> = portfolio::Entity::find_by_id(portfolio_id)
+        let portfolio_db: Option<portfolios::Model> = portfolios::Entity::find_by_id(portfolio_id)
             .one(&self.db_conn)
             .await?;
 
-        let mut portfolio: portfolio::ActiveModel = portfolio_db.unwrap().into();
+        let mut portfolio: portfolios::ActiveModel = portfolio_db.unwrap().into();
 
         portfolio.deleted = Set(true);
 
