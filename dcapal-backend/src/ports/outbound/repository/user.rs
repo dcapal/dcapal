@@ -65,7 +65,7 @@ mod tests {
             // First query returns the existing DB user
             .append_query_results(vec![vec![users::Model {
                 id: user_id,
-                username: "Existing User".to_string(),
+                username: Some("Existing User".to_string()),
                 email: "old-email@example.com".to_string(),
                 role: "user".to_string(),
                 created_at: Default::default(),
@@ -74,7 +74,7 @@ mod tests {
             // Next query result after update
             .append_query_results(vec![vec![users::Model {
                 id: user_id,
-                username: "Existing User".to_string(),
+                username: Some("Existing User".to_string()),
                 email: "updated-email@example.com".to_string(),
                 role: "user".to_string(),
                 created_at: Default::default(),
