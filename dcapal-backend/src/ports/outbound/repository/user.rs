@@ -1,7 +1,7 @@
 use crate::app::domain::db::users;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
-use sea_orm::{sqlx, DatabaseConnection, NotSet, SqlxPostgresConnector};
+use sea_orm::{sqlx, DatabaseConnection, EntityTrait, NotSet, SqlxPostgresConnector};
 use sea_orm::{ActiveModelTrait, Set};
 
 pub struct UserRepository {
@@ -15,16 +15,41 @@ impl UserRepository {
     }
 
     pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::ActiveModel> {
-        let user = users::ActiveModel {
-            id: Set(claims.sub), // We know the ID, so we set it
-            username: Set(claims.user_metadata.full_name.clone()),
-            email: Set(claims.user_metadata.email.clone()),
-            role: Set(claims.role.clone()),
-            created_at: NotSet, // Let the database handle this if it's a new record
-            updated_at: Set(chrono::Utc::now().into()),
-        };
+        // Check if user exists
+        if let Some(existing) = users::Entity::find_by_id(claims.sub)
+            .one(&self.db_conn)
+            .await?
+        {
+            // Create the active model with new values
+            let user = users::ActiveModel {
+                id: Set(claims.sub),
+                username: Set(claims.user_metadata.full_name.clone()),
+                email: Set(claims.user_metadata.email.clone()),
+                role: Set(claims.role.clone()),
+                created_at: NotSet,
+                updated_at: Set(chrono::Utc::now().into()),
+            };
 
-        Ok(user.save(&self.db_conn).await?)
+            // If nothing changed, return existing
+            if !user.is_changed() {
+                return Ok(existing.into());
+            }
+
+            // Otherwise save changes
+            Ok(user.save(&self.db_conn).await?)
+        } else {
+            // User doesn't exist, create new
+            let user = users::ActiveModel {
+                id: Set(claims.sub),
+                username: Set(claims.user_metadata.full_name.clone()),
+                email: Set(claims.user_metadata.email.clone()),
+                role: Set(claims.role.clone()),
+                created_at: Set(chrono::Utc::now().into()),
+                updated_at: Set(chrono::Utc::now().into()),
+            };
+
+            Ok(user.save(&self.db_conn).await?)
+        }
     }
 }
 
@@ -77,6 +102,6 @@ mod tests {
         let repo = UserRepository { db_conn: db };
 
         let updated_user = repo.save_user_if_not_present(&claims).await.unwrap();
-        assert_eq!(updated_user.email, "updated-email@example.com");
+        assert_eq!(updated_user.email.unwrap(), "updated-email@example.com");
     }
 }
