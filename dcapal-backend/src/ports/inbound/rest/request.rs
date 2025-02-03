@@ -7,6 +7,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use tracing::info;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -56,7 +57,7 @@ pub async fn sync_portfolios(
     claims: Claims,
     Json(req): Json<SyncPortfoliosRequest>,
 ) -> crate::error::Result<Response> {
-    info!("Update profile user_id: {}.", claims.sub);
+    info!("Syncing portfolios for user_id: {}.", claims.sub);
     match &ctx
         .services
         .portfolio
@@ -64,11 +65,14 @@ pub async fn sync_portfolios(
         .await
     {
         Ok(resp) => {
-            info!("Success update profile user user_id: {}.", claims.sub);
+            info!(
+                "Successfully synced portfolios for user_id: {}.",
+                claims.sub
+            );
             Ok(Json(resp).into_response())
         }
         Err(e) => {
-            info!("Unsuccessful update profile user: {e:?}");
+            error!("Failed to sync portfolios: {} due to: {}.", claims.sub, e);
             Ok(StatusCode::BAD_REQUEST.into_response())
         }
     }

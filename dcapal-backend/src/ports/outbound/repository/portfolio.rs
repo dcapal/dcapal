@@ -36,7 +36,7 @@ impl PortfolioRepository {
         &self,
         user_id: Uuid,
         portfolio: PortfolioRequest,
-    ) -> Result<portfolios::ActiveModel> {
+    ) -> Result<portfolios::Model> {
         let (max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee) =
             if let Some(fees) = portfolio.fees {
                 match fees.fee_structure {
@@ -80,38 +80,51 @@ impl PortfolioRepository {
                 )
             };
 
-        let portfolio_model = portfolios::ActiveModel {
-            id: Set(portfolio.id),
-            user_id: Set(user_id),
-            name: Set(portfolio.name.clone()),
-            currency: Set(portfolio.quote_ccy.clone()),
-            deleted: Set(false), // When creating a new portfolio, it is not deleted
-            last_updated_at: Set(portfolio.last_updated_at.into()),
-            max_fee_impact,
-            fee_type,
-            fee_amount,
-            fee_rate,
-            min_fee,
-            max_fee,
-            created_at: Default::default(),
-            updated_at: Default::default(),
+        let existing_portfolio = portfolios::Entity::find_by_id(portfolio.id)
+            .one(&self.db_conn)
+            .await?;
+
+        let mut portfolio_model = if let Some(existing) = existing_portfolio.clone() {
+            existing.into_active_model()
+        } else {
+            portfolios::ActiveModel {
+                id: Set(portfolio.id),
+                user_id: Set(user_id),
+                deleted: Set(false), // When creating a new portfolio, it is not deleted
+                created_at: Default::default(),
+                updated_at: Default::default(),
+                ..Default::default()
+            }
         };
 
-        let portfolio = portfolio_model.save(&self.db_conn).await?;
+        portfolio_model.name = Set(portfolio.name.clone());
+        portfolio_model.currency = Set(portfolio.quote_ccy.clone());
+        portfolio_model.last_updated_at = Set(portfolio.last_updated_at.into());
+        portfolio_model.max_fee_impact = max_fee_impact;
+        portfolio_model.fee_type = fee_type;
+        portfolio_model.fee_amount = fee_amount;
+        portfolio_model.fee_rate = fee_rate;
+        portfolio_model.min_fee = min_fee;
+        portfolio_model.max_fee = max_fee;
+
+        let portfolio = if existing_portfolio.is_some() {
+            portfolio_model.update(&self.db_conn).await?
+        } else {
+            portfolio_model.insert(&self.db_conn).await?
+        };
 
         Ok(portfolio)
     }
 
     pub async fn soft_delete(&self, portfolio_id: Uuid) -> Result<()> {
-        let portfolio_db: Option<portfolios::Model> = portfolios::Entity::find_by_id(portfolio_id)
+        if let Some(portfolio_db) = portfolios::Entity::find_by_id(portfolio_id)
             .one(&self.db_conn)
-            .await?;
-
-        let mut portfolio: portfolios::ActiveModel = portfolio_db.unwrap().into();
-
-        portfolio.deleted = Set(true);
-
-        portfolio.update(&self.db_conn).await?;
+            .await?
+        {
+            let mut portfolio: portfolios::ActiveModel = portfolio_db.into();
+            portfolio.deleted = Set(true);
+            portfolio.update(&self.db_conn).await?;
+        }
 
         Ok(())
     }

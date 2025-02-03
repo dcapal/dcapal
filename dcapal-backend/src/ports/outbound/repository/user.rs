@@ -14,7 +14,7 @@ impl UserRepository {
         Self { db_conn }
     }
 
-    pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::ActiveModel> {
+    pub async fn save_user_if_not_present(&self, claims: &Claims) -> Result<users::Model> {
         // Check if user exists
         if let Some(existing) = users::Entity::find_by_id(claims.sub)
             .one(&self.db_conn)
@@ -32,11 +32,11 @@ impl UserRepository {
 
             // If nothing changed, return existing
             if !user.is_changed() {
-                return Ok(existing.into());
+                return Ok(existing);
             }
 
             // Otherwise save changes
-            Ok(user.save(&self.db_conn).await?)
+            Ok(user.update(&self.db_conn).await?)
         } else {
             // User doesn't exist, create new
             let user = users::ActiveModel {
@@ -48,7 +48,7 @@ impl UserRepository {
                 updated_at: Set(chrono::Utc::now().into()),
             };
 
-            Ok(user.save(&self.db_conn).await?)
+            Ok(user.insert(&self.db_conn).await?)
         }
     }
 }
@@ -102,6 +102,6 @@ mod tests {
         let repo = UserRepository { db_conn: db };
 
         let updated_user = repo.save_user_if_not_present(&claims).await.unwrap();
-        assert_eq!(updated_user.email.unwrap(), "updated-email@example.com");
+        assert_eq!(updated_user.email, "updated-email@example.com");
     }
 }
