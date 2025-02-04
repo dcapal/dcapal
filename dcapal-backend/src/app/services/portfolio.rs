@@ -55,12 +55,18 @@ impl PortfolioService {
 
         // Process client-side portfolios
         for client_pf in req.portfolios {
-            if !db_portfolios
-                .clone()
-                .iter()
-                .any(|db_pf| db_pf.0.id == client_pf.id)
-            {
-                self.portfolio_repository.upsert(user_id, client_pf).await?;
+            if let Some(db_pf) = db_portfolios.iter().find(|pf| pf.0.id == client_pf.id) {
+                if db_pf.0.deleted {
+                    deleted_portfolios.push(db_pf.0.id);
+                } else if client_pf.last_updated_at > db_pf.0.last_updated_at {
+                    self.portfolio_repository
+                        .upsert(user_id, client_pf.clone())
+                        .await?;
+                }
+            } else {
+                self.portfolio_repository
+                    .upsert(user_id, client_pf.clone())
+                    .await?;
             }
         }
 
