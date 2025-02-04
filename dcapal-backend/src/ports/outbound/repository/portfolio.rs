@@ -69,8 +69,8 @@ impl PortfolioRepository {
             asset_model.target_weight = Set(asset.target_weight);
             asset_model.price = Set(asset.price);
 
-            // Handle fees similar to portfolio if needed
-            // ...
+            // Handle fees similar to portfolio
+            //...
             let updated = if existing_asset.is_some() {
                 asset_model.update(&self.db_conn).await?
             } else {
