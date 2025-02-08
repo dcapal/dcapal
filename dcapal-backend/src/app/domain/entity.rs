@@ -1,12 +1,7 @@
 use crate::app::infra::utils::Expiring;
 use crate::DateTime;
-use bigdecimal::BigDecimal;
 use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::str::FromStr;
-use time::Date;
-use uuid::Uuid;
 
 pub type AssetId = String;
 pub type MarketId = String;
@@ -208,147 +203,10 @@ impl Expiring for Market {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct User {
-    pub name: Option<String>,
-    pub email: String,
-    pub birth_date: Option<Date>,
-}
-#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
-#[sqlx(type_name = "risk_tolerance", rename_all = "snake_case")]
-pub enum RiskTolerance {
-    Low,
-    Medium,
-    High,
-}
-
-impl FromStr for RiskTolerance {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Low" => Ok(RiskTolerance::Low),
-            "Medium" => Ok(RiskTolerance::Medium),
-            "High" => Ok(RiskTolerance::High),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for RiskTolerance {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                RiskTolerance::Low => "Low",
-                RiskTolerance::Medium => "Medium",
-                RiskTolerance::High => "High",
-            }
-        )
-    }
-}
-
-#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
-#[sqlx(type_name = "investment_mode", rename_all = "snake_case")]
-pub enum InvestmentMode {
-    Standard,
-    Expert,
-}
-
-impl FromStr for InvestmentMode {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Standard" => Ok(InvestmentMode::Standard),
-            "Expert" => Ok(InvestmentMode::Expert),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for InvestmentMode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                InvestmentMode::Standard => "Standard",
-                InvestmentMode::Expert => "Expert",
-            }
-        )
-    }
-}
-
-#[derive(sqlx::Type, Clone, Debug, Deserialize, Serialize)]
-#[sqlx(type_name = "investment_goal", rename_all = "snake_case")]
-pub enum InvestmentGoal {
-    Retirement,
-    Education,
-    WealthBuilding,
-    Other,
-}
-
-impl FromStr for InvestmentGoal {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Retirement" => Ok(InvestmentGoal::Retirement),
-            "Education" => Ok(InvestmentGoal::Education),
-            "Wealth Building" => Ok(InvestmentGoal::WealthBuilding),
-            "Other" => Ok(InvestmentGoal::Other),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for InvestmentGoal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                InvestmentGoal::Retirement => "Retirement",
-                InvestmentGoal::Education => "Education",
-                InvestmentGoal::WealthBuilding => "Wealth Building",
-                InvestmentGoal::Other => "Other",
-            }
-        )
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct InvestmentPreferences {
-    pub risk_tolerance: RiskTolerance,
-    pub investment_horizon: i32,
-    pub investment_mode: InvestmentMode,
-    pub investment_goal: InvestmentGoal,
-    pub ai_enabled: bool,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Ai {
-    pub response: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Portfolio {
-    pub id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub currency: String,
-    pub assets: Vec<PortfolioHoldings>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PortfolioHoldings {
-    pub symbol: String,
-    pub name: String,
-    pub quantity: BigDecimal,
-    pub price: BigDecimal,
-    pub average_buy_price: BigDecimal,
-    pub weight: BigDecimal,
-    pub total: BigDecimal,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum AssetClass {
+    Equity,
+    Crypto,
+    Currency,
 }
