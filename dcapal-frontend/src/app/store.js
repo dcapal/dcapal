@@ -82,11 +82,27 @@ const migrations = {
       },
     };
   },
+  5: (state) => {
+    return {
+      ...state,
+      pfolio: {
+        ...state.pfolio,
+        pfolios: Object.keys(state.pfolio.pfolios).reduce((acc, key) => {
+          acc[key] = {
+            ...state.pfolio.pfolios[key],
+            lastUpdatedAt: Date.now(),
+          };
+          return acc;
+        }, {}),
+        deletedPortfolios: [],
+      },
+    };
+  },
 };
 
 const rootConfig = {
   key: "root",
-  version: 4,
+  version: 5,
   storage,
   migrate: createMigrate(migrations, { debug: false }),
 };
