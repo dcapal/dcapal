@@ -338,7 +338,7 @@ export const portfolioSlice = createSlice({
       Object.values(pfolio.assets).forEach((asset) => {
         updateWeight(asset, pfolio.totalAmount);
       });
-      
+
       pfolio.lastUpdatedAt = Date.now();
     },
     setTargetWeight: (state, action) => {
