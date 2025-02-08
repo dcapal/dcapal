@@ -29,19 +29,15 @@ export const isWholeShares = (aclass) => {
   }
 };
 
+const aclassMap = {
+  [ACLASS.UNDEFINED]: "UNDEFINED",
+  [ACLASS.EQUITY]: "EQUITY",
+  [ACLASS.CRYPTO]: "CRYPTO",
+  [ACLASS.CURRENCY]: "CURRENCY",
+};
+
 export const aclassToString = (aclass) => {
-  switch (aclass) {
-    case ACLASS.UNDEFINED:
-      return "UNDEFINED";
-    case ACLASS.EQUITY:
-      return "EQUITY";
-    case ACLASS.CRYPTO:
-      return "CRYPTO";
-    case ACLASS.CURRENCY:
-      return "CURRENCY";
-    default:
-      return "UNDEFINED";
-  }
+  return aclassMap[aclass] || "UNDEFINED";
 };
 
 export const parseAClass = (aclassStr) => {
@@ -124,7 +120,7 @@ export const getDefaultFees = (type) => {
     return null;
   }
 
-  if (type == FeeType.ZERO_FEE) {
+  if (type === FeeType.ZERO_FEE) {
     return {
       feeStructure: {
         type: FeeType.ZERO_FEE,
@@ -162,6 +158,7 @@ export const getNewPortfolio = () => {
     budget: 0,
     fees: getDefaultFees(FeeType.ZERO_FEE),
     lastPriceRefresh: Date.now(),
+    lastUpdatedAt: Date.now(),
   };
 };
 
@@ -194,6 +191,7 @@ const initialState = () => {
   return {
     selected: null,
     pfolios: {},
+    deletedPortfolios: [],
   };
 };
 
@@ -210,6 +208,7 @@ export const portfolioSlice = createSlice({
       const { id } = action.payload;
       if (!(id in state.pfolios)) return;
 
+      state.deletedPortfolios.push(id);
       delete state.pfolios[id];
     },
     duplicatePortfolio: (state, action) => {
@@ -240,6 +239,7 @@ export const portfolioSlice = createSlice({
       if (!(id in state.pfolios)) return;
 
       state.pfolios[id].name = name;
+      state.pfolios[id].lastUpdatedAt = Date.now();
     },
     addAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -270,6 +270,7 @@ export const portfolioSlice = createSlice({
       if (Object.keys(pfolio.assets).length === 1) {
         pfolio.lastPriceRefresh = Date.now();
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     removeAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -286,6 +287,7 @@ export const portfolioSlice = createSlice({
           updateWeight(asset, pfolio.totalAmount);
         });
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setQty: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -310,6 +312,7 @@ export const portfolioSlice = createSlice({
       Object.values(pfolio.assets).forEach((asset) => {
         updateWeight(asset, pfolio.totalAmount);
       });
+      pfolio.lastUpdatedAt = Date.now();
     },
     setPrice: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -327,7 +330,6 @@ export const portfolioSlice = createSlice({
       const newAmount = roundAmount((asset.qty || 0) * price);
       pfolio.totalAmount -= asset.amount;
       pfolio.totalAmount += newAmount;
-      pfolio.totalAmount = pfolio.totalAmount;
 
       // Update asset info
       asset.price = price;
@@ -336,6 +338,8 @@ export const portfolioSlice = createSlice({
       Object.values(pfolio.assets).forEach((asset) => {
         updateWeight(asset, pfolio.totalAmount);
       });
+      
+      pfolio.lastUpdatedAt = Date.now();
     },
     setTargetWeight: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -348,6 +352,7 @@ export const portfolioSlice = createSlice({
           targetWeight: action.payload.weight || 0,
         },
       };
+      pfolio.lastUpdatedAt = Date.now();
     },
     setRefreshTime: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -356,6 +361,7 @@ export const portfolioSlice = createSlice({
       if (action.payload.time) {
         pfolio.lastPriceRefresh = action.payload.time;
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setQuoteCurrency: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -364,6 +370,7 @@ export const portfolioSlice = createSlice({
       if (action.payload.quoteCcy && action.payload.quoteCcy.length > 0) {
         pfolio.quoteCcy = action.payload.quoteCcy;
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setBudget: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -372,6 +379,7 @@ export const portfolioSlice = createSlice({
       if (action.payload.budget && action.payload.budget >= 0) {
         pfolio.budget = action.payload.budget;
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setFees: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -380,6 +388,7 @@ export const portfolioSlice = createSlice({
       if (action.payload.fees) {
         pfolio.fees = action.payload.fees;
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setFeesAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -391,6 +400,7 @@ export const portfolioSlice = createSlice({
       }
 
       pfolio.assets[symbol].fees = fees;
+      pfolio.lastUpdatedAt = Date.now();
     },
     setFeeType: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -412,6 +422,7 @@ export const portfolioSlice = createSlice({
           feeStructure: getDefaultFees(action.payload.type).feeStructure,
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setFeeTypeAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -440,6 +451,7 @@ export const portfolioSlice = createSlice({
           feeStructure: getDefaultFees(type).feeStructure,
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setMaxFeeImpact: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -451,6 +463,7 @@ export const portfolioSlice = createSlice({
           maxFeeImpact: action.payload.value,
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setMaxFeeImpactAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -468,6 +481,7 @@ export const portfolioSlice = createSlice({
           maxFeeImpact: value,
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setFixedFeeAmount: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -482,6 +496,7 @@ export const portfolioSlice = createSlice({
           },
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setFixedFeeAmountAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -502,6 +517,7 @@ export const portfolioSlice = createSlice({
           },
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setVariableFee: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -516,6 +532,7 @@ export const portfolioSlice = createSlice({
           },
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     setVariableFeeAsset: (state, action) => {
       const pfolio = currentPortfolio(state);
@@ -536,6 +553,7 @@ export const portfolioSlice = createSlice({
           },
         };
       }
+      pfolio.lastUpdatedAt = Date.now();
     },
     clearBudget: (state) => {
       const pfolio = currentPortfolio(state);
