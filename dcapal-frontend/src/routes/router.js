@@ -19,6 +19,7 @@ import {
 import AuthPage from "@routes/loginPage";
 import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
+import { useSyncPortfolios } from "@hooks/useSyncPortfolios";
 
 import(/* webpackPrefetch: true */ "@app");
 
@@ -27,15 +28,26 @@ const App = lazy(() => import("@app"));
 export const Router = () => {
   const [session, setSession] = useState(null);
 
+  useSyncPortfolios();
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+      } catch (error) {
+        console.error('Error fetching session:', error);
+      }
+    };
+
+    initSession();
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 

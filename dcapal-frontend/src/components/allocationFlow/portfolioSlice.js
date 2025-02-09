@@ -1,7 +1,8 @@
 import { store } from "@app/store";
-import { createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
+import { syncPortfoliosAPI } from "@app/api";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -194,6 +195,14 @@ const initialState = () => {
     deletedPortfolios: [],
   };
 };
+
+export const syncPortfolios = createAsyncThunk(
+  "portfolio/syncPortfolios",
+  async (_, { getState }) => {
+    const { pfolios, deletedPortfolios } = getState().pfolio;
+    return await syncPortfoliosAPI(pfolios, deletedPortfolios);
+  }
+);
 
 export const portfolioSlice = createSlice({
   name: "portfolio",
@@ -561,6 +570,18 @@ export const portfolioSlice = createSlice({
 
       pfolio.budget = 0;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(syncPortfolios.fulfilled, (state, action) => {
+      if (!action.payload) return;
+      const { updatedPortfolios, deletedPortfolios } = action.payload;
+      updatedPortfolios?.forEach((pf) => {
+        state.pfolios[pf.id] = { ...pf };
+      });
+      deletedPortfolios?.forEach((id) => {
+        if (id in state.pfolios) delete state.pfolios[id];
+      });
+    });
   },
 });
 
