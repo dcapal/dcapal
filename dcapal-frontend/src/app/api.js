@@ -1,5 +1,9 @@
 import axios from "axios";
 import { DCAPAL_API, supabase } from "@app/config";
+import {
+  aclassToString,
+  feeTypeToString,
+} from "@components/allocationFlow/portfolioSlice";
 
 // Create `axios` instance passing the newly created `cache.adapter`
 export const api = axios.create();
@@ -19,7 +23,7 @@ export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
         fees: p.fees
           ? {
               feeStructure: {
-                type: feeTypeToString(p.fees.feeStructure.type).toLowerCase(),
+                type: feeTypeToString(p.fees.feeStructure.type),
                 // TODO: Add other feeStructure properties
               },
             }

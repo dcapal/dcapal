@@ -148,6 +148,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionFeesResponse {
     pub max_fee_impact: Option<Decimal>,
     pub fee_structure: FeeStructure,
