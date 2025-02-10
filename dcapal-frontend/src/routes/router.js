@@ -33,10 +33,12 @@ export const Router = () => {
   useEffect(() => {
     const initSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         setSession(session);
       } catch (error) {
-        console.error('Error fetching session:', error);
+        console.error("Error fetching session:", error);
       }
     };
 
