@@ -27,7 +27,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 const_format = "0.2.34"
 futures = "0.3.31"
-strum = "0.26.3"
+strum = "0.27.0"
 strum_macros = "0.26.4"
 config = "0.15.7"
 lazy_static = "1.5.0"
