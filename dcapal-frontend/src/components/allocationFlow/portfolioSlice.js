@@ -576,7 +576,19 @@ export const portfolioSlice = createSlice({
       if (!action.payload) return;
       const { updatedPortfolios, deletedPortfolios } = action.payload;
       updatedPortfolios?.forEach((pf) => {
-        state.pfolios[pf.id] = { ...pf };
+        state.pfolios[pf.id] = {
+          ...pf,
+          fees: parseFees(pf.fees),
+          assets: pf.assets.map((asset) => ({
+            ...asset,
+            fees: parseFees(asset.fees),
+            aclass: parseAClass(asset.aclass),
+            weight: asset.targetWeight,
+          })),
+          nextIdx: pf.nextIdx || 0,
+          totalAmount: pf.totalAmount || 0,
+          budget: pf.budget || 0,
+        };
       });
       deletedPortfolios?.forEach((id) => {
         if (id in state.pfolios) delete state.pfolios[id];

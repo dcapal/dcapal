@@ -20,7 +20,7 @@ pub struct PortfolioResponse {
     pub id: Uuid,
     pub name: String,
     pub quote_ccy: String,
-    pub fees: TransactionFeesResponse,
+    pub fees: Option<TransactionFeesResponse>,
     pub assets: Vec<PortfolioAssetResponse>,
     pub last_updated_at: DateTime,
 }
@@ -109,37 +109,43 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
             id: portfolio.id,
             name: portfolio.name.clone(),
             quote_ccy: portfolio.currency.clone(),
-            fees: TransactionFeesResponse {
-                max_fee_impact: portfolio.max_fee_impact,
-                fee_structure: match portfolio.fee_type {
-                    Some(val) if val == *"ZeroFee" => FeeStructure::ZeroFee,
-                    Some(val) if val == *"Fixed" => {
-                        if let Some(fee_amount) = portfolio.fee_amount {
-                            FeeStructure::Fixed { fee_amount }
-                        } else {
-                            return Err(DcaError::Generic(
-                                "Fixed fee requires fee_amount to be Some.".to_string(),
-                            ));
-                        }
-                    }
-                    Some(val) if val == *"Variable" => {
-                        if let (Some(fee_rate), Some(min_fee)) =
-                            (portfolio.fee_rate, portfolio.min_fee)
-                        {
-                            FeeStructure::Variable {
-                                fee_rate,
-                                min_fee,
-                                max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
+            fees: if let Some(fee_type) = portfolio.fee_type {
+                Some(TransactionFeesResponse {
+                    max_fee_impact: portfolio.max_fee_impact,
+                    fee_structure: match fee_type {
+                        val if val == *"ZeroFee" => FeeStructure::ZeroFee,
+                        val if val == *"Fixed" => {
+                            if let Some(fee_amount) = portfolio.fee_amount {
+                                FeeStructure::Fixed { fee_amount }
+                            } else {
+                                return Err(DcaError::Generic(
+                                    "Fixed fee requires fee_amount to be Some.".to_string(),
+                                ));
                             }
-                        } else {
-                            return Err(DcaError::Generic(
-                                "Variable fee requires fee_rate and min_fee to be Some."
-                                    .to_string(),
-                            ));
                         }
-                    }
-                    _ => return Err(DcaError::Generic("Fee type is not specified.".to_string())),
-                },
+                        val if val == *"Variable" => {
+                            if let (Some(fee_rate), Some(min_fee)) =
+                                (portfolio.fee_rate, portfolio.min_fee)
+                            {
+                                FeeStructure::Variable {
+                                    fee_rate,
+                                    min_fee,
+                                    max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
+                                }
+                            } else {
+                                return Err(DcaError::Generic(
+                                    "Variable fee requires fee_rate and min_fee to be Some."
+                                        .to_string(),
+                                ));
+                            }
+                        }
+                        _ => {
+                            return Err(DcaError::Generic("Fee type is not specified.".to_string()))
+                        }
+                    },
+                })
+            } else {
+                None
             },
             assets: portfolio_assets,
             last_updated_at: portfolio.last_updated_at.into(),
