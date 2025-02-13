@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use sea_orm::prelude::Decimal;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use tracing::info;

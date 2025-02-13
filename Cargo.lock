@@ -1161,6 +1161,7 @@ dependencies = [
  "redis",
  "regex",
  "reqwest",
+ "rust_decimal",
  "sea-orm",
  "sea-orm-migration",
  "serde",

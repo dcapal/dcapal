@@ -2,7 +2,7 @@ use crate::app::domain::db::{portfolio_asset, portfolios};
 use crate::error::DcaError;
 use crate::ports::inbound::rest::FeeStructure;
 use crate::DateTime;
-use sea_orm::prelude::Decimal;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;

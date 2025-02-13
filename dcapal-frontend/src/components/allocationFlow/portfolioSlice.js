@@ -579,12 +579,16 @@ export const portfolioSlice = createSlice({
         state.pfolios[pf.id] = {
           ...pf,
           fees: parseFees(pf.fees),
-          assets: pf.assets.map((asset) => ({
-            ...asset,
-            fees: parseFees(asset.fees),
-            aclass: parseAClass(asset.aclass),
-            weight: asset.targetWeight,
-          })),
+          assets: pf.assets.reduce((acc, asset) => {
+            acc[asset.symbol] = {
+              ...asset,
+              fees: parseFees(asset.fees),
+              aclass: parseAClass(asset.aclass),
+              weight: asset.targetWeight,
+              amount: 0,
+            };
+            return acc;
+          }, {}),
           nextIdx: pf.nextIdx || 0,
           totalAmount: pf.totalAmount || 0,
           budget: pf.budget || 0,
