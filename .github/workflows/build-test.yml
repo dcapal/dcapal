@@ -9,8 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
-  SQLX_VERSION: 0.8.0
-  SQLX_FEATURES: "rustls,postgres"
   DATABASE_URL: postgres://postgres:postgres@supabase_db_dcapal:5432/postgres
 
 jobs:
@@ -35,16 +33,49 @@ jobs:
           cargo install sea-orm-cli@1.1.0
 
       - name: Lint
-        env:
-          SQLX_OFFLINE: true
         run: |
           cd dcapal-backend
           cargo fmt --all -- --check
           cargo clippy -- -D warnings
 
+
+      - name: Configure dcapal.yml
+        run: |
+          cat > dcapal-backend/dcapal.yml << EOF
+          app:
+            providers:
+              priceProvider: kraken
+              cwApiKey: CW_API_KEY
+              ipApiKey: IP_API_KEY
+            auth:
+              jwtSecret: JWT_SECRET
+
+            log:
+              level: dcapal_backend=info,tower_http=debug
+              file: data/dcapal/dcapal.log
+              enableStdout: true
+
+          server:
+            web:
+              hostname: 0.0.0.0
+              port: 8080
+            metrics:
+              hostname: 0.0.0.0
+              port: 9000
+            redis:
+              hostname: redis
+              port: 6379
+              user: dcapal
+              password: dcapal
+            postgres:
+              hostname: supabase_db_dcapal
+              port: 5432
+              user: postgres
+              password: postgres
+              database: postgres
+          EOF
+
       - name: Build and Test
-        env:
-          SQLX_OFFLINE: true
         run: |
           cd dcapal-backend
           RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
