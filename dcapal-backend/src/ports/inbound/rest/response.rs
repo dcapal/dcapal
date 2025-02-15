@@ -7,14 +7,14 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncPortfoliosResponse {
     pub updated_portfolios: Vec<PortfolioResponse>,
     pub deleted_portfolios: Vec<Uuid>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioResponse {
     pub id: Uuid,
@@ -25,7 +25,7 @@ pub struct PortfolioResponse {
     pub last_updated_at: DateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetResponse {
     pub symbol: String,
@@ -153,7 +153,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesResponse {
     pub max_fee_impact: Option<Decimal>,

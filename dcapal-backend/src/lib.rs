@@ -358,3 +358,142 @@ async fn refresh_imported_portfolios_stats(stats_repo: &StatsRepository) -> Resu
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::infra::claim::{Claims, UserMetadataClaim};
+    use crate::ports::inbound::rest::response::SyncPortfoliosResponse;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use uuid::Uuid;
+
+    fn generate_jwt() -> String {
+        let jwt_secret = "super-secret-jwt-token-with-at-least-32-characters-long";
+
+        let expiration = Utc::now()
+            .checked_add_signed(chrono::Duration::hours(24))
+            .unwrap()
+            .timestamp() as usize;
+
+        let sub = "73d83d29-03a2-4bb3-ac2d-379c0f4fda2a";
+
+        let claims = Claims {
+            iat: 0,
+            sub: Uuid::parse_str(sub).unwrap(),
+            session_id: Default::default(),
+            role: "".to_string(),
+            aud: "authenticated".to_string(),
+            exp: expiration,
+            user_metadata: UserMetadataClaim {
+                email: "".to_string(),
+                full_name: None,
+            },
+        };
+
+        // Encode the token
+        encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(jwt_secret.as_ref()),
+        )
+        .expect("Failed to generate JWT")
+    }
+
+    #[tokio::test]
+    async fn test_sync_portfolios_e2e() {
+        let _ = tracing_subscriber::fmt().try_init();
+        let config = Config::new().unwrap();
+        let server = DcaServer::try_new(config).await.unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::serve(listener, server.app).await.unwrap();
+        });
+
+        let last_updated_at = chrono::Utc::now().to_rfc3339();
+
+        let payload = serde_json::json!({
+            "portfolios": [
+                {
+                    "id": "7cf8be0e-3ad9-48f5-a7b2-0acdaae5f139",
+                    "name": "p2",
+                    "quoteCcy": "usd",
+                    "fees": {
+                        "feeStructure": {
+                            "type": "zeroFee"
+                        }
+                    },
+                    "assets": [
+                        {
+                            "symbol": "vwenx",
+                            "name": "Vanguard Wellington Admiral",
+                            "aclass": "EQUITY",
+                            "baseCcy": "usd",
+                            "provider": "YF",
+                            "price": 76.38,
+                            "qty": "10",
+                            "targetWeight": "90"
+                        },
+                        {
+                            "symbol": "spy",
+                            "name": "SPDR S&P 500 ETF Trust",
+                            "aclass": "EQUITY",
+                            "baseCcy": "usd",
+                            "provider": "YF",
+                            "price": 609.73,
+                            "qty": "1",
+                            "targetWeight": 10
+                        }
+                    ],
+                    "lastUpdatedAt": last_updated_at
+                },
+                {
+                    "id": "e025e9ad-398f-44ba-9d80-c5ccfca2e330",
+                    "name": "p1",
+                    "quoteCcy": "usd",
+                    "fees": {
+                        "feeStructure": {
+                            "type": "zeroFee"
+                        }
+                    },
+                    "assets": [
+                        {
+                            "symbol": "btc",
+                            "name": "Grayscale Bitcoin Mini Trust ETF",
+                            "aclass": "EQUITY",
+                            "baseCcy": "usd",
+                            "provider": "YF",
+                            "price": "42.66",
+                            "qty": "10",
+                            "targetWeight": "100"
+                        }
+                    ],
+                    "lastUpdatedAt": last_updated_at
+                }
+            ],
+            "deletedPortfolios": [
+            ]
+        });
+        
+        let payload_response = serde_json::json!({
+            "updatedPortfolios": [],
+            "deletedPortfolios": []
+        });
+
+        let body: SyncPortfoliosResponse = serde_json::from_value(payload_response.clone()).unwrap();
+
+        let client = reqwest::Client::new();
+        let token = generate_jwt();
+        let res = client
+            .post(format!("http://{}/v1/sync/portfolios", addr))
+            .header("authorization", format!("Bearer {}", token))
+            .json(&payload)
+            .send()
+            .await
+            .expect("Failed to send request");
+
+        assert_eq!(res.status(), 200);
+        assert_eq!(res.json::<SyncPortfoliosResponse>().await.unwrap(), body);
+    }
+}

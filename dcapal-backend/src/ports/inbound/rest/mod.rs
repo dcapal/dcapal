@@ -141,7 +141,7 @@ pub async fn get_imported_portfolio(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone,PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum FeeStructure {
     #[serde(rename = "zeroFee")]
