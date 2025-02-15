@@ -38,7 +38,6 @@ jobs:
           cargo fmt --all -- --check
           cargo clippy -- -D warnings
 
-
       - name: Configure dcapal.yml
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
@@ -74,6 +73,12 @@ jobs:
               password: postgres
               database: postgres
           EOF
+
+      - name: Install Supabase
+        run: |
+          npm install supabase --save-dev
+          npx supabase init
+          npx supabase start
 
       - name: Build and Test
         run: |
