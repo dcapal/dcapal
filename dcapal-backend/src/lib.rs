@@ -447,41 +447,19 @@ mod tests {
                         }
                     ],
                     "lastUpdatedAt": last_updated_at
-                },
-                {
-                    "id": "e025e9ad-398f-44ba-9d80-c5ccfca2e330",
-                    "name": "p1",
-                    "quoteCcy": "usd",
-                    "fees": {
-                        "feeStructure": {
-                            "type": "zeroFee"
-                        }
-                    },
-                    "assets": [
-                        {
-                            "symbol": "btc",
-                            "name": "Grayscale Bitcoin Mini Trust ETF",
-                            "aclass": "EQUITY",
-                            "baseCcy": "usd",
-                            "provider": "YF",
-                            "price": "42.66",
-                            "qty": "10",
-                            "targetWeight": "100"
-                        }
-                    ],
-                    "lastUpdatedAt": last_updated_at
                 }
             ],
             "deletedPortfolios": [
             ]
         });
-        
+
         let payload_response = serde_json::json!({
             "updatedPortfolios": [],
             "deletedPortfolios": []
         });
 
-        let body: SyncPortfoliosResponse = serde_json::from_value(payload_response.clone()).unwrap();
+        let body: SyncPortfoliosResponse =
+            serde_json::from_value(payload_response.clone()).unwrap();
 
         let client = reqwest::Client::new();
         let token = generate_jwt();
