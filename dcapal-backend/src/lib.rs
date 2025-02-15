@@ -399,21 +399,8 @@ mod tests {
         .expect("Failed to generate JWT")
     }
 
-    #[tokio::test]
-    async fn test_sync_portfolios_e2e() {
-        let _ = tracing_subscriber::fmt().try_init();
-        let config = Config::new().unwrap();
-        let server = DcaServer::try_new(config).await.unwrap();
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        tokio::spawn(async move {
-            axum::serve(listener, server.app).await.unwrap();
-        });
-
-        let last_updated_at = chrono::Utc::now().to_rfc3339();
-
-        let payload = serde_json::json!({
+    fn generate_payload(last_updated_at: &str) -> serde_json::Value {
+        serde_json::json!({
             "portfolios": [
                 {
                     "id": "7cf8be0e-3ad9-48f5-a7b2-0acdaae5f139",
@@ -451,27 +438,112 @@ mod tests {
             ],
             "deletedPortfolios": [
             ]
+        })
+    }
+
+    #[tokio::test]
+    async fn test_sync_portfolios_e2e() {
+        let _ = tracing_subscriber::fmt().try_init();
+        let config = Config::new().unwrap();
+        let server = DcaServer::try_new(config).await.unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::serve(listener, server.app).await.unwrap();
         });
 
-        let payload_response = serde_json::json!({
+        let last_updated_at_in_the_past = "2021-08-01T00:00:00Z";
+        let last_updated_at = Utc::now().to_rfc3339();
+
+        let client_1_payload = generate_payload(&last_updated_at);
+        let client_2_payload = generate_payload(&last_updated_at_in_the_past);
+
+        let payload_response_1 = serde_json::json!({
             "updatedPortfolios": [],
             "deletedPortfolios": []
         });
 
-        let body: SyncPortfoliosResponse =
-            serde_json::from_value(payload_response.clone()).unwrap();
+        let payload_response_2 = serde_json::json!({
+            "updatedPortfolios": [
+                 {
+                    "id": "7cf8be0e-3ad9-48f5-a7b2-0acdaae5f139",
+                    "name": "p2",
+                    "quoteCcy": "usd",
+                    "fees": {
+                        "feeStructure": {
+                            "type": "zeroFee"
+                        }
+                    },
+                    "assets": [
+                        {
+                            "symbol": "vwenx",
+                            "name": "Vanguard Wellington Admiral",
+                            "aclass": "EQUITY",
+                            "baseCcy": "usd",
+                            "provider": "YF",
+                            "price": 76.38,
+                            "qty": "10",
+                            "targetWeight": "90"
+                        },
+                        {
+                            "symbol": "spy",
+                            "name": "SPDR S&P 500 ETF Trust",
+                            "aclass": "EQUITY",
+                            "baseCcy": "usd",
+                            "provider": "YF",
+                            "price": 609.73,
+                            "qty": "1",
+                            "targetWeight": 10
+                        }
+                    ],
+                    "lastUpdatedAt": last_updated_at
+                }
+            ],
+            "deletedPortfolios": []
+        });
+
+        let response_body_1: SyncPortfoliosResponse =
+            serde_json::from_value(payload_response_1.clone()).unwrap();
+
+        let response_body_2: SyncPortfoliosResponse =
+            serde_json::from_value(payload_response_2.clone()).unwrap();
 
         let client = reqwest::Client::new();
         let token = generate_jwt();
-        let res = client
+
+        let response_client_1 = client
             .post(format!("http://{}/v1/sync/portfolios", addr))
             .header("authorization", format!("Bearer {}", token))
-            .json(&payload)
+            .json(&client_1_payload)
             .send()
             .await
             .expect("Failed to send request");
 
-        assert_eq!(res.status(), 200);
-        assert_eq!(res.json::<SyncPortfoliosResponse>().await.unwrap(), body);
+        let response_client_2 = client
+            .post(format!("http://{}/v1/sync/portfolios", addr))
+            .header("authorization", format!("Bearer {}", token))
+            .json(&client_2_payload)
+            .send()
+            .await
+            .expect("Failed to send request");
+
+        assert_eq!(response_client_1.status(), 200);
+        assert_eq!(
+            response_client_1
+                .json::<SyncPortfoliosResponse>()
+                .await
+                .unwrap(),
+            response_body_1
+        );
+
+        assert_eq!(response_client_2.status(), 200);
+        assert_eq!(
+            response_client_2
+                .json::<SyncPortfoliosResponse>()
+                .await
+                .unwrap(),
+            response_body_2
+        );
     }
 }
