@@ -43,11 +43,11 @@ jobs:
           cat > dcapal-backend/dcapal.yml << EOF
           app:
             providers:
-              priceProvider: kraken
+              priceProvider: yahoo
               cwApiKey: CW_API_KEY
               ipApiKey: IP_API_KEY
             auth:
-              jwtSecret: JWT_SECRET
+              jwtSecret: super-secret-jwt-token-with-at-least-32-characters-long
 
             log:
               level: dcapal_backend=info,tower_http=debug
@@ -56,19 +56,19 @@ jobs:
 
           server:
             web:
-              hostname: 0.0.0.0
+              hostname: 127.0.0.1
               port: 8080
             metrics:
-              hostname: 0.0.0.0
+              hostname: 127.0.0.1
               port: 9000
             redis:
-              hostname: redis
+              hostname: 127.0.0.1
               port: 6379
               user: dcapal
               password: dcapal
             postgres:
-              hostname: supabase_db_dcapal
-              port: 5432
+              hostname: 127.0.0.1
+              port: 54322
               user: postgres
               password: postgres
               database: postgres
