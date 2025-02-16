@@ -2,11 +2,35 @@ import axios from "axios";
 import { DCAPAL_API, supabase } from "@app/config";
 import {
   aclassToString,
+  FeeType,
   feeTypeToString,
-} from "@components/allocationFlow/portfolioSlice";
+} from "@components/allocationFlow/portfolioSlice"; // Create `axios` instance passing the newly created `cache.adapter`
 
 // Create `axios` instance passing the newly created `cache.adapter`
 export const api = axios.create();
+
+const parseFees = (fees) => {
+  if (!fees) return null;
+  const feeStructure = { type: feeTypeToString(fees.feeStructure.type) };
+
+  switch (fees.feeStructure.type) {
+    case FeeType.FIXED:
+      feeStructure.feeAmount = fees.feeStructure.feeAmount;
+      break;
+    case FeeType.VARIABLE:
+      feeStructure.feeRate = fees.feeStructure.feeRate;
+      feeStructure.minFee = fees.feeStructure.minFee;
+      if (fees.feeStructure.maxFee) {
+        feeStructure.maxFee = fees.feeStructure.maxFee;
+      }
+      break;
+    case FeeType.ZERO_FEE:
+    default:
+      break;
+  }
+
+  return { feeStructure };
+};
 
 export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
   try {
@@ -20,14 +44,7 @@ export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
         id: p.id,
         name: p.name,
         quoteCcy: p.quoteCcy,
-        fees: p.fees
-          ? {
-              feeStructure: {
-                type: feeTypeToString(p.fees.feeStructure.type),
-                // TODO: Add other feeStructure properties
-              },
-            }
-          : null,
+        fees: p.fees ? parseFees(p.fees) : null,
         assets: Object.entries(p.assets).map(([_, a]) => ({
           symbol: a.symbol.toLowerCase(),
           name: a.name,
@@ -37,6 +54,7 @@ export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
           price: a.price,
           qty: a.qty,
           targetWeight: a.targetWeight,
+          fees: parseFees(a.fees),
         })),
         lastUpdatedAt: new Date(p.lastUpdatedAt).toISOString(),
       })),

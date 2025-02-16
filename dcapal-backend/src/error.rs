@@ -67,6 +67,15 @@ impl Debug for DcaError {
     }
 }
 
+impl From<sea_orm::TransactionError<DcaError>> for DcaError {
+    fn from(err: sea_orm::TransactionError<DcaError>) -> Self {
+        match err {
+            sea_orm::TransactionError::Connection(e) => DcaError::DatabaseError(e),
+            sea_orm::TransactionError::Transaction(e) => e,
+        }
+    }
+}
+
 impl DcaError {
     pub fn iter_sources(&self) -> ErrorIter {
         ErrorIter {

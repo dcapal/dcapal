@@ -1,15 +1,28 @@
 use crate::app::domain::db::{portfolio_asset, portfolios};
-use crate::error::Result;
-use crate::ports::inbound::rest::request::{PortfolioAssetRequest, PortfolioRequest};
+use crate::error::{DcaError, Result};
+use crate::ports::inbound::rest::request::{
+    PortfolioAssetRequest, PortfolioRequest, TransactionFeesRequest,
+};
 use crate::ports::inbound::rest::FeeStructure;
+use rust_decimal::Decimal;
 use sea_orm::{
-    entity::*, sqlx, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    SqlxPostgresConnector,
+    entity::*, sqlx, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    QueryFilter, SqlxPostgresConnector, TransactionTrait,
 };
 use uuid::Uuid;
 
 pub struct PortfolioRepository {
     pub db_conn: DatabaseConnection,
+}
+
+#[derive(Default)]
+struct FeeFields {
+    max_fee_impact: ActiveValue<Option<Decimal>>,
+    fee_type: ActiveValue<Option<String>>,
+    fee_amount: ActiveValue<Option<Decimal>>,
+    fee_rate: ActiveValue<Option<Decimal>>,
+    min_fee: ActiveValue<Option<Decimal>>,
+    max_fee: ActiveValue<Option<Decimal>>,
 }
 
 impl PortfolioRepository {
@@ -31,17 +44,89 @@ impl PortfolioRepository {
         Ok(portfolios_with_assets)
     }
 
-    async fn upsert_assets(
+    pub async fn soft_delete(&self, portfolio_id: Uuid) -> Result<()> {
+        if let Some(portfolio_db) = portfolios::Entity::find_by_id(portfolio_id)
+            .one(&self.db_conn)
+            .await?
+        {
+            let mut portfolio: portfolios::ActiveModel = portfolio_db.into();
+            portfolio.deleted = Set(true);
+            portfolio.update(&self.db_conn).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn upsert(
         &self,
+        user_id: Uuid,
+        portfolio_req: PortfolioRequest,
+    ) -> Result<(portfolios::Model, Vec<portfolio_asset::Model>)> {
+        let fee_fields = Self::extract_fee_fields(portfolio_req.fees.clone());
+        let portfolio_req = portfolio_req.clone();
+
+        let result = self
+            .db_conn
+            .transaction::<_, (portfolios::Model, Vec<portfolio_asset::Model>), DcaError>(|txn| {
+                Box::pin(async move {
+                    let existing_portfolio = portfolios::Entity::find_by_id(portfolio_req.id)
+                        .one(txn)
+                        .await?;
+
+                    let mut portfolio_model = if let Some(existing) = existing_portfolio.clone() {
+                        existing.into_active_model()
+                    } else {
+                        portfolios::ActiveModel {
+                            id: Set(portfolio_req.id),
+                            user_id: Set(user_id),
+                            deleted: Set(false),
+                            created_at: Default::default(),
+                            updated_at: Default::default(),
+                            ..Default::default()
+                        }
+                    };
+
+                    portfolio_model.name = Set(portfolio_req.name.clone());
+                    portfolio_model.currency = Set(portfolio_req.quote_ccy.clone());
+                    portfolio_model.last_updated_at = Set(portfolio_req.last_updated_at.into());
+                    portfolio_model.max_fee_impact = fee_fields.max_fee_impact;
+                    portfolio_model.fee_type = fee_fields.fee_type;
+                    portfolio_model.fee_amount = fee_fields.fee_amount;
+                    portfolio_model.fee_rate = fee_fields.fee_rate;
+                    portfolio_model.min_fee = fee_fields.min_fee;
+                    portfolio_model.max_fee = fee_fields.max_fee;
+
+                    let portfolio = if existing_portfolio.is_some() {
+                        portfolio_model.update(txn).await?
+                    } else {
+                        portfolio_model.insert(txn).await?
+                    };
+
+                    let assets = Self::upsert_assets_transaction(
+                        txn,
+                        portfolio_req.id,
+                        portfolio_req.assets,
+                    )
+                    .await?;
+
+                    Ok((portfolio, assets))
+                })
+            })
+            .await?;
+
+        Ok(result)
+    }
+
+    async fn upsert_assets_transaction(
+        txn: &DatabaseTransaction,
         portfolio_id: Uuid,
         assets: Vec<PortfolioAssetRequest>,
     ) -> Result<Vec<portfolio_asset::Model>> {
         let mut updated_assets = Vec::new();
 
-        // Get existing assets for this portfolio
         let existing_assets = portfolio_asset::Entity::find()
             .filter(portfolio_asset::Column::PortfolioId.eq(portfolio_id))
-            .all(&self.db_conn)
+            .all(txn)
             .await?;
 
         for asset in &assets {
@@ -59,7 +144,8 @@ impl PortfolioRepository {
                 }
             };
 
-            // Update asset fields
+            let fee_fields = Self::extract_fee_fields(asset.clone().fees);
+
             asset_model.symbol = Set(asset.symbol.clone());
             asset_model.name = Set(asset.name.clone());
             asset_model.asset_class = Set(asset.aclass.clone());
@@ -68,24 +154,27 @@ impl PortfolioRepository {
             asset_model.quantity = Set(asset.qty);
             asset_model.target_weight = Set(asset.target_weight);
             asset_model.price = Set(asset.price);
+            asset_model.max_fee_impact = fee_fields.max_fee_impact;
+            asset_model.fee_type = fee_fields.fee_type;
+            asset_model.fee_amount = fee_fields.fee_amount;
+            asset_model.fee_rate = fee_fields.fee_rate;
+            asset_model.min_fee = fee_fields.min_fee;
+            asset_model.max_fee = fee_fields.max_fee;
 
-            // Handle fees similar to portfolio
-            //...
             let updated = if existing_asset.is_some() {
-                asset_model.update(&self.db_conn).await?
+                asset_model.update(txn).await?
             } else {
-                asset_model.insert(&self.db_conn).await?
+                asset_model.insert(txn).await?
             };
 
             updated_assets.push(updated);
         }
 
-        // Delete assets that are no longer present
         let current_symbols: Vec<String> = assets.into_iter().map(|a| a.symbol).collect();
         for existing in existing_assets {
             if !current_symbols.contains(&existing.symbol) {
                 portfolio_asset::Entity::delete_by_id(existing.id)
-                    .exec(&self.db_conn)
+                    .exec(txn)
                     .await?;
             }
         }
@@ -93,106 +182,47 @@ impl PortfolioRepository {
         Ok(updated_assets)
     }
 
-    //TODO: refactoring
-    pub async fn upsert(
-        &self,
-        user_id: Uuid,
-        portfolio_req: PortfolioRequest,
-    ) -> Result<(portfolios::Model, Vec<portfolio_asset::Model>)> {
-        let (max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee) =
-            if let Some(fees) = portfolio_req.fees {
-                match fees.fee_structure {
-                    FeeStructure::ZeroFee => (
-                        Set(fees.max_fee_impact),
-                        Set(Some(fees.fee_structure.to_string())),
-                        Set(None),
-                        Set(None),
-                        Set(None),
-                        Set(None),
-                    ),
-                    FeeStructure::Fixed { fee_amount } => (
-                        Set(fees.max_fee_impact),
-                        Set(Some(fees.fee_structure.to_string())),
-                        Set(Some(fee_amount)),
-                        Set(None),
-                        Set(None),
-                        Set(None),
-                    ),
-                    FeeStructure::Variable {
-                        fee_rate,
-                        min_fee,
-                        max_fee,
-                    } => (
-                        Set(fees.max_fee_impact),
-                        Set(Some(fees.fee_structure.to_string())),
-                        Set(None),
-                        Set(Some(fee_rate)),
-                        Set(Some(min_fee)),
-                        Set(max_fee),
-                    ),
-                }
-            } else {
-                (
-                    Default::default(),
-                    Default::default(),
-                    Default::default(),
-                    Default::default(),
-                    Default::default(),
-                    Default::default(),
-                )
-            };
-
-        let existing_portfolio = portfolios::Entity::find_by_id(portfolio_req.id)
-            .one(&self.db_conn)
-            .await?;
-
-        let mut portfolio_model = if let Some(existing) = existing_portfolio.clone() {
-            existing.into_active_model()
-        } else {
-            portfolios::ActiveModel {
-                id: Set(portfolio_req.id),
-                user_id: Set(user_id),
-                deleted: Set(false), // When creating a new portfolio, it is not deleted
-                created_at: Default::default(),
-                updated_at: Default::default(),
-                ..Default::default()
+    fn extract_fee_fields(fees: Option<TransactionFeesRequest>) -> FeeFields {
+        if let Some(fees) = fees {
+            match fees.fee_structure {
+                FeeStructure::ZeroFee => FeeFields {
+                    max_fee_impact: Set(fees.max_fee_impact),
+                    fee_type: Set(Some(fees.fee_structure.to_string())),
+                    fee_amount: Set(None),
+                    fee_rate: Set(None),
+                    min_fee: Set(None),
+                    max_fee: Set(None),
+                },
+                FeeStructure::Fixed { fee_amount } => FeeFields {
+                    max_fee_impact: Set(fees.max_fee_impact),
+                    fee_type: Set(Some(fees.fee_structure.to_string())),
+                    fee_amount: Set(Some(fee_amount)),
+                    fee_rate: Set(None),
+                    min_fee: Set(None),
+                    max_fee: Set(None),
+                },
+                FeeStructure::Variable {
+                    fee_rate,
+                    min_fee,
+                    max_fee,
+                } => FeeFields {
+                    max_fee_impact: Set(fees.max_fee_impact),
+                    fee_type: Set(Some(fees.fee_structure.to_string())),
+                    fee_amount: Set(None),
+                    fee_rate: Set(Some(fee_rate)),
+                    min_fee: Set(Some(min_fee)),
+                    max_fee: Set(max_fee),
+                },
             }
-        };
-
-        portfolio_model.name = Set(portfolio_req.name.clone());
-        portfolio_model.currency = Set(portfolio_req.quote_ccy.clone());
-        portfolio_model.last_updated_at = Set(portfolio_req.last_updated_at.into());
-        portfolio_model.max_fee_impact = max_fee_impact;
-        portfolio_model.fee_type = fee_type;
-        portfolio_model.fee_amount = fee_amount;
-        portfolio_model.fee_rate = fee_rate;
-        portfolio_model.min_fee = min_fee;
-        portfolio_model.max_fee = max_fee;
-
-        let portfolio = if existing_portfolio.is_some() {
-            portfolio_model.update(&self.db_conn).await?
         } else {
-            portfolio_model.insert(&self.db_conn).await?
-        };
-
-        // Handle portfolio assets
-        let assets = self
-            .upsert_assets(portfolio_req.id, portfolio_req.assets)
-            .await?;
-
-        Ok((portfolio, assets))
-    }
-
-    pub async fn soft_delete(&self, portfolio_id: Uuid) -> Result<()> {
-        if let Some(portfolio_db) = portfolios::Entity::find_by_id(portfolio_id)
-            .one(&self.db_conn)
-            .await?
-        {
-            let mut portfolio: portfolios::ActiveModel = portfolio_db.into();
-            portfolio.deleted = Set(true);
-            portfolio.update(&self.db_conn).await?;
+            FeeFields {
+                max_fee_impact: Set(None),
+                fee_type: Set(Some(FeeStructure::ZeroFee.to_string())),
+                fee_amount: Set(None),
+                fee_rate: Set(None),
+                min_fee: Set(None),
+                max_fee: Set(None),
+            }
         }
-
-        Ok(())
     }
 }

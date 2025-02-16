@@ -31,6 +31,14 @@ test("sync portfolios e2e", async ({ request }) => {
             price: "76.38",
             qty: "10",
             targetWeight: "90",
+            fees: {
+              feeStructure: {
+                type: "variable",
+                feeRate: "0.005",
+                minFee: "0.01",
+                maxFee: "0.1",
+              },
+            },
           },
           {
             symbol: "spy",
@@ -41,6 +49,12 @@ test("sync portfolios e2e", async ({ request }) => {
             price: "609.73",
             qty: "1",
             targetWeight: "10",
+            fees: {
+              feeStructure: {
+                type: "fixed",
+                feeAmount: "0.01",
+              },
+            },
           },
         ],
         lastUpdatedAt: lastUpdatedAtNow,
