@@ -179,7 +179,7 @@ jobs:
               cwApiKey: CW_API_KEY
               ipApiKey: IP_API_KEY
             auth:
-              jwtSecret: JWT_SECRET
+              jwtSecret: super-secret-jwt-token-with-at-least-32-characters-long
 
             log:
               level: dcapal_backend=info,tower_http=debug
