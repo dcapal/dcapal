@@ -33,8 +33,11 @@ pub struct PortfolioAssetResponse {
     pub aclass: String,
     pub base_ccy: String,
     pub provider: String,
+    #[serde(with = "rust_decimal::serde::float")]
     pub qty: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
     pub target_weight: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
     pub price: Decimal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fees: Option<TransactionFeesResponse>,
@@ -156,7 +159,10 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
 #[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "rust_decimal::serde::float_option"
+    )]
     pub max_fee_impact: Option<Decimal>,
     pub fee_structure: FeeStructure,
 }

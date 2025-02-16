@@ -56,4 +56,4 @@ sea-orm-migration = { version = "1.1.4", features = [
     "runtime-tokio-rustls",
     "sqlx-postgres",
 ] }
-rust_decimal = { version = "1.30", features = ["serde"] }
+rust_decimal = { version = "1.30", features = ["serde", "serde-float"] }
