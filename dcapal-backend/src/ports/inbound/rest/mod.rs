@@ -161,6 +161,7 @@ pub enum FeeStructure {
         min_fee: Decimal,
         #[serde(
             rename = "maxFee",
+            default,
             skip_serializing_if = "Option::is_none",
             with = "rust_decimal::serde::float_option"
         )]

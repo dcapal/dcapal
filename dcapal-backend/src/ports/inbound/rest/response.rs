@@ -161,6 +161,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
 pub struct TransactionFeesResponse {
     #[serde(
         skip_serializing_if = "Option::is_none",
+        default,
         with = "rust_decimal::serde::float_option"
     )]
     pub max_fee_impact: Option<Decimal>,
