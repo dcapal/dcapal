@@ -2,30 +2,30 @@ use crate::app::domain::db::{portfolio_asset, portfolios};
 use crate::error::DcaError;
 use crate::ports::inbound::rest::FeeStructure;
 use crate::DateTime;
-use sea_orm::prelude::Decimal;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncPortfoliosResponse {
     pub updated_portfolios: Vec<PortfolioResponse>,
     pub deleted_portfolios: Vec<Uuid>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioResponse {
     pub id: Uuid,
     pub name: String,
     pub quote_ccy: String,
-    pub fees: TransactionFeesResponse,
+    pub fees: Option<TransactionFeesResponse>,
     pub assets: Vec<PortfolioAssetResponse>,
     pub last_updated_at: DateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetResponse {
     pub symbol: String,
@@ -33,8 +33,11 @@ pub struct PortfolioAssetResponse {
     pub aclass: String,
     pub base_ccy: String,
     pub provider: String,
+    #[serde(with = "rust_decimal::serde::float")]
     pub qty: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
     pub target_weight: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
     pub price: Decimal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fees: Option<TransactionFeesResponse>,
@@ -109,37 +112,43 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
             id: portfolio.id,
             name: portfolio.name.clone(),
             quote_ccy: portfolio.currency.clone(),
-            fees: TransactionFeesResponse {
-                max_fee_impact: portfolio.max_fee_impact,
-                fee_structure: match portfolio.fee_type {
-                    Some(val) if val == *"ZeroFee" => FeeStructure::ZeroFee,
-                    Some(val) if val == *"Fixed" => {
-                        if let Some(fee_amount) = portfolio.fee_amount {
-                            FeeStructure::Fixed { fee_amount }
-                        } else {
-                            return Err(DcaError::Generic(
-                                "Fixed fee requires fee_amount to be Some.".to_string(),
-                            ));
-                        }
-                    }
-                    Some(val) if val == *"Variable" => {
-                        if let (Some(fee_rate), Some(min_fee)) =
-                            (portfolio.fee_rate, portfolio.min_fee)
-                        {
-                            FeeStructure::Variable {
-                                fee_rate,
-                                min_fee,
-                                max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
+            fees: if let Some(fee_type) = portfolio.fee_type {
+                Some(TransactionFeesResponse {
+                    max_fee_impact: portfolio.max_fee_impact,
+                    fee_structure: match fee_type {
+                        val if val == *"ZeroFee" => FeeStructure::ZeroFee,
+                        val if val == *"Fixed" => {
+                            if let Some(fee_amount) = portfolio.fee_amount {
+                                FeeStructure::Fixed { fee_amount }
+                            } else {
+                                return Err(DcaError::Generic(
+                                    "Fixed fee requires fee_amount to be Some.".to_string(),
+                                ));
                             }
-                        } else {
-                            return Err(DcaError::Generic(
-                                "Variable fee requires fee_rate and min_fee to be Some."
-                                    .to_string(),
-                            ));
                         }
-                    }
-                    _ => return Err(DcaError::Generic("Fee type is not specified.".to_string())),
-                },
+                        val if val == *"Variable" => {
+                            if let (Some(fee_rate), Some(min_fee)) =
+                                (portfolio.fee_rate, portfolio.min_fee)
+                            {
+                                FeeStructure::Variable {
+                                    fee_rate,
+                                    min_fee,
+                                    max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
+                                }
+                            } else {
+                                return Err(DcaError::Generic(
+                                    "Variable fee requires fee_rate and min_fee to be Some."
+                                        .to_string(),
+                                ));
+                            }
+                        }
+                        _ => {
+                            return Err(DcaError::Generic("Fee type is not specified.".to_string()))
+                        }
+                    },
+                })
+            } else {
+                None
             },
             assets: portfolio_assets,
             last_updated_at: portfolio.last_updated_at.into(),
@@ -147,8 +156,14 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionFeesResponse {
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        with = "rust_decimal::serde::float_option"
+    )]
     pub max_fee_impact: Option<Decimal>,
     pub fee_structure: FeeStructure,
 }

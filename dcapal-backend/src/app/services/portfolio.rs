@@ -55,6 +55,7 @@ impl PortfolioService {
 
         // Process client-side portfolios
         for client_pf in req.portfolios {
+            // Check if portfolio exists in db, if so, update if client data is newer
             if let Some(db_pf) = db_portfolios.iter().find(|pf| pf.0.id == client_pf.id) {
                 if db_pf.0.deleted {
                     deleted_portfolios.push(db_pf.0.id);
@@ -68,6 +69,11 @@ impl PortfolioService {
                     .upsert(user_id, client_pf.clone())
                     .await?;
             }
+        }
+
+        // Process deleted portfolios
+        for deleted_pf in req.deleted_portfolios {
+            self.portfolio_repository.soft_delete(deleted_pf).await?;
         }
 
         Ok(SyncPortfoliosResponse {
