@@ -226,7 +226,7 @@ impl DcaServer {
             let ctx = self.ctx.clone();
             let stop_rx = self.stop_tx.subscribe();
             let handle = tokio::spawn(async move {
-                let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 600));
+                let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 60));
                 worker.run(stop_rx).await;
             });
             self.worker_handlers.push(handle);

@@ -33,8 +33,6 @@ lazy_static! {
         Mutex::new(HashMap::new());
     static ref SUGGESTION_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::Problem>> =
         Mutex::new(HashMap::new());
-    static ref SUGGESTION_AVERAGE_BUY_PRICE_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::AverageBuyPriceProblem>> =
-        Mutex::new(HashMap::new());
     static ref NUMERIC_DIST: distributions::Uniform<u8> =
         distributions::Uniform::new_inclusive(0, 9);
 }
@@ -88,18 +86,6 @@ impl Solver {
                     kind: ProblemKind::Analyze,
                 })
             }
-            JsProblemOptions::AverageBuyPrice(options) => {
-                let options = suggestions::AverageBuyPriceProblemOptions::try_from(options)?;
-                let problem = optimize::suggestions::AverageBuyPriceProblem::new(options);
-
-                let mut problems = SUGGESTION_AVERAGE_BUY_PRICE_PROBLEMS.lock().unwrap();
-                problems.insert(id.clone(), problem);
-
-                Ok(ProblemHandle {
-                    id,
-                    kind: ProblemKind::AverageBuyPrice,
-                })
-            }
         }
     }
 
@@ -110,7 +96,6 @@ impl Solver {
             ProblemKind::Advanced => Self::solve_advanced(&handle.id),
             ProblemKind::Basic => Self::solve_basic(&handle.id),
             ProblemKind::Analyze => Self::suggest_amount_to_invest(&handle.id),
-            ProblemKind::AverageBuyPrice => Self::suggest_amount_increasing(&handle.id),
         }
     }
 
@@ -191,17 +176,6 @@ impl Solver {
         Ok(serde_wasm_bindgen::to_value(&solution).unwrap())
     }
 
-    fn suggest_amount_increasing(id: &str) -> Result<JsValue, JsValue> {
-        let problems = SUGGESTION_AVERAGE_BUY_PRICE_PROBLEMS.lock().unwrap();
-        let problem = problems
-            .get(id)
-            .ok_or_else(|| format!("Invalid problem id {}", id))?;
-
-        let solution = problem.suggest_invest_amount().round_dp(AMOUNT_DECIMALS);
-
-        Ok(serde_wasm_bindgen::to_value(&solution).unwrap())
-    }
-
     pub fn delete_problem(handle: &ProblemHandle) -> Result<bool, JsValue> {
         utils::require_init();
 
@@ -209,7 +183,6 @@ impl Solver {
             ProblemKind::Advanced => delete_problem(&ADVANCED_PROBLEMS, &handle.id),
             ProblemKind::Basic => delete_problem(&BASIC_PROBLEMS, &handle.id),
             ProblemKind::Analyze => delete_problem(&SUGGESTION_PROBLEMS, &handle.id),
-            ProblemKind::AverageBuyPrice => delete_problem(&SUGGESTION_PROBLEMS, &handle.id),
         })
     }
 }
@@ -223,7 +196,6 @@ pub enum ProblemKind {
     Advanced,
     Basic,
     Analyze,
-    AverageBuyPrice,
 }
 
 #[wasm_bindgen]
@@ -284,7 +256,6 @@ pub enum JsProblemOptions {
     Advanced(JsAdvancedOptions),
     Basic(JsBasicOptions),
     Analyze(JsAnalyzeOptions),
-    AverageBuyPrice(JsAverageBuyPriceOptions),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -304,12 +275,6 @@ pub struct JsAnalyzeOptions {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct JsAverageBuyPriceOptions {
-    pub assets: HashMap<String, JsAverageBuyPriceAsset>,
-    pub investment_amount: f64,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct JsAdvancedAsset {
     pub symbol: String,
     pub shares: f64,
@@ -326,14 +291,6 @@ pub struct JsAnalyzeAsset {
     pub price: f64,
     pub target_weight: f64,
     pub is_whole_shares: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct JsAverageBuyPriceAsset {
-    pub symbol: String,
-    pub price: f64,
-    pub target_weight: f64,
-    pub abp: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -446,25 +403,6 @@ impl TryFrom<JsAnalyzeOptions> for suggestions::ProblemOptions {
         Ok(suggestions::ProblemOptions {
             current_pfolio_amount: current_total,
             assets,
-        })
-    }
-}
-
-impl TryFrom<JsAverageBuyPriceOptions> for suggestions::AverageBuyPriceProblemOptions {
-    type Error = String;
-
-    fn try_from(options: JsAverageBuyPriceOptions) -> Result<Self, Self::Error> {
-        let assets = options
-            .assets
-            .into_iter()
-            .map(|(aid, a)| suggestions::AverageBuyPriceAsset::try_from(a).map(|a| (aid, a)))
-            .collect::<Result<HashMap<_, _>, _>>()?;
-
-        let investment_amount = parse_amount(options.investment_amount);
-
-        Ok(suggestions::AverageBuyPriceProblemOptions {
-            assets,
-            investment_amount,
         })
     }
 }
@@ -589,51 +527,6 @@ impl TryFrom<JsAnalyzeAsset> for suggestions::ProblemAsset {
             price: parse_amount(price),
             target_weight: parse_percentage(target_weight),
             is_whole_shares,
-        })
-    }
-}
-
-impl TryFrom<JsAverageBuyPriceAsset> for suggestions::AverageBuyPriceAsset {
-    type Error = String;
-
-    fn try_from(asset: JsAverageBuyPriceAsset) -> Result<Self, Self::Error> {
-        let JsAverageBuyPriceAsset {
-            symbol,
-            price,
-            target_weight,
-            abp,
-        } = asset;
-
-        if symbol.is_empty() {
-            return Err("Invalid symbol. Must not be empty".to_string());
-        }
-
-        if price < 0. {
-            return Err(format!(
-                "Invalid price ({}). Must be zero or positive",
-                price
-            ));
-        }
-
-        if target_weight < 0. {
-            return Err(format!(
-                "Invalid target weight ({}). Must be zero or positive",
-                target_weight
-            ));
-        }
-
-        if target_weight > 1. {
-            return Err(format!(
-                "Invalid target weight ({}). Must be less then or equal to 1.",
-                target_weight
-            ));
-        }
-
-        Ok(suggestions::AverageBuyPriceAsset {
-            symbol,
-            price: parse_amount(price),
-            target_weight: parse_percentage(target_weight),
-            abp: parse_amount(abp),
         })
     }
 }

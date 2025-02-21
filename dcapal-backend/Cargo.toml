@@ -33,7 +33,6 @@ parking_lot = "0.12.3"
 metrics = "0.24.1"
 metrics-exporter-prometheus = "0.16.0"
 tracing-appender = "0.2.3"
-regex = "1.11.1"
 itertools = "0.13.0"
 failsafe = "1.3.0"
 ip2location = "0.5.4"
@@ -42,18 +41,11 @@ uuid = { version = "1.11.0", features = ["v4", "serde"] }
 jsonwebtoken = "9.3.0"
 utoipa = "4.2.3"
 once_cell = "1.19.0"
-time = { version = "0.3.36", features = ["serde"] }
 async-openai = "0.23.4"
-garde = { version = "0.20.0", features = ["full"] }
-utoipa-axum = "0.1.4"
 sea-orm = { version = "1.1.4", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
     "macros",
     "mock"
-] }
-sea-orm-migration = { version = "1.1.4", features = [
-    "runtime-tokio-rustls",
-    "sqlx-postgres",
 ] }
 rust_decimal = { version = "1.30", features = ["serde", "serde-float"] }

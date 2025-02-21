@@ -8,13 +8,13 @@ Sync user's portfolios with DcaPal
 
 **Auth required** : YES
 
-**Permissions required** : SYNC_PORTFOLIO
-
 **Data constraints**
 
-Request body must be a JSON payload matching the [`portfolio`](../../../schema/portfolio/v1/schema.json) JSON schema. The ID should be provided, if not the request will be rejected.
+Request body must be a JSON payload containing a list of 0..n portfolios matching the [
+`portfolio`](../../../schema/portfolio/v1/schema.json) JSON schema. The ID should be provided, if not the request will
+be rejected. A list of uuid of deleted portfolios can also be provided.
 
-**Header constraints** : None
+**Header constraints** : The request must contain an `Authorization` header with a valid JWT token.
 
 **Data examples**
 
@@ -56,15 +56,17 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
 
 ## Success Responses
 
-**Condition** : Data provided is successfully validated against [`portfolio`](../../../schema/portfolio/v1/schema.json) JSON schema.
+**Condition** : Data provided is successfully validated against [`portfolio`](../../../schema/portfolio/v1/schema.json)
+JSON schema.
 
 **Code** : `201 CREATED`
 
-**Content example** :Response contains just updated (if the server has a greater lastUpdated) or missing portfolios for the user.
+**Content example** :Response contains just updated (if the server has a greater lastUpdated) or missing portfolios for
+the user.
 
 ```json
 {
-  "portfolios": [
+  "updatedPortfolios": [
     {
       "id": "5035c98b63b4451380f08c4978166bec",
       "name": "My Portfolio",
@@ -90,6 +92,9 @@ Request body must be a JSON payload matching the [`portfolio`](../../../schema/p
       ],
       "lastUpdatedAt": "2023-11-24 18:35:01 UTC"
     }
+  ],
+  "deletedPortfolios": [
+    "6585fe4c-912b-4597-8c52-7970ead6e1d1"
   ]
 }
 ```

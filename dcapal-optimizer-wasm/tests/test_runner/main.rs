@@ -42,7 +42,6 @@ fn test_runner() -> anyhow::Result<()> {
             JsProblemOptions::Advanced(o) => build_solve_advanced(o),
             JsProblemOptions::Basic(_) => todo!(),
             JsProblemOptions::Analyze(_) => todo!("Analyze not implemented"),
-            JsProblemOptions::AverageBuyPrice(_) => todo!("AverageBuyPrice not implemented"),
         };
 
         info!("==> 🔬  Checking expectations");

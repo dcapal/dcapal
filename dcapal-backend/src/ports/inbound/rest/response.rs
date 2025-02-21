@@ -74,7 +74,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                                     FeeStructure::Variable {
                                         fee_rate,
                                         min_fee,
-                                        max_fee: asset.max_fee, // `max_fee` is optional, so we can pass it directly
+                                        max_fee: asset.max_fee,
                                     }
                                 } else {
                                     return Err(DcaError::Generic(
@@ -133,7 +133,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                                 FeeStructure::Variable {
                                     fee_rate,
                                     min_fee,
-                                    max_fee: portfolio.max_fee, // `max_fee` is optional, so we can pass it directly
+                                    max_fee: portfolio.max_fee,
                                 }
                             } else {
                                 return Err(DcaError::Generic(

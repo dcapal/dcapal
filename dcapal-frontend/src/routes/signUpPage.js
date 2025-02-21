@@ -4,6 +4,7 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const containerStyle = {
   backgroundColor: "#F3F4F6", // light gray
@@ -46,6 +47,7 @@ const linkStyle = {
 // Media query styles
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -76,9 +78,7 @@ export default function SignUpPage() {
                 Dollar Cost Averaging Made Easy
               </h2>
               <p className="text-primary-foreground/80">
-                Signing up for DcaPal provides numerous benefits, including the
-                ability to keep your portfolio under control with tax-efficient
-                suggestions for your monthly investments.
+                {t("signUp.description")}
               </p>
             </div>
             <ul className="space-y-2 text-primary-foreground">

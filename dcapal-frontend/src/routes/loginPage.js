@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
+import { useTranslation } from "react-i18next";
 
 const containerStyle = {
   width: "100vw",
@@ -49,6 +50,7 @@ const linkStyle = {
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -67,8 +69,8 @@ export default function AuthPage() {
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
-        <h1 style={titleStyle}>Sign In</h1>
-        <p style={subtitleStyle}>to continue to DcaPal</p>
+        <h1 style={titleStyle}>{t("login.signIn")}</h1>
+        <p style={subtitleStyle}>{t("login.subtile")}</p>
         <Auth
           supabaseClient={supabase}
           appearance={{
@@ -91,7 +93,7 @@ export default function AuthPage() {
         />
         <div style={linkStyle}>
           <a href="/signup" style={linkStyle}>
-            Don't have an account? Sign up
+            {t("login.signUp")}
           </a>
           <br />
           <a href="/reset-password" style={linkStyle}>
