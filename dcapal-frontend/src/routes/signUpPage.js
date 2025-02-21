@@ -136,7 +136,7 @@ export default function SignUpPage() {
                   },
                 },
               }}
-              providers={["github"]}
+              providers={["google", "github"]}
               view="sign_up"
               showLinks={false}
               onlyThirdPartyProviders={true}

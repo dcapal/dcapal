@@ -99,8 +99,8 @@ export default function AuthPage() {
               },
             },
           }}
-          providers={["github"]}
-          view="magic_link"
+          providers={["google", "github"]}
+          view="sign_in"
           showLinks={false}
           magicLink={false}
           onlyThirdPartyProviders={true}
