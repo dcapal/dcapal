@@ -24,7 +24,6 @@ const buildProblemInput = (assets) => {
         target_weight: a.targetWeight / 100,
         shares: a.qty,
         price: a.price,
-        abp: a.abp,
         is_whole_shares: isWholeShares(a.aclass),
         current_amount: a.amount,
       },
@@ -51,7 +50,6 @@ export const InvestStep = ({
   );
   const assets = useSelector((state) => currentPortfolio(state).assets);
   const [solution, setSolution] = useState(null);
-  const [solutionAbp, setSolutionAbp] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const handleButtonClick = () => {
@@ -71,7 +69,7 @@ export const InvestStep = ({
       const as = buildProblemInput(assets);
 
       try {
-        const sol = await solver.analyzeAndSolve(as, cash);
+        const sol = await solver.analyzeAndSolve(as);
 
         await Thread.terminate(solver);
 
@@ -94,41 +92,6 @@ export const InvestStep = ({
 
     solve();
   }, []);
-
-  useEffect(() => {
-    const launchSolver = async () => {
-      const solver = await spawn(
-        new Worker(new URL("@workers/analyzer.js", import.meta.url), {
-          name: "wasm-analyzer-worker",
-        })
-      );
-
-      const as = buildProblemInput(assets);
-
-      try {
-        const sol = await solver.analyzeAndSuggest(as, cash);
-
-        await Thread.terminate(solver);
-
-        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-
-        return sol;
-      } catch (error) {
-        console.error("Unexpected exception in dcapal-optimizer:", error);
-        return null;
-      }
-    };
-
-    const solve = async () => {
-      const sol = await launchSolver();
-      setIsLoading(false);
-      if (sol) {
-        setSolutionAbp(sol);
-      }
-    };
-
-    solve();
-  }, [cash]);
 
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
@@ -214,17 +177,6 @@ export const InvestStep = ({
               {t("investStep.clickHere")}
             </Button>
             <span>{t("investStep.toInsertAmount")}</span>
-          </>
-        ) : null}
-      </div>
-      <div className="mt-2 text-xl font-light text-center">
-        {Number(solutionAbp) !== 0 ? (
-          <>
-            <span>
-              Your weighted average buy price is currently below the target
-              threshold of 10%. Consider increasing your investment to{" "}
-              {solutionAbp} to take advantage of this favorable condition.
-            </span>
           </>
         ) : null}
       </div>

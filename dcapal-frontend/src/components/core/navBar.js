@@ -1,7 +1,6 @@
 import { useMediaQuery } from "@react-hook/media-query";
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MEDIA_MEDIUM, supabase } from "@app/config";
 import { ExportBtn } from "@components/exportBtn";
 
@@ -12,7 +11,7 @@ import LanguageSwitcher from "@components/languageSwitcher";
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
 import { useDispatch } from "react-redux";
-import { Step, setAllocationFlowStep } from "@app/appSlice";
+import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 const CloseBtn = ({ onClick }) => {
   return (
@@ -122,11 +121,6 @@ export const NavBar = () => {
     navigate("/");
   };
 
-  const onClickProfile = () => {
-    navigate("/profile");
-    setDropdownVisible(false);
-  };
-
   const onClickMyPortfolios = () => {
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
   };
@@ -212,12 +206,6 @@ export const NavBar = () => {
             </button>
             {dropdownVisible && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
-                <button
-                  onClick={onClickProfile}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Profile
-                </button>
                 <button
                   onClick={handleLogout}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

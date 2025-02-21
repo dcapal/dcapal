@@ -202,11 +202,3 @@ impl Expiring for Market {
             .unwrap_or_else(|| std::time::Duration::from_secs(0))
     }
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum AssetClass {
-    Equity,
-    Crypto,
-    Currency,
-}

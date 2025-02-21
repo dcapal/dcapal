@@ -4,14 +4,17 @@ import {
   aclassToString,
   FeeType,
   feeTypeToString,
-} from "@components/allocationFlow/portfolioSlice"; // Create `axios` instance passing the newly created `cache.adapter`
+} from "@components/allocationFlow/portfolioSlice";
 
 // Create `axios` instance passing the newly created `cache.adapter`
 export const api = axios.create();
 
 const parseFees = (fees) => {
   if (!fees) return null;
-  const feeStructure = { type: feeTypeToString(fees.feeStructure.type) };
+  const feeStructure = {
+    type: feeTypeToString(fees.feeStructure.type),
+    maxFeeImpact: fees.feeStructure.maxFeeImpact,
+  };
 
   switch (fees.feeStructure.type) {
     case FeeType.FIXED:

@@ -4,6 +4,7 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const containerStyle = {
   backgroundColor: "#F3F4F6", // light gray
@@ -46,6 +47,7 @@ const linkStyle = {
 // Media query styles
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -68,41 +70,37 @@ export default function SignUpPage() {
           <div className="max-w-md space-y-6">
             <div className="flex items-center space-x-2">
               <span className="text-5xl font-bold text-primary-foreground">
-                DcaPal
+                {t("page.signUp.title")}
               </span>
             </div>
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-primary-foreground">
-                Dollar Cost Averaging Made Easy
+                {t("page.signUp.subtitle")}
               </h2>
               <p className="text-primary-foreground/80">
-                Signing up for DcaPal provides numerous benefits, including the
-                ability to keep your portfolio under control with tax-efficient
-                suggestions for your monthly investments.
+                {t("page.signUp.description")}
               </p>
             </div>
             <ul className="space-y-2 text-primary-foreground">
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
-                <span>
-                  Access to your investment portfolios across all devices
-                </span>
+                <span>{t("page.signUp.feature1")}</span>
               </li>
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
-                <span>Dive into a fully customizable experience</span>
+                <span>{t("page.signUp.feature2")}*</span>
               </li>
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
-                <span>Access to the dashboard</span>
+                <span>{t("page.signUp.feature3")}*</span>
               </li>
               <li className="flex items-center space-x-2">
                 <CheckIcon className="h-5 w-5" />
-                <span>Set custom alerts for your investments*</span>
+                <span>{t("page.signUp.feature4")}*</span>
               </li>
             </ul>
             <div className="text-primary-foreground/80 text-center">
-              *Feature not yet available.
+              <p>{t("page.signUp.featureNotYetAvailable")}</p>
             </div>
           </div>
         </div>
@@ -112,6 +110,18 @@ export default function SignUpPage() {
             <p style={subtitleStyle}>to continue to DcaPal</p>
             <Auth
               supabaseClient={supabase}
+              localization={{
+                variables: {
+                  sign_up: {
+                    email_label: t("page.signUp.email"),
+                    password_label: t("page.signUp.password"),
+                    email_input_placeholder: t("page.signUp.emailInput"),
+                    password_input_placeholder: t("page.signUp.passwordInput"),
+                    button_label: t("page.signUp.signUp"),
+                    social_provider_text: t("page.signUp.socialLogin"),
+                  },
+                },
+              }}
               appearance={{
                 theme: ThemeSupa,
                 variables: {
@@ -129,10 +139,11 @@ export default function SignUpPage() {
               providers={["google", "github"]}
               view="sign_up"
               showLinks={false}
+              onlyThirdPartyProviders={true}
             />
             <div style={linkStyle}>
               <a href="/login" style={linkStyle}>
-                Already have an account? Sign in
+                {t("page.signUp.alreadyHaveAnAccount")}
               </a>
             </div>
           </div>
