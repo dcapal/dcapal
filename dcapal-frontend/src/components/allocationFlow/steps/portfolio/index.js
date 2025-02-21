@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
 import toast from "react-hot-toast";

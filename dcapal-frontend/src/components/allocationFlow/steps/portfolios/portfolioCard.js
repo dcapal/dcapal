@@ -13,6 +13,7 @@ import { Step, setAllocationFlowStep } from "@app/appSlice";
 import EDIT_SVG from "@images/icons/edit.svg";
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 import { Button } from "@/components/ui/button";
+import { useSyncPortfolios } from "@hooks/useSyncPortfolios";
 
 const orderByWeightDesc = (a, b) => b.weight - a.weight;
 
@@ -43,6 +44,8 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
   };
 
+  const { syncNow, isAuthenticated } = useSyncPortfolios();
+
   const onClickEdit = () => {
     if (state === CardState.VIEW) {
       setState(CardState.EDIT);
@@ -55,15 +58,18 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const onClickSave = () => {
     dispatch(renamePortfolio({ id: id, name: newName }));
     setState(CardState.VIEW);
+    if (isAuthenticated) syncNow();
   };
 
   const onClickDelete = () => {
     dispatch(deletePortfolio({ id: id }));
+    if (isAuthenticated) syncNow();
   };
 
   const onClickDuplicate = () => {
     dispatch(duplicatePortfolio({ id: id }));
     onClickEdit();
+    if (isAuthenticated) syncNow();
   };
 
   const editIcon = state === CardState.VIEW ? EDIT_SVG : CLOSE_SVG;

@@ -18,7 +18,7 @@ export const fetchPrice = async (base, quote, token) => {
   try {
     const response = await api.get(url, { cancelToken: token });
 
-    if (response.status != 200) {
+    if (response.status !== 200) {
       console.error(
         `Response {status: ${response.status}, data: ${response.data}`
       );
@@ -53,7 +53,7 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
       cancelToken: token,
     });
 
-    if (response.status != 200) {
+    if (response.status !== 200) {
       console.error(
         `Response {status: ${response.status}, data: ${response.data}`
       );
@@ -137,7 +137,7 @@ export const fetchAssetsDcaPal = async (type) => {
   try {
     const response = await api.get(url);
 
-    if (response.status != 200) {
+    if (response.status !== 200) {
       console.error(
         `Response {status: ${response.status}, data: ${response.data}`
       );

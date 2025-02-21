@@ -2,13 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [ "master", "rc/**" ]
+    branches: [ "master", "dev", "rc/**" ]
   pull_request:
-    branches: [ "master", "rc/**" ]
+    branches: [ "master", "dev", "rc/**" ]
 
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
+  DATABASE_URL: postgres://postgres:postgres@supabase_db_dcapal:5432/postgres
 
 jobs:
   backend-build-test:
@@ -26,6 +27,10 @@ jobs:
           cargo --version --verbose
           rustc --version
           cargo clippy --version
+
+      - name: Install SeaORM CLI
+        run:
+          cargo install sea-orm-cli@1.1.0
 
       - name: Lint
         run: |
@@ -173,6 +178,8 @@ jobs:
               priceProvider: kraken
               cwApiKey: CW_API_KEY
               ipApiKey: IP_API_KEY
+            auth:
+              jwtSecret: super-secret-jwt-token-with-at-least-32-characters-long
 
             log:
               level: dcapal_backend=info,tower_http=debug
@@ -191,6 +198,12 @@ jobs:
               port: 6379
               user: dcapal
               password: dcapal
+            postgres:
+              hostname: supabase_db_dcapal
+              port: 5432
+              user: postgres
+              password: postgres
+              database: postgres
           EOF
 
       - name: Use local registry image
@@ -202,13 +215,28 @@ jobs:
               image: localhost:5000/${DOCKER_REPO}:latest
           EOF
 
+
+      - name: Install Supabase
+        run: |
+          npm install supabase --save-dev
+          npx supabase init
+          npx supabase start
+
       - name: Run dcapal-backend
         run: |
-          cd dcapal-backend && \
-          docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
-          up --no-build --wait
+          cd dcapal-backend
+          if ! docker compose -f docker-compose.yml \
+                              -f ./docker/docker-compose.local.yml \
+                              -f docker-compose.override.yml \
+                              up --no-build --wait; then
+            echo "Docker Compose failed. Printing logs:"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Connect Supabase to Dcapal Docker Network
+        run: |
+          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v4
