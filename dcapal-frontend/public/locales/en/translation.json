@@ -101,7 +101,7 @@
     },
     "importStep": {
       "fetchData": "Just a sec! Fetching fresh data for your portfolio",
-      "importPortfolio": "--Import Portfolio",
+      "importPortfolio": "Import Portfolio",
       "ops": "Oops! This is embarassing",
       "allocateYourSavings": "Allocate your savings",
       "defaultPortfolioName": "Main portfolio"
@@ -189,11 +189,30 @@
       },
       "login": {
         "signIn": "Sign in",
-        "subtitle": "to continue to DcaPal--",
-        "signUp": "Don't have an account? Sign up--"
+        "subtitle": "to continue to DcaPal",
+        "signUp": "Don't have an account? Sign up",
+        "email": "Email address",
+        "password": "Password",
+        "emailInput": "Enter your email",
+        "passwordInput": "Your password",
+        "forgotPassword": "Forgot password?",
+        "socialLogin": "Sign in with {{provider}}"
       },
       "signUp": {
-        "description": "test-Signing up for DcaPal provides numerous benefits, including the\n                ability to keep your portfolio under control with tax-efficient\n                suggestions for your monthly investments."
+        "signUp": "Sign up",
+        "description": "Signing up for DcaPal provides numerous benefits, including the\n                ability to keep your portfolio under control with tax-efficient\n                suggestions for your monthly investments.",
+        "alreadyHaveAnAccount": "Already have an account? Sign in",
+        "passwordInput": "Your password",
+        "password": "Password",
+        "emailInput": "Enter your email",
+        "socialLogin": "Sign up with {{provider}}",
+        "title": "DcaPal",
+        "subtitle": "Dollar Cost Averaging Made Easy",
+        "feature1": "Access to your investment portfolios across all devices",
+        "feature2": "Dive into a fully customizable experience",
+        "feature3": "Access to the dashboard with your portfolio performance",
+        "feature4": "Set custom alerts for your investments",
+        "featureNotYetAvailable": "*Feature not yet available"
       }
     }
   }

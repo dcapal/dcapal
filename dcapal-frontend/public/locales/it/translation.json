@@ -189,10 +189,30 @@
       },
       "login": {
         "signIn": "Accedi",
-        "signUp": "Non hai un account? Iscriviti"
+        "subtitle": "per continuare su DcaPal",
+        "signUp": "Non hai un account? Iscriviti",
+        "email": "Email",
+        "password": "Password",
+        "emailInput": "Inserisci la tua email",
+        "passwordInput": "Inserisci la tua password",
+        "forgotPassword": "Hai dimenticato la password?",
+        "socialLogin": "Accedi con {{provider}}"
       },
       "signUp": {
-        "description": "Iscriversi a DcaPal offre numerosi vantaggi, tra cui la\npossibilità di mantenere il controllo del tuo portafoglio con suggerimenti\nfiscali efficienti per i tuoi investimenti mensili."
+        "signUp": "Iscriviti",
+        "description": "Iscriversi a DcaPal offre numerosi vantaggi, tra cui la\npossibilità di mantenere il controllo del tuo portafoglio con suggerimenti\nfiscali efficienti per i tuoi investimenti mensili.",
+        "alreadyHaveAnAccount": "Hai già un account? Accedi",
+        "passwordInput": "Inserisci la tua password",
+        "password": "Password",
+        "emailInput": "Inserisci la tua email",
+        "socialLogin": "Accedi con {{provider}}",
+        "title": "DcaPal",
+        "subtitle": "Il tuo assistente per l'investimento periodico",
+        "feature1": "Accesso ai tuoi portafogli di investimento su tutti i dispositivi",
+        "feature2": "Esplora un'esperienza completamente personalizzabile",
+        "feature3": "Accesso al dashboard con le prestazioni del tuo portafoglio",
+        "feature4": "Imposta avvisi personalizzati per i tuoi investimenti",
+        "featureNotYetAvailable": "*Questa funzionalità non è ancora disponibile. Resta sintonizzato per gli aggiornamenti futuri."
       }
     }
   }

@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@app/config";
 import { useTranslation } from "react-i18next";
+import { ThemeSupa } from "@supabase/auth-ui-shared";
 
 const containerStyle = {
   width: "100vw",
@@ -69,10 +69,22 @@ export default function AuthPage() {
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
-        <h1 style={titleStyle}>{t("login.signIn")}</h1>
-        <p style={subtitleStyle}>{t("login.subtile")}</p>
+        <h1 style={titleStyle}>{t("page.login.signIn")}</h1>
+        <p style={subtitleStyle}>{t("page.login.subtitle")}</p>
         <Auth
           supabaseClient={supabase}
+          localization={{
+            variables: {
+              sign_in: {
+                email_label: t("page.login.email"),
+                password_label: t("page.login.password"),
+                email_input_placeholder: t("page.login.emailInput"),
+                password_input_placeholder: t("page.login.passwordInput"),
+                button_label: t("page.login.signIn"),
+                social_provider_text: t("page.login.socialLogin"),
+              },
+            },
+          }}
           appearance={{
             theme: ThemeSupa,
             variables: {
@@ -87,18 +99,17 @@ export default function AuthPage() {
               },
             },
           }}
-          providers={["google", "github"]}
-          view="sign_in"
+          providers={["github"]}
+          view="magic_link"
           showLinks={false}
+          magicLink={false}
+          onlyThirdPartyProviders={true}
         />
         <div style={linkStyle}>
           <a href="/signup" style={linkStyle}>
-            {t("login.signUp")}
+            {t("page.login.signUp")}
           </a>
           <br />
-          <a href="/reset-password" style={linkStyle}>
-            Forgot your password?
-          </a>
         </div>
       </div>
     </div>
