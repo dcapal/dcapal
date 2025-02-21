@@ -5,6 +5,8 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 anyhow = "1.0.95"
 axum = { version = "0.7.9", features = ["macros"] }
@@ -16,7 +18,7 @@ reqwest = { version = "0.12.9", features = ["gzip", "json"] }
 serde = "1.0.216"
 serde_json = "1.0.134"
 thiserror = "2.0.9"
-tokio = { version = "1.42.0", features = ["full"] }
+tokio = { version = "1.43.0", features = ["full"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace"] }
 tracing = "0.1.41"
@@ -27,7 +29,7 @@ const_format = "0.2.34"
 futures = "0.3.31"
 strum = "0.26.3"
 strum_macros = "0.26.4"
-config = "0.15.4"
+config = "0.15.7"
 lazy_static = "1.5.0"
 parking_lot = "0.12.3"
 metrics = "0.24.1"
