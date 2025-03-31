@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow = "1.0.95"
-axum = { version = "0.7.9", features = ["macros"] }
+axum = { version = "0.8.3", features = ["macros"] }
 axum-extra = { version = "0.9.6", features = ["typed-header"] }
 hyper = { version = "1.5.2", features = ["full"] }
 deadpool-redis = { version = "0.18.0", features = ["serde"] }
