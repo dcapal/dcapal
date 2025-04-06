@@ -172,6 +172,7 @@ jobs:
           services:
             dcapal:
               image: leonardoarcari/dcapal:latest
+              env_file: dcapal.env
               restart: always
               ports:
                 - ${DCAPAL_API_PORT}:8080
