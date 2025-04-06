@@ -10,6 +10,7 @@ services:
       - "5433:5432"
     volumes:
       - ./data/db/:/home/postgres/pgdata/data
+      - ./config/db/init/:/docker-entrypoint-initdb.d
 
   prometheus:
     image: prom/prometheus:latest
