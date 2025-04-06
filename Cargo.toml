@@ -5,8 +5,8 @@ members = ["dcapal-backend", "dcapal-optimizer-wasm", "dcapal-backend/migration"
 [workspace.package]
 version = "0.8.0"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
-edition = "2021"
-rust-version = "1.79"
+edition = "2024"
+rust-version = "1.86"
 
 [profile.release]
 lto = "thin"
