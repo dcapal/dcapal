@@ -25,7 +25,7 @@ DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${AP
 export DATABASE_URL
 # Run migrations
 # cargo run --bin migration -- refresh -u $DATABASE_URL
-/var/dcapal/dcapal-backend/bin/migration refresh -u "$DATABASE_URL"
+/var/dcapal/dcapal-backend/bin/migration up -u "$DATABASE_URL"
 
 # Start the application
 exec /var/dcapal/dcapal-backend/bin/dcapal-backend
