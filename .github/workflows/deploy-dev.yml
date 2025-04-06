@@ -147,6 +147,8 @@ jobs:
       - name: Configure docker-compose.yml
         env:
           REDIS_PORT: ${{ secrets.REDIS_PORT_DEV }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
         run: |
           cat > dcapal-backend/docker-compose.yml << EOF
           version: "3.9"
@@ -168,6 +170,24 @@ jobs:
                 interval: 10s
                 timeout: 10s
                 retries: 3
+
+              db:
+                image: timescale/timescaledb-ha:pg17
+                container_name: db-dev
+                restart: always
+                # set shared memory limit when using docker-compose
+                shm_size: 128mb
+                ports:
+                  - "${POSTGRES_PORT}:5432"
+                networks:
+                  - dcapalnetwork
+                environment:
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+                healthcheck:
+                  test: [ "CMD-SHELL", "pg_isready -U user" ]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
 
           networks:
             dcapal-dev-network:
@@ -271,18 +291,18 @@ jobs:
 
       - name: Configure dotenv
         env:
-          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER_DEV }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/dcapal.env << EOF
-          DB_HOST: ${POSTGRES_HOSTNAME}
-          DB_PORT: ${POSTGRES_PORT}
-          APP_USER: ${POSTGRES_USER}
-          APP_USER_PWD: ${POSTGRES_PASSWORD}
-          APP_DB_NAME: ${POSTGRES_DATABASE}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_HOST=${POSTGRES_HOST}
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_PORT=${POSTGRES_PORT}
           EOF
 
       - name: Deploy dcapal-backend config
