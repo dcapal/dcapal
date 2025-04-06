@@ -30,7 +30,6 @@ RUN mkdir bin
 RUN mkdir data
 COPY --from=builder /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/dcapal-backend/bin
 COPY --from=builder /var/dcapal/target/release-with-debug/migration /var/dcapal/dcapal-backend/bin
-COPY --from=builder /usr/local/cargo/bin/sea-orm-cli /usr/local/bin/sea-orm-cli
 COPY ./dcapal-backend/migration ./migration
 COPY ./dcapal-backend/migration/Cargo.toml ./migration/Cargo.toml
 COPY ./dcapal-backend/migration/src ./migration/src
