@@ -10,6 +10,10 @@ help:
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+## Format Rust code (nightly)
+fmt:
+	cargo +nightly fmt -- --config-path rustfmt.nightly.toml
+
 ## Start Supabase with config
 supabase-up:  ## Start Supabase with config
 	cd $(DCAPAL_BACKEND_DIR) && npx supabase start --workdir $(SUPABASE_WORKDIR)
