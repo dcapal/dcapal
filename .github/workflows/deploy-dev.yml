@@ -179,6 +179,9 @@ jobs:
                 shm_size: 128mb
                 ports:
                   - "${POSTGRES_PORT}:5432"
+                volumes:
+                - ./data/db/:/home/postgres/pgdata/data
+                - ./config/db/init/:/docker-entrypoint-initdb.d
                 networks:
                   - dcapalnetwork
                 environment:
@@ -236,6 +239,16 @@ jobs:
           user default off
           EOF
 
+      - name: Configure Postgres Dcapal user
+        env:
+          PG_DCAPAL_USER: ${{ secrets.PG_DCAPAL_USER }}
+          PG_DCAPAL_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
+        run: |
+          cat > dcapal-backend/config/db/init/99_create_dcapal_user.sql << EOF
+          CREATE USER ${PG_DCAPAL_USER} WITH PASSWORD '${PG_DCAPAL_PASSWORD}';
+          GRANT app_role TO ${PG_DCAPAL_USER};
+          EOF
+
       - name: Configure dcapal.yml
         env:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
@@ -246,8 +259,8 @@ jobs:
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME_DEV }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER_DEV }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
