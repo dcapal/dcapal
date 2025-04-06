@@ -143,7 +143,9 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                             }
                         }
                         _ => {
-                            return Err(DcaError::Generic("Fee type is not specified.".to_string()));
+                            return Err(DcaError::Generic(
+                                "Fee type is not specified.".to_string(),
+                            ));
                         }
                     },
                 })
