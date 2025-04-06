@@ -27,8 +27,6 @@ services:
       - "5433:5432"
     networks:
       - dcapalnetwork
-    volumes:
-      - ./data/db/:/home/postgres/pgdata/data
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:

@@ -5,6 +5,10 @@ services:
       - 6379:6379
       - 8001:8001
 
+  db:
+    volumes:
+      - ./data/db/:/home/postgres/pgdata/data
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
