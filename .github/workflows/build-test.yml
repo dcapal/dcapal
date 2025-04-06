@@ -9,7 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
-  DATABASE_URL: postgres://postgres:postgres@supabase_db_dcapal:5432/postgres
 
 jobs:
   backend-build-test:
@@ -135,7 +134,7 @@ jobs:
     needs: [ frontend-check, optimizer-build-test ]
     env:
       POSTGRES_HOST: db
-      POSTGRES_PORT: 5433
+      POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
       POSTGRES_DB: postgres
@@ -225,7 +224,6 @@ jobs:
       - name: Use local registry image
         run: |
           cat > dcapal-backend/docker-compose.override.yml << EOF
-          version: "3.9"
           services:
             dcapal:
               image: localhost:5000/${DOCKER_REPO}:latest
