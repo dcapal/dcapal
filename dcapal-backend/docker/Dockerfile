@@ -39,4 +39,4 @@ COPY ./dcapal-backend/migration/src ./migration/src
 # Create start script
 COPY ./dcapal-backend/scripts/start.sh ./start.sh
 RUN chmod +x ./start.sh
-CMD ["./start.sh"]
+ENTRYPOINT ["./start.sh"]
