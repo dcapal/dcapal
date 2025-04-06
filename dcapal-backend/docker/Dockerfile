@@ -9,8 +9,6 @@ COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
-# Install sea-orm-cli
-RUN cargo install sea-orm-cli
 # Build dependencies
 COPY --from=planner /var/dcapal/recipe.json recipe.json
 RUN cargo chef cook --profile release-with-debug --recipe-path recipe.json
