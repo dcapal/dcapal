@@ -1,8 +1,11 @@
-use crate::app::domain::db::users;
-use crate::app::infra::claim::Claims;
-use crate::error::Result;
-use sea_orm::{ActiveModelTrait, Set};
-use sea_orm::{DatabaseConnection, EntityTrait, NotSet, SqlxPostgresConnector, sqlx};
+use sea_orm::{
+    ActiveModelTrait, DatabaseConnection, EntityTrait, NotSet, Set, SqlxPostgresConnector, sqlx,
+};
+
+use crate::{
+    app::{domain::db::users, infra::claim::Claims},
+    error::Result,
+};
 
 pub struct UserRepository {
     pub db_conn: DatabaseConnection,
@@ -55,8 +58,9 @@ impl UserRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_save_user_if_not_present_updates_existing_user() {

@@ -1,5 +1,4 @@
-use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use rust_decimal::Decimal;
 
@@ -152,8 +151,10 @@ mod tests {
 
     use rust_decimal_macros::dec;
 
-    use crate::AMOUNT_DECIMALS;
-    use crate::optimize::suggestions::{Problem, ProblemAsset, ProblemOptions};
+    use crate::{
+        AMOUNT_DECIMALS,
+        optimize::suggestions::{Problem, ProblemAsset, ProblemOptions},
+    };
 
     #[test_log::test]
     fn it_solves_60_40_portfolio_buy_only() {

@@ -3,20 +3,19 @@ extern crate lazy_static;
 
 use std::{collections::HashMap, sync::Mutex};
 
+use optimize::{
+    FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
+    advanced::{self, TheoreticalAllocation},
+    basic,
+};
 use rand::{Rng, distributions};
 use rust_decimal::{
     Decimal,
     prelude::{One, ToPrimitive},
 };
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
-
-use optimize::{
-    FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
-    advanced::{self, TheoreticalAllocation},
-    basic,
-};
 use utils::{parse_amount, parse_percentage, parse_shares};
+use wasm_bindgen::prelude::*;
 
 use crate::optimize::suggestions;
 

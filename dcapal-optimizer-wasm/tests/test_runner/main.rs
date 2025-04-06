@@ -4,16 +4,15 @@ mod scenario;
 #[macro_use]
 mod utils_macros;
 
+use std::{fs::File, io::BufReader, path::Path};
+
 use dcapal_optimizer_wasm::{
     JsAdvancedOptions, JsProblemOptions,
     optimize::advanced::{self, Solution},
 };
-
+use error::{Error, Result};
 use glob::glob;
 use log::info;
-use std::{fs::File, io::BufReader, path::Path};
-
-use error::{Error, Result};
 use scenario::{Expect, ExpectedSolution, Scenario};
 
 const SCENARIOS_PATH: &str = "./tests/scenarios";

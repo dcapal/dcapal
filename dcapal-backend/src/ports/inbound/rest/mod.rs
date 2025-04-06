@@ -1,17 +1,12 @@
 //! The [`rest`](self) module implements the REST API of the system
 
-use std::fmt::Display;
-use std::time::Duration;
+use std::{fmt::Display, time::Duration};
 
-use crate::app::domain::entity::AssetKind;
-use crate::app::infra::utils::Expiring;
-use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
-use crate::error::{DcaError, Result};
-use crate::ports::outbound::repository::ImportedPortfolio;
-use crate::{AppContext, infra::stats};
-use axum::Json;
-use axum::extract::{Path, Query, State};
-use axum::response::{IntoResponse, Response};
+use axum::{
+    Json,
+    extract::{Path, Query, State},
+    response::{IntoResponse, Response},
+};
 use axum_extra::{TypedHeader, headers::CacheControl};
 use hyper::StatusCode;
 use lazy_static::lazy_static;
@@ -19,6 +14,18 @@ use metrics::counter;
 use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::{
+    AppContext,
+    app::{
+        domain::entity::AssetKind,
+        infra::utils::Expiring,
+        services::command::{ConversionRateQuery, ImportPortfolioCmd},
+    },
+    error::{DcaError, Result},
+    infra::stats,
+    ports::outbound::repository::ImportedPortfolio,
+};
 
 pub mod request;
 pub mod response;

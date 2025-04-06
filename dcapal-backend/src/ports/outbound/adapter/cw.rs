@@ -1,10 +1,11 @@
-use futures::{StreamExt, future};
-use reqwest::StatusCode;
-use serde::{Deserialize, de::DeserializeOwned};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
 };
+
+use futures::{StreamExt, future};
+use reqwest::StatusCode;
+use serde::{Deserialize, de::DeserializeOwned};
 use tracing::{debug, error, info};
 
 use crate::{

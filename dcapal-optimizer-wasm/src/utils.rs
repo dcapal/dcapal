@@ -1,12 +1,9 @@
 use std::sync::Once;
 
 use log::Level;
-use rust_decimal::Decimal;
-use rust_decimal::prelude::*;
+use rust_decimal::{Decimal, prelude::*};
 
-use crate::AMOUNT_DECIMALS;
-use crate::PERCENTAGE_DECIMALS;
-use crate::SHARES_DECIMALS;
+use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, SHARES_DECIMALS};
 
 static INIT: Once = Once::new();
 

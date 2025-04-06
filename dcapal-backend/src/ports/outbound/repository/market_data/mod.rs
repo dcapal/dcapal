@@ -1,12 +1,11 @@
 mod redis_asset;
 mod redis_market;
 
+use self::{redis_asset::RedisAsset, redis_market::RedisMarket};
 use crate::{
     app::domain::entity::{Asset, AssetId, AssetKind, Market, MarketId},
     error::{DcaError, Result},
 };
-
-use self::{redis_asset::RedisAsset, redis_market::RedisMarket};
 
 #[derive(Clone)]
 pub struct MarketDataRepository {

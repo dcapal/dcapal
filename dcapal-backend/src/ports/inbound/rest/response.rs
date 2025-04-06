@@ -1,11 +1,14 @@
-use crate::DateTime;
-use crate::app::domain::db::{portfolio_asset, portfolios};
-use crate::error::DcaError;
-use crate::ports::inbound::rest::FeeStructure;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+use crate::{
+    DateTime,
+    app::domain::db::{portfolio_asset, portfolios},
+    error::DcaError,
+    ports::inbound::rest::FeeStructure,
+};
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]

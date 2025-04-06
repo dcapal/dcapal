@@ -1,7 +1,7 @@
-//! The [`repository`](self) module contains interfaces to persistent storage services, like Redis.
+//! The [`repository`](self) module contains interfaces to persistent storage
+//! services, like Redis.
 
-use std::collections::HashMap;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;

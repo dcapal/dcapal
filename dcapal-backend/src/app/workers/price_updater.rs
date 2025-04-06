@@ -15,7 +15,8 @@ use crate::{
     ports::outbound::{adapter::PriceProviders, repository::market_data::MarketDataRepository},
 };
 
-/// Worker periodically updating market prices. As of today, prices are refreshed every 5 minutes.
+/// Worker periodically updating market prices. As of today, prices are
+/// refreshed every 5 minutes.
 pub struct PriceUpdaterWorker {
     period: Duration,
     market_data_service: Arc<MarketDataService>,

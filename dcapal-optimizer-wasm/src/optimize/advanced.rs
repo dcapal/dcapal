@@ -4,9 +4,8 @@ use log::debug;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 
-use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, SHARES_DECIMALS};
-
 use super::TransactionFees;
+use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, SHARES_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
@@ -260,8 +259,8 @@ impl Problem {
             let mut freed_budget =
                 check_fully_allocated_assets(&mut open_assets, budget_left, pfolio_fees);
 
-            // If previous step freed some budget, do another round of allocation unconditionally.
-            // Otherwise, try to break ties or exit
+            // If previous step freed some budget, do another round of allocation
+            // unconditionally. Otherwise, try to break ties or exit
             if freed_budget == Decimal::ZERO {
                 // Unblock ties if necessary
                 if !is_negligible(budget_left) && is_all_unallocated {
@@ -332,8 +331,8 @@ impl Problem {
             SolutionState::PriceTooHigh,
         ];
 
-        // For starters, allocate remaining budget to under-allocated assets, prioritizing assets
-        // farther from their target allocation
+        // For starters, allocate remaining budget to under-allocated assets,
+        // prioritizing assets farther from their target allocation
         let mut candidates = assets
             .values_mut()
             .filter(|a| !EXCLUDED_STATES.contains(&a.state))
@@ -488,7 +487,8 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
     sold_amount.round_dp(AMOUNT_DECIMALS)
 }
 
-/// Get a view over under allocated assets i.e. assets with `current_weight` less than `target_weight`
+/// Get a view over under allocated assets i.e. assets with `current_weight`
+/// less than `target_weight`
 fn under_allocated_view(assets: &mut HashMap<String, Asset>) -> Vec<&mut Asset> {
     assets
         .values_mut()
@@ -512,7 +512,8 @@ fn shares_to_allocate(asset: &Asset, allocated_amount: Decimal) -> Decimal {
     }
 }
 
-/// Remove fully allocated assets. Returns budget freed from assets with too high fee impact.
+/// Remove fully allocated assets. Returns budget freed from assets with too
+/// high fee impact.
 fn check_fully_allocated_assets(
     open_assets: &mut Vec<&mut Asset>,
     budget_left: &Decimal,
