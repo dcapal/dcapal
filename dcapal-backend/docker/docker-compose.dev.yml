@@ -6,6 +6,8 @@ services:
       - 8001:8001
 
   db:
+    ports:
+      - "5433:5432"
     volumes:
       - ./data/db/:/home/postgres/pgdata/data
 

@@ -21,10 +21,10 @@ services:
     image: timescale/timescaledb-ha:pg17
     container_name: db
     restart: always
+    expose:
+      - "5432"
     # set shared memory limit when using docker-compose
     shm_size: 128mb
-    ports:
-      - "5433:5432"
     networks:
       - dcapalnetwork
     environment:

@@ -26,8 +26,26 @@ docker-dev-up:  ## Start development Docker containers
 docker-dev-down:  ## Stop development Docker containers
 	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) down
 
+## Start development Docker containers with Dcapal image
+docker-local-build:  ## Start development Docker containers
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) -f docker/docker-compose.local.yml build
+
+## Start development Docker containers with Dcapal image
+docker-local-up:  ## Start development Docker containers
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) -f docker/docker-compose.local.yml up -d
+
+## Start development Docker containers with Dcapal image
+docker-local-down:  ## Stop development Docker containers
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) -f docker/docker-compose.local.yml down
+
 ## Start full dev environment (Supabase + Docker)
 dev-up: supabase-up docker-dev-up  ## Start full dev environment (Supabase + Docker)
 
 ## Stop full dev environment
 dev-down: docker-dev-down supabase-down  ## Stop full dev environment
+
+## Start full dev+local environment (Supabase + Docker)
+local-up: supabase-up docker-local-up  ## Start full dev environment (Supabase + Docker)
+
+## Stop full dev+local environment
+local-down: docker-local-down supabase-down  ## Stop full dev environment
