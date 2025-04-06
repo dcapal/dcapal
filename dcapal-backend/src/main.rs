@@ -7,9 +7,9 @@ use futures::FutureExt;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::signal;
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
-use dcapal_backend::{config::Config, error::DcaError, DcaServer};
+use dcapal_backend::{DcaServer, config::Config, error::DcaError};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

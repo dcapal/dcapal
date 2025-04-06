@@ -7,7 +7,7 @@ use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
 use uuid::Uuid;
 
-use crate::{app::services::ip2location::GeoData, error::Result, DateTime};
+use crate::{DateTime, app::services::ip2location::GeoData, error::Result};
 pub mod dto;
 pub mod market_data;
 pub mod portfolio;

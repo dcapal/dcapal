@@ -5,7 +5,7 @@ use tracing::{debug, error};
 use crate::{
     app::domain::entity::{Market, MarketId},
     error::{DcaError, Result},
-    ports::outbound::repository::{dto::MarketDto, REDIS_BASE},
+    ports::outbound::repository::{REDIS_BASE, dto::MarketDto},
 };
 
 use super::MarketDataRepository;

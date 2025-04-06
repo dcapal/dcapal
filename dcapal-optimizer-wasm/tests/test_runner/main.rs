@@ -5,8 +5,8 @@ mod scenario;
 mod utils_macros;
 
 use dcapal_optimizer_wasm::{
-    optimize::advanced::{self, Solution},
     JsAdvancedOptions, JsProblemOptions,
+    optimize::advanced::{self, Solution},
 };
 
 use glob::glob;

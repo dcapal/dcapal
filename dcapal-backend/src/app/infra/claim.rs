@@ -1,9 +1,9 @@
-use crate::error::DcaError;
 use crate::AppContext;
-use axum::{async_trait, extract::FromRequestParts, http::request::Parts, RequestPartsExt};
+use crate::error::DcaError;
+use axum::{RequestPartsExt, async_trait, extract::FromRequestParts, http::request::Parts};
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use once_cell::sync::Lazy;

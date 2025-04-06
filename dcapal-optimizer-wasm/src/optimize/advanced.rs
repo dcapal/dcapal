@@ -179,7 +179,9 @@ impl Problem {
         // Budget available to allocate
         let mut budget_left = self.options.budget + sold_amount;
 
-        debug!("[Init] solution={solution:?} pfolio_amount={pfolio_amount} sold_amount={sold_amount} budget_left={budget_left}");
+        debug!(
+            "[Init] solution={solution:?} pfolio_amount={pfolio_amount} sold_amount={sold_amount} budget_left={budget_left}"
+        );
 
         // Run main budget allocation algorithm
         Self::allocate_budget(
@@ -292,9 +294,15 @@ impl Problem {
 
             // Refresh open_assets
             if freed_budget > Decimal::ZERO {
-                debug!("[Step {step}] Before refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}", open_assets.len());
+                debug!(
+                    "[Step {step}] Before refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}",
+                    open_assets.len()
+                );
                 open_assets = refresh_open_assets(assets, budget_left);
-                debug!("[Step {step}] After refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}", open_assets.len());
+                debug!(
+                    "[Step {step}] After refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}",
+                    open_assets.len()
+                );
             }
 
             // Update open_assets rescaled weights
@@ -461,7 +469,10 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
         let overallocated = asset.current_amount - asset.target_amount;
         let sell_shares = shares_to_allocate(asset, overallocated);
         if sell_shares.is_zero() {
-            debug!("[Rebalance] Cannot sell over allocated asset: {:?} (overallocated={overallocated}, sell_shares={sell_shares}", asset);
+            debug!(
+                "[Rebalance] Cannot sell over allocated asset: {:?} (overallocated={overallocated}, sell_shares={sell_shares}",
+                asset
+            );
             continue; // If cannot sell a single share, do nothing -- Better slightly overbalanced
         }
 

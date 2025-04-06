@@ -13,9 +13,9 @@ pub use kraken::*;
 pub use yahoo::*;
 
 use failsafe::{
+    StateMachine,
     backoff::EqualJittered,
     failure_policy::{ConsecutiveFailures, OrElse, SuccessRateOverTimeWindow},
-    StateMachine,
 };
 
 type DefaultCircuitBreaker = StateMachine<

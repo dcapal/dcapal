@@ -8,15 +8,15 @@ use futures::StreamExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use reqwest::StatusCode;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{Deserialize, de::DeserializeOwned};
 use tracing::{debug, error, warn};
 
 use crate::{
+    DateTime,
     app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
     error::{DcaError, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
-    DateTime,
 };
 
 use super::DefaultCircuitBreaker;

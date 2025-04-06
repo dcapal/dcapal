@@ -4,15 +4,15 @@ use chrono::Utc;
 use tracing::{error, info, warn};
 
 use crate::{
+    AppContext,
     app::{
         domain::market_data_utils::fetch_market_price,
-        infra::utils::{should_stop, StopToken},
+        infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
     error::Result,
     ports::outbound::{adapter::PriceProviders, repository::market_data::MarketDataRepository},
-    AppContext,
 };
 
 /// Worker periodically updating market prices. As of today, prices are refreshed every 5 minutes.

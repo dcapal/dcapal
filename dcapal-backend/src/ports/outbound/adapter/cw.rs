@@ -1,6 +1,6 @@
-use futures::{future, StreamExt};
+use futures::{StreamExt, future};
 use reqwest::StatusCode;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{Deserialize, de::DeserializeOwned};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
@@ -8,11 +8,11 @@ use std::{
 use tracing::{debug, error, info};
 
 use crate::{
+    DateTime,
     app::domain::entity::{Asset, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
     error::{DcaError, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
-    DateTime,
 };
 
 #[derive(Clone)]
@@ -123,7 +123,9 @@ impl CryptoWatchProvider {
         let periods = get_cw_api_periods(freq);
         let (r_lo, r_hi) = freq.ohlc_range(ts);
         let (after_ts, before_ts) = (r_lo.timestamp(), r_hi.timestamp());
-        let url = format!("https://api.cryptowat.ch/markets/kraken/{id}/ohlc?after={after_ts}&before={before_ts}&periods={periods}");
+        let url = format!(
+            "https://api.cryptowat.ch/markets/kraken/{id}/ohlc?after={after_ts}&before={before_ts}&periods={periods}"
+        );
 
         debug!(
             url = url,

@@ -1,7 +1,7 @@
+use crate::DateTime;
 use crate::app::domain::db::{portfolio_asset, portfolios};
 use crate::error::DcaError;
 use crate::ports::inbound::rest::FeeStructure;
-use crate::DateTime;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -86,7 +86,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                             _ => {
                                 return Err(DcaError::Generic(
                                     "Fee type is not specified.".to_string(),
-                                ))
+                                ));
                             }
                         },
                     })
@@ -143,7 +143,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                             }
                         }
                         _ => {
-                            return Err(DcaError::Generic("Fee type is not specified.".to_string()))
+                            return Err(DcaError::Generic("Fee type is not specified.".to_string()));
                         }
                     },
                 })

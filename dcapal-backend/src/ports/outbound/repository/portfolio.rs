@@ -1,13 +1,13 @@
 use crate::app::domain::db::{portfolio_asset, portfolios};
 use crate::error::{DcaError, Result};
+use crate::ports::inbound::rest::FeeStructure;
 use crate::ports::inbound::rest::request::{
     PortfolioAssetRequest, PortfolioRequest, TransactionFeesRequest,
 };
-use crate::ports::inbound::rest::FeeStructure;
 use rust_decimal::Decimal;
 use sea_orm::{
-    entity::*, sqlx, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
-    QueryFilter, SqlxPostgresConnector, TransactionTrait,
+    ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter,
+    SqlxPostgresConnector, TransactionTrait, entity::*, sqlx,
 };
 use uuid::Uuid;
 

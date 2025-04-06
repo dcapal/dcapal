@@ -2,18 +2,18 @@
 extern crate const_format;
 
 use axum::{
+    Router,
     extract::connect_info::IntoMakeServiceWithConnectInfo,
     middleware,
     routing::{get, post},
-    Router,
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
-use metrics::{counter, describe_counter, describe_histogram, Unit};
+use metrics::{Unit, counter, describe_counter, describe_histogram};
 use sea_orm::sqlx;
-use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::sqlx::PgPool;
+use sea_orm::sqlx::postgres::PgPoolOptions;
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
@@ -41,8 +41,8 @@ use crate::{
         outbound::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
-                market_data::MarketDataRepository, ImportedRepository, MiscRepository,
-                StatsRepository,
+                ImportedRepository, MiscRepository, StatsRepository,
+                market_data::MarketDataRepository,
             },
         },
     },

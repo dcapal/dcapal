@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures::Future;
-use tokio::sync::{watch, OnceCell, RwLock};
+use tokio::sync::{OnceCell, RwLock, watch};
 
 pub struct ExpiringOnceCellValue<T> {
     pub value: T,

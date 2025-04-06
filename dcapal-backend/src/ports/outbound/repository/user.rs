@@ -1,8 +1,8 @@
 use crate::app::domain::db::users;
 use crate::app::infra::claim::Claims;
 use crate::error::Result;
-use sea_orm::{sqlx, DatabaseConnection, EntityTrait, NotSet, SqlxPostgresConnector};
 use sea_orm::{ActiveModelTrait, Set};
+use sea_orm::{DatabaseConnection, EntityTrait, NotSet, SqlxPostgresConnector, sqlx};
 
 pub struct UserRepository {
     pub db_conn: DatabaseConnection,

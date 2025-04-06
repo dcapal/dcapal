@@ -3,17 +3,18 @@ extern crate lazy_static;
 
 use std::{collections::HashMap, sync::Mutex};
 
-use rand::{distributions, Rng};
+use rand::{Rng, distributions};
 use rust_decimal::{
-    prelude::{One, ToPrimitive},
     Decimal,
+    prelude::{One, ToPrimitive},
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use optimize::{
+    FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
     advanced::{self, TheoreticalAllocation},
-    basic, FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
+    basic,
 };
 use utils::{parse_amount, parse_percentage, parse_shares};
 
@@ -662,8 +663,7 @@ impl TryFrom<JsBasicOptions> for basic::ProblemOptions {
         if current_total > budget {
             return Err(format!(
                 "Invalid current amounts. Sum must be less than or equal to budget: {} ({} instead)",
-                budget,
-                current_total
+                budget, current_total
             ));
         }
 
