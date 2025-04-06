@@ -1,11 +1,10 @@
-version: "3.9"
 services:
   redis:
     image: redis/redis-stack-server:7.2.0-v0
     container_name: redis
     restart: always
     ports:
-      - 6379:6379
+      - "6379:6379"
     networks:
       - dcapalnetwork
     volumes:
@@ -17,6 +16,26 @@ services:
       interval: 10s
       timeout: 10s
       retries: 3
+
+  db:
+    image: timescale/timescaledb-ha:pg17
+    container_name: db
+    restart: always
+    # set shared memory limit when using docker-compose
+    shm_size: 128mb
+    ports:
+      - "5433:5432"
+    networks:
+      - dcapalnetwork
+    volumes:
+      - ./data/db/:/home/postgres/pgdata/data
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   dcapalnetwork:

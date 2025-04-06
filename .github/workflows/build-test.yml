@@ -133,6 +133,12 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     needs: [ frontend-check, optimizer-build-test ]
+    env:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5433
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
+      POSTGRES_DB: postgres
     services:
       registry:
         image: registry:2
@@ -170,6 +176,16 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      - name: Use local registry image
+        run: |
+          cat > dcapal-backend/dcapal.env << EOF
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_HOST=${POSTGRES_HOST}
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_PORT=${POSTGRES_PORT}
+          EOF
+
       - name: Configure dcapal.yml
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
@@ -199,11 +215,11 @@ jobs:
               user: dcapal
               password: dcapal
             postgres:
-              hostname: supabase_db_dcapal
-              port: 5432
-              user: postgres
-              password: postgres
-              database: postgres
+              hostname: ${POSTGRES_HOST}
+              port: ${POSTGRES_PORT}
+              user: ${POSTGRES_USER}
+              password: ${POSTGRES_PASSWORD}
+              database: ${POSTGRES_DB}
           EOF
 
       - name: Use local registry image
@@ -213,14 +229,12 @@ jobs:
           services:
             dcapal:
               image: localhost:5000/${DOCKER_REPO}:latest
+              env_file: dcapal.env
           EOF
-
 
       - name: Install Supabase
         run: |
-          npm install supabase --save-dev
-          npx supabase init
-          npx supabase start
+          make supabase-up
 
       - name: Run dcapal-backend
         run: |
@@ -233,10 +247,6 @@ jobs:
             docker compose logs
             exit 1
           fi
-
-      - name: Connect Supabase to Dcapal Docker Network
-        run: |
-          docker network connect dcapal-backend_dcapalnetwork supabase_db_dcapal
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v4
