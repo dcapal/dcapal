@@ -18,7 +18,7 @@ reqwest = { version = "0.12.9", features = ["gzip", "json"] }
 serde = "1.0.216"
 serde_json = "1.0.134"
 thiserror = "2.0.9"
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.43.1", features = ["full"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["trace"] }
 tracing = "0.1.41"
