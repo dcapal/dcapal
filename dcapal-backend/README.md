@@ -38,3 +38,9 @@ postgres:
 ```bash
 make local-up
 ```
+
+- Stop the container stack
+
+```bash
+make local-down
+```
