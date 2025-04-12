@@ -9,8 +9,7 @@ TBD
 - Build backend image
 
 ```bash
-cd dcapal-backend
-docker compose -f docker-compose.yml -f ./docker/docker-compose.local.yml build
+make docker-local-build
 ```
 
 - Update `dcapal.yml` config
@@ -26,7 +25,7 @@ redis:
   user: dcapal
   password: dcapal
 postgres:
-  hostname: supabase_db_dcapal # IMPORTANT!
+  hostname: postgres # IMPORTANT!
   port: 5432 # IMPORTANT!
   user: postgres
   password: postgres
@@ -37,5 +36,11 @@ postgres:
 - Start the container stack
 
 ```bash
-docker compose -f docker-compose.yml -f ./docker/docker-compose.local.yml up -d
+make local-up
+```
+
+- Stop the container stack
+
+```bash
+make local-down
 ```

@@ -1,16 +1,16 @@
-use crate::app::infra::claim::Claims;
-use crate::ports::inbound::rest::FeeStructure;
-use crate::{AppContext, DateTime};
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use axum::Json;
+use axum::{
+    Json,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use tracing::error;
-use tracing::info;
+use tracing::{error, info};
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+use crate::{AppContext, DateTime, app::infra::claim::Claims, ports::inbound::rest::FeeStructure};
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

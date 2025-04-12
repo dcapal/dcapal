@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use tracing::{debug, warn};
 
 use crate::{
+    DateTime,
     app::domain::entity::{Market, OHLCFrequency},
     error::{DcaError, Result},
-    DateTime,
 };
 
 #[derive(Clone)]
@@ -44,7 +44,9 @@ impl YahooProvider {
         let interval = get_api_interval(freq);
         let (r_lo, r_hi) = freq.ohlc_range(ts);
         let (period_1, period_2) = (r_lo.timestamp(), r_hi.timestamp());
-        let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={period_1}&period2={period_2}&interval={interval}");
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={period_1}&period2={period_2}&interval={interval}"
+        );
 
         debug!(
             url = url,

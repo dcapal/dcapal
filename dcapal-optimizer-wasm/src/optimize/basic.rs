@@ -4,7 +4,7 @@ use log::debug;
 use minilp::{ComparisonOp, OptimizationDirection, Variable};
 use rust_decimal::prelude::*;
 
-use crate::{utils::parse_amount, AMOUNT_DECIMALS, PERCENTAGE_DECIMALS};
+use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, utils::parse_amount};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {

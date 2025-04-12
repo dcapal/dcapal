@@ -1,15 +1,14 @@
-use crate::error::DcaError;
-use crate::AppContext;
-use axum::{async_trait, extract::FromRequestParts, http::request::Parts, RequestPartsExt};
+use axum::{RequestPartsExt, async_trait, extract::FromRequestParts, http::request::Parts};
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use once_cell::sync::Lazy;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::{AppContext, error::DcaError};
 
 const JWT_AUDIENCE_DOMAIN: &str = "authenticated";
 pub static DECODE_HEADER: Lazy<Validation> = Lazy::new(|| {

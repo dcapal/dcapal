@@ -1,10 +1,16 @@
-version: "3.9"
 services:
   redis:
     image: redis/redis-stack:7.2.0-v0
     ports:
       - 6379:6379
       - 8001:8001
+
+  db:
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/db/:/home/postgres/pgdata/data
+      - ./config/db/init/:/docker-entrypoint-initdb.d
 
   prometheus:
     image: prom/prometheus:latest

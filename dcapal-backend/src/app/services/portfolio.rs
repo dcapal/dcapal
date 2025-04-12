@@ -1,10 +1,17 @@
-use crate::error::Result;
-use crate::ports::inbound::rest::request::{PortfolioRequest, SyncPortfoliosRequest};
-use crate::ports::inbound::rest::response::{PortfolioResponse, SyncPortfoliosResponse};
-use crate::ports::outbound::repository::portfolio::PortfolioRepository;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
+
 use uuid::Uuid;
+
+use crate::{
+    error::Result,
+    ports::{
+        inbound::rest::{
+            request::{PortfolioRequest, SyncPortfoliosRequest},
+            response::{PortfolioResponse, SyncPortfoliosResponse},
+        },
+        outbound::repository::portfolio::PortfolioRepository,
+    },
+};
 
 pub struct PortfolioService {
     portfolio_repository: Arc<PortfolioRepository>,

@@ -1,13 +1,13 @@
-//! The [`repository`](self) module contains interfaces to persistent storage services, like Redis.
+//! The [`repository`](self) module contains interfaces to persistent storage
+//! services, like Redis.
 
-use std::collections::HashMap;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use chrono::{TimeZone, Utc};
 use redis::AsyncCommands;
 use uuid::Uuid;
 
-use crate::{app::services::ip2location::GeoData, error::Result, DateTime};
+use crate::{DateTime, app::services::ip2location::GeoData, error::Result};
 pub mod dto;
 pub mod market_data;
 pub mod portfolio;

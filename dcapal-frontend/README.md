@@ -1,8 +1,10 @@
 # DcaPal Frontend
 
-Follow
-the [Supabase local development guide](https://supabase.com/docs/guides/local-development?queryGroups=package-manager&package-manager=npm)
-to set up the local Supabase environment.
+Set up the [local Supabase environment](https://supabase.com/docs/guides/local-development):
+
+```shell
+make supabase-up
+```
 
 Once the docker instance is started, copy the displayed anon key and replace the `VITE_SUPABASE_ANON_KEY` in the
 `.env`
@@ -16,7 +18,7 @@ VITE_SUPABASE_ANON_KEY=<anon_key>
 
 Run the frontend server
 
-```bash
+```shell
 cd dcapal/dcapal-frontend
 npm run start
 ```

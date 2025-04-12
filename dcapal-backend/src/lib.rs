@@ -1,48 +1,50 @@
 #[macro_use]
 extern crate const_format;
 
-use axum::{
-    extract::connect_info::IntoMakeServiceWithConnectInfo,
-    middleware,
-    routing::{get, post},
-    Router,
-};
-use chrono::prelude::*;
-use deadpool_redis::{Pool, Runtime};
-use futures::future::BoxFuture;
-use metrics::{counter, describe_counter, describe_histogram, Unit};
-use sea_orm::sqlx;
-use sea_orm::sqlx::postgres::PgPoolOptions;
-use sea_orm::sqlx::PgPool;
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
     time::Duration,
+};
+
+use axum::{
+    Router,
+    extract::connect_info::IntoMakeServiceWithConnectInfo,
+    middleware,
+    routing::{get, post},
+};
+use chrono::prelude::*;
+use deadpool_redis::{Pool, Runtime};
+use futures::future::BoxFuture;
+use metrics::{Unit, counter, describe_counter, describe_histogram};
+use sea_orm::{
+    sqlx,
+    sqlx::{PgPool, postgres::PgPoolOptions},
 };
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 
-use crate::app::services::portfolio::PortfolioService;
-use crate::config::Postgres;
-use crate::ports::outbound::repository::portfolio::PortfolioRepository;
-use crate::ports::outbound::repository::user::UserRepository;
 use crate::{
     app::{
         infra,
-        services::{ip2location::Ip2LocationService, market_data::MarketDataService},
+        services::{
+            ip2location::Ip2LocationService, market_data::MarketDataService,
+            portfolio::PortfolioService,
+        },
         workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
-    config::Config,
+    config::{Config, Postgres},
     error::{DcaError, Result},
     ports::{
         inbound::rest,
         outbound::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
-                market_data::MarketDataRepository, ImportedRepository, MiscRepository,
-                StatsRepository,
+                ImportedRepository, MiscRepository, StatsRepository,
+                market_data::MarketDataRepository, portfolio::PortfolioRepository,
+                user::UserRepository,
             },
         },
     },

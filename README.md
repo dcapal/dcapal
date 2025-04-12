@@ -36,19 +36,13 @@ machine.
 
 **Start Docker environment**
 
-- Move to the dcapal-backend folder
-
-```bash
-cd dcapal-backend
-```
-
 - Setup the `.env` file
 
 ```bash
-cp .env.example .env
+cp dcapal-backend/.env.example dcapal-backend/.env
 ```
 
-- setup a password for the db and the JWT secret (you can use `openssl rand -base64 32` to generate a random string) in
+- Setup a password for the db and the JWT secret (you can use `openssl rand -base64 32` to generate a random string) in
   the new `.env` file
 
 ```dotenv
@@ -59,7 +53,7 @@ JWT_SECRET=<generated_secret>
 - Start the Docker environment
 
 ```bash
-docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
+make dev-up
 ```
 
 (Note: if you're using a Mac with an ARM processor, you should replace (in the docker-compose dev file) Cadvisor's image

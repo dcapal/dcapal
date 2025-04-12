@@ -14,8 +14,8 @@ use metrics::{counter, histogram};
 use tracing::{info, log::error};
 
 use crate::{
-    app::services::ip2location::Ip2LocationService, error::Result,
-    ports::outbound::repository::StatsRepository, AppContext,
+    AppContext, app::services::ip2location::Ip2LocationService, error::Result,
+    ports::outbound::repository::StatsRepository,
 };
 
 const BASE: &str = "dcapal";

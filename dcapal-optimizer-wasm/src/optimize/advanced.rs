@@ -4,9 +4,8 @@ use log::debug;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 
-use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, SHARES_DECIMALS};
-
 use super::TransactionFees;
+use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, SHARES_DECIMALS};
 
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
@@ -179,7 +178,9 @@ impl Problem {
         // Budget available to allocate
         let mut budget_left = self.options.budget + sold_amount;
 
-        debug!("[Init] solution={solution:?} pfolio_amount={pfolio_amount} sold_amount={sold_amount} budget_left={budget_left}");
+        debug!(
+            "[Init] solution={solution:?} pfolio_amount={pfolio_amount} sold_amount={sold_amount} budget_left={budget_left}"
+        );
 
         // Run main budget allocation algorithm
         Self::allocate_budget(
@@ -258,8 +259,8 @@ impl Problem {
             let mut freed_budget =
                 check_fully_allocated_assets(&mut open_assets, budget_left, pfolio_fees);
 
-            // If previous step freed some budget, do another round of allocation unconditionally.
-            // Otherwise, try to break ties or exit
+            // If previous step freed some budget, do another round of allocation
+            // unconditionally. Otherwise, try to break ties or exit
             if freed_budget == Decimal::ZERO {
                 // Unblock ties if necessary
                 if !is_negligible(budget_left) && is_all_unallocated {
@@ -292,9 +293,15 @@ impl Problem {
 
             // Refresh open_assets
             if freed_budget > Decimal::ZERO {
-                debug!("[Step {step}] Before refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}", open_assets.len());
+                debug!(
+                    "[Step {step}] Before refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}",
+                    open_assets.len()
+                );
                 open_assets = refresh_open_assets(assets, budget_left);
-                debug!("[Step {step}] After refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}", open_assets.len());
+                debug!(
+                    "[Step {step}] After refresh: budget_left={budget_left} freed_budget={freed_budget} count={} open_assets={open_assets:?}",
+                    open_assets.len()
+                );
             }
 
             // Update open_assets rescaled weights
@@ -324,8 +331,8 @@ impl Problem {
             SolutionState::PriceTooHigh,
         ];
 
-        // For starters, allocate remaining budget to under-allocated assets, prioritizing assets
-        // farther from their target allocation
+        // For starters, allocate remaining budget to under-allocated assets,
+        // prioritizing assets farther from their target allocation
         let mut candidates = assets
             .values_mut()
             .filter(|a| !EXCLUDED_STATES.contains(&a.state))
@@ -461,7 +468,10 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
         let overallocated = asset.current_amount - asset.target_amount;
         let sell_shares = shares_to_allocate(asset, overallocated);
         if sell_shares.is_zero() {
-            debug!("[Rebalance] Cannot sell over allocated asset: {:?} (overallocated={overallocated}, sell_shares={sell_shares}", asset);
+            debug!(
+                "[Rebalance] Cannot sell over allocated asset: {:?} (overallocated={overallocated}, sell_shares={sell_shares}",
+                asset
+            );
             continue; // If cannot sell a single share, do nothing -- Better slightly overbalanced
         }
 
@@ -477,7 +487,8 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
     sold_amount.round_dp(AMOUNT_DECIMALS)
 }
 
-/// Get a view over under allocated assets i.e. assets with `current_weight` less than `target_weight`
+/// Get a view over under allocated assets i.e. assets with `current_weight`
+/// less than `target_weight`
 fn under_allocated_view(assets: &mut HashMap<String, Asset>) -> Vec<&mut Asset> {
     assets
         .values_mut()
@@ -501,7 +512,8 @@ fn shares_to_allocate(asset: &Asset, allocated_amount: Decimal) -> Decimal {
     }
 }
 
-/// Remove fully allocated assets. Returns budget freed from assets with too high fee impact.
+/// Remove fully allocated assets. Returns budget freed from assets with too
+/// high fee impact.
 fn check_fully_allocated_assets(
     open_assets: &mut Vec<&mut Asset>,
     budget_left: &Decimal,

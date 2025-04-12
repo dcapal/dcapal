@@ -1,6 +1,6 @@
 app:
   providers:
-    priceProvider: yahoo
+    priceProvider: kraken
     cwApiKey: CW_API_KEY
     ipApiKey: IP_API_KEY
     # cmcApiKey: CMC_API_KEY
