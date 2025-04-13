@@ -43,6 +43,16 @@ pub enum DcaError {
     Reqwest(#[from] reqwest::Error),
     #[error("IP2Location internal error: {0:?}")]
     Ip2Location(ip2location::error::Error),
+    #[error(transparent)]
+    TypeHeaderError(#[from] axum_extra::typed_header::TypedHeaderRejection),
+    #[error(transparent)]
+    UuidError(#[from] uuid::Error),
+    #[error(transparent)]
+    JwtError(#[from] jsonwebtoken::errors::Error),
+    #[error("OpenAI Error: {0}")]
+    OpenAIError(#[from] async_openai::error::OpenAIError),
+    #[error(transparent)]
+    DatabaseError(#[from] sea_orm::error::DbErr),
 }
 
 impl Debug for DcaError {
@@ -54,6 +64,15 @@ impl Debug for DcaError {
         }
 
         Ok(())
+    }
+}
+
+impl From<sea_orm::TransactionError<DcaError>> for DcaError {
+    fn from(err: sea_orm::TransactionError<DcaError>) -> Self {
+        match err {
+            sea_orm::TransactionError::Connection(e) => DcaError::DatabaseError(e),
+            sea_orm::TransactionError::Transaction(e) => e,
+        }
     }
 }
 

@@ -1,9 +1,8 @@
 use chrono::Utc;
 use tracing::{error, warn};
 
-use crate::{config::PriceProvider, ports::outbound::adapter::PriceProviders};
-
 use super::entity::{Market, Price};
+use crate::{config::PriceProvider, ports::outbound::adapter::PriceProviders};
 
 pub async fn fetch_market_price(
     market: &Market,

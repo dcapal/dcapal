@@ -1,6 +1,9 @@
 data/**
 dcapal.yml
 **/*.log*
+.env
+dcapal.env
+volumes/**
 
 !data/.gitkeep
 !data/dcapal/.gitkeep

@@ -9,26 +9,38 @@ TBD
 - Build backend image
 
 ```bash
-cd dcapal-backend
-docker compose -f docker-compose.yml -f ./docker/docker-compose.local.yml build
+make docker-local-build
 ```
 
 - Update `dcapal.yml` config
 
 ```yml
 app:
-    # App configs
+# App configs
 
 server:
 redis:
-    hostname: redis # IMPORTANT!
-    port: 6379
-    user: dcapal
-    password: dcapal
+  hostname: redis # IMPORTANT!
+  port: 6379
+  user: dcapal
+  password: dcapal
+postgres:
+  hostname: postgres # IMPORTANT!
+  port: 5432 # IMPORTANT!
+  user: postgres
+  password: postgres
+  database: postgres
+
 ```
 
 - Start the container stack
 
 ```bash
-docker compose -f docker-compose.yml -f ./docker/docker-compose.local.yml up -d
+make local-up
+```
+
+- Stop the container stack
+
+```bash
+make local-down
 ```

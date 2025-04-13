@@ -36,9 +36,24 @@ machine.
 
 **Start Docker environment**
 
+- Setup the `.env` file
+
 ```bash
-cd dcapal-backend
-docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
+cp dcapal-backend/.env.example dcapal-backend/.env
+```
+
+- Setup a password for the db and the JWT secret (you can use `openssl rand -base64 32` to generate a random string) in
+  the new `.env` file
+
+```dotenv
+POSTGRES_PASSWORD=<replace-with-your-pwd>
+JWT_SECRET=<generated_secret>
+```
+
+- Start the Docker environment
+
+```bash
+make dev-up
 ```
 
 (Note: if you're using a Mac with an ARM processor, you should replace (in the docker-compose dev file) Cadvisor's image
@@ -106,5 +121,5 @@ Born as a personal Sunday morning project, DcaPal would have never grown so much
 contribute with their time and work. Thank you very much ya all!
 
 <a href="https://github.com/dcapal/dcapal/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=dcapal/dcapal" />
+  <img src="https://contrib.rocks/image?repo=dcapal/dcapal"  alt="Missing contributors"/>
 </a>

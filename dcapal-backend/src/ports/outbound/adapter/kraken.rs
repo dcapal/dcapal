@@ -8,18 +8,17 @@ use futures::StreamExt;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use reqwest::StatusCode;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{Deserialize, de::DeserializeOwned};
 use tracing::{debug, error, warn};
 
+use super::DefaultCircuitBreaker;
 use crate::{
+    DateTime,
     app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
     config,
     error::{DcaError, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
-    DateTime,
 };
-
-use super::DefaultCircuitBreaker;
 
 #[derive(Clone)]
 pub struct KrakenProvider {
@@ -59,7 +58,8 @@ impl KrakenProvider {
             return Err(DcaError::Generic(format!("{:?}", res.error)));
         }
 
-        // Filter online market symbols and rename Kraken specific pairs to standard names
+        // Filter online market symbols and rename Kraken specific pairs to standard
+        // names
         let market_symbols = res
             .result
             .values()
@@ -68,10 +68,12 @@ impl KrakenProvider {
             .collect::<Vec<String>>();
 
         let (markets, assets) = if self.cmc_api_key.is_some() {
-            // If CoinMarketCap API key is available, enrich assets data with human-friendly info
+            // If CoinMarketCap API key is available, enrich assets data with human-friendly
+            // info
             self.resolve_assets_data(&market_symbols, repo).await
         } else {
-            // If not, `Asset`s will have same `id` and `symbol`. No big deal, just less fancy
+            // If not, `Asset`s will have same `id` and `symbol`. No big deal, just less
+            // fancy
             resolve_assets_data_kraken_only(&market_symbols, repo).await
         };
 
@@ -288,7 +290,8 @@ impl KrakenProvider {
             ]);
         }
 
-        // Skip currencies not known by CMC for now. Better to fallback than send confusing asset names
+        // Skip currencies not known by CMC for now. Better to fallback than send
+        // confusing asset names
         let symbols = ccys
             .iter()
             .filter_map(|c| (!CMC_ALIAS.contains_key(c.as_str())).then_some(c.as_str()))
@@ -529,30 +532,6 @@ fn get_kraken_api_periods(freq: OHLCFrequency) -> &'static str {
     match freq {
         OHLCFrequency::Minutes5 => "5",
         OHLCFrequency::Daily => "1440",
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct KAssetsDataCurrency {
-    symbol: String,
-    name: String,
-    is_fiat: bool,
-}
-
-#[allow(clippy::from_over_into)]
-impl Into<Asset> for KAssetsDataCurrency {
-    fn into(self) -> Asset {
-        if self.is_fiat {
-            Asset::Fiat(Fiat {
-                id: self.symbol,
-                symbol: self.name,
-            })
-        } else {
-            Asset::Crypto(Crypto {
-                id: self.symbol,
-                symbol: self.name,
-            })
-        }
     }
 }
 

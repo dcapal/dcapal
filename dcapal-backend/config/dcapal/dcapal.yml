@@ -1,9 +1,11 @@
 app:
   providers:
-    priceProvider: yahoo
+    priceProvider: kraken
     cwApiKey: CW_API_KEY
     ipApiKey: IP_API_KEY
     # cmcApiKey: CMC_API_KEY
+  auth:
+    jwtSecret: SUPABASE_JWT_SECRET
 
   # services:
   #   ip:
@@ -26,3 +28,9 @@ server:
     port: 6379
     user: dcapal
     password: dcapal
+  postgres:
+    hostname: 127.0.0.1
+    port: 54322
+    user: postgres
+    password: postgres
+    database: postgres

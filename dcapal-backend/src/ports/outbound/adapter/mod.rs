@@ -8,15 +8,14 @@ mod yahoo;
 use std::sync::Arc;
 
 pub use cw::*;
+use failsafe::{
+    StateMachine,
+    backoff::EqualJittered,
+    failure_policy::{ConsecutiveFailures, OrElse, SuccessRateOverTimeWindow},
+};
 pub use ipapi::*;
 pub use kraken::*;
 pub use yahoo::*;
-
-use failsafe::{
-    backoff::EqualJittered,
-    failure_policy::{ConsecutiveFailures, OrElse, SuccessRateOverTimeWindow},
-    StateMachine,
-};
 
 type DefaultCircuitBreaker = StateMachine<
     OrElse<SuccessRateOverTimeWindow<EqualJittered>, ConsecutiveFailures<EqualJittered>>,

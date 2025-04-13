@@ -46,7 +46,7 @@ const fetchImportedPortfolio = async (id) => {
   try {
     const response = await api.get(url);
 
-    if (response.status != 200) {
+    if (response.status !== 200) {
       console.error(
         `Failed to fetch imported portfolio (${id}): {status: ${response.status}, data: ${response.data}}`
       );

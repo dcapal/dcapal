@@ -1,24 +1,25 @@
-use chrono::{TimeZone, Utc};
 use std::{sync::Arc, time::Duration};
+
+use chrono::{TimeZone, Utc};
 use tracing::{debug, error, info};
 
 use crate::{
+    AppContext, DateTime,
     app::{
         domain::market_data_utils::fetch_market_price,
-        infra::utils::{should_stop, StopToken},
+        infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
     error::Result,
     ports::outbound::{
         adapter::PriceProviders,
-        repository::{market_data::MarketDataRepository, MiscRepository},
+        repository::{MiscRepository, market_data::MarketDataRepository},
     },
-    AppContext, DateTime,
 };
 
-/// Worker to periodically discover new crypto assets and markets. As of today, new markets are
-/// checked every 24 hours.
+/// Worker to periodically discover new crypto assets and markets. As of today,
+/// new markets are checked every 24 hours.
 pub struct MarketDiscoveryWorker {
     market_data_service: Arc<MarketDataService>,
     misc_repo: Arc<MiscRepository>,

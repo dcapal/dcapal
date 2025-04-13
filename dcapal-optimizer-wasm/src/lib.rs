@@ -3,19 +3,19 @@ extern crate lazy_static;
 
 use std::{collections::HashMap, sync::Mutex};
 
-use rand::{distributions, Rng};
+use optimize::{
+    FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
+    advanced::{self, TheoreticalAllocation},
+    basic,
+};
+use rand::{Rng, distr};
 use rust_decimal::{
-    prelude::{One, ToPrimitive},
     Decimal,
+    prelude::{One, ToPrimitive},
 };
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
-
-use optimize::{
-    advanced::{self, TheoreticalAllocation},
-    basic, FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
-};
 use utils::{parse_amount, parse_percentage, parse_shares};
+use wasm_bindgen::prelude::*;
 
 use crate::optimize::suggestions;
 
@@ -33,8 +33,7 @@ lazy_static! {
         Mutex::new(HashMap::new());
     static ref SUGGESTION_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::Problem>> =
         Mutex::new(HashMap::new());
-    static ref NUMERIC_DIST: distributions::Uniform<u8> =
-        distributions::Uniform::new_inclusive(0, 9);
+    static ref NUMERIC_DIST: distr::Uniform<u8> = distr::Uniform::new_inclusive(0, 9).unwrap();
 }
 
 #[wasm_bindgen]
@@ -212,7 +211,7 @@ impl ProblemHandle {
 }
 
 fn generate_problem_id() -> String {
-    rand::thread_rng()
+    rand::rng()
         .sample_iter(&*NUMERIC_DIST)
         .take(10)
         .map(|n| n.to_string())
@@ -662,8 +661,7 @@ impl TryFrom<JsBasicOptions> for basic::ProblemOptions {
         if current_total > budget {
             return Err(format!(
                 "Invalid current amounts. Sum must be less than or equal to budget: {} ({} instead)",
-                budget,
-                current_total
+                budget, current_total
             ));
         }
 

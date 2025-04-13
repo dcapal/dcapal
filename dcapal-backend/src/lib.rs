@@ -8,15 +8,19 @@ use std::{
 };
 
 use axum::{
+    Router,
     extract::connect_info::IntoMakeServiceWithConnectInfo,
     middleware,
     routing::{get, post},
-    Router,
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
-use metrics::{counter, describe_counter, describe_histogram, Unit};
+use metrics::{Unit, counter, describe_counter, describe_histogram};
+use sea_orm::{
+    sqlx,
+    sqlx::{PgPool, postgres::PgPoolOptions},
+};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
@@ -25,18 +29,22 @@ use tracing::{error, info};
 use crate::{
     app::{
         infra,
-        services::{ip2location::Ip2LocationService, market_data::MarketDataService},
+        services::{
+            ip2location::Ip2LocationService, market_data::MarketDataService,
+            portfolio::PortfolioService,
+        },
         workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
-    config::Config,
+    config::{Config, Postgres},
     error::{DcaError, Result},
     ports::{
         inbound::rest,
         outbound::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
-                market_data::MarketDataRepository, ImportedRepository, MiscRepository,
-                StatsRepository,
+                ImportedRepository, MiscRepository, StatsRepository,
+                market_data::MarketDataRepository, portfolio::PortfolioRepository,
+                user::UserRepository,
             },
         },
     },
@@ -59,6 +67,7 @@ pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
     redis: Pool,
+    postgres: PgPool,
     services: Services,
     repos: Arc<Repository>,
     providers: Arc<PriceProviders>,
@@ -70,6 +79,7 @@ pub type AppContext = Arc<AppContextInner>;
 struct Services {
     mkt_data: Arc<MarketDataService>,
     ip2location: Option<Arc<Ip2LocationService>>,
+    portfolio: Arc<PortfolioService>,
 }
 
 #[derive(Clone)]
@@ -78,6 +88,8 @@ struct Repository {
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
+    pub portfolio: Arc<PortfolioRepository>,
+    pub user: Arc<UserRepository>,
 }
 
 pub struct DcaServer {
@@ -89,7 +101,7 @@ pub struct DcaServer {
 }
 
 impl DcaServer {
-    pub fn try_new(config: Config) -> Result<Self> {
+    pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
 
         let http = reqwest::Client::builder()
@@ -100,11 +112,15 @@ impl DcaServer {
 
         let redis = build_redis_pool(&config.server.redis)?;
 
+        let postgres = build_postgres_pool(&config.server.postgres).await?;
+
         let repos = Arc::new(Repository {
             misc: Arc::new(MiscRepository::new(redis.clone())),
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
+            portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
+            user: Arc::new(UserRepository::new(postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {
@@ -132,24 +148,34 @@ impl DcaServer {
         let services = Services {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             ip2location,
+            portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
         };
 
         let ctx = Arc::new(AppContextInner {
             config: config.clone(),
             http,
             redis,
+            postgres,
             services,
             repos,
             providers,
         });
 
-        let app = Router::new()
+        let open_routes = Router::new()
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
             .route("/assets/fiat", get(rest::get_assets_fiat))
             .route("/assets/crypto", get(rest::get_assets_crypto))
-            .route("/price/:asset", get(rest::get_price))
+            .route("/price/{asset}", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
-            .route("/import/portfolio/:id", get(rest::get_imported_portfolio))
+            .route("/import/portfolio/{id}", get(rest::get_imported_portfolio));
+
+        let authenticated_routes = Router::new()
+            .route("/v1/sync/portfolios", post(rest::request::sync_portfolios))
+            .with_state(ctx.clone());
+
+        let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);
+
+        let app = merged_app
             .route_layer(
                 ServiceBuilder::new()
                     .layer(TraceLayer::new_for_http())
@@ -278,6 +304,33 @@ fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
         })?;
 
     Ok(redis_pool)
+}
+
+async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
+    let url = config.connection_url();
+    let pool = PgPoolOptions::new()
+        .max_connections(50)
+        .connect(&url)
+        .await
+        .map_err(|e| {
+            DcaError::StartupFailure(
+                format!(
+                    "Error in building Postgres poll config (user={}, hostname={}, port={}, db={})",
+                    &config.user, &config.hostname, &config.port, &config.database
+                ),
+                e.into(),
+            )
+        })?;
+
+    let row: (i64,) = sqlx::query_as("SELECT $1")
+        .bind(150_i64)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| DcaError::StartupFailure("Failed to query Postgres".into(), e.into()))?;
+
+    assert_eq!(row.0, 150);
+
+    Ok(pool)
 }
 
 async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {

@@ -1,14 +1,13 @@
-use axum::async_trait;
+use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use tracing::{debug, error};
 
+use super::MarketDataRepository;
 use crate::{
     app::domain::entity::{Market, MarketId},
     error::{DcaError, Result},
-    ports::outbound::repository::{dto::MarketDto, REDIS_BASE},
+    ports::outbound::repository::{REDIS_BASE, dto::MarketDto},
 };
-
-use super::MarketDataRepository;
 
 const MARKET_KEY: &str = concatcp!(REDIS_BASE, ':', "market");
 

@@ -16,9 +16,11 @@
     },
     "navbar": {
       "myPortfolios": "My portfolios",
+      "dashboard": "Dashboard",
       "about": "About",
       "docs": "Docs",
-      "exportPortfolio": "Export Portfolio"
+      "exportPortfolio": "Export Portfolio",
+      "login": "Sign in"
     },
     "currencyStep": {
       "chooseCurrency": "Choose your portfolio currency"
@@ -184,6 +186,33 @@
         "cardStep3": "<p1>Choose<bold1> tax-efficient </bold1> (buy-only) or standard <bold2> rebalancing</bold2></p1>",
         "cardStep4": "<p1>Discover <bold>how much to invest </bold> on each asset and go to market</p1>",
         "getStart": "<p1>Get started now. It's free!</p1><p2>We built DcaPal as quick tool for passive investors. Get your allocation done in minutes.</p2><p3>No registration required!</p3>"
+      },
+      "login": {
+        "signIn": "Sign in",
+        "subtitle": "to continue to DcaPal",
+        "signUp": "Don't have an account? Sign up",
+        "email": "Email address",
+        "password": "Password",
+        "emailInput": "Enter your email",
+        "passwordInput": "Your password",
+        "forgotPassword": "Forgot password?",
+        "socialLogin": "Sign in with {{provider}}"
+      },
+      "signUp": {
+        "signUp": "Sign up",
+        "description": "Signing up for DcaPal provides numerous benefits, including the\n                ability to keep your portfolio under control with tax-efficient\n                suggestions for your monthly investments.",
+        "alreadyHaveAnAccount": "Already have an account? Sign in",
+        "passwordInput": "Your password",
+        "password": "Password",
+        "emailInput": "Enter your email",
+        "socialLogin": "Sign up with {{provider}}",
+        "title": "DcaPal",
+        "subtitle": "Dollar Cost Averaging Made Easy",
+        "feature1": "Access to your investment portfolios across all devices",
+        "feature2": "Dive into a fully customizable experience",
+        "feature3": "Access to the dashboard with your portfolio performance",
+        "feature4": "Set custom alerts for your investments",
+        "featureNotYetAvailable": "*Feature not yet available"
       }
     }
   }

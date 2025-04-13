@@ -1,22 +1,34 @@
 //! The [`rest`](self) module implements the REST API of the system
 
-use std::time::Duration;
+use std::{fmt::Display, time::Duration};
 
-use crate::app::domain::entity::AssetKind;
-use crate::app::infra::utils::Expiring;
-use crate::app::services::command::{ConversionRateQuery, ImportPortfolioCmd};
-use crate::error::{DcaError, Result};
-use crate::ports::outbound::repository::ImportedPortfolio;
-use crate::{infra::stats, AppContext};
-
-use axum::extract::{Path, Query, State};
-use axum::response::{IntoResponse, Response};
-use axum::Json;
-use axum_extra::{headers::CacheControl, TypedHeader};
+use axum::{
+    Json,
+    extract::{Path, Query, State},
+    response::{IntoResponse, Response},
+};
+use axum_extra::{TypedHeader, headers::CacheControl};
 use hyper::StatusCode;
 use lazy_static::lazy_static;
 use metrics::counter;
+use sea_orm::prelude::Decimal;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use crate::{
+    AppContext,
+    app::{
+        domain::entity::AssetKind,
+        infra::utils::Expiring,
+        services::command::{ConversionRateQuery, ImportPortfolioCmd},
+    },
+    error::{DcaError, Result},
+    infra::stats,
+    ports::outbound::repository::ImportedPortfolio,
+};
+
+pub mod request;
+pub mod response;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../docs/schema/portfolio/v1/schema.json");
@@ -132,6 +144,44 @@ pub async fn get_imported_portfolio(
 
     match repo.find_portfolio(&id).await? {
         Some(portfolio) => Ok(Json(portfolio).into_response()),
-        None => Ok((StatusCode::NOT_FOUND).into_response()),
+        None => Ok(StatusCode::NOT_FOUND.into_response()),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum FeeStructure {
+    #[serde(rename = "zeroFee")]
+    ZeroFee,
+
+    #[serde(rename = "fixed")]
+    Fixed {
+        #[serde(rename = "feeAmount", with = "rust_decimal::serde::float")]
+        fee_amount: Decimal,
+    },
+
+    #[serde(rename = "variable")]
+    Variable {
+        #[serde(rename = "feeRate", with = "rust_decimal::serde::float")]
+        fee_rate: Decimal,
+        #[serde(rename = "minFee", with = "rust_decimal::serde::float")]
+        min_fee: Decimal,
+        #[serde(
+            rename = "maxFee",
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "rust_decimal::serde::float_option"
+        )]
+        max_fee: Option<Decimal>,
+    },
+}
+
+impl Display for FeeStructure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FeeStructure::ZeroFee => write!(f, "ZeroFee"),
+            FeeStructure::Fixed { .. } => write!(f, "Fixed"),
+            FeeStructure::Variable { .. } => write!(f, "Variable"),
+        }
     }
 }

@@ -3,12 +3,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use dcapal_backend::{config::Config, error::DcaError, DcaServer};
+use dcapal_backend::{DcaServer, config::Config, error::DcaError};
 use futures::FutureExt;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::signal;
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
 
     init_prometheus_exporter(&config.server.metrics)?;
 
-    let mut server = DcaServer::try_new(config)?;
+    let mut server = DcaServer::try_new(config).await?;
 
     Ok(server.start(shutdown_signal().boxed()).await?)
 }

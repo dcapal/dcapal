@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Optional: Roles
+READONLY_ROLE="readonly"
+
+# --- Run SQL through psql ---
+psql -U $POSTGRES_USER -d "$POSTGRES_DB" <<EOF
+-- Create roles (if not exist)
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${READONLY_ROLE}') THEN
+        CREATE ROLE ${READONLY_ROLE} NOLOGIN;
+    END IF;
+END
+\$\$;
+
+-- Grant readonly role privileges
+GRANT CONNECT ON DATABASE ${POSTGRES_DB} TO ${READONLY_ROLE};
+GRANT USAGE ON SCHEMA public TO ${READONLY_ROLE};
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${READONLY_ROLE};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO ${READONLY_ROLE};
+EOF
