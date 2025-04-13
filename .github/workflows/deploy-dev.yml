@@ -148,6 +148,7 @@ jobs:
         env:
           REDIS_PORT: ${{ secrets.REDIS_PORT_DEV }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
+          POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
         run: |
           cat > dcapal-backend/docker-compose.yml << EOF
@@ -171,26 +172,26 @@ jobs:
                 timeout: 10s
                 retries: 3
 
-              db:
-                image: timescale/timescaledb-ha:pg17
-                container_name: db-dev
-                restart: always
-                # set shared memory limit when using docker-compose
-                shm_size: 128mb
-                ports:
-                  - "${POSTGRES_PORT}:5432"
-                volumes:
-                - ./data/db/:/home/postgres/pgdata/data
-                - ./config/db/init/:/docker-entrypoint-initdb.d
-                networks:
-                  - dcapalnetwork
-                environment:
-                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-                healthcheck:
-                  test: [ "CMD-SHELL", "pg_isready -U user" ]
-                  interval: 10s
-                  timeout: 5s
-                  retries: 5
+            db:
+              image: timescale/timescaledb-ha:pg17
+              container_name: db-dev
+              restart: always
+              # set shared memory limit when using docker-compose
+              shm_size: 128mb
+              ports:
+                - "${POSTGRES_PORT}:5432"
+              volumes:
+              - ./data/db/:/home/postgres/pgdata/data
+              - ./config/db/init/:/docker-entrypoint-initdb.d
+              networks:
+                - dcapalnetwork
+              environment:
+                POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+              healthcheck:
+                test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+                interval: 10s
+                timeout: 5s
+                retries: 5
 
           networks:
             dcapal-dev-network:
@@ -314,7 +315,7 @@ jobs:
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_HOST=${POSTGRES_HOST}
           POSTGRES_USER=${POSTGRES_USER}
-          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_DB=${POSTGRES_DATABASE}
           POSTGRES_PORT=${POSTGRES_PORT}
           EOF
 
