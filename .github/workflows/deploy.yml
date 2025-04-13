@@ -57,6 +57,17 @@ jobs:
           cd dcapal-frontend
           npm ci
 
+      - name: Configure .env.production
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          cat > dcapal-frontend/.env.production << EOF
+          REACT_APP_ENABLE_COOKIE_BUTTON=0
+          VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+          VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+          EOF
+
       - name: Build
         run: |
           cd dcapal-frontend
@@ -136,6 +147,10 @@ jobs:
       - name: Configure docker-compose.yml
         env:
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: |
           cat > dcapal-backend/docker-compose.yml << EOF
           version: "3.9"
@@ -157,6 +172,27 @@ jobs:
                 interval: 10s
                 timeout: 10s
                 retries: 3
+
+            db:
+              image: timescale/timescaledb-ha:pg17
+              container_name: db
+              restart: always
+              # set shared memory limit when using docker-compose
+              shm_size: 128mb
+              ports:
+                - "${POSTGRES_PORT}:5432"
+              volumes:
+              - ./data/db/:/home/postgres/pgdata/data
+              - ./config/db/init/:/docker-entrypoint-initdb.d
+              networks:
+                - dcapalnetwork
+              environment:
+                POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+              healthcheck:
+                test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DATABASE}" ]
+                interval: 10s
+                timeout: 5s
+                retries: 5
 
           networks:
             dcapalnetwork:
@@ -185,6 +221,8 @@ jobs:
               depends_on:
                 redis:
                   condition: service_healthy
+                db:
+                  condition: service_healthy
               healthcheck:
                 test: curl --fail http://localhost:8080 || exit 1
                 interval: 10s
@@ -205,6 +243,16 @@ jobs:
           user default off
           EOF
 
+      - name: Configure Postgres Dcapal user
+        env:
+          PG_DCAPAL_USER: ${{ secrets.PG_DCAPAL_USER }}
+          PG_DCAPAL_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
+        run: |
+          cat > dcapal-backend/config/db/init/99_create_dcapal_user.sql << EOF
+          CREATE USER "${PG_DCAPAL_USER}" WITH PASSWORD '${PG_DCAPAL_PASSWORD}';
+          GRANT app_role TO "${PG_DCAPAL_USER}";
+          EOF
+
       - name: Configure dcapal.yml
         env:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
@@ -215,8 +263,8 @@ jobs:
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
@@ -260,18 +308,18 @@ jobs:
 
       - name: Configure dotenv
         env:
-          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOSTNAME }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: |
           cat > dcapal-backend/dcapal.env << EOF
-          DB_HOST: ${POSTGRES_HOSTNAME}
-          DB_PORT: ${POSTGRES_PORT}
-          APP_USER: ${POSTGRES_USER}
-          APP_USER_PWD: ${POSTGRES_PASSWORD}
-          APP_DB_NAME: ${POSTGRES_DATABASE}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_HOST=${POSTGRES_HOST}
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_DB=${POSTGRES_DATABASE}
+          POSTGRES_PORT=${POSTGRES_PORT}
           EOF
 
       - name: Deploy dcapal-backend config
@@ -299,6 +347,7 @@ jobs:
             cd ${DCAPAL_DIR}
             ls -la
             mkdir -p ./data/dcapal
+            mkdir -p ./data/db
             touch ./data/dcapal/dcapal.log
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml down
