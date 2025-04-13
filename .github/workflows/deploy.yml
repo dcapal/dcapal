@@ -261,8 +261,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          POSTGRES_HOSTNAME: ${{ secrets.POSTGRES_HOSTNAME }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
           POSTGRES_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
@@ -299,8 +297,8 @@ jobs:
               user: ${REDIS_USER}
               password: ${REDIS_PASSWORD}
             postgres:
-              hostname: ${POSTGRES_HOSTNAME}
-              port: ${POSTGRES_PORT}
+              hostname: db
+              port: 5432
               user: ${POSTGRES_USER}
               password: ${POSTGRES_PASSWORD}
               database: ${POSTGRES_DATABASE}
@@ -309,17 +307,16 @@ jobs:
       - name: Configure dotenv
         env:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOSTNAME }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: |
           cat > dcapal-backend/dcapal.env << EOF
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-          POSTGRES_HOST=${POSTGRES_HOST}
+          POSTGRES_HOST=db
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_DB=${POSTGRES_DATABASE}
-          POSTGRES_PORT=${POSTGRES_PORT}
+          POSTGRES_PORT=5432
           EOF
 
       - name: Deploy dcapal-backend config
