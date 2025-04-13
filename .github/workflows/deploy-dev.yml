@@ -184,7 +184,7 @@ jobs:
               - ./data/db/:/home/postgres/pgdata/data
               - ./config/db/init/:/docker-entrypoint-initdb.d
               networks:
-                - dcapalnetwork
+                - dcapal-dev-network
               environment:
                 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
               healthcheck:
