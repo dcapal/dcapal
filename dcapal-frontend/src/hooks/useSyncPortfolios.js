@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { syncPortfolios } from "@components/allocationFlow/portfolioSlice";
 import { supabase } from "@app/config";
 
-export function useSyncPortfolios(intervalMs = 300000) {
+export function useSyncPortfolios(intervalMs = 5000) {
   const dispatch = useDispatch();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
