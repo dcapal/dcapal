@@ -220,6 +220,8 @@ jobs:
               depends_on:
                 redis:
                   condition: service_healthy
+                db:
+                  condition: service_healthy
               healthcheck:
                 test: curl --fail http://localhost:8080 || exit 1
                 interval: 10s
@@ -246,8 +248,8 @@ jobs:
           PG_DCAPAL_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
         run: |
           cat > dcapal-backend/config/db/init/99_create_dcapal_user.sql << EOF
-          CREATE USER ${PG_DCAPAL_USER} WITH PASSWORD '${PG_DCAPAL_PASSWORD}';
-          GRANT app_role TO ${PG_DCAPAL_USER};
+          CREATE USER "${PG_DCAPAL_USER}" WITH PASSWORD '${PG_DCAPAL_PASSWORD}';
+          GRANT app_role TO "${PG_DCAPAL_USER}";
           EOF
 
       - name: Configure dcapal.yml
@@ -344,6 +346,7 @@ jobs:
             cd ${DCAPAL_DIR}
             ls -la
             mkdir -p ./data/dcapal
+            mkdir -p ./data/db
             touch ./data/dcapal/dcapal.log
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml down
