@@ -165,9 +165,9 @@ impl DcaServer {
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
             .route("/assets/fiat", get(rest::get_assets_fiat))
             .route("/assets/crypto", get(rest::get_assets_crypto))
-            .route("/price/:asset", get(rest::get_price))
+            .route("/price/{asset}", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
-            .route("/import/portfolio/:id", get(rest::get_imported_portfolio));
+            .route("/import/portfolio/{id}", get(rest::get_imported_portfolio));
 
         let authenticated_routes = Router::new()
             .route("/v1/sync/portfolios", post(rest::request::sync_portfolios))

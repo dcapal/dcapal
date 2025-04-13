@@ -1,4 +1,4 @@
-use axum::{RequestPartsExt, async_trait, extract::FromRequestParts, http::request::Parts};
+use axum::{RequestPartsExt, extract::FromRequestParts, http::request::Parts};
 use axum_extra::{
     TypedHeader,
     headers::{Authorization, authorization::Bearer},
@@ -50,7 +50,6 @@ impl Claims {
     }
 }
 
-#[async_trait]
 impl FromRequestParts<AppContext> for Claims {
     type Rejection = DcaError;
 

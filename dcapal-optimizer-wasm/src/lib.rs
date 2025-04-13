@@ -8,7 +8,7 @@ use optimize::{
     advanced::{self, TheoreticalAllocation},
     basic,
 };
-use rand::{Rng, distributions};
+use rand::{Rng, distr};
 use rust_decimal::{
     Decimal,
     prelude::{One, ToPrimitive},
@@ -33,8 +33,7 @@ lazy_static! {
         Mutex::new(HashMap::new());
     static ref SUGGESTION_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::Problem>> =
         Mutex::new(HashMap::new());
-    static ref NUMERIC_DIST: distributions::Uniform<u8> =
-        distributions::Uniform::new_inclusive(0, 9);
+    static ref NUMERIC_DIST: distr::Uniform<u8> = distr::Uniform::new_inclusive(0, 9).unwrap();
 }
 
 #[wasm_bindgen]
@@ -212,7 +211,7 @@ impl ProblemHandle {
 }
 
 fn generate_problem_id() -> String {
-    rand::thread_rng()
+    rand::rng()
         .sample_iter(&*NUMERIC_DIST)
         .take(10)
         .map(|n| n.to_string())
