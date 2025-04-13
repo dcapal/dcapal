@@ -207,7 +207,7 @@ jobs:
           version: "3.9"
           services:
             dcapal:
-              image: leonardoarcari/dcapal:latest
+              image: leonardoarcari/dcapal:master
               env_file: dcapal.env
               restart: always
               ports:
