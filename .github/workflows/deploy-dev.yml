@@ -150,6 +150,7 @@ jobs:
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT_DEV }}
           POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/docker-compose.yml << EOF
           version: "3.9"
@@ -188,7 +189,7 @@ jobs:
               environment:
                 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
               healthcheck:
-                test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+                test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DATABASE}" ]
                 interval: 10s
                 timeout: 5s
                 retries: 5
