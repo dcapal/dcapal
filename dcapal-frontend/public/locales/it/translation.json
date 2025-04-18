@@ -161,7 +161,7 @@
         "letTheAlgorithmDoTheSplittingForYou": "lascia che l'algoritmo faccia i calcoli per te",
         "exportPortfolio": "Puoi anche esportare il tuo portafoglio e importarlo la prossima volta per risparmiare tempo prezioso.",
         "privacyPolicyTitle": "Informativa sulla privacy",
-        "privacyPolicyMessage1": "Questa è la nostra povertissima privacy policy. Salviamo la posizione IP per fini statistici. Con la nuova funzionalità di login opzionale, alcuni dati essenziali potrebbero essere memorizzati se decidi di accedere.",
+        "privacyPolicyMessage1": "Questa è la nostra privacy policy. Salviamo la posizione IP per fini statistici. Con la nuova funzionalità di login opzionale, alcuni dati essenziali potrebbero essere memorizzati se decidi di accedere.",
         "privacyPolicyMessage2": "Poiché DcaPal è open source, non possiamo garantire contro la perdita o il furto di dati. Usa l'app a tuo rischio e non inserire o salvare dati personali sensibili.",
         "privacyPolicyMessage3": "Non facciamo profilazione degli utenti. I dati di portafoglio e investimento non vengono salvati sui nostri server, salvo utilizzo del login (e solo i dati minimi necessari). Questa policy potrebbe evolvere insieme a DcaPal.",
         "privacyPolicyMessageTotal": "<0>{{part1}}</0><1>{{part2}}</1><2>{{part3}}</2>",
