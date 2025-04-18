@@ -161,9 +161,9 @@
         "letTheAlgorithmDoTheSplittingForYou": "let the algorithm do the splitting for you",
         "exportPortfolio": "You can even export your portfolio and import it back next time to save precious minutes.",
         "privacyPolicyTitle": "Privacy policy",
-        "privacyPolicyMessage1": "Here's our poor man privacy policy. We store your IP location for stats purposes. That's it. Nothing more.",
-        "privacyPolicyMessage2": "Since DcaPal is a zero-login service, we don't do user profiling. We do not store any user data: portfolio assets, invested amounts, nothing ever leaves your browser.",
-        "privacyPolicyMessage3": "This may change in the future. Until then, long live the Far West.",
+        "privacyPolicyMessage1": "Here's our poor man privacy policy. We store your IP location for stats purposes. With the new optional login feature, some basic user data may be stored if you choose to log in.",
+        "privacyPolicyMessage2": "Since DcaPal is open source, we cannot guarantee against data loss or theft. Use this app at your own risk, and do not provide or save any sensitive personal data.",
+        "privacyPolicyMessage3": "We do not do user profiling. Portfolio data and investments are not stored on our servers unless you use the login feature, and then only the minimum required. This policy may evolve as DcaPal grows.",
         "privacyPolicyMessageTotal": "<0>{{part1}}</0><1>{{part2}}</1><2>{{part3}}</2>",
         "feedback": "Feedback",
         "feedbackMessage": " If you find any issue, would like to ask for new features or simply leave a feedback, <0>{{feelFree}}</0> to me on any of <1>{{socialProfiles}}</1>.",
@@ -185,7 +185,7 @@
         "cardStep2": "<p1>Tell us <bold>your budget</bold> for this month</p1>",
         "cardStep3": "<p1>Choose<bold1> tax-efficient </bold1> (buy-only) or standard <bold2> rebalancing</bold2></p1>",
         "cardStep4": "<p1>Discover <bold>how much to invest </bold> on each asset and go to market</p1>",
-        "getStart": "<p1>Get started now. It's free!</p1><p2>We built DcaPal as quick tool for passive investors. Get your allocation done in minutes.</p2><p3>No registration required!</p3>"
+        "getStart": "<p1>Get started now. It's free!</p1><p2>We built DcaPal as quick tool for passive investors. Get your allocation done in minutes.</p2><p3>Use without registration, or sign up for more features!\n</p3>"
       },
       "login": {
         "signIn": "Sign in",
