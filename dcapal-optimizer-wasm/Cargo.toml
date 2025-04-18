@@ -13,28 +13,28 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 # WASM dependencies
-wasm-bindgen = { version = "0.2.100", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4.50"
-wasm-logger = "0.2.0"
-js-sys = "0.3.77"
-console_error_panic_hook = { version = "0.1.7", optional = true }
+console_error_panic_hook = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+wasm-logger = { workspace = true }
+
 # Library dependencies
-log = "0.4.27"
-minilp = "0.2.2"
-serde = { version = "1.0.219", features = ["derive"] }
-serde-wasm-bindgen = "0.6.5"
-futures = "0.3.31"
-anyhow = "1.0.97"
-thiserror = "2"
-lazy_static = "1.5.0"
-rand = "0.9.0"
-getrandom = { version = "0.3.2", features = ["wasm_js"] }
-rust_decimal = { version = "1.37.1", features = ["serde-with-float"] }
-rust_decimal_macros = "1.37.1"
+anyhow = { workspace = true }
+getrandom = { workspace = true, features = ["wasm_js"] }
+lazy_static = { workspace = true }
+log = { workspace = true }
+js-sys = { workspace = true }
+minilp = { workspace = true }
+rand = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+serde = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.50"
-env_logger = "0.11.8"
-test-log = { version = "0", features = ["log"] }
-glob = "0.3.2"
-serde_json = "1.0.140"
+env_logger = { workspace = true }
+glob = { workspace = true }
+serde_json = { workspace = true }
+test-log = { workspace = true }
+wasm-bindgen-test = { workspace = true }
