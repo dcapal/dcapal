@@ -138,7 +138,7 @@ export default function AboutPage() {
                   components={[
                     <span className="font-normal" />,
                     <a className="underline" href="#social-profiles" />,
-                    <a href="mailto:support@dcapal.com" />
+                    <a href="mailto:support@dcapal.com" />,
                   ]}
                 />
               </p>
