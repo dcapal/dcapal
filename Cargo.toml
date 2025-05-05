@@ -24,7 +24,7 @@ opt-level = "s"
 anyhow = "1.0.98"
 async-openai = "0.28.1"
 async-trait = "0.1.88"
-axum = { version = "0.8.3", features = ["macros"] }
+axum = { version = "0.8.4", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 config = "0.15.11"
 console_error_panic_hook = { version = "0.1.7" }
