@@ -4,11 +4,11 @@
   "description": "A web client for DcaPal web application",
   "main": "index.js",
   "scripts": {
-    "build": "webpack --config webpack.prod.js --mode production",
-    "build-dev": "webpack --config webpack.prod.js --mode development",
+    "build": "vite build",
+    "build-dev": "vite build",
     "check": "prettier --check \"src/**/*.js\"",
     "format": "prettier --write \"src/**/*.js\"",
-    "start": "webpack-dev-server --open --config webpack.dev.js --mode development"
+    "start": "vite"
   },
   "repository": {
     "type": "git",
@@ -53,11 +53,13 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.30.0",
     "recharts": "^2.15.3",
+    "redux-persist": "^6.0.0",
     "redux-persist-expire": "^1.1.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "threads": "^1.7.0",
-    "vanilla-cookieconsent": "^3.1.0"
+    "vanilla-cookieconsent": "^3.1.0",
+    "vite-plugin-top-level-await": "^1.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",
@@ -65,6 +67,7 @@
     "@babel/preset-react": "^7.26.3",
     "@playwright/test": "^1.52.0",
     "@types/node": "^20.17.30",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
     "babel-loader": "^9.2.1",
     "copy-webpack-plugin": "^12.0.2",
@@ -81,11 +84,10 @@
     "prettier": "^3.5.3",
     "style-loader": "^4.0.0",
     "svg-url-loader": "^8.0.0",
-    "tailwindcss": "^3.4.17",
-    "terser-webpack-plugin": "^5.3.14",
-    "webpack": "^5.99.6",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.2.1",
-    "webpack-merge": "^6.0.1"
+    "tailwindcss": "^3.4.16",
+    "terser-webpack-plugin": "^5.3.11",
+    "vite": "^6.1.0",
+    "vite-plugin-wasm": "^3.4.1",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }

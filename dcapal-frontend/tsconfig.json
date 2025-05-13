@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "moduleResolution":"bundler",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
+    "module": "esnext",
+    "skipLibCheck": true,
+    "strict": false,
+    "allowJs": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@app/*": ["./src/app/*"],
+      "@components/*": ["./src/components/*"],
+      "@demo/*": ["./src/demo/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@routes/*": ["./src/routes/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@images/*": ["./images/*"],
+      "@workers/*": ["./workers/*"]
+    }
+  },
+}
