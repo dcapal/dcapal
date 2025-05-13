@@ -8,3 +8,5 @@ TODO.md
 # IDE stuff
 .vscode
 .idea
+
+.DS_Store
