@@ -10,11 +10,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct YahooProvider {
-    http: reqwest::Client,
+    http: rquest::Client,
 }
 
 impl YahooProvider {
-    pub fn new(http: reqwest::Client) -> Self {
+    pub fn new(http: rquest::Client) -> Self {
         Self { http }
     }
 
@@ -60,7 +60,15 @@ impl YahooProvider {
         let res = self.http.get(&url).send().await?;
         if !res.status().is_success() {
             if res.status() == reqwest::StatusCode::NOT_FOUND {
-                let res = res.json::<chart::ChartResponse>().await?;
+                let full = res.bytes().await?;
+
+                let res = serde_json::from_slice::<chart::ChartResponse>(&full).map_err(|_| {
+                    DcaError::Generic(format!(
+                        "Malformed response. Unexpected empty chart.result: {:?}",
+                        full
+                    ))
+                })?;
+
                 if let Some(e) = res.chart.error {
                     warn!(
                         url = url,
@@ -73,7 +81,15 @@ impl YahooProvider {
             return Err(res.error_for_status().unwrap_err().into());
         }
 
-        let res = res.json::<chart::ChartResponse>().await?;
+        //        let res = res.json::<chart::ChartResponse>().await?;
+        let full = res.bytes().await?;
+        let res = serde_json::from_slice::<chart::ChartResponse>(&full).map_err(|_| {
+            DcaError::Generic(format!(
+                "Malformed response. Unexpected empty chart.result: {:?}",
+                full
+            ))
+        })?;
+
         if let Some(e) = res.chart.error {
             warn!(
                 url = url,
@@ -109,6 +125,18 @@ impl YahooProvider {
                 Ok(price)
             }
         }
+    }
+
+    pub async fn search(&self, request_param: String) -> String {
+        let url = format!("https://query2.finance.yahoo.com/v1/finance/search?q={request_param}");
+        self.http
+            .get(&url)
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap()
     }
 }
 

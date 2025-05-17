@@ -69,6 +69,20 @@ pub async fn get_assets_crypto(State(ctx): State<AppContext>) -> Result<Response
     Ok(response.into_response())
 }
 
+pub async fn get_assets_data(
+    State(ctx): State<AppContext>,
+    Query(name): Query<String>,
+) -> Result<Response> {
+    let data = &ctx.providers.yahoo.search(name).await;
+
+    let response = (
+        TypedHeader(ASSETS_CACHE_CONTROL.clone()),
+        Json((*data).clone()),
+    );
+
+    Ok(response.into_response())
+}
+
 #[derive(Debug, Deserialize)]
 pub struct GetPriceQuery {
     quote: String,

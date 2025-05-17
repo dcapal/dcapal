@@ -110,6 +110,8 @@ impl DcaServer {
             .timeout(Duration::from_secs(10))
             .build()?;
 
+        let rquest = rquest::Client::builder().build()?;
+
         let redis = build_redis_pool(&config.server.redis)?;
 
         let postgres = build_postgres_pool(&config.server.postgres).await?;
@@ -129,7 +131,7 @@ impl DcaServer {
                 &config.app.providers,
             )),
             kraken: Arc::new(KrakenProvider::new(http.clone(), &config.app.providers)),
-            yahoo: Arc::new(YahooProvider::new(http.clone())),
+            yahoo: Arc::new(YahooProvider::new(rquest.clone())),
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
@@ -167,7 +169,8 @@ impl DcaServer {
             .route("/assets/crypto", get(rest::get_assets_crypto))
             .route("/price/{asset}", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
-            .route("/import/portfolio/{id}", get(rest::get_imported_portfolio));
+            .route("/import/portfolio/{id}", get(rest::get_imported_portfolio))
+            .route("assets/search", get(providers.yahoo.search()));
 
         let authenticated_routes = Router::new()
             .route("/v1/sync/portfolios", post(rest::request::sync_portfolios))
