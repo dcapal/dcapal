@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use tracing::{debug, warn};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use tracing::{debug, error, warn};
 
 use crate::{
     DateTime,
@@ -10,11 +14,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct YahooProvider {
-    http: reqwest::Client,
+    http: rquest::Client,
 }
 
 impl YahooProvider {
-    pub fn new(http: reqwest::Client) -> Self {
+    pub fn new(http: rquest::Client) -> Self {
         Self { http }
     }
 
@@ -61,6 +65,7 @@ impl YahooProvider {
         if !res.status().is_success() {
             if res.status() == reqwest::StatusCode::NOT_FOUND {
                 let res = res.json::<chart::ChartResponse>().await?;
+
                 if let Some(e) = res.chart.error {
                     warn!(
                         url = url,
@@ -74,6 +79,7 @@ impl YahooProvider {
         }
 
         let res = res.json::<chart::ChartResponse>().await?;
+
         if let Some(e) = res.chart.error {
             warn!(
                 url = url,
@@ -107,6 +113,38 @@ impl YahooProvider {
                 };
 
                 Ok(price)
+            }
+        }
+    }
+
+    pub async fn search(&self, request_param: String) -> Response {
+        let url = format!("https://query2.finance.yahoo.com/v1/finance/search?q={request_param}");
+        self.forward(url).await
+    }
+
+    pub async fn chart(&self, symbol: String, start_period: i64, end_period: i64) -> Response {
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={start_period}&period2={end_period}&interval=5m&close=adjusted"
+        );
+        self.forward(url).await
+    }
+
+    async fn forward(&self, url: String) -> Response {
+        match self.http.get(url).send().await {
+            Ok(res) => {
+                let mut response = Response::builder().status(res.status());
+
+                // Copy headers
+                for (key, value) in res.headers() {
+                    response = response.header(key, value);
+                }
+
+                let body = axum::body::Body::from_stream(res.bytes_stream());
+                response.body(body).unwrap().into_response()
+            }
+            Err(e) => {
+                error!("Proxy error: {e:?}");
+                StatusCode::BAD_GATEWAY.into_response()
             }
         }
     }

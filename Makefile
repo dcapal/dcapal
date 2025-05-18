@@ -86,8 +86,8 @@ dev-up: supabase-up docker-dev-up  ## Start full dev environment (Supabase + Doc
 
 ## Stop full dev environment
 dev-down: docker-dev-down supabase-down  ## Stop full dev environment
-
 ## Start full dev+local environment (Supabase + Docker)
+
 local-up: supabase-up docker-local-up  ## Start full dev environment (Supabase + Docker)
 
 ## Stop full dev+local environment

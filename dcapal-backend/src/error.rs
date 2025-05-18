@@ -53,6 +53,8 @@ pub enum DcaError {
     OpenAIError(#[from] async_openai::error::OpenAIError),
     #[error(transparent)]
     DatabaseError(#[from] sea_orm::error::DbErr),
+    #[error("Third-party API reqwest failed")]
+    Rquest(#[from] rquest::Error),
 }
 
 impl Debug for DcaError {

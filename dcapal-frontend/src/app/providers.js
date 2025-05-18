@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "./api";
-import { DCAPAL_API, DCAPAL_API_CHART } from "./config";
+import { DCAPAL_API } from "./config";
 import { ACLASS } from "@components/allocationFlow/portfolioSlice";
 
 export const Provider = Object.freeze({
@@ -47,7 +47,7 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
   lastFourDays.setDate(lastFourDays.getDate() - 4);
   const period1 = toUnixTimestamp(lastFourDays, true);
   const period2 = toUnixTimestamp(new Date(), false);
-  const url = `${DCAPAL_API_CHART}/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
+  const url = `${DCAPAL_API}/assets/chart/${symbol}?startPeriod=${period1}&endPeriod=${period2}`;
   try {
     const response = await api.get(url, {
       cancelToken: token,
@@ -55,7 +55,7 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
 
     if (response.status !== 200) {
       console.error(
-        `Response {status: ${response.status}, data: ${response.data}`
+        `Response {status: ${response.status}, data: ${response.data}}`
       );
       return null;
     }

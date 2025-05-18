@@ -78,8 +78,9 @@
       "targetWeights": "Pesi Obiettivo",
       "fillWithNumber": "Compila il campo <0>{{field}}</0> con il numero di <1>{{symbol}}</1> che hai già nel tuo portafoglio (es. 10 unità)",
       "defineTargetWeight": "Definisci la tua allocazione desiderata dell'asset nel campo <0>{{targetWeight}}</0> (ad es. <1>{{percentage}}</1> del valore totale del portafoglio)",
-      "reviewYourWeight": "Rivedi i tuoi <0>{{targetWeights}}</0>. La somma deve essere pari al 100% (attualmente <1>{{actualWeight}} %</1>)",
-      "lastFetch": "Ultimo aggiornamento dei prezzi alle"
+      "reviewYourWeight": "La somma dei tuoi <0>{{targetWeights}}</0> deve essere pari al 100% (attualmente <0>{{actualWeight}} %</0>). Rivedi i tuoi pesi o aggiungi nuovi asset dalla barra di ricerca in alto.",
+      "lastFetch": "Ultimo aggiornamento dei prezzi alle",
+      "confirmWeights": "Conferma i pesi"
     },
     "searchBar": {
       "placeholder": "Cerca Crypto, ETF e altro",
@@ -166,7 +167,7 @@
         "privacyPolicyMessage3": "Non facciamo profilazione degli utenti. I dati di portafoglio e investimento non vengono salvati sui nostri server, salvo utilizzo del login (e solo i dati minimi necessari). Questa policy potrebbe evolvere insieme a DcaPal.",
         "privacyPolicyMessageTotal": "<0>{{part1}}</0><1>{{part2}}</1><2>{{part3}}</2>",
         "feedback": "Feedback",
-        "feedbackMessage": "Se riscontri problemi, desideri richiedere nuove funzionalità o semplicemente lasciare un feedback, non esitare a contattarmi su uno qualsiasi dei miei <1>{{socialProfiles}}</1>.",
+        "feedbackMessage": "Se riscontri problemi, desideri richiedere nuove funzionalità o semplicemente lasciare un feedback, scrivi una mail a <2>support@dcapal.com</2> oppure contattami su uno dei <1>{{socialProfiles}}</1>.",
         "feelFreeReachOut": "sentiti libero di contattarmi",
         "socialProfiles": "miei profili social",
         "everyContribution": "Ogni contributo è molto apprezzato!",

@@ -267,7 +267,7 @@ export const PortfolioStep = ({ ...props }) => {
               {t("common.goBack")}
             </Button>
             <Button onClick={onClickAddLiquidity} disabled={!isAllAllocated}>
-              {t("common.next")}
+              {t("portfolioStep.confirmWeights")}
             </Button>
           </div>
         </>

@@ -78,8 +78,9 @@
       "targetWeights": "Target weights",
       "fillWithNumber": "Fill <0>{{field}}</0> field with the number of <1>{{symbol}}</1> you already have in your portfolio (e.g. 10 units)",
       "defineTargetWeight": "Define your desired asset allocation in <0>{{targetWeight}}</0> field (e.g. <1>{{percentage}}</1> of total portfolio value)",
-      "reviewYourWeight": "Review your <0>{{targetWeights}}</0> They must sum up to 100% (currently <1>{{actualWeight}} %</1>)",
-      "lastFetch": "Prices last fetched at"
+      "reviewYourWeight": "Target weights must sum up to 100% (currently <0>{{actualWeight}} %</0>). Please adjust weights or add new assets from the search bar in the top.",
+      "lastFetch": "Prices last fetched at",
+      "confirmWeights": "Confirm weights"
     },
     "searchBar": {
       "placeholder": "Search Crypto, ETF and much more",
@@ -166,7 +167,7 @@
         "privacyPolicyMessage3": "We do not do user profiling. Portfolio data and investments are not stored on our servers unless you use the login feature, and then only the minimum required. This policy may evolve as DcaPal grows.",
         "privacyPolicyMessageTotal": "<0>{{part1}}</0><1>{{part2}}</1><2>{{part3}}</2>",
         "feedback": "Feedback",
-        "feedbackMessage": " If you find any issue, would like to ask for new features or simply leave a feedback, <0>{{feelFree}}</0> to me on any of <1>{{socialProfiles}}</1>.",
+        "feedbackMessage": " If you find any issue, would like to ask for new features or simply leave a feedback, write an email to <2>support@dcapal.com</2> or <0>{{feelFree}}</0> to me on any of <1>{{socialProfiles}}</1>.",
         "feelFreeReachOut": "feel free to reach out",
         "socialProfiles": "my social profiles",
         "everyContribution": "Every contribution is much appreciated!",
