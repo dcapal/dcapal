@@ -60,14 +60,7 @@ impl YahooProvider {
         let res = self.http.get(&url).send().await?;
         if !res.status().is_success() {
             if res.status() == reqwest::StatusCode::NOT_FOUND {
-                let full = res.bytes().await?;
-
-                let res = serde_json::from_slice::<chart::ChartResponse>(&full).map_err(|_| {
-                    DcaError::Generic(format!(
-                        "Malformed response. Unexpected empty chart.result: {:?}",
-                        full
-                    ))
-                })?;
+                let res = res.json::<chart::ChartResponse>().await?;
 
                 if let Some(e) = res.chart.error {
                     warn!(
@@ -81,14 +74,7 @@ impl YahooProvider {
             return Err(res.error_for_status().unwrap_err().into());
         }
 
-        //        let res = res.json::<chart::ChartResponse>().await?;
-        let full = res.bytes().await?;
-        let res = serde_json::from_slice::<chart::ChartResponse>(&full).map_err(|_| {
-            DcaError::Generic(format!(
-                "Malformed response. Unexpected empty chart.result: {:?}",
-                full
-            ))
-        })?;
+        let res = res.json::<chart::ChartResponse>().await?;
 
         if let Some(e) = res.chart.error {
             warn!(
