@@ -80,10 +80,10 @@ pub async fn get_assets_data(
 ) -> Result<Response> {
     let data = &ctx.providers.yahoo.search(params.name).await;
 
-    let response = (
-        TypedHeader(ASSETS_CACHE_CONTROL.clone()),
-        Json((*data).clone()),
-    );
+    let parsed_json = serde_json::from_str::<serde_json::Value>(data)
+        .map_err(|_| DcaError::Generic("Invalid JSON response".to_string()))?;
+
+    let response = (TypedHeader(ASSETS_CACHE_CONTROL.clone()), Json(parsed_json));
 
     Ok(response.into_response())
 }
@@ -106,10 +106,10 @@ pub async fn get_assets_chart(
         .chart(asset, params.start_period, params.end_period)
         .await;
 
-    let response = (
-        TypedHeader(ASSETS_CACHE_CONTROL.clone()),
-        Json((*data).clone()),
-    );
+    let parsed_json = serde_json::from_str::<serde_json::Value>(data)
+        .map_err(|_| DcaError::Generic("Invalid JSON response".to_string()))?;
+
+    let response = (TypedHeader(ASSETS_CACHE_CONTROL.clone()), Json(parsed_json));
 
     Ok(response.into_response())
 }
