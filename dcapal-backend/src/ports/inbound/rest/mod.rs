@@ -69,11 +69,42 @@ pub async fn get_assets_crypto(State(ctx): State<AppContext>) -> Result<Response
     Ok(response.into_response())
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetAssetsQuery {
+    name: String,
+}
+
 pub async fn get_assets_data(
     State(ctx): State<AppContext>,
-    Query(name): Query<String>,
+    Query(params): Query<GetAssetsQuery>,
 ) -> Result<Response> {
-    let data = &ctx.providers.yahoo.search(name).await;
+    let data = &ctx.providers.yahoo.search(params.name).await;
+
+    let response = (
+        TypedHeader(ASSETS_CACHE_CONTROL.clone()),
+        Json((*data).clone()),
+    );
+
+    Ok(response.into_response())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAssetChartQuery {
+    start_period: i64,
+    end_period: i64,
+}
+
+pub async fn get_asset_chart(
+    Path(asset): Path<String>,
+    Query(params): Query<GetAssetChartQuery>,
+    State(ctx): State<AppContext>,
+) -> Result<Response> {
+    let data = &ctx
+        .providers
+        .yahoo
+        .chart(asset, params.start_period, params.end_period)
+        .await;
 
     let response = (
         TypedHeader(ASSETS_CACHE_CONTROL.clone()),

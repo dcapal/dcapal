@@ -138,6 +138,20 @@ impl YahooProvider {
             .await
             .unwrap()
     }
+
+    pub async fn chart(&self, symbol: String, start_period: i64, end_period: i64) -> String {
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={start_period}&period2={end_period}&interval=adjusted"
+        );
+        self.http
+            .get(&url)
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap()
+    }
 }
 
 fn get_api_interval(freq: OHLCFrequency) -> &'static str {
