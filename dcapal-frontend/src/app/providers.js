@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "./api";
-import { DCAPAL_API, DCAPAL_API_CHART } from "./config";
+import { DCAPAL_API } from "./config";
 import { ACLASS } from "@components/allocationFlow/portfolioSlice";
 
 export const Provider = Object.freeze({

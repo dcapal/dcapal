@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 export const DCAPAL_CANONICAL = "https://dcapal.com";
 
 export const DCAPAL_API = "/api";
-export const DCAPAL_API_CHART = "/api/external/chart";
 
 export const MEDIA_SMALL = "only screen and (min-width: 640px)";
 export const MEDIA_MEDIUM = "only screen and (min-width: 768px)";
