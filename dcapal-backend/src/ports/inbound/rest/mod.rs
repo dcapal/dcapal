@@ -78,14 +78,7 @@ pub async fn get_assets_data(
     State(ctx): State<AppContext>,
     Query(params): Query<GetAssetsQuery>,
 ) -> Result<Response> {
-    let data = &ctx.providers.yahoo.search(params.name).await;
-
-    let response = (
-        TypedHeader(ASSETS_CACHE_CONTROL.clone()),
-        Json((*data).clone()),
-    );
-
-    Ok(response.into_response())
+    Ok(ctx.providers.yahoo.search(params.name).await)
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,18 +93,11 @@ pub async fn get_assets_chart(
     Query(params): Query<GetAssetChartQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
-    let data = &ctx
+    Ok(ctx
         .providers
         .yahoo
         .chart(asset, params.start_period, params.end_period)
-        .await;
-
-    let response = (
-        TypedHeader(ASSETS_CACHE_CONTROL.clone()),
-        Json((*data).clone()),
-    );
-
-    Ok(response.into_response())
+        .await)
 }
 
 #[derive(Debug, Deserialize)]
