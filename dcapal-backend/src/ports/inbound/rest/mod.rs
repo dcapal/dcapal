@@ -95,7 +95,7 @@ pub struct GetAssetChartQuery {
     end_period: i64,
 }
 
-pub async fn get_asset_chart(
+pub async fn get_assets_chart(
     Path(asset): Path<String>,
     Query(params): Query<GetAssetChartQuery>,
     State(ctx): State<AppContext>,

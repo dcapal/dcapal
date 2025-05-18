@@ -179,7 +179,7 @@ impl DcaServer {
             .route("/assets/fiat", get(rest::get_assets_fiat))
             .route("/assets/crypto", get(rest::get_assets_crypto))
             .route("/assets/search", get(rest::get_assets_data))
-            .route("/assets/chart/{symbol}", get(rest::get_asset_chart))
+            .route("/assets/chart/{symbol}", get(rest::get_assets_chart))
             .route("/price/{asset}", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
             .route("/import/portfolio/{id}", get(rest::get_imported_portfolio));
