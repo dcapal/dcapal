@@ -60,51 +60,39 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
       return null;
     }
 
-    // Manually parse the response data
-    let data;
-    try {
-      data =
-        typeof response.data === "string"
-          ? JSON.parse(response.data)
-          : response.data;
-    } catch (parseError) {
-      console.error("Failed to parse response data as JSON:", parseError);
-      return FetchError.BAD_DATA;
-    }
-
     // On error, log and exit
-    if (!data.chart || data.chart?.error) {
-      console.error(data.chart?.error);
+    if (!response.data.chart || response.data.chart?.error) {
+      console.error(response.data.chart?.error);
       return FetchError.BAD_DATA;
     }
 
-    const result = data.chart.result;
+    const result = response.data.chart.result;
     if (!Array.isArray(result) || result.length < 1) {
-      console.error("Empty YF price result:", data, url);
+      console.error("Empty YF price result:", response.data, url);
       return FetchError.BAD_DATA;
     }
 
     const base = result[0].meta?.currency?.toLowerCase();
     if (!base) {
-      console.error("Missing base currency:", data, url);
+      console.error("Missing base currency:", response.data, url);
       return FetchError.BAD_DATA;
     }
 
     const isValidCcy = validCcys.find((ccy) => ccy === base);
     if (!isValidCcy) {
-      console.warn("Unsupported currency:", data, url, validCcys);
+      console.warn("Unsupported currency:", response.data, url, validCcys);
       return FetchError.BAD_DATA;
     }
 
     const quotes = result[0].indicators?.quote;
     if (!Array.isArray(quotes) || quotes.length < 1) {
-      console.error("Empty quotes:", data, url);
+      console.error("Empty quotes:", response.data, url);
       return FetchError.BAD_DATA;
     }
 
     const closePrices = quotes[0].close;
     if (!Array.isArray(closePrices) || closePrices.length < 1) {
-      console.error("Empty close prices:", data, url);
+      console.error("Empty close prices:", response.data, url);
       return FetchError.BAD_DATA;
     }
 
