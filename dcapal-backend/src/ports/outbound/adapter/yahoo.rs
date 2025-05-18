@@ -141,7 +141,7 @@ impl YahooProvider {
 
     pub async fn chart(&self, symbol: String, start_period: i64, end_period: i64) -> String {
         let url = format!(
-            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={start_period}&period2={end_period}&interval=adjusted"
+            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={start_period}&period2={end_period}&interval=5m&close=adjusted"
         );
         self.http
             .get(&url)
