@@ -10,7 +10,7 @@ import {
   fetchPriceYF,
   Provider,
 } from "@app/providers";
-import { DCAPAL_API_SEARCH } from "@app/config";
+import { DCAPAL_API } from "@app/config";
 import { Spinner } from "@components/spinner/spinner";
 import {
   ACLASS,
@@ -21,18 +21,30 @@ import { useTranslation } from "react-i18next";
 let searchId = undefined;
 
 const fetchAssetsYF = async (query) => {
-  const url = `${DCAPAL_API_SEARCH}?q=${query}`;
+  const url = `${DCAPAL_API}/assets/search?name=${query}`;
   try {
     const response = await api.get(url);
 
-    if (response.status != 200) {
+    if (response.status !== 200) {
       console.error(
-        `Response {status: ${response.status}, data: ${response.data}`
+        `Response {status: ${response.status}, data: ${response.data}}`
       );
       return [];
     }
 
-    return response.data.quotes
+    // Manually parse the response data
+    let data;
+    try {
+      data =
+        typeof response.data === "string"
+          ? JSON.parse(response.data)
+          : response.data;
+    } catch (parseError) {
+      console.error("Failed to parse response data as JSON:", parseError);
+      return [];
+    }
+
+    return data.quotes
       .filter((quote) => {
         const type = quote.quoteType.toUpperCase();
         return type === "EQUITY" || type === "ETF" || type === "MUTUALFUND";

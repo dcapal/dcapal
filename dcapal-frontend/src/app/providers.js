@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "./api";
-import { DCAPAL_API, DCAPAL_API_CHART } from "./config";
+import { DCAPAL_API } from "./config";
 import { ACLASS } from "@components/allocationFlow/portfolioSlice";
 
 export const Provider = Object.freeze({
@@ -47,7 +47,7 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
   lastFourDays.setDate(lastFourDays.getDate() - 4);
   const period1 = toUnixTimestamp(lastFourDays, true);
   const period2 = toUnixTimestamp(new Date(), false);
-  const url = `${DCAPAL_API_CHART}/${symbol}?interval=5m&period1=${period1}&period2=${period2}&close=adjusted`;
+  const url = `${DCAPAL_API}/assets/chart/${symbol}?startPeriod=${period1}&endPeriod=${period2}`;
   try {
     const response = await api.get(url, {
       cancelToken: token,
@@ -55,44 +55,56 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
 
     if (response.status !== 200) {
       console.error(
-        `Response {status: ${response.status}, data: ${response.data}`
+        `Response {status: ${response.status}, data: ${response.data}}`
       );
       return null;
     }
 
-    // On error, log and exit
-    if (!response.data.chart || response.data.chart?.error) {
-      console.error(response.data.chart?.error);
+    // Manually parse the response data
+    let data;
+    try {
+      data =
+        typeof response.data === "string"
+          ? JSON.parse(response.data)
+          : response.data;
+    } catch (parseError) {
+      console.error("Failed to parse response data as JSON:", parseError);
       return FetchError.BAD_DATA;
     }
 
-    const result = response.data.chart.result;
+    // On error, log and exit
+    if (!data.chart || data.chart?.error) {
+      console.error(data.chart?.error);
+      return FetchError.BAD_DATA;
+    }
+
+    const result = data.chart.result;
     if (!Array.isArray(result) || result.length < 1) {
-      console.error("Empty YF price result:", response.data, url);
+      console.error("Empty YF price result:", data, url);
       return FetchError.BAD_DATA;
     }
 
     const base = result[0].meta?.currency?.toLowerCase();
     if (!base) {
-      console.error("Missing base currency:", response.data, url);
+      console.error("Missing base currency:", data, url);
       return FetchError.BAD_DATA;
     }
 
     const isValidCcy = validCcys.find((ccy) => ccy === base);
     if (!isValidCcy) {
-      console.warn("Unsupported currency:", response.data, url, validCcys);
+      console.warn("Unsupported currency:", data, url, validCcys);
       return FetchError.BAD_DATA;
     }
 
     const quotes = result[0].indicators?.quote;
     if (!Array.isArray(quotes) || quotes.length < 1) {
-      console.error("Empty quotes:", response.data, url);
+      console.error("Empty quotes:", data, url);
       return FetchError.BAD_DATA;
     }
 
     const closePrices = quotes[0].close;
     if (!Array.isArray(closePrices) || closePrices.length < 1) {
-      console.error("Empty close prices:", response.data, url);
+      console.error("Empty close prices:", data, url);
       return FetchError.BAD_DATA;
     }
 

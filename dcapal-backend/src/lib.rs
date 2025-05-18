@@ -16,6 +16,7 @@ use axum::{
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
+use hyper::header;
 use metrics::{Unit, counter, describe_counter, describe_histogram};
 use sea_orm::{
     sqlx,
@@ -110,6 +111,18 @@ impl DcaServer {
             .timeout(Duration::from_secs(10))
             .build()?;
 
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            rquest::header::USER_AGENT,
+            header::HeaderValue::from_static(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
+                                  AppleWebKit/537.36 (KHTML, like Gecko) \
+                                  Chrome/122.0.0.0 Safari/537.36",
+            ),
+        );
+
+        let rquest = rquest::Client::builder().default_headers(headers).build()?;
+
         let redis = build_redis_pool(&config.server.redis)?;
 
         let postgres = build_postgres_pool(&config.server.postgres).await?;
@@ -129,7 +142,7 @@ impl DcaServer {
                 &config.app.providers,
             )),
             kraken: Arc::new(KrakenProvider::new(http.clone(), &config.app.providers)),
-            yahoo: Arc::new(YahooProvider::new(http.clone())),
+            yahoo: Arc::new(YahooProvider::new(rquest.clone())),
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
@@ -165,6 +178,8 @@ impl DcaServer {
             .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
             .route("/assets/fiat", get(rest::get_assets_fiat))
             .route("/assets/crypto", get(rest::get_assets_crypto))
+            .route("/assets/search", get(rest::get_assets_data))
+            .route("/assets/chart/{symbol}", get(rest::get_assets_chart))
             .route("/price/{asset}", get(rest::get_price))
             .route("/import/portfolio", post(rest::import_portfolio))
             .route("/import/portfolio/{id}", get(rest::get_imported_portfolio));
