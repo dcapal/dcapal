@@ -12,6 +12,7 @@ FROM chef AS builder
 # Build dependencies
 COPY --from=planner /var/dcapal/recipe.json recipe.json
 # Install rquest dependencies
+RUN apt-get update
 RUN apt-get install build-essential cmake perl pkg-config libclang-dev musl-tools git -y
 
 RUN cargo chef cook --profile release-with-debug --recipe-path recipe.json
