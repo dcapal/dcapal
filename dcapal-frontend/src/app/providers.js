@@ -54,16 +54,21 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
     });
 
     if (response.status !== 200) {
-      console.error(`Response {status: ${response.status}, data: ${response.data}}`);
+      console.error(
+        `Response {status: ${response.status}, data: ${response.data}}`
+      );
       return null;
     }
 
     // Manually parse the response data
     let data;
     try {
-      data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      data =
+        typeof response.data === "string"
+          ? JSON.parse(response.data)
+          : response.data;
     } catch (parseError) {
-      console.error('Failed to parse response data as JSON:', parseError);
+      console.error("Failed to parse response data as JSON:", parseError);
       return FetchError.BAD_DATA;
     }
 
