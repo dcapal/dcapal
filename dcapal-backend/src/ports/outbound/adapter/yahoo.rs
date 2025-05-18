@@ -75,7 +75,6 @@ impl YahooProvider {
         }
 
         let res = res.json::<chart::ChartResponse>().await?;
-
         if let Some(e) = res.chart.error {
             warn!(
                 url = url,
