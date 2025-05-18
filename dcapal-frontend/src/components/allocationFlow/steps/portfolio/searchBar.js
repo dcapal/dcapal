@@ -32,19 +32,7 @@ const fetchAssetsYF = async (query) => {
       return [];
     }
 
-    // Manually parse the response data
-    let data;
-    try {
-      data =
-        typeof response.data === "string"
-          ? JSON.parse(response.data)
-          : response.data;
-    } catch (parseError) {
-      console.error("Failed to parse response data as JSON:", parseError);
-      return [];
-    }
-
-    return data.quotes
+    return response.data.quotes
       .filter((quote) => {
         const type = quote.quoteType.toUpperCase();
         return type === "EQUITY" || type === "ETF" || type === "MUTUALFUND";
