@@ -5,21 +5,21 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing::{error, info};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{AppContext, DateTime, app::infra::claim::Claims, ports::inbound::rest::FeeStructure};
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncPortfoliosRequest {
     pub portfolios: Vec<PortfolioRequest>,
     pub deleted_portfolios: Vec<Uuid>,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+#[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioRequest {
     pub id: Uuid,
@@ -30,7 +30,7 @@ pub struct PortfolioRequest {
     pub last_updated_at: DateTime,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+#[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetRequest {
     pub symbol: String,
@@ -44,7 +44,7 @@ pub struct PortfolioAssetRequest {
     pub fees: Option<TransactionFeesRequest>,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+#[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
