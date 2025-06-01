@@ -175,16 +175,11 @@ pub struct TransactionFeesResponse {
 
 #[cfg(test)]
 mod test {
+
+    use super::*;
+
     use chrono::Utc;
     use rust_decimal::dec;
-    use uuid::Uuid;
-
-    use crate::{
-        app::domain::db::{portfolio_asset, portfolios},
-        ports::inbound::rest::response::PortfolioAssetResponse,
-    };
-
-    use super::PortfolioResponse;
 
     #[test]
     fn map_model_to_response() {
@@ -198,8 +193,8 @@ mod test {
             deleted: false,
             last_updated_at: Utc::now().into(),
             max_fee_impact: None,
-            fee_type: None,
-            fee_amount: None,
+            fee_type: Some(String::from("Fixed")),
+            fee_amount: Some(dec!(2.95)),
             fee_rate: None,
             min_fee: None,
             max_fee: None,
@@ -233,7 +228,12 @@ mod test {
             id: portfolio_model.id,
             name: portfolio_model.name.clone(),
             quote_ccy: portfolio_model.currency.clone(),
-            fees: None,
+            fees: Some(TransactionFeesResponse {
+                max_fee_impact: None,
+                fee_structure: FeeStructure::Fixed {
+                    fee_amount: dec!(2.95),
+                },
+            }),
             assets: vec![PortfolioAssetResponse {
                 symbol: asset_model.symbol.clone(),
                 name: asset_model.name.clone(),
