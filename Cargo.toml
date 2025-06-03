@@ -61,7 +61,11 @@ reqwest = { version = "0.12.15", default-features = false, features = [
   "rustls-tls",
 ] }
 rquest = { version = "5.1.0", features = ["json", "stream"] }
-rust_decimal = { version = "1.37.1", features = ["serde", "serde-float"] }
+rust_decimal = { version = "1.37.1", features = [
+  "serde",
+  "serde-float",
+  "macros",
+] }
 rust_decimal_macros = "1.37.1"
 sea-orm = { version = "1.1.10", features = [
   "sqlx-postgres",

@@ -1,5 +1,5 @@
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -10,14 +10,14 @@ use crate::{
     ports::inbound::rest::FeeStructure,
 };
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncPortfoliosResponse {
     pub updated_portfolios: Vec<PortfolioResponse>,
     pub deleted_portfolios: Vec<Uuid>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioResponse {
     pub id: Uuid,
@@ -28,7 +28,7 @@ pub struct PortfolioResponse {
     pub last_updated_at: DateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetResponse {
     pub symbol: String,
@@ -161,7 +161,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionFeesResponse {
     #[serde(
@@ -171,4 +171,84 @@ pub struct TransactionFeesResponse {
     )]
     pub max_fee_impact: Option<Decimal>,
     pub fee_structure: FeeStructure,
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use chrono::Utc;
+    use rust_decimal::dec;
+
+    #[test]
+    fn map_model_to_response() {
+        let portfolio_id = Uuid::new_v4();
+
+        let portfolio_model = portfolios::Model {
+            id: portfolio_id,
+            user_id: Uuid::new_v4(),
+            name: String::from("my_pf"),
+            currency: String::from("EUR"),
+            deleted: false,
+            last_updated_at: Utc::now().into(),
+            max_fee_impact: None,
+            fee_type: Some(String::from("Fixed")),
+            fee_amount: Some(dec!(2.95)),
+            fee_rate: None,
+            min_fee: None,
+            max_fee: None,
+            created_at: Utc::now().into(),
+            updated_at: Utc::now().into(),
+        };
+
+        let asset_model = portfolio_asset::Model {
+            id: Uuid::new_v4(),
+            symbol: String::from("VWCE"),
+            portfolio_id,
+            name: String::from("Vanguard FTSE All-World UCITS ETF USD Acc"),
+            asset_class: String::from("Stock"),
+            currency: String::from("EUR"),
+            provider: String::from("IBKR"),
+            quantity: dec!(10.0),
+            target_weight: dec!(1.0),
+            price: dec!(100.0),
+            max_fee_impact: None,
+            fee_type: None,
+            fee_amount: None,
+            fee_rate: None,
+            min_fee: None,
+            max_fee: None,
+            created_at: Utc::now().into(),
+            updated_at: Utc::now().into(),
+        };
+        let assets_model = vec![asset_model.clone()];
+
+        let expected = PortfolioResponse {
+            id: portfolio_model.id,
+            name: portfolio_model.name.clone(),
+            quote_ccy: portfolio_model.currency.clone(),
+            fees: Some(TransactionFeesResponse {
+                max_fee_impact: None,
+                fee_structure: FeeStructure::Fixed {
+                    fee_amount: dec!(2.95),
+                },
+            }),
+            assets: vec![PortfolioAssetResponse {
+                symbol: asset_model.symbol.clone(),
+                name: asset_model.name.clone(),
+                aclass: asset_model.asset_class.clone(),
+                base_ccy: asset_model.currency.clone(),
+                provider: asset_model.provider.clone(),
+                qty: asset_model.quantity,
+                target_weight: asset_model.target_weight,
+                price: asset_model.price,
+                fees: None,
+            }],
+            last_updated_at: portfolio_model.last_updated_at.into(),
+        };
+
+        let actual: PortfolioResponse = (portfolio_model, assets_model).try_into().unwrap();
+        assert_eq!(actual, expected);
+    }
 }
