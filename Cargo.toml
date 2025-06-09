@@ -26,7 +26,7 @@ opt-level = "s"
 
 [workspace.dependencies]
 anyhow = "1.0.98"
-async-openai = "0.28.1"
+async-openai = "0.28.3"
 async-trait = "0.1.88"
 axum = { version = "0.8.3", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
