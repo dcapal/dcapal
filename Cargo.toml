@@ -10,7 +10,7 @@ members = [
 version = "0.9.0"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.87"
 
 [profile.release]
 lto = "thin"

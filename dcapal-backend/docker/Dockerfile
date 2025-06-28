@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1-bookworm AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-latest AS chef
 WORKDIR /var/dcapal
 
 FROM chef AS planner
