@@ -1,5 +1,6 @@
-FROM lukemathwalker/cargo-chef:latest-rust-latest AS chef
+FROM rust:1 AS chef
 WORKDIR /var/dcapal
+RUN cargo install cargo-chef
 
 FROM chef AS planner
 COPY ./Cargo.toml ./Cargo.toml
