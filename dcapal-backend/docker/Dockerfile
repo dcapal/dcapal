@@ -1,6 +1,6 @@
 FROM rust:1 AS chef
-WORKDIR /var/dcapal
 RUN cargo install cargo-chef
+WORKDIR /var/dcapal
 
 FROM chef AS planner
 COPY ./Cargo.toml ./Cargo.toml
