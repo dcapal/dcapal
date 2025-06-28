@@ -102,7 +102,7 @@ impl Solver {
         let problems = BASIC_PROBLEMS.lock().unwrap();
         let problem = problems
             .get(id)
-            .ok_or_else(|| format!("Invalid problem id {}", id))?;
+            .ok_or_else(|| format!("Invalid problem id {id}"))?;
 
         let solution = problem.problem.solve().map_err(|e| e.to_string())?;
         let objective = solution.objective();
@@ -126,7 +126,7 @@ impl Solver {
         let problems = ADVANCED_PROBLEMS.lock().unwrap();
         let problem = problems
             .get(id)
-            .ok_or_else(|| format!("Invalid problem id {}", id))?;
+            .ok_or_else(|| format!("Invalid problem id {id}"))?;
 
         let solution = problem.solve();
 
@@ -168,7 +168,7 @@ impl Solver {
         let problems = SUGGESTION_PROBLEMS.lock().unwrap();
         let problem = problems
             .get(id)
-            .ok_or_else(|| format!("Invalid problem id {}", id))?;
+            .ok_or_else(|| format!("Invalid problem id {id}"))?;
 
         let solution = problem.suggest_invest_amount().round_dp(AMOUNT_DECIMALS);
 
@@ -347,8 +347,7 @@ impl TryFrom<JsAdvancedOptions> for advanced::ProblemOptions {
 
         if target_total != Decimal::one() {
             return Err(format!(
-                "Invalid target weights. Sum must be equal to 1 ({} instead)",
-                target_total
+                "Invalid target weights. Sum must be equal to 1 ({target_total} instead)"
             ));
         }
 
@@ -425,29 +424,23 @@ impl TryFrom<JsAdvancedAsset> for advanced::ProblemAsset {
 
         if shares < 0. {
             return Err(format!(
-                "Invalid shares ({}). Must be zero or positive",
-                shares
+                "Invalid shares ({shares}). Must be zero or positive"
             ));
         }
 
         if price < 0. {
-            return Err(format!(
-                "Invalid price ({}). Must be zero or positive",
-                price
-            ));
+            return Err(format!("Invalid price ({price}). Must be zero or positive"));
         }
 
         if target_weight < 0. {
             return Err(format!(
-                "Invalid target weight ({}). Must be zero or positive",
-                target_weight
+                "Invalid target weight ({target_weight}). Must be zero or positive"
             ));
         }
 
         if target_weight > 1. {
             return Err(format!(
-                "Invalid target weight ({}). Must be less then or equal to 1.",
-                target_weight
+                "Invalid target weight ({target_weight}). Must be less then or equal to 1."
             ));
         }
 
@@ -488,29 +481,23 @@ impl TryFrom<JsAnalyzeAsset> for suggestions::ProblemAsset {
 
         if shares < 0. {
             return Err(format!(
-                "Invalid shares ({}). Must be zero or positive",
-                shares
+                "Invalid shares ({shares}). Must be zero or positive"
             ));
         }
 
         if price < 0. {
-            return Err(format!(
-                "Invalid price ({}). Must be zero or positive",
-                price
-            ));
+            return Err(format!("Invalid price ({price}). Must be zero or positive"));
         }
 
         if target_weight < 0. {
             return Err(format!(
-                "Invalid target weight ({}). Must be zero or positive",
-                target_weight
+                "Invalid target weight ({target_weight}). Must be zero or positive"
             ));
         }
 
         if target_weight > 1. {
             return Err(format!(
-                "Invalid target weight ({}). Must be less then or equal to 1.",
-                target_weight
+                "Invalid target weight ({target_weight}). Must be less then or equal to 1."
             ));
         }
 
@@ -646,8 +633,7 @@ impl TryFrom<JsBasicOptions> for basic::ProblemOptions {
 
         if target_total != Decimal::one() {
             return Err(format!(
-                "Invalid target weights. Sum must be equal to 1 ({} instead)",
-                target_total
+                "Invalid target weights. Sum must be equal to 1 ({target_total} instead)"
             ));
         }
 
@@ -660,8 +646,7 @@ impl TryFrom<JsBasicOptions> for basic::ProblemOptions {
 
         if current_total > budget {
             return Err(format!(
-                "Invalid current amounts. Sum must be less than or equal to budget: {} ({} instead)",
-                budget, current_total
+                "Invalid current amounts. Sum must be less than or equal to budget: {budget} ({current_total} instead)"
             ));
         }
 
@@ -689,22 +674,19 @@ impl TryFrom<JsProblemAsset> for basic::ProblemAsset {
 
         if target_weight < 0. {
             return Err(format!(
-                "Invalid target weight ({}). Must be zero or positive",
-                target_weight
+                "Invalid target weight ({target_weight}). Must be zero or positive"
             ));
         }
 
         if target_weight > 1. {
             return Err(format!(
-                "Invalid target weight ({}). Must be less then or equal to 1.",
-                target_weight
+                "Invalid target weight ({target_weight}). Must be less then or equal to 1."
             ));
         }
 
         if current_amount < 0. {
             return Err(format!(
-                "Invalid current amount ({}). Must be zero or positive",
-                current_amount
+                "Invalid current amount ({current_amount}). Must be zero or positive"
             ));
         }
 

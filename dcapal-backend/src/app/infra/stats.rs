@@ -105,7 +105,7 @@ async fn record_visitors_stats(
 #[allow(dead_code)]
 async fn fetch_geo_ip(ip: IpAddr, repo: Arc<StatsRepository>, ip_service: Arc<Ip2LocationService>) {
     if let Err(e) = fetch_geo_ip_inner(ip, repo, ip_service).await {
-        error!("Error occurred in fetching GeoIP for {}: {:?}", ip, e);
+        error!("Error occurred in fetching GeoIP for {ip}: {e:?}");
     }
 }
 

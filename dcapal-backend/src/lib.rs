@@ -204,11 +204,11 @@ impl DcaServer {
             .into_make_service_with_connect_info();
 
         let (hostname, port) = (&config.server.web.hostname, config.server.web.port);
-        let addr = format!("{}:{}", hostname, port)
+        let addr = format!("{hostname}:{port}")
             .parse()
             .map_err(|e: AddrParseError| {
                 DcaError::StartupFailure(
-                    format!("Invalid hostname ({}) or port ({})", hostname, port),
+                    format!("Invalid hostname ({hostname}) or port ({port})"),
                     e.into(),
                 )
             })?;

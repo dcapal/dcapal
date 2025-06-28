@@ -199,7 +199,7 @@ impl MarketDataService {
         let quote = normalized_asset(quote);
 
         // Find base/quote market
-        let id = format!("{}{}", base, quote);
+        let id = format!("{base}{quote}");
         let mkt = self.get_market(&id).await?;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
@@ -209,7 +209,7 @@ impl MarketDataService {
         }
 
         // Find quote/base market
-        let id = format!("{}{}", quote, base);
+        let id = format!("{quote}{base}");
         let mkt = self.get_market(&id).await?;
         if let Some(m) = mkt {
             if let Some(px) = m.price() {
@@ -224,9 +224,10 @@ impl MarketDataService {
             return Ok(None);
         };
 
-        let base_quote_id = format!("{}{}", base, quote);
-        let usd_quote_id = format!("{}{}", "usd", quote);
-        let quote_usd_id = format!("{}{}", quote, "usd");
+        let usd_ccy = "usd";
+        let base_quote_id = format!("{base}{quote}");
+        let usd_quote_id = format!("{usd_ccy}{quote}");
+        let quote_usd_id = format!("{quote}{usd_ccy}");
 
         let usd_quote = self.get_market(&usd_quote_id).await?;
         if let Some(usd_quote) = usd_quote {

@@ -26,7 +26,7 @@ fn test_runner() -> anyhow::Result<()> {
     } else {
         let path = Path::new(SCENARIOS_PATH).canonicalize()?;
         info!("==> ⚙️  Loading test scenarios from \"{}\"", path.display());
-        format!("{}/**/*.json", SCENARIOS_PATH)
+        format!("{SCENARIOS_PATH}/**/*.json")
     };
 
     let scenarios = glob(&pattern)?.filter_map(|e| e.ok()).collect::<Vec<_>>();
