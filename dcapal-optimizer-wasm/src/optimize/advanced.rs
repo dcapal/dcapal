@@ -467,7 +467,7 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
         let sell_shares = shares_to_allocate(asset, overallocated);
         if sell_shares.is_zero() {
             debug!(
-                "[Rebalance] Cannot sell over allocated asset: {asset:?} (overallocated={overallocated}, sell_shares={sell_shares}"
+                "[Rebalance] Cannot sell over allocated asset: {asset:?} (overallocated={overallocated}, sell_shares={sell_shares})"
             );
             continue; // If cannot sell a single share, do nothing -- Better slightly overbalanced
         }
