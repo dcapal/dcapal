@@ -308,7 +308,7 @@ impl KrakenProvider {
 
         if let Some(msg) = res.status.error_message {
             error!("Error occurred: {:?}", msg);
-            return Err(DcaError::Generic(format!("{:?}", msg)));
+            return Err(DcaError::Generic(format!("{msg:?}")));
         }
 
         let assets = res

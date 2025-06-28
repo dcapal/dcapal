@@ -226,8 +226,7 @@ impl Problem {
         let mut step = 0;
         while !open_assets.is_empty() {
             debug!(
-                "[Step {}] budget_left={} open_assets={:?} w_sum={} adjusted_weights={:?}",
-                step, budget_left, open_assets, w_sum, adjusted_weights
+                "[Step {step}] budget_left={budget_left} open_assets={open_assets:?} w_sum={w_sum} adjusted_weights={adjusted_weights:?}"
             );
 
             let mut budget_left_next = *budget_left;
@@ -315,8 +314,7 @@ impl Problem {
         }
 
         debug!(
-            "[End] budget_left={} open_assets={:?} w_sum={} adjusted_weights={:?}",
-            budget_left, open_assets, w_sum, adjusted_weights
+            "[End] budget_left={budget_left} open_assets={open_assets:?} w_sum={w_sum} adjusted_weights={adjusted_weights:?}"
         );
     }
 
@@ -469,8 +467,7 @@ fn sell_over_allocated_assets(solution: &mut Solution, pfolio_amount: Decimal) -
         let sell_shares = shares_to_allocate(asset, overallocated);
         if sell_shares.is_zero() {
             debug!(
-                "[Rebalance] Cannot sell over allocated asset: {:?} (overallocated={overallocated}, sell_shares={sell_shares}",
-                asset
+                "[Rebalance] Cannot sell over allocated asset: {asset:?} (overallocated={overallocated}, sell_shares={sell_shares})"
             );
             continue; // If cannot sell a single share, do nothing -- Better slightly overbalanced
         }

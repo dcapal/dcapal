@@ -16,18 +16,14 @@ impl ConversionRateQuery {
         let base = AssetId::from(base);
         let base_asset = repo.find_asset(&base).await?;
         if base_asset.is_none() {
-            return Err(DcaError::BadRequest(format!(
-                "Unknown base asset: {}",
-                base
-            )));
+            return Err(DcaError::BadRequest(format!("Unknown base asset: {base}")));
         }
 
         let quote = AssetId::from(quote);
         let quote_asset = repo.find_asset(&quote).await?;
         if quote_asset.is_none() {
             return Err(DcaError::BadRequest(format!(
-                "Unknown quote asset: {}",
-                quote
+                "Unknown quote asset: {quote}"
             )));
         }
 
