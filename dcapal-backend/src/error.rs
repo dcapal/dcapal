@@ -79,7 +79,7 @@ impl From<sea_orm::TransactionError<DcaError>> for DcaError {
 }
 
 impl DcaError {
-    pub fn iter_sources(&self) -> ErrorIter {
+    pub fn iter_sources(&self) -> ErrorIter<'_> {
         ErrorIter {
             current: (self as &dyn std::error::Error).source(),
         }
