@@ -131,7 +131,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
             .map(|a| (a.target_weight / w_sum).round_dp(PERCENTAGE_DECIMALS))
             .collect::<Vec<Decimal>>();
 
-        debug!("w_sum = {leftover:?} adjusted_weights = {adjusted_weights:?}");
+        debug!("w_sum = {w_sum:?} adjusted_weights = {adjusted_weights:?}");
 
         while leftover > Decimal::zero() {
             let mut leftover_next = Decimal::zero();
