@@ -4,6 +4,7 @@
 **/pkg/
 wasm-pack.log
 TODO.md
+.DS_Store
 
 # IDE stuff
 .vscode

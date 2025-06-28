@@ -59,10 +59,10 @@ pub enum DcaError {
 
 impl Debug for DcaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}", self))?;
+        f.write_fmt(format_args!("{self}"))?;
 
         for e in self.iter_sources() {
-            f.write_fmt(format_args!(" -- Caused by: {}", e))?;
+            f.write_fmt(format_args!(" -- Caused by: {e}"))?;
         }
 
         Ok(())
@@ -99,11 +99,9 @@ impl IntoResponse for DcaError {
     fn into_response(self) -> axum::response::Response {
         error!("{:?}", &self);
         match self {
-            DcaError::BadRequest(_) => {
-                (StatusCode::BAD_REQUEST, format!("{}", self)).into_response()
-            }
+            DcaError::BadRequest(_) => (StatusCode::BAD_REQUEST, format!("{self}")).into_response(),
             DcaError::PriceNotAvailable(_, _) => {
-                (StatusCode::NOT_FOUND, format!("{}", self)).into_response()
+                (StatusCode::NOT_FOUND, format!("{self}")).into_response()
             }
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
         }

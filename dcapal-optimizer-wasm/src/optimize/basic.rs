@@ -104,7 +104,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
     let budget = options.budget;
     let mut assets = parse_assets(options, vars);
 
-    debug!("assets = {:?}", assets);
+    debug!("assets = {assets:?}");
 
     {
         let mut under_allocated = assets
@@ -112,7 +112,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
             .filter_map(|a| (a.solution_weight <= a.target_weight).then_some(a))
             .collect::<Vec<&mut Asset>>();
 
-        debug!("under_allocated = {:?}", under_allocated);
+        debug!("under_allocated = {under_allocated:?}");
 
         if under_allocated.is_empty() {
             return vars.clone();
@@ -123,7 +123,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
             .map(|a| a.solution_amount - a.current_amount)
             .sum();
 
-        debug!("leftover = {:?}", leftover);
+        debug!("leftover = {leftover:?}");
 
         let mut w_sum: Decimal = under_allocated.iter().map(|a| a.target_weight).sum();
         let mut adjusted_weights = under_allocated
@@ -131,10 +131,7 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
             .map(|a| (a.target_weight / w_sum).round_dp(PERCENTAGE_DECIMALS))
             .collect::<Vec<Decimal>>();
 
-        debug!(
-            "w_sum = {:?} adjusted_weights = {:?}",
-            leftover, adjusted_weights
-        );
+        debug!("w_sum = {leftover:?} adjusted_weights = {adjusted_weights:?}");
 
         while leftover > Decimal::zero() {
             let mut leftover_next = Decimal::zero();
@@ -152,8 +149,8 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
 
             leftover = leftover_next.round_dp(AMOUNT_DECIMALS);
 
-            debug!("under_allocated = {:?}", under_allocated);
-            debug!("leftover = {:?}", leftover_next);
+            debug!("under_allocated = {under_allocated:?}");
+            debug!("leftover = {leftover_next:?}");
 
             // Remove fully allocated assets
             let mut i = 0;
@@ -171,14 +168,11 @@ pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMa
                 .map(|a| (a.target_weight / w_sum).round_dp(PERCENTAGE_DECIMALS))
                 .collect::<Vec<Decimal>>();
 
-            debug!(
-                "w_sum = {:?} adjusted_weights = {:?}",
-                leftover, adjusted_weights
-            );
+            debug!("w_sum = {leftover:?} adjusted_weights = {adjusted_weights:?}");
         }
     }
 
-    debug!("assets = {:?}", assets);
+    debug!("assets = {assets:?}");
 
     assets
         .into_iter()

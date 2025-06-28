@@ -187,7 +187,7 @@ impl AsYahooMarket for Market {
             .map(|s| s.to_string())
             .unwrap_or_else(|| self.quote.id().clone());
 
-        format!("{}-{}", base, quote)
+        format!("{base}-{quote}")
     }
 }
 

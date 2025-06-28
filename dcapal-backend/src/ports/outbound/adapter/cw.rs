@@ -135,8 +135,7 @@ impl CryptoWatchProvider {
         let res: CWOHLCResult = self.fetch_cw_api(&url).await?;
         if res.result.is_empty() || !res.result.contains_key(periods) {
             return Err(DcaError::Generic(format!(
-                "Malformed response. Unexpected empty result: {:?}",
-                res
+                "Malformed response. Unexpected empty result: {res:?}"
             )));
         }
 
@@ -148,8 +147,7 @@ impl CryptoWatchProvider {
         let cstick = csticks.last().unwrap();
         if cstick.len() < 5 {
             return Err(DcaError::Generic(format!(
-                "Malformed response. Unexpected candlestick length: {:?}",
-                csticks
+                "Malformed response. Unexpected candlestick length: {csticks:?}"
             )));
         }
 

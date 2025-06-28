@@ -176,10 +176,10 @@ pub struct TransactionFeesResponse {
 #[cfg(test)]
 mod test {
 
-    use super::*;
-
     use chrono::Utc;
     use rust_decimal::dec;
+
+    use super::*;
 
     #[test]
     fn map_model_to_response() {
