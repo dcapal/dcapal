@@ -31,7 +31,6 @@ import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
-import ReactPDF from '@react-pdf/renderer';
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
