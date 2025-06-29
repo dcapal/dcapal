@@ -28,6 +28,7 @@
     "@radix-ui/react-select": "^2.1.7",
     "@radix-ui/react-slot": "^1.1.1",
     "@react-hook/media-query": "^1.1.1",
+    "@react-pdf/renderer": "^4.3.0",
     "@reduxjs/toolkit": "^2.7.0",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
