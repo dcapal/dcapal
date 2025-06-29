@@ -80,7 +80,8 @@
       "defineTargetWeight": "Define your desired asset allocation in <0>{{targetWeight}}</0> field (e.g. <1>{{percentage}}</1> of total portfolio value)",
       "reviewYourWeight": "Target weights must sum up to 100% (currently <0>{{actualWeight}} %</0>). Please adjust weights or add new assets from the search bar in the top.",
       "lastFetch": "Prices last fetched at",
-      "confirmWeights": "Confirm weights"
+      "confirmWeights": "Confirm weights",
+      "downloadDocument": "Download the portfolio summary in PDF format"
     },
     "searchBar": {
       "placeholder": "Search Crypto, ETF and much more",

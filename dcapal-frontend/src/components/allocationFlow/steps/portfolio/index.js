@@ -2,10 +2,13 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
+
 import toast from "react-hot-toast";
 
+import { PDFDownloadLink, Document, Page } from '@react-pdf/renderer';
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
+import { PortfolioSummaryDocument } from "./documentSummary";
 
 import {
   addAsset,
@@ -23,10 +26,12 @@ import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
+import PDF from "@images/icons/pdf-document.svg"
 import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
+import ReactPDF from '@react-pdf/renderer';
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
@@ -53,7 +58,7 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   dispatch(setRefreshTime({ time: Date.now() }));
 };
 
-export const PortfolioStep = ({ ...props }) => {
+export const PortfolioStep = () => {
   const [searchText, setSearchText] = useState("");
 
   const { t, i18n } = useTranslation();
@@ -129,6 +134,7 @@ export const PortfolioStep = ({ ...props }) => {
   const onClickAddLiquidity = () => {
     dispatch(setAllocationFlowStep({ step: Step.INVEST }));
   };
+
 
   return (
     <div className="w-full flex flex-col pt-2 items-center">
@@ -236,6 +242,31 @@ export const PortfolioStep = ({ ...props }) => {
               />
             </p>
           </div>
+          {assets && assets.length > 0 && (
+            <div className="w-full flex items-center justify-start">
+              <img
+                className="w-full max-w-[3rem] p-1 self-start"
+                alt="PDF"
+                src={PDF}
+              />
+              <PDFDownloadLink document={<PortfolioSummaryDocument assets={assets} />} fileName="dcapal.pdf">
+                {({ loading }) =>
+                  loading ? 'Loading document...' :
+                    <p className="flex-grow font-light">
+                      <Trans
+                        i18nKey="portfolioStep.downloadDocument"
+                        components={[
+                          <span className="font-normal" />,
+                          <span className="italic" />,
+                        ]}
+                      />
+                    </p>
+
+                }
+              </PDFDownloadLink>
+            </div>
+          )}
+
         </div>
       )}
       {(isFirstCardFilled || Object.keys(assetStore).length > 1) &&
