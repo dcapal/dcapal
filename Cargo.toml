@@ -55,7 +55,7 @@ once_cell = "1.21.3"
 parking_lot = "0.12.4"
 rand = "0.9.1"
 redis = { version = "0.29.5", features = ["tokio-comp"] }
-reqwest = { version = "0.12.20", default-features = false, features = [
+reqwest = { version = "0.12.22", default-features = false, features = [
   "gzip",
   "json",
   "rustls-tls",
