@@ -40,7 +40,6 @@ export const PortfolioSummaryDocument = ({ assets }) => {
               <Text style={[styles.cell, styles.name]}>
                 {t("pdf.assetName")}
               </Text>
-              <Text style={[styles.cell, styles.aclass]}>{t("pdf.class")}</Text>
               <Text style={[styles.cell, styles.price]}>{t("pdf.price")}</Text>
               <Text style={[styles.cell, styles.qty]}>{t("pdf.qty")}</Text>
               <Text style={[styles.cell, styles.weight]}>
@@ -54,12 +53,13 @@ export const PortfolioSummaryDocument = ({ assets }) => {
               <View style={styles.tableRow} key={a.symbol}>
                 <Text style={[styles.cell, styles.symbol]}>{a.symbol}</Text>
                 <Text style={[styles.cell, styles.name]}>{a.name}</Text>
-                <Text style={[styles.cell, styles.aclass]}>{a.aclass}</Text>
                 <Text style={[styles.cell, styles.price]}>{a.price}</Text>
                 <Text style={[styles.cell, styles.qty]}>{a.qty}</Text>
-                <Text style={[styles.cell, styles.weight]}>{a.weight}</Text>
+                <Text style={[styles.cell, styles.weight]}>
+                  {Number(a.weight).toFixed(2)}
+                </Text>
                 <Text style={[styles.cell, styles.target]}>
-                  {a.targetWeight}
+                  {Number(a.targetWeight).toFixed(2)}
                 </Text>
               </View>
             ))}
