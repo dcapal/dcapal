@@ -5,7 +5,7 @@ import { useMediaQuery } from "@react-hook/media-query";
 
 import toast from "react-hot-toast";
 
-import { PDFDownloadLink, Document, Page } from '@react-pdf/renderer';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 import { PortfolioSummaryDocument } from "./documentSummary";
@@ -248,7 +248,11 @@ export const PortfolioStep = () => {
                 alt="PDF"
                 src={PDF}
               />
-              <PDFDownloadLink document={<PortfolioSummaryDocument assets={assets} />} fileName="dcapal.pdf">
+              <PDFDownloadLink
+                document={<PortfolioSummaryDocument assets={assets} />}
+                fileName={`${pfolioName}_${new Date().toISOString().slice(0, 10)}.pdf`}
+              >
+
                 {({ loading }) =>
                   loading ? 'Loading document...' :
                     <p className="flex-grow font-light">

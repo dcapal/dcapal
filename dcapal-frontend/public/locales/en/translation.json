@@ -83,6 +83,16 @@
       "confirmWeights": "Confirm weights",
       "downloadDocument": "Download the portfolio summary in PDF format"
     },
+    "pdf": {
+      "name": "Portfolio Summary",
+      "assetName": "Name",
+      "symbol": "Symbol",
+      "class": "Class",
+      "price": "Price",
+      "qty": "Quantity",
+      "weight": "Weight",
+      "target": "Target"
+    },
     "searchBar": {
       "placeholder": "Search Crypto, ETF and much more",
       "noAssetFoundFor": "No asset found for ",

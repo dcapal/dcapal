@@ -1,5 +1,10 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { useTranslation } from "react-i18next";
+
+
+
+
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 10 },
@@ -18,34 +23,39 @@ const styles = StyleSheet.create({
   target: { width: '10%' },
 });
 
-export const PortfolioSummaryDocument = ({ assets }) => (
-  <Document>
-    <Page size="A4" style={styles.page}>
-      <View style={styles.section}>
-        <Text style={styles.title}>Portfolio Summary</Text>
-        <View style={[styles.table, styles.tableHeader]}>
-          <View style={[styles.tableRow, styles.tableHeader]}>
-            <Text style={[styles.cell, styles.symbol]}>Symbol</Text>
-            <Text style={[styles.cell, styles.name]}>Name</Text>
-            <Text style={[styles.cell, styles.aclass]}>Class</Text>
-            <Text style={[styles.cell, styles.price]}>Price</Text>
-            <Text style={[styles.cell, styles.qty]}>Qty</Text>
-            <Text style={[styles.cell, styles.weight]}>Weight</Text>
-            <Text style={[styles.cell, styles.target]}>Target</Text>
-          </View>
-          {assets.map((a) => (
-            <View style={styles.tableRow} key={a.symbol}>
-              <Text style={[styles.cell, styles.symbol]}>{a.symbol}</Text>
-              <Text style={[styles.cell, styles.name]}>{a.name}</Text>
-              <Text style={[styles.cell, styles.aclass]}>{a.aclass}</Text>
-              <Text style={[styles.cell, styles.price]}>{a.price}</Text>
-              <Text style={[styles.cell, styles.qty]}>{a.qty}</Text>
-              <Text style={[styles.cell, styles.weight]}>{a.weight}</Text>
-              <Text style={[styles.cell, styles.target]}>{a.targetWeight}</Text>
+export const PortfolioSummaryDocument = ({ assets }) => {
+
+  const { t } = useTranslation();
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.section}>
+          <Text style={styles.title}>{t("pdf.name")}</Text>
+          <View style={[styles.table, styles.tableHeader]}>
+            <View style={[styles.tableRow, styles.tableHeader]}>
+              <Text style={[styles.cell, styles.symbol]}>{t("pdf.symbol")}</Text>
+              <Text style={[styles.cell, styles.name]}>{t("pdf.assetName")}</Text>
+              <Text style={[styles.cell, styles.aclass]}>{t("pdf.class")}</Text>
+              <Text style={[styles.cell, styles.price]}>{t("pdf.price")}</Text>
+              <Text style={[styles.cell, styles.qty]}>{t("pdf.qty")}</Text>
+              <Text style={[styles.cell, styles.weight]}>{t("pdf.weight")}</Text>
+              <Text style={[styles.cell, styles.target]}>{t("pdf.target")}</Text>
             </View>
-          ))}
+            {assets.map((a) => (
+              <View style={styles.tableRow} key={a.symbol}>
+                <Text style={[styles.cell, styles.symbol]}>{a.symbol}</Text>
+                <Text style={[styles.cell, styles.name]}>{a.name}</Text>
+                <Text style={[styles.cell, styles.aclass]}>{a.aclass}</Text>
+                <Text style={[styles.cell, styles.price]}>{a.price}</Text>
+                <Text style={[styles.cell, styles.qty]}>{a.qty}</Text>
+                <Text style={[styles.cell, styles.weight]}>{a.weight}</Text>
+                <Text style={[styles.cell, styles.target]}>{a.targetWeight}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
-    </Page>
-  </Document>
-);
+      </Page>
+    </Document>
+  );
+}
