@@ -19,6 +19,10 @@ portfolio assets. *How the heck can I do it so that my portfolio stays balanced?
 Hence DcaPal. You come here every week/month/quarter, build your portfolio, define asset allocation in percentage, input
 how much you want to invest and **let the algorithm do the splitting for you**.
 
+## Demo
+
+https://github.com/user-attachments/assets/ba80874e-5b78-440d-a055-7db8fbfe7084
+
 ## Getting started
 
 You can start using [DcaPal](https://dcapal.com) right away. It's free. No registration required.
