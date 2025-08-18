@@ -30,7 +30,7 @@ async-openai = "0.28.3"
 async-trait = "0.1.88"
 axum = { version = "0.8.4", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
-config = "0.15.11"
+config = "0.15.14"
 console_error_panic_hook = { version = "0.1.7" }
 const_format = "0.2.34"
 chrono = { version = "0.4.41", features = ["serde"] }
