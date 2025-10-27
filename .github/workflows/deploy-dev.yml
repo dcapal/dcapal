@@ -30,7 +30,7 @@ jobs:
           wasm-pack build --release dcapal-optimizer-wasm
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -74,7 +74,7 @@ jobs:
           npm run build
 
       - name: Archive dcapal-frontend
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dcapal-frontend-dist
           path: dcapal-frontend/dist
