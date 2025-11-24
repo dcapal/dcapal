@@ -11,7 +11,7 @@ jobs:
   optimizer-build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: optimizer-build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: frontend-build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
