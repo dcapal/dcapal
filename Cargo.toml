@@ -10,7 +10,7 @@ members = [
 version = "0.9.0"
 authors = ["Leonardo Arcari <leonardo1.arcari@gmail.com>"]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.92"
 
 [profile.release]
 lto = "thin"
@@ -25,71 +25,70 @@ inherits = "release"
 opt-level = "s"
 
 [workspace.dependencies]
-anyhow = "1.0.98"
-async-openai = "0.28.3"
-async-trait = "0.1.88"
-axum = { version = "0.8.4", features = ["macros"] }
-axum-extra = { version = "0.10.1", features = ["typed-header"] }
-config = "0.15.11"
+anyhow = "1.0.100"
+async-trait = "0.1.89"
+axum = { version = "0.8.8", features = ["macros"] }
+axum-extra = { version = "0.12.5", features = ["typed-header"] }
+config = "0.15.19"
 console_error_panic_hook = { version = "0.1.7" }
-const_format = "0.2.34"
-chrono = { version = "0.4.41", features = ["serde"] }
+const_format = "0.2.35"
+chrono = { version = "0.4.42", features = ["serde"] }
 deadpool-redis = { version = "0.20.0", features = ["serde"] }
 env_logger = "0.11.8"
 failsafe = "1.3.0"
 futures = "0.3.31"
-getrandom = { version = "0.3.3" }
-glob = "0.3.2"
-hyper = { version = "1.6.0", features = ["full"] }
-ip2location = "0.5.4"
+getrandom = { version = "0.3.4" }
+glob = "0.3.3"
+hyper = { version = "1.8.1", features = ["full"] }
+ip2location = "0.6.0"
 itertools = "0.14.0"
-js-sys = "0.3.77"
-jsonschema = "0.30.0"
-jsonwebtoken = "9.3.1"
+js-sys = "0.3.83"
+jsonschema = "0.38.1"
+jsonwebtoken = {version = "10.2.0", features = ["aws_lc_rs"]} # This was the default before, now it needs to be specify between aws and rust-crypto
 lazy_static = "1.5.0"
-log = "0.4.27"
-metrics = "0.24.2"
-metrics-exporter-prometheus = "0.17.2"
+log = "0.4.29"
+metrics = "0.24.3"
+metrics-exporter-prometheus = "0.18.1"
 minilp = "0.2.2"
 once_cell = "1.21.3"
-parking_lot = "0.12.4"
-rand = "0.9.1"
+parking_lot = "0.12.5"
+rand = "0.9.2"
 redis = { version = "0.29.5", features = ["tokio-comp"] }
-reqwest = { version = "0.12.20", default-features = false, features = [
+reqwest = { version = "0.12.28", default-features = false, features = [
   "gzip",
   "json",
   "rustls-tls",
 ] }
 rquest = { version = "5.1.0", features = ["json", "stream"] }
-rust_decimal = { version = "1.37.2", features = [
+rust_decimal = { version = "1.39.0", features = [
   "serde",
   "serde-float",
   "macros",
 ] }
-rust_decimal_macros = "1.37.1"
-sea-orm = { version = "1.1.13", features = [
+rust_decimal_macros = "1.39.0"
+sea-orm = { version = "1.1.19", features = [
   "sqlx-postgres",
   "runtime-tokio-rustls",
   "macros",
   "mock",
 ] }
-serde = "1.0.219"
-serde_json = "1.0.140"
+serde = "1.0.228"
+serde_json = "1.0.148"
 serde-wasm-bindgen = "0.6.5"
-strum = "0.27.1"
-strum_macros = "0.27.1"
+strum = "0.27.2"
+strum_macros = "0.27.2"
 test-log = { version = "0", features = ["log"] }
-thiserror = "2.0.12"
-tokio = { version = "1.45.1", features = ["full"] }
+thiserror = "2.0.17"
+tokio = { version = "1.48.0", features = ["full"] }
 tower = "0.5.2"
-tower-http = { version = "0.6.6", features = ["trace"] }
-tracing = "0.1.41"
-tracing-appender = "0.2.3"
+tower-http = { version = "0.6.8", features = ["trace"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.4"
 tracing-log = "0.2.0"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 utoipa = { version = "5.4.0", features = ["chrono", "decimal", "uuid"] }
-uuid = { version = "1.17.0", features = ["v4", "serde"] }
-wasm-bindgen = { version = "0.2.100", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4.50"
-wasm-bindgen-test = "0.3.50"
+uuid = { version = "1.19.0", features = ["v4", "serde"] }
+wasm-bindgen = { version = "0.2.106", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.56"
+wasm-bindgen-test = "0.3.56"
 wasm-logger = "0.2.0"
