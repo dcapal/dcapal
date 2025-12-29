@@ -201,22 +201,22 @@ impl MarketDataService {
         // Find base/quote market
         let id = format!("{base}{quote}");
         let mkt = self.get_market(&id).await?;
-        if let Some(m) = mkt {
-            if let Some(px) = m.price() {
-                info!("Computed conversion rate for market {}", m.id);
-                return Ok(Some((*px, vec![id])));
-            }
+        if let Some(m) = mkt
+            && let Some(px) = m.price()
+        {
+            info!("Computed conversion rate for market {}", m.id);
+            return Ok(Some((*px, vec![id])));
         }
 
         // Find quote/base market
         let id = format!("{quote}{base}");
         let mkt = self.get_market(&id).await?;
-        if let Some(m) = mkt {
-            if let Some(px) = m.price() {
-                let rate = Price::new(1. / px.price, px.ts);
-                info!("Computed conversion rate for market {}", m.id);
-                return Ok(Some((rate, vec![id])));
-            }
+        if let Some(m) = mkt
+            && let Some(px) = m.price()
+        {
+            let rate = Price::new(1. / px.price, px.ts);
+            info!("Computed conversion rate for market {}", m.id);
+            return Ok(Some((rate, vec![id])));
         }
 
         // Find alternative markets
@@ -230,31 +230,31 @@ impl MarketDataService {
         let quote_usd_id = format!("{quote}{usd_ccy}");
 
         let usd_quote = self.get_market(&usd_quote_id).await?;
-        if let Some(usd_quote) = usd_quote {
-            if let Some(usd_quote_px) = usd_quote.price() {
-                let price = base_usd_px.price * usd_quote_px.price;
-                let ts = std::cmp::min(base_usd_px.ts, usd_quote_px.ts);
-                let rate = Price::new(price, ts);
-                info!(
-                    "Computed conversion rate for market {} triangulating between markets",
-                    base_quote_id
-                );
-                return Ok(Some((rate, vec![base_usd_id, usd_quote_id])));
-            }
+        if let Some(usd_quote) = usd_quote
+            && let Some(usd_quote_px) = usd_quote.price()
+        {
+            let price = base_usd_px.price * usd_quote_px.price;
+            let ts = std::cmp::min(base_usd_px.ts, usd_quote_px.ts);
+            let rate = Price::new(price, ts);
+            info!(
+                "Computed conversion rate for market {} triangulating between markets",
+                base_quote_id
+            );
+            return Ok(Some((rate, vec![base_usd_id, usd_quote_id])));
         }
 
         let quote_usd = self.get_market(&quote_usd_id).await?;
-        if let Some(quote_usd) = quote_usd {
-            if let Some(quote_usd_px) = quote_usd.price() {
-                let price = base_usd_px.price / quote_usd_px.price;
-                let ts = std::cmp::min(base_usd_px.ts, quote_usd_px.ts);
-                let rate = Price::new(price, ts);
-                info!(
-                    "Computed conversion rate for market {} triangulating between markets",
-                    base_quote_id
-                );
-                return Ok(Some((rate, vec![base_quote_id, usd_quote_id])));
-            }
+        if let Some(quote_usd) = quote_usd
+            && let Some(quote_usd_px) = quote_usd.price()
+        {
+            let price = base_usd_px.price / quote_usd_px.price;
+            let ts = std::cmp::min(base_usd_px.ts, quote_usd_px.ts);
+            let rate = Price::new(price, ts);
+            info!(
+                "Computed conversion rate for market {} triangulating between markets",
+                base_quote_id
+            );
+            return Ok(Some((rate, vec![base_quote_id, usd_quote_id])));
         }
 
         warn!(
@@ -277,23 +277,23 @@ impl MarketDataService {
         let usd_base_id = format!("{}{}", "usd", base);
 
         let base_usd = self.get_market(&base_usd_id).await?;
-        if let Some(ref m) = base_usd {
-            if let Some(px) = m.price() {
-                return Ok(Some((base_usd_id, *px)));
-            }
+        if let Some(ref m) = base_usd
+            && let Some(px) = m.price()
+        {
+            return Ok(Some((base_usd_id, *px)));
         }
 
         let usd_base = self.get_market(&usd_base_id).await?;
-        if let Some(ref m) = usd_base {
-            if let Some(px) = m.price() {
-                return Ok(Some((
-                    usd_base_id,
-                    Price {
-                        price: 1. / px.price,
-                        ts: px.ts,
-                    },
-                )));
-            }
+        if let Some(ref m) = usd_base
+            && let Some(px) = m.price()
+        {
+            return Ok(Some((
+                usd_base_id,
+                Price {
+                    price: 1. / px.price,
+                    ts: px.ts,
+                },
+            )));
         }
 
         match (base_usd, usd_base) {
