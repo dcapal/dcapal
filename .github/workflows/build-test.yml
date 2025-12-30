@@ -150,6 +150,7 @@ jobs:
           sudo rm -rf /opt/ghc # Haskell
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           sudo rm -rf /opt/hostedtoolcache/go
+          sudo rm -rf /usr/local/share/powershell
           sudo docker image prune --all --force
           df -h
       - uses: actions/checkout@v4
@@ -248,7 +249,7 @@ jobs:
           if ! docker compose -f docker-compose.yml \
                               -f ./docker/docker-compose.local.yml \
                               -f docker-compose.override.yml \
-                              up --no-build --wait; then
+                              up --no-build --wait --wait-timeout 120; then
             echo "Docker Compose failed. Printing logs:"
             docker compose logs
             exit 1
