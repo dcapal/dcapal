@@ -149,7 +149,8 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc # Haskell
           sudo rm -rf /opt/hostedtoolcache/CodeQL
-          # sudo docker image prune --all --force, uncomment this if the space is still not enough
+          sudo rm -rf /opt/hostedtoolcache/go
+          sudo docker image prune --all --force
           df -h
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
