@@ -143,6 +143,14 @@ jobs:
         ports:
           - 5000:5000
     steps:
+      - name: Free up disk space # This is because the CI fails with no space left on device otherwise
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc # Haskell
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          # sudo docker image prune --all --force, uncomment this if the space is still not enough
+          df -h
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
