@@ -30,10 +30,11 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1" ]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
 networks:
   dcapalnetwork:

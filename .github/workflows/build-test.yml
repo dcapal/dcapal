@@ -143,6 +143,16 @@ jobs:
         ports:
           - 5000:5000
     steps:
+      - name: Free up disk space # This is because the CI fails with no space left on device otherwise
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc # Haskell
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /opt/hostedtoolcache/go
+          sudo rm -rf /usr/local/share/powershell
+          sudo docker image prune --all --force
+          df -h
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -239,7 +249,7 @@ jobs:
           if ! docker compose -f docker-compose.yml \
                               -f ./docker/docker-compose.local.yml \
                               -f docker-compose.override.yml \
-                              up --no-build --wait; then
+                              up --no-build --wait --wait-timeout 120; then
             echo "Docker Compose failed. Printing logs:"
             docker compose logs
             exit 1

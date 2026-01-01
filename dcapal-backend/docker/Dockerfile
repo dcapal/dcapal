@@ -1,4 +1,5 @@
-FROM rust:1 AS chef
+# Bookworm, so it's the same as the runtime
+FROM rust:1-bookworm AS chef
 RUN cargo install cargo-chef
 WORKDIR /var/dcapal
 
