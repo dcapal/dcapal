@@ -10,7 +10,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(PortfolioAsset::Table)
-                    .add_column(ColumnDef::new(PortfolioAsset::AverageBuyPrice).decimal().null())
+                    .add_column(
+                        ColumnDef::new(PortfolioAsset::AverageBuyPrice)
+                            .decimal()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await

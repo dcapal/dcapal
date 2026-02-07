@@ -25,7 +25,11 @@ const styles = StyleSheet.create({
   gain: { width: "10%" },
   gainPositive: { color: "#16a34a" },
   gainNegative: { color: "#dc2626" },
-  summaryRow: { marginTop: 8, flexDirection: "row", justifyContent: "flex-end" },
+  summaryRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
 });
 
 export const PortfolioSummaryDocument = ({ assets }) => {

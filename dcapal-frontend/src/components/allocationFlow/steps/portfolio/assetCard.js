@@ -233,7 +233,7 @@ export const AssetCard = ({
                     onChange={props.setAverageBuyPrice}
                     isValid={true}
                     min={0}
-                    />
+                  />
                 </div>
               </div>
             )}
