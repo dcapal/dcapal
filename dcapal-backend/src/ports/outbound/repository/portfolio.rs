@@ -157,6 +157,7 @@ impl PortfolioRepository {
             asset_model.quantity = Set(asset.qty);
             asset_model.target_weight = Set(asset.target_weight);
             asset_model.price = Set(asset.price);
+            asset_model.average_buy_price = Set(Some(asset.average_buy_price));
             asset_model.max_fee_impact = fee_fields.max_fee_impact;
             asset_model.fee_type = fee_fields.fee_type;
             asset_model.fee_amount = fee_fields.fee_amount;

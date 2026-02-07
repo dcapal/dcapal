@@ -14,6 +14,7 @@ import {
   addAsset,
   currentPortfolio,
   selectPortfolio,
+  setAverageBuyPrice,
   setPrice,
   setQty,
   setRefreshTime,
@@ -55,6 +56,23 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
 
   toast.success(t("common.refreshedPrices"));
   dispatch(setRefreshTime({ time: Date.now() }));
+};
+
+const computePortfolioGain = (assets) => {
+  let totalCost = 0;
+  let totalValue = 0;
+
+  assets.forEach((a) => {
+    if (a.qty > 0) {
+      const effectiveABP = a.averageBuyPrice || a.price;
+      totalCost += effectiveABP * a.qty;
+      totalValue += a.price * a.qty;
+    }
+  });
+
+  if (totalCost === 0) return null;
+
+  return ((totalValue - totalCost) / totalCost) * 100;
 };
 
 export const PortfolioStep = () => {
@@ -111,6 +129,9 @@ export const PortfolioStep = () => {
   const isFirstCardFilled =
     assets && assets.length === 1 && assets[0].targetWeight > 0;
 
+  const portfolioGain = computePortfolioGain(assets);
+  const hasAssetsWithQty = assets.some((a) => a.qty > 0);
+
   const addAssetToPortfolio = (asset) => {
     dispatch(
       addAsset({
@@ -149,8 +170,34 @@ export const PortfolioStep = () => {
         </div>
       )}
       {assets && assets.length > 0 && (
-        <div className="w-full flex items-center mb-3 pl-3 font-light text-2xl">
-          {pfolioName || t("importStep.defaultPortfolioName")}
+        <div className="w-full flex items-center mb-3 pl-3">
+          <span className="font-light text-2xl">
+            {pfolioName || t("importStep.defaultPortfolioName")}
+          </span>
+          {hasAssetsWithQty && portfolioGain !== null && (
+            <span className="ml-3 flex items-center gap-1">
+              <span
+                className={classNames("text-sm font-semibold", {
+                  "text-green-600": portfolioGain > 0,
+                  "text-red-600": portfolioGain < 0,
+                  "text-neutral-500": portfolioGain === 0,
+                })}
+              >
+                {portfolioGain > 0 ? "+" : ""}
+                {portfolioGain.toLocaleString(i18n.language, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+                %
+              </span>
+              <span
+                className="text-xs text-neutral-400 cursor-help"
+                title={t("portfolioStep.mwrTooltip")}
+              >
+                (MWR)
+              </span>
+            </span>
+          )}
         </div>
       )}
       <div className="w-full flex flex-col items-center">
@@ -168,6 +215,15 @@ export const PortfolioStep = () => {
             );
           };
 
+          const setAssetAverageBuyPrice = (abp) => {
+            dispatch(
+              setAverageBuyPrice({
+                symbol: a.symbol,
+                averageBuyPrice: abp || null,
+              })
+            );
+          };
+
           return (
             <AssetCard
               key={a.symbol}
@@ -181,6 +237,8 @@ export const PortfolioStep = () => {
               targetWeight={a.targetWeight}
               setTargetWeight={setAssetTargetWeight}
               isValidTargetWeight={validity[idx]}
+              averageBuyPrice={a.averageBuyPrice}
+              setAverageBuyPrice={setAssetAverageBuyPrice}
             />
           );
         })}
