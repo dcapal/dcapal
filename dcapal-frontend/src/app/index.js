@@ -38,7 +38,10 @@ export const App = () => {
           />
           <div className="absolute bg-[#F3F4F6] w-full h-[50px] top-10 -z-40" />
           <div className="absolute app-bg -z-50" />
-          <div className="flex-grow w-full flex flex-col items-center">
+          <div
+            data-testid="route-allocate"
+            className="flex-grow w-full flex flex-col items-center"
+          >
             <div className="w-full max-w-[42rem] grow flex px-6 pt-4 pb-6">
               <AllocationFlow />
             </div>

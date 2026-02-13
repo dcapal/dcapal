@@ -8,7 +8,8 @@
     "build-dev": "webpack --config webpack.prod.js --mode development",
     "check": "prettier --check \"src/**/*.js\"",
     "format": "prettier --write \"src/**/*.js\"",
-    "start": "webpack-dev-server --open --config webpack.dev.js --mode development"
+    "start": "webpack-dev-server --open --config webpack.dev.js --mode development",
+    "test:e2e": "npx playwright test"
   },
   "repository": {
     "type": "git",
@@ -43,7 +44,6 @@
     "i18next-browser-languagedetector": "^8.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.469.0",
-    "playwright": "^1.40.1",
     "react": "^18.3.1",
     "react-collapsed": "^4.2.0",
     "react-dom": "^18.3.1",
@@ -64,7 +64,7 @@
     "@babel/core": "^7.26.10",
     "@babel/preset-env": "^7.26.9",
     "@babel/preset-react": "^7.26.3",
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.58.2",
     "@types/node": "^20.17.30",
     "autoprefixer": "^10.4.21",
     "babel-loader": "^9.2.1",
@@ -76,6 +76,7 @@
     "dotenv-webpack": "^8.1.0",
     "html-webpack-plugin": "^5.6.3",
     "mini-css-extract-plugin": "^2.9.2",
+    "msw": "^2.12.10",
     "postcss": "^8.5.3",
     "postcss-loader": "^8.1.1",
     "postcss-preset-env": "^9.6.0",
@@ -88,5 +89,10 @@
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.2.1",
     "webpack-merge": "^6.0.1"
+  },
+  "msw": {
+    "workerDirectory": [
+      "./public"
+    ]
   }
 }
