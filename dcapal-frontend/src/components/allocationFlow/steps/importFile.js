@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
-import { getFetcher } from "@app/providers";
+import { getFetcher } from "@/api";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {

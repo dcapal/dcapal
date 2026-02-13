@@ -4,7 +4,7 @@ import { Toaster } from "react-hot-toast";
 
 import { AllocationFlow } from "@components/allocationFlow";
 import { setCurrencies } from "@app/appSlice";
-import { fetchAssetsDcaPal } from "./providers";
+import { fetchAssetsDcaPal } from "@/api";
 import { ContainerPage } from "@routes/containerPage";
 
 const loadCurrencies = async (dispatch) => {

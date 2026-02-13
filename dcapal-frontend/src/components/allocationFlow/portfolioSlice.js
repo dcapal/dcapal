@@ -2,7 +2,7 @@ import { store } from "@app/store";
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
-import { syncPortfoliosAPI } from "@app/api";
+import { syncPortfoliosAPI } from "@/api";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;

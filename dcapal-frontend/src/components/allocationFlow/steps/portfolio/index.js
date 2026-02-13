@@ -27,7 +27,7 @@ import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
 import PDF from "@images/icons/pdf-document.svg";
-import { getFetcher } from "@app/providers";
+import { getFetcher } from "@/api";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
