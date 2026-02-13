@@ -73,6 +73,7 @@ module.exports = defineConfig({
   webServer: {
     command: "REACT_APP_E2E_MSW=1 npm run start:ci",
     url: "http://127.0.0.1:3000",
+    timeout: 120000,
     reuseExistingServer: !process.env.CI,
   },
 });
