@@ -265,8 +265,6 @@ jobs:
         run: cd dcapal-frontend && npx playwright install --with-deps
 
       - name: Run Playwright tests
-        env:
-          DEBUG: pw:browser,pw:webserver
         run: cd dcapal-frontend && npx playwright test
 
       - uses: actions/upload-artifact@v6
