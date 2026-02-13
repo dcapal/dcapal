@@ -9,6 +9,7 @@
     "check": "prettier --check \"src/**/*.js\"",
     "format": "prettier --write \"src/**/*.js\"",
     "start": "webpack-dev-server --open --config webpack.dev.js --mode development",
+    "start:ci": "webpack-dev-server --config webpack.dev.js --mode development --no-open",
     "test:e2e": "npx playwright test"
   },
   "repository": {

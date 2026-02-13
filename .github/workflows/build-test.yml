@@ -83,7 +83,7 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
   frontend-check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-slim
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v4
