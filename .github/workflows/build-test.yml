@@ -99,6 +99,11 @@ jobs:
           npm ci
           npm run check
 
+      - name: Typecheck
+        run: |
+          cd dcapal-frontend
+          npm run typecheck
+
   frontend-build-test:
     runs-on: ubuntu-latest
     needs: [frontend-check, optimizer-build-test]
