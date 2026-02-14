@@ -9,7 +9,7 @@ env:
 
 jobs:
   optimizer-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -36,7 +36,7 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
   frontend-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: optimizer-build
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
           path: dcapal-frontend/dist
 
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-slim
     needs: frontend-build
     steps:
       - uses: actions/checkout@v4
