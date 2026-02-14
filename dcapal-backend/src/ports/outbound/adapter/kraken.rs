@@ -63,7 +63,7 @@ impl KrakenProvider {
         let market_symbols = res
             .result
             .values()
-            .filter(|&p| (p.status == "online"))
+            .filter(|&p| p.status == "online")
             .map(|p| normalize_symbol(&p.wsname))
             .collect::<Vec<String>>();
 

@@ -48,10 +48,10 @@ where
         }
 
         // If value is outdated, clear OnceCell if none is updating it
-        if self.cell.try_read().is_ok() {
-            if let Ok(mut lock) = self.cell.try_write() {
-                lock.take();
-            }
+        if self.cell.try_read().is_ok()
+            && let Ok(mut lock) = self.cell.try_write()
+        {
+            lock.take();
         }
 
         // Compute new value
