@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
 import { getPriceForProvider } from "@/api/priceProviders";
+import { useAppStore } from "@/state/appStore";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {
@@ -115,9 +115,9 @@ export const ImportStep = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const validCcys = useSelector((state) => state.app.currencies);
+  const validCcys = useAppStore((state) => state.currencies);
 
-  const pfolioFile = useSelector((state) => state.app.pfolioFile);
+  const pfolioFile = useAppStore((state) => state.pfolioFile);
   const pfolio = useMemo(() => {
     const parsed = pfolioFile ? JSON.parse(pfolioFile) : {};
     if (Object.keys(parsed).length > 0) {
