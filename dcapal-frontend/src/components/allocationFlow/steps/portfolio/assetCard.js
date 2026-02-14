@@ -12,6 +12,12 @@ import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
 import { TransactionFees } from "./transactionFees";
 import { useTranslation } from "react-i18next";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 
@@ -26,15 +32,30 @@ const GainBadge = ({ gain, i18n }) => {
 
   return (
     <span className={classNames("text-sm font-medium", colorClass)}>
-      {sign}
+      ({sign}
       {gain.toLocaleString(i18n.language, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}
-      %
+      %)
     </span>
   );
 };
+
+const AbpTooltipIcon = ({ tooltip }) => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-neutral-200 text-neutral-600 text-[10px] cursor-help">
+          ?
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[16rem]">
+        <p>{tooltip}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
 
 export const AssetCard = ({
   symbol,
@@ -86,14 +107,6 @@ export const AssetCard = ({
           <div className="text-sm font-light uppercase">{symbol}</div>
         </div>
         <div className="grow flex items-center justify-end">
-          {!isMobile && (
-            <div className="flex ml-4">
-              <div className="font-medium">
-                {(price * qty).toLocaleString(i18n.language, priceFmt)}
-              </div>
-              <div className="ml-1 uppercase">{quoteCcy}</div>
-            </div>
-          )}
           <div className="whitespace-nowrap ml-4 py-1 px-2 bg-green-800 text-green-50 font-semibold rounded-md">
             {weight.toLocaleString(i18n.language, {
               minimumFractionDigits: 1,
@@ -113,6 +126,11 @@ export const AssetCard = ({
             <div className="ml-1 text-sm">
               {(price * qty).toLocaleString(i18n.language, priceFmt)}
             </div>
+            {hasQty && (
+              <div className="ml-1">
+                <GainBadge gain={gain} i18n={i18n} />
+              </div>
+            )}
           </div>
           <div className="flex items-center py-2">
             <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs">
@@ -142,31 +160,18 @@ export const AssetCard = ({
             <div className="flex items-center h-12">
               <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs flex items-center gap-1">
                 {t("assetCard.averageBuyPrice")}
-                <span
-                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-neutral-200 text-neutral-600 text-[10px] cursor-help"
-                  title={t("assetCard.averageBuyPriceTooltip")}
-                >
-                  ?
-                </span>
+                <AbpTooltipIcon tooltip={t("assetCard.averageBuyPriceTooltip")} />
               </div>
               <div className="grow">
                 <InputNumber
                   textAlign={"text-right"}
                   type={InputNumberType.DECIMAL}
-                  value={averageBuyPrice || ""}
+                  value={averageBuyPrice ?? price}
                   onChange={props.setAverageBuyPrice}
                   isValid={true}
                   min={0}
                 />
               </div>
-            </div>
-          )}
-          {hasQty && (
-            <div className="flex items-center py-2">
-              <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs">
-                {t("assetCard.gain")}
-              </div>
-              <GainBadge gain={gain} i18n={i18n} />
             </div>
           )}
           <div className="flex items-center h-12">
@@ -190,6 +195,20 @@ export const AssetCard = ({
       {!isMobile && (
         <div className="flex justify-between items-start">
           <div className="flex flex-col">
+            <div className="flex items-center h-6">
+              <div className="w-12 mr-2 font-light text-xs">
+                {t("assetCard.amount")}
+              </div>
+              <div className="uppercase text-sm">{quoteCcy}</div>
+              <div className="ml-1 text-sm">
+                {(price * qty).toLocaleString(i18n.language, priceFmt)}
+              </div>
+              {hasQty && (
+                <div className="ml-1">
+                  <GainBadge gain={gain} i18n={i18n} />
+                </div>
+              )}
+            </div>
             <div className="flex items-center h-12">
               <div className="w-12 mr-2 font-light text-xs">
                 {t("assetCard.quantity")}
@@ -218,31 +237,18 @@ export const AssetCard = ({
               <div className="flex items-center h-12 mt-1">
                 <div className="w-12 mr-2 font-light text-xs flex items-center gap-1">
                   {t("assetCard.averageBuyPrice")}
-                  <span
-                    className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-neutral-200 text-neutral-600 text-[10px] cursor-help"
-                    title={t("assetCard.averageBuyPriceTooltip")}
-                  >
-                    ?
-                  </span>
+                  <AbpTooltipIcon tooltip={t("assetCard.averageBuyPriceTooltip")} />
                 </div>
                 <div className="w-40">
                   <InputNumber
                     textAlign={"text-left"}
                     type={InputNumberType.DECIMAL}
-                    value={averageBuyPrice || ""}
+                    value={averageBuyPrice ?? price}
                     onChange={props.setAverageBuyPrice}
                     isValid={true}
                     min={0}
                   />
                 </div>
-              </div>
-            )}
-            {hasQty && (
-              <div className="flex items-center h-6 mt-1">
-                <div className="w-12 mr-2 font-light text-xs">
-                  {t("assetCard.gain")}
-                </div>
-                <GainBadge gain={gain} i18n={i18n} />
               </div>
             )}
           </div>

@@ -34,14 +34,14 @@ i18n.on("languageChanged", (lang) => (document.documentElement.lang = lang));
 const root = createRoot(document.getElementById("app"));
 root.render(
   <React.StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <BrowserRouter>
-          <Suspense fallback={<div>Loading...</div>}>
-            <Router />
-          </Suspense>
-        </BrowserRouter>
-      </PersistGate>
-    </Provider>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <BrowserRouter>
+            <Suspense fallback={<div>Loading...</div>}>
+              <Router />
+            </Suspense>
+          </BrowserRouter>
+        </PersistGate>
+      </Provider>
   </React.StrictMode>
 );
