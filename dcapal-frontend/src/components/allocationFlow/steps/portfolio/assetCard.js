@@ -160,7 +160,9 @@ export const AssetCard = ({
             <div className="flex items-center h-12">
               <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs flex items-center gap-1">
                 {t("assetCard.averageBuyPrice")}
-                <AbpTooltipIcon tooltip={t("assetCard.averageBuyPriceTooltip")} />
+                <AbpTooltipIcon
+                  tooltip={t("assetCard.averageBuyPriceTooltip")}
+                />
               </div>
               <div className="grow">
                 <InputNumber
@@ -237,7 +239,9 @@ export const AssetCard = ({
               <div className="flex items-center h-12 mt-1">
                 <div className="w-12 mr-2 font-light text-xs flex items-center gap-1">
                   {t("assetCard.averageBuyPrice")}
-                  <AbpTooltipIcon tooltip={t("assetCard.averageBuyPriceTooltip")} />
+                  <AbpTooltipIcon
+                    tooltip={t("assetCard.averageBuyPriceTooltip")}
+                  />
                 </div>
                 <div className="w-40">
                   <InputNumber
