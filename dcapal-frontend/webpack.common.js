@@ -20,7 +20,7 @@ module.exports = (_env, argv) => {
     module: {
       rules: [
         {
-          test: /\.(js|jsx)$/,
+          test: /\.(js|jsx|ts|tsx)$/,
           exclude: /node_modules/,
           loader: "babel-loader",
           options: {
@@ -32,6 +32,7 @@ module.exports = (_env, argv) => {
                   runtime: "automatic",
                 },
               ],
+              "@babel/preset-typescript",
             ],
           },
         },
@@ -59,7 +60,7 @@ module.exports = (_env, argv) => {
       ],
     },
     resolve: {
-      extensions: ["*", ".js", ".jsx"],
+      extensions: ["*", ".ts", ".tsx", ".js", ".jsx"],
       alias: {
         "@": path.resolve(__dirname, "src"),
         "@app": path.resolve(__dirname, "src/app"),
