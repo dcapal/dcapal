@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
+import { useAppStore } from "@/state/appStore";
 import { PortfolioCard } from "./portfolioCard";
 import { useNavigate } from "react-router-dom";
 import { InputText } from "@components/core/inputText";
@@ -114,8 +115,8 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
   const { t } = useTranslation();
   const [name, setName] = useState("");
 
-  const ccys = useSelector((state) => state.app.currencies);
-  const preferredCcy = useSelector((state) => state.app.preferredCurrency);
+  const ccys = useAppStore((state) => state.currencies);
+  const preferredCcy = useAppStore((state) => state.preferredCurrency);
   const sortedCcys = [...ccys].sort(sortCcy);
 
   const [selectedCcy, setSelectedCcy] = useState(

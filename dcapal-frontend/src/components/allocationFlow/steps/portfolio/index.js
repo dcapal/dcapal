@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
+import { useAppStore } from "@/state/appStore";
 
 import toast from "react-hot-toast";
 
@@ -64,7 +65,7 @@ export const PortfolioStep = () => {
   const pfolioName = useSelector((state) => currentPortfolio(state).name);
   const assetStore = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const validCcys = useSelector((state) => state.app.currencies);
+  const validCcys = useAppStore((state) => state.currencies);
   const lastRefreshTime = useSelector(
     (state) => currentPortfolio(state).lastPriceRefresh
   );

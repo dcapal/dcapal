@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Fuse from "fuse.js";
 import { useSelector } from "react-redux";
+import { useAppStore } from "@/state/appStore";
 import {
   fetchAssetsYF,
   fetchAssetsDcaPal,
@@ -261,7 +262,7 @@ const SearchItemCW = (props) => {
 
 const SearchItemYF = (props) => {
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const validCcys = useSelector((state) => state.app.currencies);
+  const validCcys = useAppStore((state) => state.currencies);
   const { t, i18n } = useTranslation();
 
   const [price, setPrice] = useState(null);
