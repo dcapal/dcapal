@@ -19,6 +19,7 @@ import {
 import createMigrate from "redux-persist/es/createMigrate";
 import { mapValues } from "@utils/index.js";
 import { REFRESH_PRICE_INTERVAL_SEC } from "./config";
+import { bindAppStoreToRedux } from "@/state/appStore";
 
 const migrations = {
   0: (state) => {
@@ -123,5 +124,7 @@ export const store = configureStore({
       },
     }),
 });
+
+bindAppStoreToRedux(store);
 
 export const persistor = persistStore(store);

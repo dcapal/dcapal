@@ -8,13 +8,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  DOCKER_REPO: leonardoarcari/dcapal
 
 jobs:
   backend-build-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -42,9 +41,9 @@ jobs:
           RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
 
   optimizer-build-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -78,17 +77,17 @@ jobs:
           wasm-pack build
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
 
   frontend-check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-slim
     needs: optimizer-build-test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
@@ -100,19 +99,24 @@ jobs:
           npm ci
           npm run check
 
+      - name: Typecheck
+        run: |
+          cd dcapal-frontend
+          npm run typecheck
+
   frontend-build-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: [frontend-check, optimizer-build-test]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
           cache-dependency-path: dcapal-frontend/package-lock.json
 
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -127,64 +131,38 @@ jobs:
           cd dcapal-frontend
           npm run build
 
-  frontend-e2e-tests:
+      - name: Unit tests
+        run: |
+          cd dcapal-frontend
+          npm run test:unit
+
+  backend-smoke-test:
     timeout-minutes: 60
-    runs-on: ubuntu-latest
-    needs: [frontend-check, optimizer-build-test]
+    runs-on: ubuntu-24.04
     env:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
       POSTGRES_DB: postgres
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     steps:
-      - name: Free up disk space # This is because the CI fails with no space left on device otherwise
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc # Haskell
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /opt/hostedtoolcache/go
-          sudo rm -rf /usr/local/share/powershell
-          sudo docker image prune --all --force
-          df -h
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
-          cache-dependency-path: dcapal-frontend/package-lock.json
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      # Prebuild backend Docker image to leverage cached layers
       - name: Build dcapal-backend image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./dcapal-backend/docker/Dockerfile
-          push: true
-          tags: localhost:5000/${{ env.DOCKER_REPO }}:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-      - name: Use local registry image
+          load: true
+          push: false
+          tags: dcapal-backend:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Configure dcapal env
         run: |
           cat > dcapal-backend/dcapal.env << EOF
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -193,7 +171,6 @@ jobs:
           POSTGRES_DB=${POSTGRES_DB}
           POSTGRES_PORT=${POSTGRES_PORT}
           EOF
-
       - name: Configure dcapal.yml
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
@@ -229,34 +206,56 @@ jobs:
               password: ${POSTGRES_PASSWORD}
               database: ${POSTGRES_DB}
           EOF
-
-      - name: Use local registry image
+      - name: Configure docker compose override
         run: |
           cat > dcapal-backend/docker-compose.override.yml << EOF
           services:
             dcapal:
-              image: localhost:5000/${DOCKER_REPO}:latest
+              image: dcapal-backend:smoke
               env_file: dcapal.env
           EOF
-
       - name: Install Supabase
-        run: |
-          make supabase-up
-
-      - name: Run dcapal-backend
+        run: make supabase-up
+      - name: Run backend stack and wait for health
         run: |
           cd dcapal-backend
-          if ! docker compose -f docker-compose.yml \
-                              -f ./docker/docker-compose.local.yml \
-                              -f docker-compose.override.yml \
-                              up --no-build --wait --wait-timeout 120; then
-            echo "Docker Compose failed. Printing logs:"
-            docker compose logs
-            exit 1
-          fi
+          docker compose -f docker-compose.yml \
+                         -f ./docker/docker-compose.local.yml \
+                         -f docker-compose.override.yml \
+                         up --no-build --wait --wait-timeout 120
+      - name: Print backend logs on failure
+        if: failure()
+        run: |
+          cd dcapal-backend
+          docker compose -f docker-compose.yml \
+                         -f ./docker/docker-compose.local.yml \
+                         -f docker-compose.override.yml \
+                         logs
+      - name: Stop backend stack
+        if: always()
+        run: |
+          cd dcapal-backend
+          docker compose -f docker-compose.yml \
+                         -f ./docker/docker-compose.local.yml \
+                         -f docker-compose.override.yml \
+                         down
+      - name: Stop Supabase
+        if: always()
+        run: make supabase-down
 
+  frontend-e2e-tests:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    needs: [frontend-check, optimizer-build-test]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+          cache-dependency-path: dcapal-frontend/package-lock.json
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -264,31 +263,23 @@ jobs:
       - name: Install dependencies
         run: cd dcapal-frontend && npm ci
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('dcapal-frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-
+
       - name: Install Playwright Browsers
         run: cd dcapal-frontend && npx playwright install --with-deps
 
       - name: Run Playwright tests
         run: cd dcapal-frontend && npx playwright test
 
-      - name: Stop dcapal-backend
-        run: |
-          cd dcapal-backend && \
-          docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
-          down
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: playwright-report
           path: dcapal-frontend/playwright-report/
           retention-days: 30
-
-      - # Temp fix: Docker cache layer
-        # https://github.com/docker/build-push-action/issues/252
-        # https://github.com/moby/buildkit/issues/1896
-        name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache

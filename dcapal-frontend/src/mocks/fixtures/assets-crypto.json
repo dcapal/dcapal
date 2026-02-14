@@ -1,0 +1,12 @@
+[
+  {
+    "type": "Crypto",
+    "id": "btc",
+    "symbol": "BTC"
+  },
+  {
+    "type": "Crypto",
+    "id": "eth",
+    "symbol": "ETH"
+  }
+]

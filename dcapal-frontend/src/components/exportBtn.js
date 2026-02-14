@@ -1,6 +1,7 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import { Step } from "@app/appSlice";
+import { useAppStore } from "@/state/appStore";
 import {
   aclassToString,
   currentPortfolio,
@@ -66,7 +67,7 @@ const exportPfolio = ({ name, assets, quoteCcy, fees }) => {
 export const ExportBtn = () => {
   const { t } = useTranslation();
 
-  const step = useSelector((state) => state.app.allocationFlowStep);
+  const step = useAppStore((state) => state.allocationFlowStep);
 
   const name = useSelector((state) => currentPortfolio(state)?.name);
   const assets = useSelector((state) => currentPortfolio(state)?.assets);

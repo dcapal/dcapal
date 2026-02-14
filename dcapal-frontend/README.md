@@ -22,3 +22,15 @@ Run the frontend server
 cd dcapal/dcapal-frontend
 npm run start
 ```
+
+## E2E smoke tests
+
+Run Playwright smoke tests with deterministic MSW fixtures for backend APIs
+(`/api/assets/*`, `/api/price/*`, import endpoints, and sync endpoints):
+
+```shell
+cd dcapal/dcapal-frontend
+npm run test:e2e
+```
+
+These smoke tests do not require local backend containers.

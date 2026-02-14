@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
+import { useAppStore } from "@/state/appStore";
 
 import toast from "react-hot-toast";
 
@@ -27,7 +28,7 @@ import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
 import PDF from "@images/icons/pdf-document.svg";
-import { getFetcher } from "@app/providers";
+import { getFetcher } from "@/api";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
@@ -64,7 +65,7 @@ export const PortfolioStep = () => {
   const pfolioName = useSelector((state) => currentPortfolio(state).name);
   const assetStore = useSelector((state) => currentPortfolio(state).assets);
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const validCcys = useSelector((state) => state.app.currencies);
+  const validCcys = useAppStore((state) => state.currencies);
   const lastRefreshTime = useSelector(
     (state) => currentPortfolio(state).lastPriceRefresh
   );

@@ -9,7 +9,7 @@ import {
   setBudget,
 } from "@components/allocationFlow/portfolioSlice";
 import { Trans, useTranslation } from "react-i18next";
-import { spawn, Thread, Worker } from "threads";
+import { analyze } from "@/compute";
 import { replacer } from "@utils/index.js";
 import { Button } from "@/components/ui/button";
 
@@ -59,31 +59,10 @@ export const InvestStep = ({
   useEffect(() => {
     if (totalAmount === 0) return;
 
-    const launchSolver = async () => {
-      const solver = await spawn(
-        new Worker(new URL("@workers/analyzer.js", import.meta.url), {
-          name: "wasm-analyzer-worker",
-        })
-      );
-
-      const as = buildProblemInput(assets);
-
-      try {
-        const sol = await solver.analyzeAndSolve(as);
-
-        await Thread.terminate(solver);
-
-        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-
-        return sol;
-      } catch (error) {
-        console.error("Unexpected exception in dcapal-optimizer:", error);
-        return null;
-      }
-    };
-
     const solve = async () => {
-      const sol = await launchSolver();
+      const as = buildProblemInput(assets);
+      const sol = await analyze(as);
+      console.debug(`solution=${JSON.stringify(sol, replacer)}`);
       setIsLoading(false);
       if (sol) {
         setSolution(sol);
