@@ -5,9 +5,90 @@ import {
   feeTypeToString,
 } from "@components/allocationFlow/portfolioSlice";
 
-const parseFees = (fees) => {
+interface FeeStructureInput {
+  type: number;
+  feeAmount?: number;
+  feeRate?: number;
+  minFee?: number;
+  maxFee?: number | null;
+  maxFeeImpact?: number | null;
+}
+
+interface FeesInput {
+  feeStructure: FeeStructureInput;
+}
+
+interface PortfolioAssetInput {
+  symbol: string;
+  name: string;
+  aclass: number;
+  baseCcy: string;
+  provider: string;
+  price: number;
+  qty: number;
+  targetWeight: number;
+  fees?: FeesInput | null;
+}
+
+interface PortfolioInput {
+  id: string;
+  name: string;
+  quoteCcy: string;
+  fees?: FeesInput | null;
+  assets: Record<string, PortfolioAssetInput>;
+  lastUpdatedAt: number | string | Date;
+}
+
+type PortfoliosMap = Record<string, PortfolioInput>;
+
+interface FeeStructurePayload {
+  type: string;
+  maxFeeImpact?: number | null;
+  feeAmount?: number;
+  feeRate?: number;
+  minFee?: number;
+  maxFee?: number;
+}
+
+interface FeesPayload {
+  feeStructure: FeeStructurePayload;
+}
+
+interface PortfolioAssetPayload {
+  symbol: string;
+  name: string;
+  aclass: string;
+  baseCcy: string;
+  provider: string;
+  price: number;
+  qty: number;
+  targetWeight: number;
+  fees: FeesPayload | null;
+}
+
+interface PortfolioPayload {
+  id: string;
+  name: string;
+  quoteCcy: string;
+  fees: FeesPayload | null;
+  assets: PortfolioAssetPayload[];
+  lastUpdatedAt: string;
+}
+
+interface SyncPortfoliosPayload {
+  portfolios: PortfolioPayload[];
+  deletedPortfolios: string[];
+}
+
+export interface SyncPortfoliosResponse {
+  updatedPortfolios: unknown[];
+  deletedPortfolios: string[];
+}
+
+const parseFees = (fees: FeesInput | null | undefined): FeesPayload | null => {
   if (!fees) return null;
-  const feeStructure = {
+
+  const feeStructure: FeeStructurePayload = {
     type: feeTypeToString(fees.feeStructure.type),
     maxFeeImpact: fees.feeStructure.maxFeeImpact,
   };
@@ -31,14 +112,17 @@ const parseFees = (fees) => {
   return { feeStructure };
 };
 
-export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
+export const syncPortfoliosAPI = async (
+  portfolios: PortfoliosMap,
+  deletedPortfolios: string[]
+): Promise<SyncPortfoliosResponse | null> => {
   try {
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
 
-    const transformedData = {
+    const transformedData: SyncPortfoliosPayload = {
       portfolios: Object.values(portfolios).map((p) => ({
         id: p.id,
         name: p.name,
@@ -71,7 +155,7 @@ export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
     });
 
     if (!response.ok) throw new Error("Sync failed");
-    return response.json();
+    return (await response.json()) as SyncPortfoliosResponse;
   } catch (error) {
     console.error("Sync error:", error);
     return null;

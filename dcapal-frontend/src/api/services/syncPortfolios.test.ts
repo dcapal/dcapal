@@ -19,7 +19,7 @@ vi.mock("@components/allocationFlow/portfolioSlice", () => ({
     FIXED: 20,
     VARIABLE: 30,
   },
-  feeTypeToString: (type) => {
+  feeTypeToString: (type: number) => {
     if (type === 10) return "zeroFee";
     if (type === 20) return "fixed";
     if (type === 30) return "variable";
@@ -31,9 +31,12 @@ vi.mock("@components/allocationFlow/portfolioSlice", () => ({
 import { syncPortfoliosAPI } from "./syncPortfolios";
 
 describe("syncPortfoliosAPI", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+    fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -41,7 +44,7 @@ describe("syncPortfoliosAPI", () => {
     getSession.mockResolvedValue({
       data: { session: { access_token: "fixture-token" } },
     });
-    global.fetch.mockResolvedValue({
+    fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ updatedPortfolios: [], deletedPortfolios: [] }),
     });
@@ -52,8 +55,8 @@ describe("syncPortfoliosAPI", () => {
       updatedPortfolios: [],
       deletedPortfolios: [],
     });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/sync/portfolios",
       expect.objectContaining({
         method: "POST",
@@ -71,14 +74,14 @@ describe("syncPortfoliosAPI", () => {
     const result = await syncPortfoliosAPI({}, []);
 
     expect(result).toBeNull();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("serializes non-empty portfolios and deletedPortfolios payload", async () => {
     getSession.mockResolvedValue({
       data: { session: { access_token: "fixture-token" } },
     });
-    global.fetch.mockResolvedValue({
+    fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ updatedPortfolios: [], deletedPortfolios: [] }),
     });
@@ -124,15 +127,21 @@ describe("syncPortfoliosAPI", () => {
 
     await syncPortfoliosAPI(portfolios, deletedPortfolios);
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const [url, options] = global.fetch.mock.calls[0];
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0] as [
+      string,
+      { headers: Record<string, string>; body: string }
+    ];
     expect(url).toBe("/api/v1/sync/portfolios");
     expect(options.headers).toStrictEqual({
       "Content-Type": "application/json",
       Authorization: "Bearer fixture-token",
     });
 
-    const body = JSON.parse(options.body);
+    const body = JSON.parse(options.body) as {
+      deletedPortfolios: string[];
+      portfolios: Array<Record<string, unknown>>;
+    };
     expect(body.deletedPortfolios).toStrictEqual(deletedPortfolios);
     expect(body.portfolios).toHaveLength(1);
     expect(body.portfolios[0]).toStrictEqual({

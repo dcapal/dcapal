@@ -1,9 +1,13 @@
 import { api } from "../httpClient";
 
-export const fetchImportedPortfolio = async (id) => {
+export type ImportedPortfolio = Record<string, unknown>;
+
+export const fetchImportedPortfolio = async (
+  id: string
+): Promise<ImportedPortfolio | null> => {
   const url = `/import/portfolio/${id}`;
   try {
-    const response = await api.get(url);
+    const response = await api.get<ImportedPortfolio>(url);
 
     if (response.status !== 200) {
       console.error(
