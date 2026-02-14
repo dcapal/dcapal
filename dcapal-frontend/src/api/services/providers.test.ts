@@ -7,7 +7,7 @@ vi.mock("../httpClient", () => ({
   },
 }));
 
-vi.mock("@components/allocationFlow/portfolioSlice", () => ({
+vi.mock("@/state/portfolioDomain", () => ({
   ACLASS: {
     CURRENCY: 30,
     CRYPTO: 20,

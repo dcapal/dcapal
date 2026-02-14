@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Fuse from "fuse.js";
-import { useSelector } from "react-redux";
 import { useAppStore } from "@/state/appStore";
+import { useCurrentPortfolio } from "@/state/portfolioStore";
 import {
   fetchAssetsYF,
   fetchAssetsDcaPal,
@@ -12,7 +12,6 @@ import {
   Provider,
 } from "@/api";
 import { Spinner } from "@components/spinner/spinner";
-import { currentPortfolio } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 let searchId = undefined;
@@ -177,7 +176,7 @@ const SearchHeader = (props) => (
 
 const SearchItemCW = (props) => {
   const { i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
 
   const [price, setPrice] = useState(null);
   const cancelTokenSources = { price: useRef(null) };
@@ -261,7 +260,7 @@ const SearchItemCW = (props) => {
 };
 
 const SearchItemYF = (props) => {
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
   const validCcys = useAppStore((state) => state.currencies);
   const { t, i18n } = useTranslation();
 

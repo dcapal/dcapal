@@ -3,13 +3,13 @@ import {
   aclassToString,
   FeeType,
   feeTypeToString,
-} from "@components/allocationFlow/portfolioSlice";
+} from "@/state/portfolioDomain";
 
 interface FeeStructureInput {
   type: number;
-  feeAmount?: number;
-  feeRate?: number;
-  minFee?: number;
+  feeAmount?: number | null;
+  feeRate?: number | null;
+  minFee?: number | null;
   maxFee?: number | null;
   maxFeeImpact?: number | null;
 }
@@ -95,11 +95,17 @@ const parseFees = (fees: FeesInput | null | undefined): FeesPayload | null => {
 
   switch (fees.feeStructure.type) {
     case FeeType.FIXED:
-      feeStructure.feeAmount = fees.feeStructure.feeAmount;
+      if (fees.feeStructure.feeAmount != null) {
+        feeStructure.feeAmount = fees.feeStructure.feeAmount;
+      }
       break;
     case FeeType.VARIABLE:
-      feeStructure.feeRate = fees.feeStructure.feeRate;
-      feeStructure.minFee = fees.feeStructure.minFee;
+      if (fees.feeStructure.feeRate != null) {
+        feeStructure.feeRate = fees.feeStructure.feeRate;
+      }
+      if (fees.feeStructure.minFee != null) {
+        feeStructure.minFee = fees.feeStructure.minFee;
+      }
       if (fees.feeStructure.maxFee) {
         feeStructure.maxFee = fees.feeStructure.maxFee;
       }

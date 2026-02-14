@@ -1,10 +1,11 @@
 import { useEffect, useCallback, useState } from "react";
-import { useDispatch } from "react-redux";
-import { syncPortfolios } from "@components/allocationFlow/portfolioSlice";
+import { usePortfolioStore } from "@/state/portfolioStore";
 import { supabase } from "@app/config";
 
 export function useSyncPortfolios(intervalMs = 5000) {
-  const dispatch = useDispatch();
+  const syncPortfoliosNow = usePortfolioStore(
+    (state) => state.syncPortfoliosNow
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Check auth state on mount and listen for changes
@@ -28,8 +29,8 @@ export function useSyncPortfolios(intervalMs = 5000) {
 
   const syncData = useCallback(() => {
     if (!isAuthenticated) return;
-    dispatch(syncPortfolios());
-  }, [dispatch, isAuthenticated]);
+    syncPortfoliosNow();
+  }, [syncPortfoliosNow, isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;

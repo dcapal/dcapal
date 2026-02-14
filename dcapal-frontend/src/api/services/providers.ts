@@ -1,6 +1,6 @@
 import axios, { type CancelToken } from "axios";
 import { api } from "../httpClient";
-import { ACLASS } from "@components/allocationFlow/portfolioSlice";
+import { ACLASS } from "@/state/portfolioDomain";
 
 export const Provider = Object.freeze({
   DCA_PAL: "DCAPal",

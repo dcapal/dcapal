@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "../httpClient";
-import { ACLASS } from "@components/allocationFlow/portfolioSlice";
+import { ACLASS } from "@/state/portfolioDomain";
 
 interface YahooSearchQuote {
   quoteType?: string;

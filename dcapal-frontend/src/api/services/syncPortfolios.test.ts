@@ -13,7 +13,7 @@ vi.mock("@app/config", () => ({
   },
 }));
 
-vi.mock("@components/allocationFlow/portfolioSlice", () => ({
+vi.mock("@/state/portfolioDomain", () => ({
   FeeType: {
     ZERO_FEE: 10,
     FIXED: 20,

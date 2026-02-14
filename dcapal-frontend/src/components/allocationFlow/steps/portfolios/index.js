@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useAppStore } from "@/state/appStore";
+import { getNewPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 import { PortfolioCard } from "./portfolioCard";
 import { useNavigate } from "react-router-dom";
 import { InputText } from "@components/core/inputText";
@@ -11,18 +12,13 @@ import {
   setAllocationFlowStep,
   setPreferredCurrency,
 } from "@app/appSlice";
-import {
-  addPortfolio,
-  getNewPortfolio,
-  selectPortfolio,
-} from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@app/config";
 
 export const PortfoliosStep = () => {
   const { t } = useTranslation();
-  const pfolios = useSelector((state) => state.pfolio.pfolios);
+  const pfolios = usePortfolioStore((state) => state.pfolios);
   const [showNewPfolio, setShowNewPfolio] = useState(
     Object.keys(pfolios).length === 0
   );
@@ -113,6 +109,8 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const addPortfolio = usePortfolioStore((state) => state.addPortfolio);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
   const [name, setName] = useState("");
 
   const ccys = useAppStore((state) => state.currencies);
@@ -138,8 +136,8 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
     pfolio.name = name;
     pfolio.quoteCcy = selectedCcy;
 
-    dispatch(addPortfolio({ pfolio: pfolio }));
-    dispatch(selectPortfolio({ id: pfolio.id }));
+    addPortfolio({ pfolio: pfolio });
+    selectPortfolio({ id: pfolio.id });
     dispatch(setPreferredCurrency({ ccy: selectedCcy }));
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
   };

@@ -1,41 +1,46 @@
 import React from "react";
-import { useDispatch, useSelector } from "react-redux";
 import {
   FeeType,
-  currentPortfolio,
-  setFeeType,
-  setFeeTypeAsset,
-  setFixedFeeAmount,
-  setFixedFeeAmountAsset,
-  setMaxFeeImpact,
-  setMaxFeeImpactAsset,
-  setVariableFee,
-  setVariableFeeAsset,
-} from "@components/allocationFlow/portfolioSlice";
+  useCurrentPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 import classNames from "classnames";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import { Trans, useTranslation } from "react-i18next";
 
 export const TransactionFees = ({ asset }) => {
-  const dispatch = useDispatch();
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const pfolio = useCurrentPortfolio();
+  const quoteCcy = pfolio?.quoteCcy || "";
   const { t } = useTranslation();
+  const setFeeType = usePortfolioStore((state) => state.setFeeType);
+  const setFeeTypeAsset = usePortfolioStore((state) => state.setFeeTypeAsset);
+  const setFixedFeeAmount = usePortfolioStore(
+    (state) => state.setFixedFeeAmount
+  );
+  const setFixedFeeAmountAsset = usePortfolioStore(
+    (state) => state.setFixedFeeAmountAsset
+  );
+  const setMaxFeeImpact = usePortfolioStore((state) => state.setMaxFeeImpact);
+  const setMaxFeeImpactAsset = usePortfolioStore(
+    (state) => state.setMaxFeeImpactAsset
+  );
+  const setVariableFee = usePortfolioStore((state) => state.setVariableFee);
+  const setVariableFeeAsset = usePortfolioStore(
+    (state) => state.setVariableFeeAsset
+  );
 
-  const fees = useSelector((state) => {
-    const pfolio = currentPortfolio(state);
-    return asset && asset in pfolio.assets
+  const fees =
+    asset && pfolio && asset in pfolio.assets
       ? pfolio.assets[asset].fees || pfolio.fees
-      : pfolio.fees;
-  });
+      : pfolio?.fees;
 
-  const feeType = useSelector((state) => {
-    const pfolio = currentPortfolio(state);
-    return asset
-      ? asset in pfolio.assets && pfolio.assets[asset].fees
-        ? pfolio.assets[asset].fees.feeStructure.type
-        : null
-      : pfolio.fees.feeStructure.type;
-  });
+  const feeType = (() => {
+    if (!pfolio) return null;
+    if (!asset) return pfolio.fees?.feeStructure?.type;
+    return asset in pfolio.assets && pfolio.assets[asset].fees
+      ? pfolio.assets[asset].fees?.feeStructure?.type
+      : null;
+  })();
 
   const maxFeeImpact = fees?.maxFeeImpact || null;
   const fixedFeeAmount = fees?.feeStructure?.feeAmount || null;
@@ -50,33 +55,33 @@ export const TransactionFees = ({ asset }) => {
 
   const setSelected = (type) => {
     if (!asset) {
-      dispatch(setFeeType({ type: type }));
+      setFeeType({ type: type });
     } else {
-      dispatch(setFeeTypeAsset({ type: type, symbol: asset }));
+      setFeeTypeAsset({ type: type, symbol: asset });
     }
   };
 
   const onChangeMaxFeeImpact = (value) => {
     if (!asset) {
-      dispatch(setMaxFeeImpact({ value: value }));
+      setMaxFeeImpact({ value: value });
     } else {
-      dispatch(setMaxFeeImpactAsset({ value: value, symbol: asset }));
+      setMaxFeeImpactAsset({ value: value, symbol: asset });
     }
   };
 
   const onChangeFeeAmount = (value) => {
     if (!asset) {
-      dispatch(setFixedFeeAmount({ value: value }));
+      setFixedFeeAmount({ value: value });
     } else {
-      dispatch(setFixedFeeAmountAsset({ value: value, symbol: asset }));
+      setFixedFeeAmountAsset({ value: value, symbol: asset });
     }
   };
 
   const onChangeVariableFee = (value) => {
     if (!asset) {
-      dispatch(setVariableFee({ ...value }));
+      setVariableFee({ ...value });
     } else {
-      dispatch(setVariableFeeAsset({ ...value, symbol: asset }));
+      setVariableFeeAsset({ ...value, symbol: asset });
     }
   };
 
