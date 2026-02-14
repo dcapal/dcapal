@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
+import { useAppStore } from "@/state/appStore";
+import { useCurrentPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 
 import toast from "react-hot-toast";
 
@@ -10,16 +12,6 @@ import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 import { PortfolioSummaryDocument } from "./documentSummary";
 
-import {
-  addAsset,
-  currentPortfolio,
-  selectPortfolio,
-  setPrice,
-  setQty,
-  setRefreshTime,
-  setTargetWeight,
-} from "@components/allocationFlow/portfolioSlice";
-
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
@@ -27,16 +19,23 @@ import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
 import PDF from "@images/icons/pdf-document.svg";
-import { getFetcher } from "@app/providers";
+import { getFetcher } from "@/api";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
 
-const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
+const refreshAssetPrices = async (
+  assets,
+  quoteCcy,
+  validCcys,
+  setPrice,
+  setRefreshTime,
+  t
+) => {
   console.debug("Refreshing prices (", new Date(), ")");
 
   if (Object.keys(assets) < 1) {
-    dispatch(setRefreshTime({ time: Date.now() }));
+    setRefreshTime({ time: Date.now() });
     return;
   }
 
@@ -50,27 +49,32 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
       );
       return;
     }
-    dispatch(setPrice({ symbol: a.symbol, price: price }));
+    setPrice({ symbol: a.symbol, price: price });
   });
 
   toast.success(t("common.refreshedPrices"));
-  dispatch(setRefreshTime({ time: Date.now() }));
+  setRefreshTime({ time: Date.now() });
 };
 
 export const PortfolioStep = () => {
   const [searchText, setSearchText] = useState("");
 
   const { t, i18n } = useTranslation();
-  const pfolioName = useSelector((state) => currentPortfolio(state).name);
-  const assetStore = useSelector((state) => currentPortfolio(state).assets);
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const validCcys = useSelector((state) => state.app.currencies);
-  const lastRefreshTime = useSelector(
-    (state) => currentPortfolio(state).lastPriceRefresh
-  );
+  const pfolio = useCurrentPortfolio();
+  const pfolioName = pfolio?.name || "";
+  const assetStore = pfolio?.assets || {};
+  const quoteCcy = pfolio?.quoteCcy || "";
+  const validCcys = useAppStore((state) => state.currencies);
+  const lastRefreshTime = pfolio?.lastPriceRefresh || 0;
 
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const dispatch = useDispatch();
+  const addAsset = usePortfolioStore((state) => state.addAsset);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
+  const setPrice = usePortfolioStore((state) => state.setPrice);
+  const setQty = usePortfolioStore((state) => state.setQty);
+  const setRefreshTime = usePortfolioStore((state) => state.setRefreshTime);
+  const setTargetWeight = usePortfolioStore((state) => state.setTargetWeight);
 
   useEffect(() => {
     let timeout = null;
@@ -82,12 +86,26 @@ export const PortfolioStep = () => {
       );
 
       if (now > nextRefresh) {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
+        await refreshAssetPrices(
+          assetStore,
+          quoteCcy,
+          validCcys,
+          setPrice,
+          setRefreshTime,
+          t
+        );
         return;
       }
 
       timeout = setTimeout(async () => {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
+        await refreshAssetPrices(
+          assetStore,
+          quoteCcy,
+          validCcys,
+          setPrice,
+          setRefreshTime,
+          t
+        );
       }, nextRefresh - now);
     };
 
@@ -112,21 +130,19 @@ export const PortfolioStep = () => {
     assets && assets.length === 1 && assets[0].targetWeight > 0;
 
   const addAssetToPortfolio = (asset) => {
-    dispatch(
-      addAsset({
-        symbol: asset.symbol,
-        name: asset.name,
-        aclass: asset.aclass,
-        price: asset.price,
-        baseCcy: asset.baseCcy,
-        provider: asset.provider,
-      })
-    );
+    addAsset({
+      symbol: asset.symbol,
+      name: asset.name,
+      aclass: asset.aclass,
+      price: asset.price,
+      baseCcy: asset.baseCcy,
+      provider: asset.provider,
+    });
     setSearchText("");
   };
 
   const onClickGoBack = () => {
-    dispatch(selectPortfolio({ id: null }));
+    selectPortfolio({ id: null });
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
   };
 
@@ -156,16 +172,14 @@ export const PortfolioStep = () => {
       <div className="w-full flex flex-col items-center">
         {assets.map((a, idx) => {
           const setAssetQty = (qty) => {
-            dispatch(setQty({ symbol: a.symbol, qty: qty }));
+            setQty({ symbol: a.symbol, qty: qty });
           };
 
           const setAssetTargetWeight = (w) => {
-            dispatch(
-              setTargetWeight({
-                symbol: a.symbol,
-                weight: w,
-              })
-            );
+            setTargetWeight({
+              symbol: a.symbol,
+              weight: w,
+            });
           };
 
           return (

@@ -1,56 +1,20 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { api } from "@app/api";
 import Fuse from "fuse.js";
-import { useSelector } from "react-redux";
+import { useAppStore } from "@/state/appStore";
+import { useCurrentPortfolio } from "@/state/portfolioStore";
 import {
+  fetchAssetsYF,
   fetchAssetsDcaPal,
   FetchError,
   fetchPrice,
   fetchPriceYF,
   Provider,
-} from "@app/providers";
-import { DCAPAL_API } from "@app/config";
+} from "@/api";
 import { Spinner } from "@components/spinner/spinner";
-import {
-  ACLASS,
-  currentPortfolio,
-} from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 
 let searchId = undefined;
-
-const fetchAssetsYF = async (query) => {
-  const url = `${DCAPAL_API}/assets/search?name=${query}`;
-  try {
-    const response = await api.get(url);
-
-    if (response.status !== 200) {
-      console.error(
-        `Response {status: ${response.status}, data: ${response.data}}`
-      );
-      return [];
-    }
-
-    return response.data.quotes
-      .filter((quote) => {
-        const type = quote.quoteType.toUpperCase();
-        return type === "EQUITY" || type === "ETF" || type === "MUTUALFUND";
-      })
-      .map((quote) => ({
-        name: quote.longname || quote.shortname || "",
-        symbol: quote.symbol,
-        type: quote.quoteType,
-        exchange: quote.exchange,
-        aclass: ACLASS.EQUITY,
-      }));
-  } catch (error) {
-    if (!axios.isCancel(error)) {
-      console.error(error);
-    }
-    return [];
-  }
-};
 
 export const SearchBar = (props) => {
   const [results, setResults] = useState(null);
@@ -212,7 +176,7 @@ const SearchHeader = (props) => (
 
 const SearchItemCW = (props) => {
   const { i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
 
   const [price, setPrice] = useState(null);
   const cancelTokenSources = { price: useRef(null) };
@@ -296,8 +260,8 @@ const SearchItemCW = (props) => {
 };
 
 const SearchItemYF = (props) => {
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const validCcys = useSelector((state) => state.app.currencies);
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
+  const validCcys = useAppStore((state) => state.currencies);
   const { t, i18n } = useTranslation();
 
   const [price, setPrice] = useState(null);

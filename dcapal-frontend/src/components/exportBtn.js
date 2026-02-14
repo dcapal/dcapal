@@ -1,11 +1,11 @@
 import React from "react";
-import { useSelector } from "react-redux";
 import { Step } from "@app/appSlice";
+import { useAppStore } from "@/state/appStore";
 import {
   aclassToString,
-  currentPortfolio,
   feeTypeToString,
-} from "@components/allocationFlow/portfolioSlice";
+  useCurrentPortfolio,
+} from "@/state/portfolioStore";
 import { useTranslation } from "react-i18next";
 import { ignoreNullReplacer } from "@utils";
 import { Button } from "./ui/button";
@@ -66,16 +66,17 @@ const exportPfolio = ({ name, assets, quoteCcy, fees }) => {
 export const ExportBtn = () => {
   const { t } = useTranslation();
 
-  const step = useSelector((state) => state.app.allocationFlowStep);
+  const step = useAppStore((state) => state.allocationFlowStep);
+  const pfolio = useCurrentPortfolio();
 
-  const name = useSelector((state) => currentPortfolio(state)?.name);
-  const assets = useSelector((state) => currentPortfolio(state)?.assets);
-  const quoteCcy = useSelector((state) => currentPortfolio(state)?.quoteCcy);
-  const fees = useSelector((state) => currentPortfolio(state)?.fees);
+  const name = pfolio?.name;
+  const assets = pfolio?.assets ?? {};
+  const quoteCcy = pfolio?.quoteCcy;
+  const fees = pfolio?.fees;
 
   const exportedFees = toExportedFees(fees);
 
-  const pfolio = {
+  const exportData = {
     name: name,
     assets: assets,
     quoteCcy: quoteCcy,
@@ -83,10 +84,12 @@ export const ExportBtn = () => {
   };
 
   const isDisplay =
-    step && step === Step.PORTFOLIO && Object.keys(pfolio.assets).length > 0;
+    step &&
+    step === Step.PORTFOLIO &&
+    Object.keys(exportData.assets).length > 0;
 
   const onClick = () => {
-    exportPfolio(pfolio);
+    exportPfolio(exportData);
   };
 
   return (

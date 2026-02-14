@@ -1,21 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { spawn, Thread, Worker } from "threads";
+import { useDispatch } from "react-redux";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import { toast } from "react-hot-toast";
 import {
   ACLASS,
-  clearBudget,
-  currentPortfolio,
   feeTypeToString,
   isWholeShares,
-  setQty,
-} from "@components/allocationFlow/portfolioSlice";
+  useCurrentPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { solve as runSolver } from "@/compute";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -139,21 +138,18 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const dispatch = useDispatch();
 
   const { t } = useTranslation();
-  const budget = useSelector((state) => currentPortfolio(state).budget);
-  const assets = useSelector((state) => currentPortfolio(state).assets);
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const fees = useSelector((state) => currentPortfolio(state).fees);
+  const pfolio = useCurrentPortfolio();
+  const setQty = usePortfolioStore((state) => state.setQty);
+  const clearBudget = usePortfolioStore((state) => state.clearBudget);
+  const budget = pfolio?.budget || 0;
+  const assets = pfolio?.assets || {};
+  const quoteCcy = pfolio?.quoteCcy || "";
+  const fees = pfolio?.fees || null;
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
   useEffect(() => {
-    const launchSolver = async () => {
-      const solver = await spawn(
-        new Worker(new URL("@workers/solver.js", import.meta.url), {
-          name: "wasm-solver-worker",
-        })
-      );
-
+    const loadSolution = async () => {
       const [inputBudget, as, inputFees] = buildProblemInput(
         budget,
         assets,
@@ -169,36 +165,25 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
         )}`
       );
 
-      try {
-        const sol = await solver.makeAndSolve(
+      const [sol] = await Promise.all([
+        runSolver(
           inputBudget,
           as,
           quoteCcy,
           inputFees,
           useTaxEfficient,
           useAllBudget
-        );
-
-        await Thread.terminate(solver);
-
-        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-
-        return sol;
-      } catch (error) {
-        console.error("Unexpected exception in dcapal-optimizer:", error);
-        return null;
-      }
-    };
-
-    const solve = async () => {
-      const [sol] = await Promise.all([launchSolver(), timeout(1000)]);
+        ),
+        timeout(1000),
+      ]);
+      console.debug(`solution=${JSON.stringify(sol, replacer)}`);
       setIsLoading(false);
       if (sol) {
         setSolution(sol);
       }
     };
 
-    solve();
+    loadSolution();
   }, []);
 
   const onClickUpdate = () => {
@@ -217,12 +202,10 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
 
     if (updatedAssets.length > 0) {
       updatedAssets.forEach((card) => {
-        dispatch(
-          setQty({
-            symbol: card.symbol,
-            qty: card.qty,
-          })
-        );
+        setQty({
+          symbol: card.symbol,
+          qty: card.qty,
+        });
       });
 
       // Set updated state
@@ -244,12 +227,12 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
       });
     }
 
-    dispatch(clearBudget({}));
+    clearBudget();
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
   };
 
   const onClickGoBack = () => {
-    dispatch(clearBudget({}));
+    clearBudget();
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
   };
 

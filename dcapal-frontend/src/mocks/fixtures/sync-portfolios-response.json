@@ -1,0 +1,32 @@
+{
+  "updatedPortfolios": [
+    {
+      "id": "remote-1",
+      "name": "Remote Portfolio",
+      "quoteCcy": "usd",
+      "fees": {
+        "feeStructure": {
+          "type": "zeroFee"
+        }
+      },
+      "assets": [
+        {
+          "symbol": "VWCE",
+          "name": "Vanguard FTSE All-World UCITS ETF",
+          "aclass": "EQUITY",
+          "baseCcy": "usd",
+          "provider": "YF",
+          "qty": 2,
+          "targetWeight": 100,
+          "price": 110.5,
+          "fees": null
+        }
+      ],
+      "nextIdx": 1,
+      "totalAmount": 221,
+      "budget": 0,
+      "lastUpdatedAt": "2026-02-14T10:00:00.000Z"
+    }
+  ],
+  "deletedPortfolios": ["deleted-local"]
+}

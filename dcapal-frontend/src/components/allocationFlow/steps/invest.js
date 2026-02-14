@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import {
-  currentPortfolio,
   isWholeShares,
-  setBudget,
-} from "@components/allocationFlow/portfolioSlice";
+  useCurrentPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 import { Trans, useTranslation } from "react-i18next";
-import { spawn, Thread, Worker } from "threads";
+import { analyze } from "@/compute";
 import { replacer } from "@utils/index.js";
 import { Button } from "@/components/ui/button";
 
@@ -43,12 +43,12 @@ export const InvestStep = ({
   const [cash, setCash] = useState(0);
   const dispatch = useDispatch();
   const { t } = useTranslation();
+  const setBudget = usePortfolioStore((state) => state.setBudget);
+  const pfolio = useCurrentPortfolio();
 
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const totalAmount = useSelector(
-    (state) => currentPortfolio(state).totalAmount
-  );
-  const assets = useSelector((state) => currentPortfolio(state).assets);
+  const quoteCcy = pfolio?.quoteCcy || "";
+  const totalAmount = pfolio?.totalAmount || 0;
+  const assets = pfolio?.assets || {};
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -59,31 +59,10 @@ export const InvestStep = ({
   useEffect(() => {
     if (totalAmount === 0) return;
 
-    const launchSolver = async () => {
-      const solver = await spawn(
-        new Worker(new URL("@workers/analyzer.js", import.meta.url), {
-          name: "wasm-analyzer-worker",
-        })
-      );
-
-      const as = buildProblemInput(assets);
-
-      try {
-        const sol = await solver.analyzeAndSolve(as);
-
-        await Thread.terminate(solver);
-
-        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-
-        return sol;
-      } catch (error) {
-        console.error("Unexpected exception in dcapal-optimizer:", error);
-        return null;
-      }
-    };
-
     const solve = async () => {
-      const sol = await launchSolver();
+      const as = buildProblemInput(assets);
+      const sol = await analyze(as);
+      console.debug(`solution=${JSON.stringify(sol, replacer)}`);
       setIsLoading(false);
       if (sol) {
         setSolution(sol);
@@ -112,7 +91,7 @@ export const InvestStep = ({
   };
 
   const onClickRunAllocation = () => {
-    dispatch(setBudget({ budget: cash }));
+    setBudget({ budget: cash });
     dispatch(setAllocationFlowStep({ step: Step.END }));
   };
 

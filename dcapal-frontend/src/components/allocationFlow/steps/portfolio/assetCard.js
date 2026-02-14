@@ -1,12 +1,8 @@
 import React from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useMediaQuery } from "@react-hook/media-query";
+import { useCurrentPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
-import {
-  currentPortfolio,
-  removeAsset,
-} from "@components/allocationFlow/portfolioSlice";
 import { MEDIA_SMALL } from "@app/config";
 import { useCollapse } from "react-collapsed";
 import classNames from "classnames";
@@ -27,8 +23,8 @@ export const AssetCard = ({
   ...props
 }) => {
   const { t, i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const dispatch = useDispatch();
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
+  const removeAsset = usePortfolioStore((state) => state.removeAsset);
   const isMobile = !useMediaQuery(MEDIA_SMALL);
   const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
@@ -38,7 +34,7 @@ export const AssetCard = ({
   };
 
   const onClickDelete = () => {
-    dispatch(removeAsset({ symbol: symbol }));
+    removeAsset({ symbol: symbol });
   };
 
   return (

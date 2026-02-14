@@ -1,32 +1,36 @@
 import React, { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
-import { getFetcher } from "@app/providers";
+import { useAppStore } from "@/state/appStore";
+import { getFetcher } from "@/api";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {
   ACLASS,
   FeeType,
-  addAsset,
-  addPortfolio,
   getDefaultFees,
   getDefaultPortfolioName,
-  getNewPortfolio,
   parseAClass,
   parseFees,
-  selectPortfolio,
-  setFeesAsset,
-  setQty,
-  setTargetWeight,
-} from "@components/allocationFlow/portfolioSlice";
+  getNewPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 
 import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
-const importPfolio = async (id, pfolio, validCcys, dispatch) => {
+const importPfolio = async (id, pfolio, validCcys, portfolioActions) => {
+  const {
+    addAsset,
+    addPortfolio,
+    selectPortfolio,
+    setFeesAsset,
+    setQty,
+    setTargetWeight,
+  } = portfolioActions;
+
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -54,8 +58,8 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
     return false;
   }
 
-  dispatch(addPortfolio({ pfolio: imported }));
-  dispatch(selectPortfolio({ id: imported.id }));
+  addPortfolio({ pfolio: imported });
+  selectPortfolio({ id: imported.id });
 
   for (const a of pfolio.assets) {
     const price = await getFetcher(a.provider, validCcys)(
@@ -71,19 +75,17 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
       continue;
     }
 
-    dispatch(
-      addAsset({
-        symbol: a.symbol,
-        name: a.name,
-        aclass: a.aclass ? parseAClass(a.aclass) : ACLASS.UNDEFINED,
-        baseCcy: a.baseCcy,
-        price: price,
-        provider: a.provider,
-      })
-    );
+    addAsset({
+      symbol: a.symbol,
+      name: a.name,
+      aclass: a.aclass ? parseAClass(a.aclass) : ACLASS.UNDEFINED,
+      baseCcy: a.baseCcy,
+      price: price,
+      provider: a.provider,
+    });
 
-    dispatch(setQty({ symbol: a.symbol, qty: a.qty }));
-    dispatch(setTargetWeight({ symbol: a.symbol, weight: a.targetWeight }));
+    setQty({ symbol: a.symbol, qty: a.qty });
+    setTargetWeight({ symbol: a.symbol, weight: a.targetWeight });
 
     const assetFees = (() => {
       if (a.fees != null && typeof a.fees === "object") {
@@ -93,7 +95,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
       }
     })();
 
-    dispatch(setFeesAsset({ symbol: a.symbol, fees: assetFees }));
+    setFeesAsset({ symbol: a.symbol, fees: assetFees });
   }
 
   return true;
@@ -106,10 +108,15 @@ export const ImportStep = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const addAsset = usePortfolioStore((state) => state.addAsset);
+  const addPortfolio = usePortfolioStore((state) => state.addPortfolio);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
+  const setFeesAsset = usePortfolioStore((state) => state.setFeesAsset);
+  const setQty = usePortfolioStore((state) => state.setQty);
+  const setTargetWeight = usePortfolioStore((state) => state.setTargetWeight);
 
-  const validCcys = useSelector((state) => state.app.currencies);
-
-  const pfolioFile = useSelector((state) => state.app.pfolioFile);
+  const validCcys = useAppStore((state) => state.currencies);
+  const pfolioFile = useAppStore((state) => state.pfolioFile);
   const pfolio = pfolioFile ? JSON.parse(pfolioFile) : {};
   if (Object.keys(pfolio).length > 0) {
     pfolio.name = pfolio.name ?? getDefaultPortfolioName();
@@ -129,7 +136,14 @@ export const ImportStep = () => {
         // Pass `pfolioId` to `importPfolio` to overcome component re-render
         // issues that ended up adding the imported portfolio multiple times
         // with different UUIDs
-        importPfolio(pfolioId, pfolio, validCcys, dispatch),
+        importPfolio(pfolioId, pfolio, validCcys, {
+          addAsset,
+          addPortfolio,
+          selectPortfolio,
+          setFeesAsset,
+          setQty,
+          setTargetWeight,
+        }),
         timeout(1000),
       ]);
 
