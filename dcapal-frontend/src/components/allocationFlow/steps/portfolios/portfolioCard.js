@@ -2,12 +2,7 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { InputText } from "@components/core/inputText";
 import { useDispatch } from "react-redux";
-import {
-  deletePortfolio,
-  duplicatePortfolio,
-  renamePortfolio,
-  selectPortfolio,
-} from "@components/allocationFlow/portfolioSlice";
+import { usePortfolioStore } from "@/state/portfolioStore";
 import { Step, setAllocationFlowStep } from "@app/appSlice";
 
 import EDIT_SVG from "@images/icons/edit.svg";
@@ -57,9 +52,15 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
 
   const dispatch = useDispatch();
   const { t, i18n } = useTranslation();
+  const deletePortfolio = usePortfolioStore((state) => state.deletePortfolio);
+  const duplicatePortfolio = usePortfolioStore(
+    (state) => state.duplicatePortfolio
+  );
+  const renamePortfolio = usePortfolioStore((state) => state.renamePortfolio);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
 
   const onClickPortfolio = () => {
-    dispatch(selectPortfolio({ id: id }));
+    selectPortfolio({ id: id });
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
   };
 
@@ -75,18 +76,18 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   };
 
   const onClickSave = () => {
-    dispatch(renamePortfolio({ id: id, name: newName }));
+    renamePortfolio({ id: id, name: newName });
     setState(CardState.VIEW);
     if (isAuthenticated) syncNow();
   };
 
   const onClickDelete = () => {
-    dispatch(deletePortfolio({ id: id }));
+    deletePortfolio({ id: id });
     if (isAuthenticated) syncNow();
   };
 
   const onClickDuplicate = () => {
-    dispatch(duplicatePortfolio({ id: id }));
+    duplicatePortfolio({ id: id });
     onClickEdit();
     if (isAuthenticated) syncNow();
   };
