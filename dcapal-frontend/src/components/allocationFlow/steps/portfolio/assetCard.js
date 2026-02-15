@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useMediaQuery } from "@react-hook/media-query";
 
@@ -18,6 +18,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 
@@ -42,20 +50,48 @@ const GainBadge = ({ gain, i18n }) => {
   );
 };
 
-const AbpTooltipIcon = ({ tooltip }) => (
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-neutral-200 text-neutral-600 text-[10px] cursor-help">
-          ?
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-[16rem]">
-        <p>{tooltip}</p>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
+const HelpIcon = () => (
+  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-neutral-200 text-neutral-600 text-[10px] cursor-help">
+    ?
+  </span>
 );
+
+const AbpHelpIcon = ({ title, tooltip, isMobile }) => {
+  const [open, setOpen] = useState(false);
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <button type="button">
+            <HelpIcon />
+          </button>
+        </DrawerTrigger>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>{title}</DrawerTitle>
+            <DrawerDescription>{tooltip}</DrawerDescription>
+          </DrawerHeader>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <HelpIcon />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[16rem]">
+          <p>{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 export const AssetCard = ({
   symbol,
@@ -160,8 +196,10 @@ export const AssetCard = ({
             <div className="flex items-center h-12">
               <div className="min-w-[6rem] max-w-[6rem] mr-2 font-light text-xs flex items-center gap-1">
                 {t("assetCard.averageBuyPrice")}
-                <AbpTooltipIcon
+                <AbpHelpIcon
+                  title={t("assetCard.averageBuyPrice")}
                   tooltip={t("assetCard.averageBuyPriceTooltip")}
+                  isMobile={true}
                 />
               </div>
               <div className="grow">
@@ -239,8 +277,10 @@ export const AssetCard = ({
               <div className="flex items-center h-12 mt-1">
                 <div className="w-12 mr-2 font-light text-xs flex items-center gap-1">
                   {t("assetCard.averageBuyPrice")}
-                  <AbpTooltipIcon
+                  <AbpHelpIcon
+                    title={t("assetCard.averageBuyPrice")}
                     tooltip={t("assetCard.averageBuyPriceTooltip")}
+                    isMobile={false}
                   />
                 </div>
                 <div className="w-40">
