@@ -1,0 +1,33 @@
+{
+  "name": "Imported Fixture Portfolio",
+  "quoteCcy": "eur",
+  "fees": {
+    "feeStructure": {
+      "type": "zeroFee"
+    }
+  },
+  "assets": [
+    {
+      "symbol": "VWCE.MI",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "aclass": "EQUITY",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 101.25,
+      "averageBuyPrice": 98.5,
+      "qty": 5,
+      "targetWeight": 60
+    },
+    {
+      "symbol": "AGGH.MI",
+      "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "aclass": "EQUITY",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 101.25,
+      "averageBuyPrice": 100.1,
+      "qty": 3,
+      "targetWeight": 40
+    }
+  ]
+}

@@ -77,6 +77,7 @@ module.exports = (_env, argv) => {
         path: `./.env.${
           argv.mode === "production" ? "production" : "development"
         }`,
+        systemvars: true,
       }),
       new HtmlWebpackPlugin({
         title: "DcaPal - A smart assistant for your periodic investments",

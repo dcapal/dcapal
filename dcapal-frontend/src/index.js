@@ -31,17 +31,41 @@ i18n
 document.documentElement.lang = i18n.language;
 i18n.on("languageChanged", (lang) => (document.documentElement.lang = lang));
 
-const root = createRoot(document.getElementById("app"));
-root.render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <BrowserRouter>
-          <Suspense fallback={<div>Loading...</div>}>
-            <Router />
-          </Suspense>
-        </BrowserRouter>
-      </PersistGate>
-    </Provider>
-  </React.StrictMode>
-);
+const startMocks = async () => {
+  if (process.env.REACT_APP_E2E_MSW !== "1") {
+    return;
+  }
+
+  const { worker } = await import("./mocks/browser");
+  await worker.start({
+    quiet: true,
+    onUnhandledRequest({ request }, print) {
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/")) {
+        print.error();
+        throw new Error(
+          `[MSW] Unhandled API request: ${request.method} ${url.pathname}`
+        );
+      }
+    },
+  });
+};
+
+const renderApp = () => {
+  const root = createRoot(document.getElementById("app"));
+  root.render(
+    <React.StrictMode>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <BrowserRouter>
+            <Suspense fallback={<div>Loading...</div>}>
+              <Router />
+            </Suspense>
+          </BrowserRouter>
+        </PersistGate>
+      </Provider>
+    </React.StrictMode>
+  );
+};
+
+startMocks().then(renderApp);
