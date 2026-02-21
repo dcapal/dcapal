@@ -98,11 +98,30 @@ const migrations = {
       },
     };
   },
+  6: (state) => {
+    return {
+      ...state,
+      pfolio: {
+        ...state.pfolio,
+        pfolios: Object.keys(state.pfolio.pfolios).reduce((acc, key) => {
+          const pfolio = state.pfolio.pfolios[key];
+          acc[key] = {
+            ...pfolio,
+            assets: mapValues(pfolio.assets, (a) => ({
+              ...a,
+              averageBuyPrice: null,
+            })),
+          };
+          return acc;
+        }, {}),
+      },
+    };
+  },
 };
 
 const rootConfig = {
   key: "root",
-  version: 5,
+  version: 6,
   storage,
   migrate: createMigrate(migrations, { debug: false }),
 };

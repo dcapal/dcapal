@@ -57,6 +57,7 @@ export const syncPortfoliosAPI = async (portfolios, deletedPortfolios) => {
           price: a.price,
           qty: a.qty,
           targetWeight: a.targetWeight,
+          averageBuyPrice: a.averageBuyPrice ?? a.price,
           fees: parseFees(a.fees),
         })),
         lastUpdatedAt: new Date(p.lastUpdatedAt).toISOString(),
