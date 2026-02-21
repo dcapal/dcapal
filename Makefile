@@ -96,3 +96,7 @@ local-up: supabase-up docker-local-up  ## Start full dev environment (Supabase +
 
 ## Stop full dev+local environment
 local-down: docker-local-down supabase-down  ## Stop full dev environment
+
+## Merge all dependabot PRs
+chore-merge-dependabot:  ## Merge all dependabot PRs
+	script/merge-dependabot.sh dcapal/dcapal master
