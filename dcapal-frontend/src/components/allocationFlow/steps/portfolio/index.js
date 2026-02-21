@@ -32,12 +32,7 @@ import { getFetcher } from "@app/providers";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ResponsiveHelpIcon } from "@components/core/helpIcon";
 
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
@@ -196,18 +191,14 @@ export const PortfolioStep = () => {
                 })}
                 %
               </span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-xs text-neutral-400 cursor-help">
-                      (MWR)
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[16rem]">
-                    <p>{t("portfolioStep.mwrTooltip")}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <span className="text-xs text-neutral-400">
+                (MWR)
+              </span>
+              <ResponsiveHelpIcon
+                title="MWR"
+                tooltip={t("portfolioStep.mwrTooltip")}
+                isMobile={isMobile}
+              />
             </span>
           )}
         </div>
