@@ -41,7 +41,7 @@ jobs:
           RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
 
   backend-openapi-check:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
