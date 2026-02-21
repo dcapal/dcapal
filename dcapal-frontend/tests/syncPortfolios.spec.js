@@ -31,6 +31,7 @@ test("sync portfolios e2e", async ({ request }) => {
             price: 76.38,
             qty: 10,
             targetWeight: 90,
+            averageBuyPrice: 70,
             fees: {
               feeStructure: {
                 type: "variable",
@@ -49,6 +50,7 @@ test("sync portfolios e2e", async ({ request }) => {
             price: 609.73,
             qty: 1,
             targetWeight: 10,
+            averageBuyPrice: 609.8,
             fees: {
               feeStructure: {
                 type: "fixed",
