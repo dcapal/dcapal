@@ -42,6 +42,8 @@ pub struct PortfolioAssetResponse {
     pub target_weight: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
     pub price: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
+    pub average_buy_price: Decimal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fees: Option<TransactionFeesResponse>,
 }
@@ -106,6 +108,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                     qty: asset.quantity,
                     target_weight: asset.target_weight,
                     price: asset.price,
+                    average_buy_price: asset.average_buy_price.unwrap_or(asset.price),
                     fees,
                 })
             })
@@ -219,6 +222,7 @@ mod test {
             fee_rate: None,
             min_fee: None,
             max_fee: None,
+            average_buy_price: Some(dec!(90.0)),
             created_at: Utc::now().into(),
             updated_at: Utc::now().into(),
         };
@@ -243,6 +247,7 @@ mod test {
                 qty: asset_model.quantity,
                 target_weight: asset_model.target_weight,
                 price: asset_model.price,
+                average_buy_price: dec!(90.0),
                 fees: None,
             }],
             last_updated_at: portfolio_model.last_updated_at.into(),
