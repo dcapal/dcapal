@@ -191,9 +191,7 @@ export const PortfolioStep = () => {
                 })}
                 %
               </span>
-              <span className="text-xs text-neutral-400">
-                (MWR)
-              </span>
+              <span className="text-xs text-neutral-400">(MWR)</span>
               <ResponsiveHelpIcon
                 title="MWR"
                 tooltip={t("portfolioStep.mwrTooltip")}
