@@ -40,6 +40,21 @@ jobs:
           cd dcapal-backend
           RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
 
+  backend-openapi-check:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Generate OpenAPI spec
+        run: make export-openapi
+
+      - name: Verify OpenAPI spec is up to date
+        run: git diff --exit-code -- dcapal-backend/docs/openapi.json
+
   optimizer-build-test:
     runs-on: ubuntu-latest
     steps:

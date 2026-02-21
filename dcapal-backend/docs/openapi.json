@@ -1,0 +1,1079 @@
+{
+  "components": {
+    "schemas": {
+      "Asset": {
+        "oneOf": [
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Crypto"
+              },
+              {
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "Crypto"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Fiat"
+              },
+              {
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "Fiat"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        ]
+      },
+      "Crypto": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol"
+        ],
+        "type": "object"
+      },
+      "FeeStructure": {
+        "oneOf": [
+          {
+            "properties": {
+              "type": {
+                "enum": [
+                  "zeroFee"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "feeAmount": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "fixed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "feeAmount",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "feeRate": {
+                "type": "string"
+              },
+              "maxFee": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "minFee": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "variable"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "feeRate",
+              "minFee",
+              "type"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Fiat": {
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/String"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol"
+        ],
+        "type": "object"
+      },
+      "ImportPortfolioResponse": {
+        "properties": {
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "type": "object"
+      },
+      "PortfolioAssetRequest": {
+        "properties": {
+          "aclass": {
+            "type": "string"
+          },
+          "baseCcy": {
+            "type": "string"
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesRequest"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "targetWeight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "aclass",
+          "baseCcy",
+          "provider",
+          "qty",
+          "targetWeight",
+          "price"
+        ],
+        "type": "object"
+      },
+      "PortfolioAssetResponse": {
+        "properties": {
+          "aclass": {
+            "type": "string"
+          },
+          "baseCcy": {
+            "type": "string"
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesResponse"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "targetWeight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "aclass",
+          "baseCcy",
+          "provider",
+          "qty",
+          "targetWeight",
+          "price"
+        ],
+        "type": "object"
+      },
+      "PortfolioRequest": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAssetRequest"
+            },
+            "type": "array"
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesRequest"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lastUpdatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quoteCcy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quoteCcy",
+          "assets",
+          "lastUpdatedAt"
+        ],
+        "type": "object"
+      },
+      "PortfolioResponse": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAssetResponse"
+            },
+            "type": "array"
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesResponse"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lastUpdatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quoteCcy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quoteCcy",
+          "assets",
+          "lastUpdatedAt"
+        ],
+        "type": "object"
+      },
+      "Price": {
+        "properties": {
+          "price": {
+            "format": "double",
+            "type": "number"
+          },
+          "ts": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "price",
+          "ts"
+        ],
+        "type": "object"
+      },
+      "String": {
+        "type": "string"
+      },
+      "SyncPortfoliosRequest": {
+        "properties": {
+          "deletedPortfolios": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "portfolios": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "portfolios",
+          "deletedPortfolios"
+        ],
+        "type": "object"
+      },
+      "SyncPortfoliosResponse": {
+        "properties": {
+          "deletedPortfolios": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedPortfolios": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioResponse"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "updatedPortfolios",
+          "deletedPortfolios"
+        ],
+        "type": "object"
+      },
+      "TransactionFeesRequest": {
+        "properties": {
+          "feeStructure": {
+            "$ref": "#/components/schemas/FeeStructure"
+          },
+          "maxFeeImpact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "feeStructure"
+        ],
+        "type": "object"
+      },
+      "TransactionFeesResponse": {
+        "properties": {
+          "feeStructure": {
+            "$ref": "#/components/schemas/FeeStructure"
+          },
+          "maxFeeImpact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "feeStructure"
+        ],
+        "type": "object"
+      },
+      "YahooChartIndicators": {
+        "properties": {
+          "quote": {
+            "items": {
+              "$ref": "#/components/schemas/YahooChartQuote"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooChartMeta": {
+        "properties": {
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooChartPayload": {
+        "properties": {
+          "error": {},
+          "result": {
+            "items": {
+              "$ref": "#/components/schemas/YahooChartResult"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooChartQuote": {
+        "properties": {
+          "close": {
+            "items": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooChartResponse": {
+        "properties": {
+          "chart": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/YahooChartPayload"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooChartResult": {
+        "properties": {
+          "indicators": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/YahooChartIndicators"
+              }
+            ]
+          },
+          "meta": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/YahooChartMeta"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooSearchQuote": {
+        "properties": {
+          "exchange": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "longname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quoteType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shortname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "YahooSearchResponse": {
+        "properties": {
+          "quotes": {
+            "items": {
+              "$ref": "#/components/schemas/YahooSearchQuote"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "DCA-Pal APIs",
+    "version": "0.9.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "root",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Service greeting"
+          }
+        }
+      }
+    },
+    "/assets/chart/{symbol}": {
+      "get": {
+        "operationId": "get_assets_chart",
+        "parameters": [
+          {
+            "description": "Asset symbol.",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Chart start timestamp (unix seconds).",
+            "in": "query",
+            "name": "startPeriod",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Chart end timestamp (unix seconds).",
+            "in": "query",
+            "name": "endPeriod",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "chart": {
+                    "error": null,
+                    "result": [
+                      {
+                        "indicators": {
+                          "quote": [
+                            {
+                              "close": [
+                                65231.12,
+                                65310.44,
+                                65195.87
+                              ]
+                            }
+                          ]
+                        },
+                        "meta": {
+                          "currency": "USD"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/YahooChartResponse"
+                }
+              }
+            },
+            "description": "Provider payload passthrough"
+          }
+        }
+      }
+    },
+    "/assets/crypto": {
+      "get": {
+        "operationId": "get_assets_crypto",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Asset"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Crypto assets"
+          }
+        }
+      }
+    },
+    "/assets/fiat": {
+      "get": {
+        "operationId": "get_assets_fiat",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Asset"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Fiat assets"
+          }
+        }
+      }
+    },
+    "/assets/search": {
+      "get": {
+        "operationId": "get_assets_data",
+        "parameters": [
+          {
+            "description": "Asset name query.",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YahooSearchResponse"
+                }
+              }
+            },
+            "description": "Provider payload passthrough"
+          }
+        }
+      }
+    },
+    "/import/portfolio": {
+      "post": {
+        "operationId": "import_portfolio",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$defs": {
+                  "asset": {
+                    "description": "Portfolio asset",
+                    "properties": {
+                      "aclass": {
+                        "description": "Asset class",
+                        "enum": [
+                          "EQUITY",
+                          "CRYPTO",
+                          "CURRENCY"
+                        ]
+                      },
+                      "baseCcy": {
+                        "description": "Asset base currency",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "fees": {
+                        "$ref": "#/$defs/transactionFees"
+                      },
+                      "name": {
+                        "description": "Asset name",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "price": {
+                        "description": "Asset price",
+                        "minimum": 0.0,
+                        "type": "number"
+                      },
+                      "provider": {
+                        "description": "Price provider (choose DCAPal for Crypto, YF for anything else)",
+                        "enum": [
+                          "DCAPal",
+                          "YF"
+                        ]
+                      },
+                      "qty": {
+                        "description": "Number of units of the asset in portfolio",
+                        "minimum": 0.0,
+                        "type": "number"
+                      },
+                      "symbol": {
+                        "description": "Asset ticker",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "targetWeight": {
+                        "description": "Asset target weight",
+                        "maximum": 100.0,
+                        "minimum": 0.0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "symbol",
+                      "name",
+                      "aclass",
+                      "baseCcy",
+                      "price",
+                      "qty",
+                      "targetWeight",
+                      "provider"
+                    ],
+                    "type": "object"
+                  },
+                  "fiatCurrency": {
+                    "enum": [
+                      "usd",
+                      "eur",
+                      "gbp",
+                      "chf",
+                      "jpy",
+                      "cad",
+                      "aed",
+                      "aud"
+                    ],
+                    "type": "string"
+                  },
+                  "percentage": {
+                    "maximum": 100.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  "transactionFees": {
+                    "additionalProperties": false,
+                    "description": "Transaction fees",
+                    "properties": {
+                      "feeStructure": {
+                        "description": "Fee structure",
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "type": {
+                                "const": "zeroFee"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "feeAmount": {
+                                "description": "Transaction fee amount",
+                                "minimum": 0.0,
+                                "type": "number"
+                              },
+                              "type": {
+                                "const": "fixed"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "feeAmount"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "feeRate": {
+                                "$ref": "#/$defs/percentage",
+                                "description": "Transaction fee rate (in percentage)"
+                              },
+                              "maxFee": {
+                                "description": "Transaction fee maximum amount",
+                                "minimum": 0.0,
+                                "type": "number"
+                              },
+                              "minFee": {
+                                "description": "Transaction fee minimum amount",
+                                "minimum": 0.0,
+                                "type": "number"
+                              },
+                              "type": {
+                                "const": "variable"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "feeRate",
+                              "minFee"
+                            ]
+                          }
+                        ],
+                        "type": "object"
+                      },
+                      "maxFeeImpact": {
+                        "$ref": "#/$defs/percentage",
+                        "description": "Max acceptable fees impact on the allocation"
+                      }
+                    },
+                    "required": [
+                      "feeStructure"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "$id": "https://github.com/dcapal/dcapal/blob/master/dcapal-backend/docs/schema/portfolio/v1/schema.json",
+                "$schema": "https://json-schema.org/draft-07/schema",
+                "additionalProperties": false,
+                "description": "DcaPal Portfolio",
+                "properties": {
+                  "assets": {
+                    "description": "Portfolio assets",
+                    "items": {
+                      "$ref": "#/$defs/asset"
+                    },
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "fees": {
+                    "$ref": "#/$defs/transactionFees"
+                  },
+                  "name": {
+                    "description": "Portfolio name",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "quoteCcy": {
+                    "$ref": "#/$defs/fiatCurrency",
+                    "description": "Portfolio currency"
+                  }
+                },
+                "required": [
+                  "quoteCcy",
+                  "assets"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "description": "Portfolio JSON object validated against dcapal-backend/docs/schema/portfolio/v1/schema.json",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPortfolioResponse"
+                }
+              }
+            },
+            "description": "Imported portfolio metadata"
+          },
+          "400": {
+            "description": "Input portfolio does not match schema requirements"
+          }
+        }
+      }
+    },
+    "/import/portfolio/{id}": {
+      "get": {
+        "operationId": "get_imported_portfolio",
+        "parameters": [
+          {
+            "description": "Imported portfolio id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Imported portfolio payload"
+          },
+          "404": {
+            "description": "Portfolio not found or expired"
+          }
+        }
+      }
+    },
+    "/price/{asset}": {
+      "get": {
+        "operationId": "get_price",
+        "parameters": [
+          {
+            "description": "Base asset symbol.",
+            "in": "path",
+            "name": "asset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Quote currency.",
+            "in": "query",
+            "name": "quote",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Price"
+                }
+              }
+            },
+            "description": "Asset conversion price"
+          },
+          "404": {
+            "description": "Price not available"
+          }
+        }
+      }
+    },
+    "/v1/sync/portfolios": {
+      "post": {
+        "operationId": "sync_portfolios",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPortfoliosRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPortfoliosResponse"
+                }
+              }
+            },
+            "description": "Portfolios synchronized"
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        }
+      }
+    }
+  }
+}
