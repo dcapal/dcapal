@@ -131,7 +131,7 @@ describe("syncPortfoliosAPI", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0] as [
       string,
-      { headers: Record<string, string>; body: string }
+      { headers: Record<string, string>; body: string },
     ];
     expect(url).toBe("/api/v1/sync/portfolios");
     expect(options.headers).toStrictEqual({

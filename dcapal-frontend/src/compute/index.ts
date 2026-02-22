@@ -30,7 +30,9 @@ interface WorkerState<TWorker extends WorkerRpc> {
   queueTail: Promise<unknown>;
 }
 
-const createWorkerState = <TWorker extends WorkerRpc>(): WorkerState<TWorker> => ({
+const createWorkerState = <
+  TWorker extends WorkerRpc,
+>(): WorkerState<TWorker> => ({
   instancePromise: null,
   queueTail: Promise.resolve(),
 });
@@ -56,11 +58,13 @@ const getWorker = async <TWorker extends WorkerRpc>(
 
   // TODO(migrate): threads' constructor types only accept string paths, but webpack worker loading uses URL.
   const workerUrl = new URL(workerPath, import.meta.url) as unknown as string;
-  state.instancePromise = (spawn(
-    new Worker(workerUrl, {
-      name: workerName,
-    })
-  ) as unknown as Promise<TWorker>).catch((error: unknown) => {
+  state.instancePromise = (
+    spawn(
+      new Worker(workerUrl, {
+        name: workerName,
+      })
+    ) as unknown as Promise<TWorker>
+  ).catch((error: unknown) => {
     state.instancePromise = null;
     throw error;
   });
@@ -76,9 +80,9 @@ const terminateWorkerPromise = async <TWorker extends WorkerRpc>(
   try {
     const worker = await workerPromise;
     // TODO(migrate): narrow spawned thread proxy type from threads to avoid this cast.
-    await Thread.terminate(worker as unknown as Parameters<
-      typeof Thread.terminate
-    >[0]);
+    await Thread.terminate(
+      worker as unknown as Parameters<typeof Thread.terminate>[0]
+    );
   } catch {
     // no-op: if worker failed to spawn/terminate there's nothing else to do
   }

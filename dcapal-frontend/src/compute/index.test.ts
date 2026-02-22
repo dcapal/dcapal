@@ -129,7 +129,9 @@ describe("compute boundary", () => {
   });
 
   it("returns null and does not spawn workers for invalid payloads", async () => {
-    const analyzeResult = await analyze(null as unknown as Record<string, never>);
+    const analyzeResult = await analyze(
+      null as unknown as Record<string, never>
+    );
     const solveResult = await solve(
       "100" as unknown as number,
       { SPY: {} },
