@@ -56,7 +56,7 @@
     "react-hot-toast": "^2.5.2",
     "react-i18next": "^15.4.1",
     "react-redux": "^9.2.0",
-    "react-router-dom": "^6.30.0",
+    "react-router-dom": "^6.30.3",
     "recharts": "^2.15.3",
     "redux-persist-expire": "^1.1.1",
     "tailwind-merge": "^2.6.0",
