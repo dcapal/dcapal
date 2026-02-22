@@ -3426,9 +3426,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.11.1"
+version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
+checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3438,9 +3438,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.9"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "809e8dc61f6de73b46c85f4c96486310fe304c434cfa43669d7b40f711150908"
+checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3834,9 +3834,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-cli"
-version = "1.1.14"
+version = "1.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edc17cb2b24e93fc1d56de7751a12222f2303c06e83ed4d7a1e929e39f30c7d7"
+checksum = "c94492e2ab6c045b4cc38013809ce255d14c3d352c9f0d11e6b920e2adc948ad"
 dependencies = [
  "chrono",
  "clap",
@@ -3845,6 +3845,7 @@ dependencies = [
  "regex",
  "sea-schema",
  "sqlx",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "url",
@@ -3866,9 +3867,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-migration"
-version = "1.1.14"
+version = "1.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "695e830a1332a4e3e57b5972eee00574a36060e1938afca7041a524e0955d5ba"
+checksum = "7315c0cadb7e60fb17ee2bb282aa27d01911fc2a7e5836ec1d4ac37d19250bb4"
 dependencies = [
  "async-trait",
  "clap",
