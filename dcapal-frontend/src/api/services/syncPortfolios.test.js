@@ -34,7 +34,7 @@ describe("syncPortfoliosAPI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
-    vi.spyOn(console, "error").mockImplementation(() => { });
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   it("injects bearer authorization header for sync endpoint", async () => {
