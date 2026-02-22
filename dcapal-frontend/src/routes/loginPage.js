@@ -67,7 +67,7 @@ export default function AuthPage() {
   }, [navigate]);
 
   return (
-    <div style={containerStyle}>
+    <div data-testid="route-login" style={containerStyle}>
       <div style={formContainerStyle}>
         <h1 style={titleStyle}>{t("page.login.signIn")}</h1>
         <p style={subtitleStyle}>{t("page.login.subtitle")}</p>

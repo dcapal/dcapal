@@ -7,7 +7,7 @@
     "htmlWhitespaceSensitivity": "css",
     "insertPragma": false,
     "jsxSingleQuote": false,
-    "parser": "babel",
+    "parser": "typescript",
     "printWidth": 80,
     "proseWrap": "preserve",
     "quoteProps": "as-needed",

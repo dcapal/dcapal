@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { spawn, Thread, Worker } from "threads";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
@@ -16,6 +15,7 @@ import {
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { solve as runSolver } from "@/compute";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -147,13 +147,7 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
   useEffect(() => {
-    const launchSolver = async () => {
-      const solver = await spawn(
-        new Worker(new URL("@workers/solver.js", import.meta.url), {
-          name: "wasm-solver-worker",
-        })
-      );
-
+    const loadSolution = async () => {
       const [inputBudget, as, inputFees] = buildProblemInput(
         budget,
         assets,
@@ -169,36 +163,25 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
         )}`
       );
 
-      try {
-        const sol = await solver.makeAndSolve(
+      const [sol] = await Promise.all([
+        runSolver(
           inputBudget,
           as,
           quoteCcy,
           inputFees,
           useTaxEfficient,
           useAllBudget
-        );
-
-        await Thread.terminate(solver);
-
-        console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-
-        return sol;
-      } catch (error) {
-        console.error("Unexpected exception in dcapal-optimizer:", error);
-        return null;
-      }
-    };
-
-    const solve = async () => {
-      const [sol] = await Promise.all([launchSolver(), timeout(1000)]);
+        ),
+        timeout(1000),
+      ]);
+      console.debug(`solution=${JSON.stringify(sol, replacer)}`);
       setIsLoading(false);
       if (sol) {
         setSolution(sol);
       }
     };
 
-    solve();
+    loadSolution();
   }, []);
 
   const onClickUpdate = () => {

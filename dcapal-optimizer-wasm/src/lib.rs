@@ -521,12 +521,12 @@ impl TryFrom<JsTransactionFees> for TransactionFees {
     type Error = String;
 
     fn try_from(value: JsTransactionFees) -> Result<Self, Self::Error> {
-        if let Some(max) = value.max_fee_impact {
-            if !(0.0..=1.0).contains(&max) {
-                return Err(format!(
-                    "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
-                ));
-            }
+        if let Some(max) = value.max_fee_impact
+            && !(0.0..=1.0).contains(&max)
+        {
+            return Err(format!(
+                "Invalid max_fee_impact ({max}). Must be in [0, 1] range"
+            ));
         }
 
         let max_fee_impact = value
@@ -557,10 +557,10 @@ impl TryFrom<JsFeeStructureFixed> for FeeStructureFixed {
     type Error = String;
 
     fn try_from(value: JsFeeStructureFixed) -> Result<Self, Self::Error> {
-        if let Some(amount) = value.fee_amount {
-            if amount < 0. {
-                return Err(format!("Invalid fee_amount ({amount}). Must be positive"));
-            }
+        if let Some(amount) = value.fee_amount
+            && amount < 0.
+        {
+            return Err(format!("Invalid fee_amount ({amount}). Must be positive"));
         }
 
         let fee_amount = value.fee_amount.map(parse_amount).unwrap_or(Decimal::ZERO);
@@ -573,12 +573,12 @@ impl TryFrom<JsFeeStructureVariable> for FeeStructureVariable {
     type Error = String;
 
     fn try_from(value: JsFeeStructureVariable) -> Result<Self, Self::Error> {
-        if let Some(rate) = value.fee_rate {
-            if !(0.0..=1.0).contains(&rate) {
-                return Err(format!(
-                    "Invalid fee_rate ({rate}). Must be in [0, 1] range"
-                ));
-            }
+        if let Some(rate) = value.fee_rate
+            && !(0.0..=1.0).contains(&rate)
+        {
+            return Err(format!(
+                "Invalid fee_rate ({rate}). Must be in [0, 1] range"
+            ));
         }
 
         let fee_rate = value

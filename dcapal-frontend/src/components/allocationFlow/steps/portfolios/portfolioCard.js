@@ -14,6 +14,7 @@ import EDIT_SVG from "@images/icons/edit.svg";
 import CLOSE_SVG from "@images/icons/close-menu.svg";
 import { Button } from "@/components/ui/button";
 import { useSyncPortfolios } from "@hooks/useSyncPortfolios";
+import classNames from "classnames";
 
 const orderByWeightDesc = (a, b) => b.weight - a.weight;
 
@@ -31,6 +32,23 @@ const CardState = Object.freeze({
   VIEW: 0,
   EDIT: 10,
 });
+
+const computePortfolioGain = (assets) => {
+  let totalCost = 0;
+  let totalValue = 0;
+
+  assets.forEach((a) => {
+    if (a.qty > 0) {
+      const effectiveABP = a.averageBuyPrice || a.price;
+      totalCost += effectiveABP * a.qty;
+      totalValue += a.price * a.qty;
+    }
+  });
+
+  if (totalCost === 0) return null;
+
+  return ((totalValue - totalCost) / totalCost) * 100;
+};
 
 export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const [state, setState] = useState(CardState.VIEW);
@@ -74,6 +92,9 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
 
   const editIcon = state === CardState.VIEW ? EDIT_SVG : CLOSE_SVG;
 
+  const portfolioGain = computePortfolioGain(assets);
+  const hasAssetsWithQty = assets.some((a) => a.qty > 0);
+
   return (
     <div className="relative w-full max-w-[36rem] flex flex-col px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white cursor-pointer hover:ring-2 hover:ring-neutral-400 active:ring-2 active:ring-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-500">
       <div
@@ -87,9 +108,27 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
           <div className="text-lg truncate font-medium" title={name}>
             {name}
           </div>
-          <p className="text-sm uppercase">
-            {totalAmount.toLocaleString(i18n.language, amtFmt)} {ccy}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm uppercase">
+              {totalAmount.toLocaleString(i18n.language, amtFmt)} {ccy}
+            </p>
+            {hasAssetsWithQty && portfolioGain !== null && (
+              <span
+                className={classNames("text-sm font-semibold", {
+                  "text-green-600": portfolioGain > 0,
+                  "text-red-600": portfolioGain < 0,
+                  "text-neutral-500": portfolioGain === 0,
+                })}
+              >
+                {portfolioGain > 0 ? "+" : ""}
+                {portfolioGain.toLocaleString(i18n.language, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+                %
+              </span>
+            )}
+          </div>
           {assets.length > 0 && (
             <div className="w-full flex flex-col gap-1 max-h-32 mt-2 overflow-auto">
               {assets.sort(orderByWeightDesc).map((a) => (

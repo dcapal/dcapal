@@ -1,0 +1,23 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD"
+        },
+        "indicators": {
+          "quote": [
+            {
+              "close": [
+                100.12,
+                99.8,
+                101.25
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

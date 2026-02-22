@@ -2,7 +2,7 @@ import { store } from "@app/store";
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
-import { syncPortfoliosAPI } from "@app/api";
+import { syncPortfoliosAPI } from "@/api";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -271,6 +271,7 @@ export const portfolioSlice = createSlice({
           amount: 0,
           weight: 0,
           targetWeight: 0,
+          averageBuyPrice: null,
           fees: null,
         },
       };
@@ -348,6 +349,16 @@ export const portfolioSlice = createSlice({
         updateWeight(asset, pfolio.totalAmount);
       });
 
+      pfolio.lastUpdatedAt = Date.now();
+    },
+    setAverageBuyPrice: (state, action) => {
+      const pfolio = currentPortfolio(state);
+      if (!pfolio) return;
+
+      const { symbol, averageBuyPrice } = action.payload;
+      if (!symbol || !(symbol in pfolio.assets)) return;
+
+      pfolio.assets[symbol].averageBuyPrice = averageBuyPrice;
       pfolio.lastUpdatedAt = Date.now();
     },
     setTargetWeight: (state, action) => {
@@ -584,6 +595,7 @@ export const portfolioSlice = createSlice({
               ...asset,
               fees: parseFees(asset.fees),
               aclass: parseAClass(asset.aclass),
+              averageBuyPrice: asset.averageBuyPrice,
               weight: asset.targetWeight,
               amount: 0,
             };
@@ -611,6 +623,7 @@ export const {
   removeAsset,
   setQty,
   setPrice,
+  setAverageBuyPrice,
   setTargetWeight,
   setRefreshTime,
   setQuoteCurrency,

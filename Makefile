@@ -4,7 +4,7 @@ DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
 SUPABASE_WORKDIR := ./config
 
-.PHONY: help supabase-up supabase-down docker-dev-up docker-dev-down dev-up dev-down
+.PHONY: help supabase-up supabase-down docker-dev-up docker-dev-down dev-up dev-down export-openapi
 
 ## Show this help message
 help:
@@ -20,7 +20,7 @@ fmt:  ## Format codebase
 ## Run Rust linters
 lint-rust: ## Run Rust linters
 	cargo +nightly fmt --all -- --config-path rustfmt.nightly.toml --check
-	cargo clippy -- -D warnings
+	cargo +nightly clippy -- -D warnings
 
 ## Run JS linters
 lint-js: ## Run JS linters
@@ -33,6 +33,10 @@ lint: lint-rust lint-js  ## Run linters on the codebase
 build-backend: ## Build backend
 	cd $(DCAPAL_BACKEND_DIR) && cargo build
 
+## Export backend OpenAPI spec
+export-openapi: ## Export backend OpenAPI spec
+	cargo run -p dcapal-backend --bin generate_openapi -- dcapal-backend/docs/openapi.json
+
 ## Build optimizer-wasm
 build-optimizer: ## Build optimizer-wasm
 	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev
@@ -43,6 +47,17 @@ build-frontend: ## Build frontend
 
 ## Build all
 build: build-backend build-optimizer build-frontend  ## Build all
+
+## Test frontend (unit-tests)
+test-frontend-unit: ## Run frontend tests
+	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:unit
+
+## Test frontend (e2e)
+test-frontend-e2e: ## Run frontend tests
+	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:e2e
+
+## Test frontend
+test-frontend: test-frontend-unit test-frontend-e2e ## Run all frontend tests
 
 ## Run backend (dev)
 run-backend-dev: ## Run backend (dev)
@@ -92,3 +107,7 @@ local-up: supabase-up docker-local-up  ## Start full dev environment (Supabase +
 
 ## Stop full dev+local environment
 local-down: docker-local-down supabase-down  ## Stop full dev environment
+
+## Merge all dependabot PRs
+chore-merge-dependabot:  ## Merge all dependabot PRs
+	script/merge-dependabot.sh dcapal/dcapal master
