@@ -30,7 +30,7 @@
     "@nivo/core": "^0.87.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-select": "^2.1.7",
-    "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-hook/media-query": "^1.1.1",
     "@react-pdf/renderer": "^4.3.0",
