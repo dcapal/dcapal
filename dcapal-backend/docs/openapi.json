@@ -161,6 +161,9 @@
           "aclass": {
             "type": "string"
           },
+          "averageBuyPrice": {
+            "type": "string"
+          },
           "baseCcy": {
             "type": "string"
           },
@@ -201,13 +204,17 @@
           "provider",
           "qty",
           "targetWeight",
-          "price"
+          "price",
+          "averageBuyPrice"
         ],
         "type": "object"
       },
       "PortfolioAssetResponse": {
         "properties": {
           "aclass": {
+            "type": "string"
+          },
+          "averageBuyPrice": {
             "type": "string"
           },
           "baseCcy": {
@@ -250,7 +257,8 @@
           "provider",
           "qty",
           "targetWeight",
-          "price"
+          "price",
+          "averageBuyPrice"
         ],
         "type": "object"
       },
