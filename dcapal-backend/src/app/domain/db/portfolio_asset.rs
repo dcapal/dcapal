@@ -36,6 +36,8 @@ pub struct Model {
     pub min_fee: Option<Decimal>,
     #[sea_orm(column_type = "Decimal(Some((20, 10)))", nullable)]
     pub max_fee: Option<Decimal>,
+    #[sea_orm(column_type = "Decimal(Some((20, 10)))", nullable)]
+    pub average_buy_price: Option<Decimal>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

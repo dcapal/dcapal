@@ -61,6 +61,9 @@
       "amount": "Valore",
       "quantity": "Quantità",
       "targetWeight": "Allocazione Target",
+      "averageBuyPrice": "PMC",
+      "averageBuyPriceTooltip": "Prezzo Medio di Carico (PMC): il costo medio per unità pagato per questo asset. Se non impostato, viene utilizzato il prezzo di mercato corrente.",
+      "gain": "Rendimento",
       "transactionFees": "Costi di transazione"
     },
     "portfoliosStep": {
@@ -81,7 +84,9 @@
       "reviewYourWeight": "La somma dei tuoi <0>{{targetWeights}}</0> deve essere pari al 100% (attualmente <0>{{actualWeight}} %</0>). Rivedi i tuoi pesi o aggiungi nuovi asset dalla barra di ricerca in alto.",
       "lastFetch": "Ultimo aggiornamento dei prezzi alle",
       "confirmWeights": "Conferma i pesi",
-      "downloadDocument": "Scarica il PDF con il riepilogo del portafoglio"
+      "downloadDocument": "Scarica il PDF con il riepilogo del portafoglio",
+      "portfolioGain": "Rendimento Portafoglio",
+      "mwrTooltip": "Rendimento ponderato per il capitale (MWR): misura il rendimento effettivo sul capitale investito."
     },
     "pdf": {
       "name": "Riepilogo del Portafoglio",
@@ -91,7 +96,9 @@
       "price": "Prezzo",
       "qty": "Quantità",
       "weight": "Peso",
-      "target": "Obiettivo"
+      "target": "Obiettivo",
+      "abp": "PMC",
+      "gain": "Rendimento"
     },
     "searchBar": {
       "placeholder": "Cerca Crypto, ETF e altro",

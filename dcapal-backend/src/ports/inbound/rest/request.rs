@@ -41,6 +41,7 @@ pub struct PortfolioAssetRequest {
     pub qty: Decimal,
     pub target_weight: Decimal,
     pub price: Decimal,
+    pub average_buy_price: Decimal,
     pub fees: Option<TransactionFeesRequest>,
 }
 

@@ -34,7 +34,7 @@ describe("syncPortfoliosAPI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => { });
   });
 
   it("injects bearer authorization header for sync endpoint", async () => {
@@ -104,6 +104,7 @@ describe("syncPortfoliosAPI", () => {
             baseCcy: "usd",
             provider: "YF",
             price: 609.73,
+            averageBuyPrice: 601.25,
             qty: 2,
             targetWeight: 100,
             fees: {
@@ -154,6 +155,7 @@ describe("syncPortfoliosAPI", () => {
           baseCcy: "usd",
           provider: "YF",
           price: 609.73,
+          averageBuyPrice: 601.25,
           qty: 2,
           targetWeight: 100,
           fees: {
