@@ -1,7 +1,11 @@
-const path = require("path");
-const { defineConfig } = require("vitest/config");
+import path from "path";
+import { fileURLToPath } from "url";
+import { defineConfig } from "vitest/config";
 
-module.exports = defineConfig({
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.{js,ts}"],
