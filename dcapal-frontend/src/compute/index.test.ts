@@ -11,7 +11,7 @@ vi.mock("threads", () => ({
   Thread: {
     terminate: terminateMock,
   },
-  Worker: function Worker(url, options) {
+  Worker: function Worker(url: URL, options: { name: string }) {
     workerCtorMock(url, options);
     return { url, options };
   },
@@ -61,8 +61,8 @@ describe("compute boundary", () => {
   });
 
   it("serializes solve calls on the same worker", async () => {
-    let releaseFirstCall;
-    const firstCall = new Promise((resolve) => {
+    let releaseFirstCall: () => void = () => {};
+    const firstCall = new Promise<void>((resolve) => {
       releaseFirstCall = resolve;
     });
 
@@ -129,9 +129,11 @@ describe("compute boundary", () => {
   });
 
   it("returns null and does not spawn workers for invalid payloads", async () => {
-    const analyzeResult = await analyze(null);
+    const analyzeResult = await analyze(
+      null as unknown as Record<string, never>
+    );
     const solveResult = await solve(
-      "100",
+      "100" as unknown as number,
       { SPY: {} },
       "USD",
       null,
