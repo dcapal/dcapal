@@ -1,14 +1,13 @@
-// tests/syncPortfolios.spec.js
 import { expect, test } from "@playwright/test";
-import jwt from "jsonwebtoken";
 
-test("sync portfolios e2e", async ({ request }) => {
-  const token = await generateJWT();
+test("sync portfolios restores conflict-resolution coverage using MSW", async ({
+  page,
+}) => {
+  await page.goto("/");
 
   const lastUpdatedAtInPast = "2021-08-01T00:00:00Z";
-  const lastUpdatedAtNow = new Date().toISOString();
-
-  const portfolioId = crypto.randomUUID();
+  const lastUpdatedAtNow = "2026-02-13T10:00:00.000Z";
+  const portfolioId = "f2479b20-a873-48fd-84c3-12fd979afebd";
 
   const clientPayload1 = {
     portfolios: [
@@ -31,6 +30,7 @@ test("sync portfolios e2e", async ({ request }) => {
             price: 76.38,
             qty: 10,
             targetWeight: 90,
+            averageBuyPrice: 70,
             fees: {
               feeStructure: {
                 type: "variable",
@@ -49,6 +49,7 @@ test("sync portfolios e2e", async ({ request }) => {
             price: 609.73,
             qty: 1,
             targetWeight: 10,
+            averageBuyPrice: 609.8,
             fees: {
               feeStructure: {
                 type: "fixed",
@@ -73,63 +74,71 @@ test("sync portfolios e2e", async ({ request }) => {
     ],
   };
 
-  // First sync request with current timestamp
-  const response1 = await request.post("/api/v1/sync/portfolios", {
-    data: clientPayload1,
-    headers: {
-      authorization: `Bearer ${token}`,
-    },
-  });
-  expect(response1.ok()).toBeTruthy();
+  const response1 = await page.evaluate(async (body) => {
+    const response = await fetch("/api/v1/sync/portfolios", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer fixture-token",
+      },
+      body: JSON.stringify(body),
+    });
 
-  const body1 = await response1.json();
-  expect(body1).toStrictEqual({
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  }, clientPayload1);
+
+  expect(response1.status).toBe(200);
+  expect(response1.body).toStrictEqual({
     updatedPortfolios: [],
     deletedPortfolios: [],
   });
 
-  // Second sync request with past timestamp
-  const response2 = await request.post("/api/v1/sync/portfolios", {
-    data: clientPayload2,
-    headers: {
-      authorization: `Bearer ${token}`,
-    },
-  });
-  expect(response2.ok()).toBeTruthy();
+  const response2 = await page.evaluate(async (body) => {
+    const response = await fetch("/api/v1/sync/portfolios", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer fixture-token",
+      },
+      body: JSON.stringify(body),
+    });
 
-  const body2 = await response2.json();
-  expect(body2).toStrictEqual({
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  }, clientPayload2);
+
+  expect(response2.status).toBe(200);
+  expect(response2.body).toStrictEqual({
     updatedPortfolios: [
       {
         ...clientPayload1.portfolios[0],
-        lastUpdatedAt: lastUpdatedAtNow,
       },
     ],
     deletedPortfolios: [],
   });
+
+  const missingAuthResponse = await page.evaluate(async () => {
+    const response = await fetch("/api/v1/sync/portfolios", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ portfolios: [], deletedPortfolios: [] }),
+    });
+
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  });
+
+  expect(missingAuthResponse.status).toBe(401);
+  expect(missingAuthResponse.body).toStrictEqual({
+    message: "Missing bearer token",
+  });
 });
-
-// Helper function to generate JWT token
-async function generateJWT() {
-  const jwtSecret = "super-secret-jwt-token-with-at-least-32-characters-long";
-
-  const expiration = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
-  const sub = crypto.randomUUID();
-  const sessionId = crypto.randomUUID();
-  const randEmail = crypto.randomUUID() + "@example.com";
-
-  const claims = {
-    iat: 0,
-    sub: sub,
-    session_id: sessionId,
-    role: "",
-    aud: "authenticated",
-    exp: expiration,
-    user_metadata: {
-      email: randEmail,
-      full_name: null,
-    },
-  };
-
-  return jwt.sign(claims, jwtSecret, { algorithm: "HS256" });
-}

@@ -1,0 +1,18 @@
+{
+  "quotes": [
+    {
+      "quoteType": "ETF",
+      "longname": "Vanguard FTSE All-World UCITS ETF",
+      "shortname": "Vanguard FTSE All-World",
+      "symbol": "VWCE.MI",
+      "exchange": "MIL"
+    },
+    {
+      "quoteType": "ETF",
+      "longname": "iShares Core Global Aggregate Bond UCITS ETF",
+      "shortname": "iShares Global Aggregate Bond",
+      "symbol": "AGGH.MI",
+      "exchange": "MIL"
+    }
+  ]
+}

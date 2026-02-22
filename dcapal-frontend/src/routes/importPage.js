@@ -37,7 +37,10 @@ export default function ImportPage() {
   }, [portfolio, isLoading]);
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div
+      data-testid="route-import"
+      className="w-full flex flex-col items-center"
+    >
       <div className="w-full px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">
         <img
           className="w-full px-4 sm:max-w-[20rem] pb-2"

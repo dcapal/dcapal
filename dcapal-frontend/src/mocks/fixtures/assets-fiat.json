@@ -1,0 +1,22 @@
+[
+  {
+    "type": "Fiat",
+    "id": "usd",
+    "symbol": "USD"
+  },
+  {
+    "type": "Fiat",
+    "id": "eur",
+    "symbol": "EUR"
+  },
+  {
+    "type": "Fiat",
+    "id": "gbp",
+    "symbol": "GBP"
+  },
+  {
+    "type": "Fiat",
+    "id": "chf",
+    "symbol": "CHF"
+  }
+]

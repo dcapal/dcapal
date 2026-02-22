@@ -8,10 +8,7 @@ use std::{
 };
 
 use axum::{
-    Router,
-    extract::connect_info::IntoMakeServiceWithConnectInfo,
-    middleware,
-    routing::{get, post},
+    Router, extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get,
 };
 use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
@@ -69,6 +66,7 @@ pub struct AppContextInner {
     http: reqwest::Client,
     redis: Pool,
     postgres: PgPool,
+    openapi_value: serde_json::Value,
     services: Services,
     repos: Arc<Repository>,
     providers: Arc<PriceProviders>,
@@ -164,31 +162,25 @@ impl DcaServer {
             portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
         };
 
+        let (api_routes, openapi) = rest::build_openapi_router();
+        let openapi_value = rest::openapi::openapi_value(&openapi)
+            .map_err(|e| DcaError::StartupFailure("Failed to serialize OpenAPI".into(), e))?;
+
         let ctx = Arc::new(AppContextInner {
             config: config.clone(),
             http,
             redis,
             postgres,
+            openapi_value,
             services,
             repos,
             providers,
         });
 
-        let open_routes = Router::new()
-            .route("/", get(|| async { "Greetings from DCA-Pal APIs!" }))
-            .route("/assets/fiat", get(rest::get_assets_fiat))
-            .route("/assets/crypto", get(rest::get_assets_crypto))
-            .route("/assets/search", get(rest::get_assets_data))
-            .route("/assets/chart/{symbol}", get(rest::get_assets_chart))
-            .route("/price/{asset}", get(rest::get_price))
-            .route("/import/portfolio", post(rest::import_portfolio))
-            .route("/import/portfolio/{id}", get(rest::get_imported_portfolio));
-
-        let authenticated_routes = Router::new()
-            .route("/v1/sync/portfolios", post(rest::request::sync_portfolios))
-            .with_state(ctx.clone());
-
-        let merged_app = Router::new().merge(open_routes).merge(authenticated_routes);
+        let merged_app = api_routes.route(
+            "/api-doc/openapi.json",
+            get(rest::openapi::get_openapi_json),
+        );
 
         let app = merged_app
             .route_layer(

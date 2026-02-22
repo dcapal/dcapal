@@ -41,6 +41,7 @@ pub struct PortfolioAssetRequest {
     pub qty: Decimal,
     pub target_weight: Decimal,
     pub price: Decimal,
+    pub average_buy_price: Decimal,
     pub fees: Option<TransactionFeesRequest>,
 }
 
@@ -52,6 +53,22 @@ pub struct TransactionFeesRequest {
     pub fee_structure: FeeStructure,
 }
 
+#[utoipa::path(
+    post,
+    path = "/sync/portfolios",
+    params(
+        ("Authorization" = String, Header, description = "Bearer JWT token")
+    ),
+    request_body = SyncPortfoliosRequest,
+    responses(
+        (
+            status = 200,
+            description = "Portfolios synchronized",
+            body = crate::ports::inbound::rest::response::SyncPortfoliosResponse
+        ),
+        (status = 400, description = "Bad request")
+    )
+)]
 pub async fn sync_portfolios(
     State(ctx): State<AppContext>,
     claims: Claims,

@@ -16,7 +16,7 @@ env:
 
 jobs:
   extract-tag-version:
-    runs-on: ubuntu-latest
+    runs-on: uubuntu-slim
     steps:
       - uses: actions/checkout@v4
       - name: Extract tag version
@@ -27,7 +27,7 @@ jobs:
           echo ${{ env.RELEASE_VERSION }}
 
   build-publish-docker-image:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: [ extract-tag-version ]
     steps:
       - uses: actions/checkout@v4
