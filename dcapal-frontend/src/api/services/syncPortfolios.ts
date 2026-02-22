@@ -25,6 +25,7 @@ interface PortfolioAssetInput {
   baseCcy: string;
   provider: string;
   price: number;
+  averageBuyPrice: number;
   qty: number;
   targetWeight: number;
   fees?: FeesInput | null;
