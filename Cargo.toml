@@ -44,7 +44,7 @@ ip2location = "0.6.0"
 itertools = "0.14.0"
 js-sys = "0.3.83"
 jsonschema = "0.38.1"
-jsonwebtoken = {version = "10.2.0", features = ["aws_lc_rs"]} # This was the default before, now it needs to be specify between aws and rust-crypto
+jsonwebtoken = {version = "10.3.0", features = ["aws_lc_rs"]} # This was the default before, now it needs to be specify between aws and rust-crypto
 lazy_static = "1.5.0"
 log = "0.4.29"
 metrics = "0.24.3"
