@@ -16,7 +16,7 @@ env:
 
 jobs:
   extract-tag-version:
-    runs-on: uubuntu-slim
+    runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@v4
       - name: Extract tag version
