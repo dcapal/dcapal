@@ -44,9 +44,16 @@ build-frontend: ## Build frontend
 ## Build all
 build: build-backend build-optimizer build-frontend  ## Build all
 
+## Test frontend (unit-tests)
+test-frontend-unit: ## Run frontend tests
+	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:unit
+
+## Test frontend (e2e)
+test-frontend-e2e: ## Run frontend tests
+	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:e2e
+
 ## Test frontend
-test-frontend: ## Run frontend tests
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run build && npm run test:e2e
+test-frontend: test-frontend-unit test-frontend-e2e ## Run all frontend tests
 
 ## Run backend (dev)
 run-backend-dev: ## Run backend (dev)

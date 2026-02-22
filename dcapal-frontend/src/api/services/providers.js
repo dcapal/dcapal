@@ -1,6 +1,5 @@
 import axios from "axios";
-import { api } from "./api";
-import { DCAPAL_API } from "./config";
+import { api } from "../httpClient";
 import { ACLASS } from "@components/allocationFlow/portfolioSlice";
 
 export const Provider = Object.freeze({
@@ -14,7 +13,7 @@ export const FetchError = Object.freeze({
 });
 
 export const fetchPrice = async (base, quote, token) => {
-  const url = `${DCAPAL_API}/price/${base}?quote=${quote}`;
+  const url = `/price/${base}?quote=${quote}`;
   try {
     const response = await api.get(url, { cancelToken: token });
 
@@ -47,7 +46,7 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
   lastFourDays.setDate(lastFourDays.getDate() - 4);
   const period1 = toUnixTimestamp(lastFourDays, true);
   const period2 = toUnixTimestamp(new Date(), false);
-  const url = `${DCAPAL_API}/assets/chart/${symbol}?startPeriod=${period1}&endPeriod=${period2}`;
+  const url = `/assets/chart/${symbol}?startPeriod=${period1}&endPeriod=${period2}`;
   try {
     const response = await api.get(url, {
       cancelToken: token,
@@ -60,7 +59,6 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
       return null;
     }
 
-    // On error, log and exit
     if (!response.data.chart || response.data.chart?.error) {
       console.error(response.data.chart?.error);
       return FetchError.BAD_DATA;
@@ -103,10 +101,10 @@ export const fetchPriceYF = async (symbol, quote, validCcys, token) => {
 
     if (base === quote) {
       return [price, base];
-    } else {
-      const rate = await fetchPrice(base, quote, token);
-      return [price * rate, base];
     }
+
+    const rate = await fetchPrice(base, quote, token);
+    return [price * rate, base];
   } catch (error) {
     if (!axios.isCancel(error)) {
       console.error(error);
@@ -133,7 +131,7 @@ export const getFetcher = (provider, validCcys) => {
 };
 
 export const fetchAssetsDcaPal = async (type) => {
-  const url = `${DCAPAL_API}/assets/${type}`;
+  const url = `/assets/${type}`;
   try {
     const response = await api.get(url);
 
@@ -149,7 +147,7 @@ export const fetchAssetsDcaPal = async (type) => {
     return response.data.map((asset) => ({
       symbol: asset.id,
       name: asset.symbol,
-      aclass: aclass,
+      aclass,
     }));
   } catch (error) {
     if (!axios.isCancel(error)) {
