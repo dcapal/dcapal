@@ -4,7 +4,7 @@ DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
 SUPABASE_WORKDIR := ./config
 
-.PHONY: help supabase-up supabase-down docker-dev-up docker-dev-down dev-up dev-down
+.PHONY: help supabase-up supabase-down docker-dev-up docker-dev-down dev-up dev-down export-openapi
 
 ## Show this help message
 help:
@@ -20,7 +20,7 @@ fmt:  ## Format codebase
 ## Run Rust linters
 lint-rust: ## Run Rust linters
 	cargo +nightly fmt --all -- --config-path rustfmt.nightly.toml --check
-	cargo clippy -- -D warnings
+	cargo +nightly clippy -- -D warnings
 
 ## Run JS linters
 lint-js: ## Run JS linters
@@ -32,6 +32,10 @@ lint: lint-rust lint-js  ## Run linters on the codebase
 ## Build backend
 build-backend: ## Build backend
 	cd $(DCAPAL_BACKEND_DIR) && cargo build
+
+## Export backend OpenAPI spec
+export-openapi: ## Export backend OpenAPI spec
+	cargo run -p dcapal-backend --bin generate_openapi -- dcapal-backend/docs/openapi.json
 
 ## Build optimizer-wasm
 build-optimizer: ## Build optimizer-wasm

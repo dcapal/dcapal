@@ -1,12 +1,13 @@
 use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{DateTime, app::infra::utils::Expiring};
 
 pub type AssetId = String;
 pub type MarketId = String;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct Crypto {
     pub id: AssetId,
     pub symbol: String,
@@ -19,7 +20,7 @@ impl Crypto {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct Fiat {
     pub id: AssetId,
     pub symbol: String,
@@ -31,7 +32,7 @@ impl Fiat {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 #[serde(tag = "type")]
 pub enum Asset {
     Crypto(Crypto),
@@ -64,7 +65,7 @@ impl Asset {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema)]
 pub struct Price {
     pub price: f64,
     #[serde(with = "chrono::serde::ts_seconds")]
