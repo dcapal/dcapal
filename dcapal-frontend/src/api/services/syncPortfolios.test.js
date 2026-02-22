@@ -104,6 +104,7 @@ describe("syncPortfoliosAPI", () => {
             baseCcy: "usd",
             provider: "YF",
             price: 609.73,
+            averageBuyPrice: 601.25,
             qty: 2,
             targetWeight: 100,
             fees: {
@@ -154,6 +155,7 @@ describe("syncPortfoliosAPI", () => {
           baseCcy: "usd",
           provider: "YF",
           price: 609.73,
+          averageBuyPrice: 601.25,
           qty: 2,
           targetWeight: 100,
           fees: {
