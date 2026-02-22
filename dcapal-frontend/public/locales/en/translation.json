@@ -61,6 +61,9 @@
       "amount": "Amount",
       "quantity": "Quantity",
       "targetWeight": "Target weight",
+      "averageBuyPrice": "Avg. Buy Price",
+      "averageBuyPriceTooltip": "Average Buy Price (ABP): the average cost per unit you paid for this asset. If not set, it defaults to the current market price.",
+      "gain": "Gain",
       "transactionFees": "Transaction fees"
     },
     "portfoliosStep": {
@@ -81,7 +84,9 @@
       "reviewYourWeight": "Target weights must sum up to 100% (currently <0>{{actualWeight}} %</0>). Please adjust weights or add new assets from the search bar in the top.",
       "lastFetch": "Prices last fetched at",
       "confirmWeights": "Confirm weights",
-      "downloadDocument": "Download the portfolio summary in PDF format"
+      "downloadDocument": "Download the portfolio summary in PDF format",
+      "portfolioGain": "Portfolio Gain",
+      "mwrTooltip": "Money-Weighted Return (MWR): measures the actual return on your invested capital."
     },
     "pdf": {
       "name": "Portfolio Summary",
@@ -91,7 +96,9 @@
       "price": "Price",
       "qty": "Quantity",
       "weight": "Weight",
-      "target": "Target"
+      "target": "Target",
+      "abp": "ABP",
+      "gain": "Gain"
     },
     "searchBar": {
       "placeholder": "Search Crypto, ETF and much more",
