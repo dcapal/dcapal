@@ -11,8 +11,8 @@ import { BrowserRouter } from "react-router-dom";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-import translationEN from "../public/locales/en/translation.json";
-import translationIT from "../public/locales/it/translation.json";
+import translationEN from "./locales/en/translation.json";
+import translationIT from "./locales/it/translation.json";
 
 i18n
   .use(LanguageDetector)
@@ -32,7 +32,9 @@ document.documentElement.lang = i18n.language;
 i18n.on("languageChanged", (lang) => (document.documentElement.lang = lang));
 
 const startMocks = async () => {
-  if (process.env.REACT_APP_E2E_MSW !== "1") {
+  window.__DCAPAL_MSW_READY__ = false;
+
+  if (import.meta.env.VITE_E2E_MSW !== "1") {
     return;
   }
 
@@ -49,6 +51,8 @@ const startMocks = async () => {
       }
     },
   });
+
+  window.__DCAPAL_MSW_READY__ = true;
 };
 
 const renderApp = () => {

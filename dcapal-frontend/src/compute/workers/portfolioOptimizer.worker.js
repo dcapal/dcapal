@@ -1,21 +1,42 @@
 import { expose } from "comlink";
-
-try {
-  self.postMessage({ type: "compute-worker-startup", worker: "portfolio-optimizer" });
-} catch {
-  // no-op
-}
+import {
+  Solver,
+  __wbg_set_wasm,
+} from "dcapal-optimizer-wasm/dcapal_optimizer_wasm_bg.js";
+import wasmUrl from "dcapal-optimizer-wasm/dcapal_optimizer_wasm_bg.wasm?url";
 
 let solverModulePromise = null;
 
 const getSolver = async () => {
   if (!solverModulePromise) {
-    solverModulePromise = import("dcapal-optimizer-wasm")
-      .then((mod) => mod.Solver)
-      .catch((error) => {
-        solverModulePromise = null;
-        throw error;
-      });
+    solverModulePromise = (async () => {
+      const loadViaStreaming = async () => {
+        if (typeof WebAssembly.instantiateStreaming !== "function") {
+          return null;
+        }
+
+        try {
+          const response = await fetch(wasmUrl);
+          return await WebAssembly.instantiateStreaming(response, {});
+        } catch {
+          return null;
+        }
+      };
+
+      const loadViaBuffer = async () => {
+        const response = await fetch(wasmUrl);
+        const wasmBytes = await response.arrayBuffer();
+        return await WebAssembly.instantiate(wasmBytes, {});
+      };
+
+      const result = (await loadViaStreaming()) ?? (await loadViaBuffer());
+      __wbg_set_wasm(result.instance.exports);
+      result.instance.exports.__wbindgen_start();
+      return Solver;
+    })().catch((error) => {
+      solverModulePromise = null;
+      throw error;
+    });
   }
 
   return solverModulePromise;

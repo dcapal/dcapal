@@ -51,7 +51,11 @@ const portfolioOptimizerState = createWorkerState<PortfolioOptimizerWorkerRpc>()
 
 const createPortfolioOptimizerWorkerInstance = (): Worker => {
   return new Worker(
-    new URL("./workers/portfolioOptimizer.worker.js?v=diag", import.meta.url)
+    new URL("./workers/portfolioOptimizer.worker.js", import.meta.url),
+    {
+      type: "module",
+      name: "portfolio-optimizer",
+    }
   );
 };
 

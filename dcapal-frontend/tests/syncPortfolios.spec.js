@@ -4,6 +4,10 @@ test("sync portfolios restores conflict-resolution coverage using MSW", async ({
   page,
 }) => {
   await page.goto("/");
+  await expect(
+    page.getByTestId("importStep.allocateYourSavings").first()
+  ).toBeVisible();
+  await page.waitForFunction(() => window.__DCAPAL_MSW_READY__ === true);
 
   const lastUpdatedAtInPast = "2021-08-01T00:00:00Z";
   const lastUpdatedAtNow = "2026-02-13T10:00:00.000Z";

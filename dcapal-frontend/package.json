@@ -4,12 +4,12 @@
   "description": "A web client for DcaPal web application",
   "main": "index.js",
   "scripts": {
-    "build": "webpack --config webpack.prod.js --mode production",
-    "build-dev": "webpack --config webpack.prod.js --mode development",
-    "check": "npx prettier --check 'src/**/*.{js,ts}'",
-    "format": "npx prettier --write 'src/**/*.{js,ts}'",
-    "start": "webpack-dev-server --open --config webpack.dev.js --mode development",
-    "start:ci": "webpack-dev-server --config webpack.dev.js --mode development --no-open",
+    "build": "vite build --mode production",
+    "build-dev": "vite build --mode development",
+    "check": "npx prettier --check 'src/**/*.{js,jsx,ts,tsx}'",
+    "format": "npx prettier --write 'src/**/*.{js,jsx,ts,tsx}'",
+    "start": "vite --open",
+    "start:ci": "vite --host 127.0.0.1 --port 3000 --strictPort",
     "typecheck": "tsc --noEmit",
     "test:e2e": "npx playwright test",
     "test:unit": "vitest run"
@@ -66,44 +66,27 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
     "@babel/parser": "^7.29.0",
-    "@babel/preset-env": "^7.29.0",
-    "@babel/preset-react": "^7.28.5",
-    "@babel/preset-typescript": "^7.28.5",
+    "@vitejs/plugin-react": "^4.7.0",
     "@playwright/test": "^1.58.2",
     "@types/node": "^20.17.30",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.21",
-    "babel-loader": "^9.2.1",
-    "copy-webpack-plugin": "^12.0.2",
-    "css-loader": "^7.1.2",
-    "css-minimizer-webpack-plugin": "^7.0.2",
     "cssnano": "^7.0.6",
     "cssnano-preset-advanced": "^7.0.6",
-    "dotenv-webpack": "^8.1.0",
-    "html-webpack-plugin": "^5.6.3",
-    "mini-css-extract-plugin": "^2.9.2",
     "msw": "^2.12.10",
     "postcss": "^8.5.3",
-    "postcss-loader": "^8.1.1",
     "postcss-preset-env": "^9.6.0",
     "prettier": "^3.8.1",
-    "style-loader": "^4.0.0",
-    "svg-url-loader": "^8.0.0",
     "tailwindcss": "^3.4.17",
-    "terser-webpack-plugin": "^5.3.14",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18",
-    "webpack": "^5.105.2",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.1",
-    "webpack-merge": "^6.0.1"
+    "vite": "^6.4.1",
+    "vitest": "^4.0.18"
   },
   "msw": {
     "workerDirectory": [
-      "./static"
+      "./public"
     ]
   }
 }

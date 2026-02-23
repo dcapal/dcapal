@@ -6,7 +6,7 @@
       name="viewport"
       content="height=device-height, width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, target-densitydpi=device-dpi"
     />
-    <title><%= htmlWebpackPlugin.options.title %></title>
+    <title>DcaPal - A smart assistant for your periodic investments</title>
     <meta
       name="description"
       content="Keep your investment strategy under control with DcaPal: a smart, tax-efficient app for dollar-cost-averaging passive investors."
@@ -68,12 +68,9 @@
       sizes="16x16"
       href="https://ik.imagekit.io/dcapal/favicon/favicon-16x16.png"
     />
-    <!-- LCP Preload -->
-    <link rel="preload" fetchpriority="high" as="image" href="<%=require('../images/headers/investing_front.svg')%>" type="image/svg+xml">
-    <link rel="preload" fetchpriority="low" as="image" href="<%=require('../images/stacked-wave-2.svg')%>" type="image/svg+xml">
   </head>
   <body class="w-full h-dvh">
-    <!-- Add React app container -->
     <div id="app"></div>
+    <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

@@ -14,11 +14,11 @@ export const ContainerPage = ({ id, title, content }) => {
           <NavBar />
           {content}
           <Footer />
-          {Number(process.env.REACT_APP_ENABLE_COOKIE_BUTTON) === 1 && (
+          {Number(import.meta.env.VITE_ENABLE_COOKIE_BUTTON) === 1 && (
             <CookieButton />
           )}
         </div>
-        {Number(process.env.REACT_APP_ENABLE_COOKIE_BUTTON) === 1 && (
+        {Number(import.meta.env.VITE_ENABLE_COOKIE_BUTTON) === 1 && (
           <CookieConsent />
         )}
       </div>
