@@ -168,7 +168,10 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
         </div>
       )}
       {!isLoading && solution && (
-        <div data-testid="end.allocationReady" className="w-full flex flex-col items-center">
+        <div
+          data-testid="end.allocationReady"
+          className="w-full flex flex-col items-center"
+        >
           <div className="mt-2 mb-8 text-3xl font-light">
             <span className="text-4xl">📊</span> {t("endStep.allocationReady")}
           </div>
@@ -196,12 +199,17 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
             <Button variant="link" size="link" onClick={onClickGoBack}>
               {t("endStep.backToPortfolio")}
             </Button>
-            <Button onClick={onClickUpdate}>{t("endStep.updatePortfolio")}</Button>
+            <Button onClick={onClickUpdate}>
+              {t("endStep.updatePortfolio")}
+            </Button>
           </div>
         </div>
       )}
       {!isLoading && !solution && (
-        <div data-testid="end.allocationError" className="w-full flex flex-col items-center">
+        <div
+          data-testid="end.allocationError"
+          className="w-full flex flex-col items-center"
+        >
           <div className="mt-2 mb-8 text-3xl font-light">
             <span className="text-4xl">⚠️</span> {t("endStep.opsBadHappened")}
             {t("endStep.reviewPortfolio")}

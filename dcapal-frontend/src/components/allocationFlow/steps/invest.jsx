@@ -101,7 +101,10 @@ export const InvestStep = ({
           {quoteCcy}
         </div>
       </div>
-      <div className="mt-2 text-xl font-light" data-testid="invest.recommendation.text">
+      <div
+        className="mt-2 text-xl font-light"
+        data-testid="invest.recommendation.text"
+      >
         <Trans
           i18nKey={i18nKey}
           values={{
@@ -184,7 +187,10 @@ export const InvestStep = ({
               htmlFor="#use-all-budget-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
-              {t("investStep.allocate")} <span className="font-medium capitalize">{t("investStep.allBudget")}</span>
+              {t("investStep.allocate")}{" "}
+              <span className="font-medium capitalize">
+                {t("investStep.allBudget")}
+              </span>
             </label>
           </div>
           <p className="text-sm font-light">

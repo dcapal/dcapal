@@ -23,7 +23,10 @@ export const PreferencesDialog = () => {
           <SlidersHorizontal />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[512px]" data-testid="portfolio.preferences.dialog">
+      <DialogContent
+        className="sm:max-w-[512px]"
+        data-testid="portfolio.preferences.dialog"
+      >
         <DialogHeader>
           <DialogTitle>{t("portfolioStep.preferences")}</DialogTitle>
           <DialogDescription>

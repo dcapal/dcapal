@@ -48,7 +48,7 @@ export const InputNumber = ({
       newValue = parseInt(newValue);
     }
 
-    if (newValue === NaN || newValue < min || newValue > max) {
+    if (isNaN(newValue) || newValue < min || newValue > max) {
       newValue = null;
     }
 

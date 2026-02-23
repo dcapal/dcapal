@@ -14,26 +14,26 @@ export default defineConfig(({ mode }) => {
   const devProxy = isE2eMswMode
     ? undefined
     : {
-        "/api/external/chart": {
-          target:
-            env.VITE_PROXY_YAHOO_CHART_TARGET ??
-            "https://query1.finance.yahoo.com/v8/finance/chart/",
-          changeOrigin: true,
-          rewrite: (p: string) => p.replace(/^\/api\/external\/chart/, ""),
-        },
-        "/api/external/search": {
-          target:
-            env.VITE_PROXY_YAHOO_SEARCH_TARGET ??
-            "https://query2.finance.yahoo.com/v1/finance/search",
-          changeOrigin: true,
-          rewrite: (p: string) => p.replace(/^\/api\/external\/search/, ""),
-        },
-        "/api": {
-          target: env.VITE_PROXY_API_TARGET ?? "http://0.0.0.0:8080",
-          changeOrigin: true,
-          rewrite: (p: string) => p.replace(/^\/api/, ""),
-        },
-      };
+      "/api/external/chart": {
+        target:
+          env.VITE_PROXY_YAHOO_CHART_TARGET ??
+          "https://query1.finance.yahoo.com/v8/finance/chart/",
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/api\/external\/chart/, ""),
+      },
+      "/api/external/search": {
+        target:
+          env.VITE_PROXY_YAHOO_SEARCH_TARGET ??
+          "https://query2.finance.yahoo.com/v1/finance/search",
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/api\/external\/search/, ""),
+      },
+      "/api": {
+        target: env.VITE_PROXY_API_TARGET ?? "http://0.0.0.0:8080",
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/api/, ""),
+      },
+    };
 
   return {
     plugins: [react({ include: /\.[jt]sx?$/ }), wasm(), topLevelAwait()],
@@ -66,6 +66,7 @@ export default defineConfig(({ mode }) => {
       sourcemap: true,
     },
     worker: {
+      format: "iife",
       plugins: () => [wasm(), topLevelAwait()],
     },
     optimizeDeps: {

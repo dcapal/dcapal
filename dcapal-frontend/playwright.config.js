@@ -71,7 +71,7 @@ module.exports = defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "VITE_E2E_MSW=1 npm run start:ci",
+    command: "VITE_E2E_STATIC_WORKER=0 VITE_E2E_MSW=1 npm run start:ci",
     url: "http://127.0.0.1:3000",
     timeout: 120000,
     reuseExistingServer: !process.env.CI,

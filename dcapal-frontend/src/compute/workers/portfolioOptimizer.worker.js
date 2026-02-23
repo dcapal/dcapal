@@ -2,6 +2,21 @@ import { expose } from "comlink";
 
 let solverModulePromise = null;
 
+self.addEventListener("message", (event) => {
+  const payload = event.data;
+  if (
+    !payload ||
+    payload.type !== "ping" ||
+    typeof payload.requestId !== "number"
+  )
+    return;
+
+  self.postMessage({
+    type: "pong",
+    requestId: payload.requestId,
+  });
+});
+
 const getSolver = async () => {
   if (!solverModulePromise) {
     solverModulePromise = import("dcapal-optimizer-wasm")
@@ -52,9 +67,6 @@ const solve = (Solver, input) => {
 };
 
 expose({
-  async ping() {
-    return "pong";
-  },
   async init() {
     await getSolver();
   },

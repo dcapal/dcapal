@@ -11,7 +11,6 @@ import {
 } from "./types";
 
 interface AnalyzerWorkerRpc {
-  ping(): Promise<string>;
   init(): Promise<void>;
   analyzeAndSolve(assets: AnalyzeRequest): Promise<AnalyzeResult>;
 }
@@ -37,7 +36,9 @@ type ComputeWorkerState<TWorker extends object> = {
   onMessageError: ((event: MessageEvent) => void) | null;
 };
 
-const createWorkerState = <TWorker extends object>(): ComputeWorkerState<TWorker> => ({
+const createWorkerState = <
+  TWorker extends object,
+>(): ComputeWorkerState<TWorker> => ({
   worker: null,
   proxy: null,
   initPromise: null,
@@ -47,21 +48,27 @@ const createWorkerState = <TWorker extends object>(): ComputeWorkerState<TWorker
   onMessageError: null,
 });
 
-const portfolioOptimizerState = createWorkerState<PortfolioOptimizerWorkerRpc>();
+const portfolioOptimizerState =
+  createWorkerState<PortfolioOptimizerWorkerRpc>();
+const isStaticWorkerMode = import.meta.env.VITE_E2E_STATIC_WORKER === "1";
+let pingRequestCounter = 0;
 
 const createPortfolioOptimizerWorkerInstance = (): Worker => {
-  const workerUrl = new URL("./workers/portfolioOptimizer.worker.js", import.meta.url);
-  if (import.meta.env.DEV) {
-    return new Worker(workerUrl, {
-      type: "module",
-      name: "portfolio-optimizer",
-    });
-  }
-
-  return new Worker(workerUrl, {
-    type: "classic",
-    name: "portfolio-optimizer",
-  });
+  return import.meta.env.DEV
+    ? new Worker(
+        new URL("./workers/portfolioOptimizer.worker.js", import.meta.url),
+        {
+          type: "module",
+          name: "portfolio-optimizer",
+        }
+      )
+    : new Worker(
+        new URL("./workers/portfolioOptimizer.worker.js", import.meta.url),
+        {
+          type: "classic",
+          name: "portfolio-optimizer",
+        }
+      );
 };
 
 const destroyWorkerState = async <TWorker extends object>(
@@ -98,8 +105,8 @@ const destroyWorkerState = async <TWorker extends object>(
   }
 };
 
-const PING_TIMEOUT_MS = 20_000;
-const INIT_TIMEOUT_MS = 30_000;
+const PING_TIMEOUT_MS = isStaticWorkerMode ? 2_000 : 20_000;
+const INIT_TIMEOUT_MS = isStaticWorkerMode ? 3_000 : 30_000;
 
 const withTimeout = async <T>(
   promise: Promise<T>,
@@ -120,7 +127,76 @@ const withTimeout = async <T>(
   }
 };
 
-const getOrCreateWorker = async <Rpc extends { ping(): Promise<string>; init(): Promise<void> }>(
+type PingRequestMessage = {
+  type: "ping";
+  requestId: number;
+};
+
+type PingResponseMessage = {
+  type: "pong";
+  requestId: number;
+};
+
+const isPingResponseMessage = (data: unknown): data is PingResponseMessage => {
+  if (typeof data !== "object" || data === null) return false;
+  const candidate = data as Partial<PingResponseMessage>;
+  return candidate.type === "pong" && typeof candidate.requestId === "number";
+};
+
+const pingWorkerDirect = async (
+  worker: Worker,
+  workerName: string
+): Promise<string> => {
+  const requestId = pingRequestCounter++;
+  const request: PingRequestMessage = { type: "ping", requestId };
+
+  const pingPromise = new Promise<string>((resolve, reject) => {
+    let isSettled = false;
+    const cleanUp = () => {
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+      worker.removeEventListener("messageerror", onMessageError);
+    };
+
+    const finish = (next: () => void) => {
+      if (isSettled) return;
+      isSettled = true;
+      cleanUp();
+      next();
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      if (!isPingResponseMessage(event.data)) return;
+      if (event.data.requestId !== requestId) return;
+      finish(() => resolve("pong"));
+    };
+
+    const onError = (event: ErrorEvent) => {
+      const message = event.message || "worker emitted error event during ping";
+      finish(() => reject(new Error(`${workerName} ping failed: ${message}`)));
+    };
+
+    const onMessageError = () => {
+      finish(() =>
+        reject(new Error(`${workerName} ping failed: messageerror event`))
+      );
+    };
+
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
+    worker.addEventListener("messageerror", onMessageError);
+
+    try {
+      worker.postMessage(request);
+    } catch (error: unknown) {
+      finish(() => reject(toError(error)));
+    }
+  });
+
+  return withTimeout(pingPromise, PING_TIMEOUT_MS, `${workerName} ping`);
+};
+
+const getOrCreateWorker = async <Rpc extends { init(): Promise<void> }>(
   state: ComputeWorkerState<Rpc>,
   createWorker: () => Worker,
   workerName: string
@@ -132,47 +208,78 @@ const getOrCreateWorker = async <Rpc extends { ping(): Promise<string>; init(): 
 
   if (!state.createPromise) {
     state.createPromise = (async () => {
-      if (!state.worker || !state.proxy) {
-        state.worker = createWorker();
-        state.onMessage = (event: MessageEvent) => {
-          console.info(`[${workerName}] worker message event`, event.data);
-        };
-        state.onError = (event: ErrorEvent) => {
-          console.error(`[${workerName}] worker error event`, event);
-        };
-        state.onMessageError = (event: MessageEvent) => {
-          console.error(`[${workerName}] worker messageerror event`, event);
-        };
-        if (typeof state.worker.addEventListener === "function") {
-          state.worker.addEventListener("message", state.onMessage);
-          state.worker.addEventListener("error", state.onError);
-          state.worker.addEventListener("messageerror", state.onMessageError);
-        }
-        state.proxy = wrap<Rpc>(state.worker);
-      }
-
-      const proxy = state.proxy;
-      if (!proxy) {
-        throw new Error(`${workerName} worker proxy is not available`);
-      }
-
-      if (!state.initPromise) {
-        state.initPromise = (async () => {
-          const ping = await withTimeout(
-            proxy.ping(),
-            PING_TIMEOUT_MS,
-            `${workerName} ping`
+      try {
+        if (!state.worker || !state.proxy) {
+          console.info(`[compute] creating ${workerName} worker instance`);
+          state.worker = createWorker();
+          console.info(`[compute] ${workerName} worker instance created`);
+          // state.onMessage = (event: MessageEvent) => {
+          //   console.info(`[${workerName}] worker message event`, event.data);
+          // };
+          // state.onError = (event: ErrorEvent) => {
+          //   const details = [
+          //     `message=${event.message || "<empty>"}`,
+          //     `filename=${event.filename || "<empty>"}`,
+          //     `lineno=${String(event.lineno ?? "<none>")}`,
+          //     `colno=${String(event.colno ?? "<none>")}`,
+          //   ].join(" ");
+          //   console.error(`[${workerName}] worker error event ${details}`);
+          // };
+          // state.onMessageError = (event: MessageEvent) => {
+          //   const details = [
+          //     `origin=${event.origin || "<empty>"}`,
+          //     `lastEventId=${event.lastEventId || "<empty>"}`,
+          //     `dataType=${typeof event.data}`,
+          //   ].join(" ");
+          //   console.error(`[${workerName}] worker messageerror event ${details}`);
+          // };
+          // if (typeof state.worker.addEventListener === "function") {
+          //   state.worker.addEventListener("message", state.onMessage);
+          //   state.worker.addEventListener("error", state.onError);
+          //   state.worker.addEventListener("messageerror", state.onMessageError);
+          // }
+          const pingStart = Date.now();
+          console.info(`[compute] ${workerName} ping start`);
+          await pingWorkerDirect(state.worker, workerName);
+          console.info(
+            `[compute] ${workerName} ping resolved in ${Date.now() - pingStart}ms`
           );
-          console.info(`[compute] ${workerName} worker ping=${ping}`);
-          await withTimeout(proxy.init(), INIT_TIMEOUT_MS, `${workerName} init`);
-        })().catch(async (error: unknown) => {
-          await destroyWorkerState(state);
-          throw error;
-        });
-      }
+          debugger;
+          console.info(`[compute] wrapping ${workerName} worker with Comlink`);
+          state.proxy = wrap<Rpc>(state.worker);
+          console.info(`[compute] ${workerName} worker wrapped`);
+        }
 
-      await state.initPromise;
-      return state.proxy;
+        const proxy = state.proxy;
+        if (!proxy) {
+          throw new Error(`${workerName} worker proxy is not available`);
+        }
+
+        if (!state.initPromise) {
+          state.initPromise = (async () => {
+            const initStart = Date.now();
+            console.info(`[compute] ${workerName} init start`);
+            await withTimeout(
+              proxy.init(),
+              INIT_TIMEOUT_MS,
+              `${workerName} init`
+            );
+            console.info(
+              `[compute] ${workerName} init resolved in ${Date.now() - initStart}ms`
+            );
+          })();
+        }
+
+        await state.initPromise;
+        return state.proxy;
+      } catch (error: unknown) {
+        console.error(
+          `[compute] ${workerName} init pipeline failed`,
+          describeUnknownError(error)
+        );
+        await destroyWorkerState(state);
+        throw error;
+      }
     })().finally(() => {
       state.createPromise = null;
     });
@@ -181,10 +288,7 @@ const getOrCreateWorker = async <Rpc extends { ping(): Promise<string>; init(): 
   return state.createPromise;
 };
 
-const runWithRetry = async <
-  Rpc extends { ping(): Promise<string>; init(): Promise<void> },
-  Result
->(
+const runWithRetry = async <Rpc extends { init(): Promise<void> }, Result>(
   getWorker: () => Promise<Remote<Rpc>>,
   state: ComputeWorkerState<Rpc>,
   operation: (worker: Remote<Rpc>) => Promise<Result>
@@ -316,29 +420,6 @@ export const useComputeWorker = (): [ComputeWorkerStatus, ComputeWorkerApi] => {
 
     const init = async () => {
       try {
-        if (typeof Blob !== "undefined" && typeof URL.createObjectURL === "function") {
-          const probeBlob = new Blob(
-            ['self.onmessage = (event) => { self.postMessage({ type: "probe-ok", value: event.data }); };'],
-            { type: "text/javascript" }
-          );
-          const probeWorker = new Worker(URL.createObjectURL(probeBlob));
-          const probeTimer = setTimeout(() => {
-            console.error("[compute] inline probe worker timed out");
-            probeWorker.terminate();
-          }, 1000);
-          probeWorker.addEventListener("message", () => {
-            clearTimeout(probeTimer);
-            console.info("[compute] inline probe worker responded");
-            probeWorker.terminate();
-          });
-          probeWorker.addEventListener("error", () => {
-            clearTimeout(probeTimer);
-            console.error("[compute] inline probe worker failed");
-            probeWorker.terminate();
-          });
-          probeWorker.postMessage("ping");
-        }
-
         setIsLoading(true);
         await initializeWorkers();
         if (isCancelled) return;
