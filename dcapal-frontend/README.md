@@ -11,7 +11,7 @@ Once the docker instance is started, copy the displayed anon key and replace the
 file.
 
 ```dotenv
-REACT_APP_ENABLE_COOKIE_BUTTON=0
+VITE_ENABLE_COOKIE_BUTTON=0
 VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_ANON_KEY=<anon_key>
 ```

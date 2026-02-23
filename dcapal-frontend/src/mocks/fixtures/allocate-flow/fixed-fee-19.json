@@ -1,0 +1,34 @@
+{
+  "name": "Allocate Flow Fixed Fee 19",
+  "quoteCcy": "eur",
+  "fees": {
+    "feeStructure": {
+      "type": "fixed",
+      "feeAmount": 19
+    }
+  },
+  "assets": [
+    {
+      "symbol": "VWCE.MI",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "aclass": "EQUITY",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 101.25,
+      "averageBuyPrice": 98.5,
+      "qty": 8,
+      "targetWeight": 70
+    },
+    {
+      "symbol": "AGGH.MI",
+      "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "aclass": "EQUITY",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 101.25,
+      "averageBuyPrice": 100.1,
+      "qty": 2,
+      "targetWeight": 30
+    }
+  ]
+}

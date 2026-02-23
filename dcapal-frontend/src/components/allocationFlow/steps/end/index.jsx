@@ -1,21 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
-import { replacer, roundAmount, timeout } from "@utils/index.js";
+import { roundAmount } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import { toast } from "react-hot-toast";
 import {
   ACLASS,
   clearBudget,
   currentPortfolio,
-  feeTypeToString,
-  isWholeShares,
   setQty,
 } from "@components/allocationFlow/portfolioSlice";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { solve as runSolver } from "@/compute";
+import { useComputeWorker } from "@/compute";
+import { useAllocateFunds } from "./useAllocateFunds";
 
 export const UNALLOCATED_CASH = "Unallocated cash";
 
@@ -85,58 +84,11 @@ const buildCards = (assets, solution, pfolioCcy, pfolioFees) => {
   return cards;
 };
 
-const buildFeesInput = (fees) => {
-  if (!fees) {
-    return null;
-  }
-
-  let input = {
-    ...fees,
-    feeStructure: {
-      ...fees.feeStructure,
-      type: feeTypeToString(fees.feeStructure.type),
-    },
-  };
-
-  if (input.maxFeeImpact == null) {
-    delete input.maxFeeImpact;
-  } else if (input.maxFeeImpact) {
-    input.maxFeeImpact /= 100;
-  }
-
-  if (input.feeStructure.feeRate == null) {
-    delete input.feeStructure.feeRate;
-  } else if (input.feeStructure.feeRate) {
-    input.feeStructure.feeRate /= 100;
-  }
-
-  return input;
-};
-
-const buildProblemInput = (budget, assets, fees, useWholeShares) => {
-  const as = Object.values(assets).reduce(
-    (as, a) => ({
-      ...as,
-      [a.symbol]: {
-        symbol: a.symbol,
-        shares: a.qty,
-        price: a.price,
-        target_weight: a.targetWeight / 100,
-        is_whole_shares: useWholeShares ? isWholeShares(a.aclass) : false,
-        fees: buildFeesInput(a.fees),
-      },
-    }),
-    {}
-  );
-
-  return [budget, as, buildFeesInput(fees)];
-};
-
 export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
-  const [solution, setSolution] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isUpdated, setIsUpdated] = useState(false);
   const dispatch = useDispatch();
+  const [workerStatus, worker] = useComputeWorker();
+  const { isReady: isWorkerReady } = workerStatus;
 
   const { t } = useTranslation();
   const budget = useSelector((state) => currentPortfolio(state).budget);
@@ -144,48 +96,20 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const fees = useSelector((state) => currentPortfolio(state).fees);
 
+  const { solution, isLoading } = useAllocateFunds({
+    budget,
+    assets,
+    fees,
+    quoteCcy,
+    useTaxEfficient,
+    useAllBudget,
+    useWholeShares,
+    isWorkerReady,
+    worker,
+  });
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
-  useEffect(() => {
-    const loadSolution = async () => {
-      const [inputBudget, as, inputFees] = buildProblemInput(
-        budget,
-        assets,
-        fees,
-        useWholeShares
-      );
-
-      console.debug(
-        `inputBudget=${inputBudget} as=${JSON.stringify(
-          as
-        )} quoteCcy=${quoteCcy} useTaxEfficient=${useTaxEfficient} useWholeShares=${useWholeShares} inputFees=${JSON.stringify(
-          inputFees
-        )}`
-      );
-
-      const [sol] = await Promise.all([
-        runSolver(
-          inputBudget,
-          as,
-          quoteCcy,
-          inputFees,
-          useTaxEfficient,
-          useAllBudget
-        ),
-        timeout(1000),
-      ]);
-      console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-      setIsLoading(false);
-      if (sol) {
-        setSolution(sol);
-      }
-    };
-
-    loadSolution();
-  }, []);
-
   const onClickUpdate = () => {
-    // Prevent multiple updates
     if (isUpdated) {
       toast.success(t("endStep.portfolioAlreadyUpdated"), {
         position: "top-right",
@@ -208,10 +132,8 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
         );
       });
 
-      // Set updated state
       setIsUpdated(true);
 
-      // Success toast
       toast.success(
         `${t("endStep.portfolioUpdated")}: ${updatedAssets.length} ${t("endStep.assetsUpdated")}`,
         {
@@ -220,7 +142,6 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
         }
       );
     } else {
-      // No changes toast
       toast.success(t("endStep.noAssetsToUpdate"), {
         position: "top-right",
         duration: 2000,
@@ -239,15 +160,18 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   return (
     <div className="w-full flex flex-col items-center">
       {isLoading && (
-        <>
+        <div data-testid="end.loading">
           <div className="mt-2 mb-8 text-3xl font-light">
             {t("endStep.budgetAllocated")}
           </div>
           <Spinner />
-        </>
+        </div>
       )}
       {!isLoading && solution && (
-        <>
+        <div
+          data-testid="end.allocationReady"
+          className="w-full flex flex-col items-center"
+        >
           <div className="mt-2 mb-8 text-3xl font-light">
             <span className="text-4xl">📊</span> {t("endStep.allocationReady")}
           </div>
@@ -279,10 +203,13 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
               {t("endStep.updatePortfolio")}
             </Button>
           </div>
-        </>
+        </div>
       )}
       {!isLoading && !solution && (
-        <>
+        <div
+          data-testid="end.allocationError"
+          className="w-full flex flex-col items-center"
+        >
           <div className="mt-2 mb-8 text-3xl font-light">
             <span className="text-4xl">⚠️</span> {t("endStep.opsBadHappened")}
             {t("endStep.reviewPortfolio")}
@@ -293,7 +220,7 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
           >
             {t("endStep.backToPortfolio")}
           </span>
-        </>
+        </div>
       )}
     </div>
   );

@@ -19,11 +19,14 @@ export const PreferencesDialog = () => {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button variant="outline" data-testid="portfolio.preferences.button">
           <SlidersHorizontal />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[512px]">
+      <DialogContent
+        className="sm:max-w-[512px]"
+        data-testid="portfolio.preferences.dialog"
+      >
         <DialogHeader>
           <DialogTitle>{t("portfolioStep.preferences")}</DialogTitle>
           <DialogDescription>

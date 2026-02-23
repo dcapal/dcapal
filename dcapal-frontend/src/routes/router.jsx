@@ -21,7 +21,7 @@ import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
 import { useSyncPortfolios } from "@hooks/useSyncPortfolios";
 
-import(/* webpackPrefetch: true */ "@app");
+import("@app");
 
 const App = lazy(() => import("@app"));
 

@@ -15,6 +15,6 @@ export const DEMO_PF_HODLX = "hodlx";
 export const REFRESH_PRICE_INTERVAL_SEC = 5 * 60;
 
 export const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.VITE_SUPABASE_ANON_KEY
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
 );

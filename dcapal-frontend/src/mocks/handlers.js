@@ -5,10 +5,20 @@ import assetsCrypto from "./fixtures/assets-crypto.json";
 import assetsSearch from "./fixtures/assets-search.json";
 import assetsChart from "./fixtures/assets-chart.json";
 import importPortfolio from "./fixtures/import-portfolio.json";
+import allocateFlowZeroFee from "./fixtures/allocate-flow/zero-fee.json";
+import allocateFlowFixedFee from "./fixtures/allocate-flow/fixed-fee-19.json";
+import allocateFlowVariableFee from "./fixtures/allocate-flow/variable-fee.json";
+import allocateFlowTaxEfficientOff from "./fixtures/allocate-flow/tax-efficient-off.json";
 import importCreatedResponse from "./fixtures/import-created-response.json";
 import priceConversions from "./fixtures/price-conversions.json";
 
-const IMPORT_PORTFOLIO_ID = "fixture-import-portfolio";
+const importPortfoliosById = {
+  "fixture-import-portfolio": importPortfolio,
+  "fixture-allocate-zero-fee": allocateFlowZeroFee,
+  "fixture-allocate-fixed-fee-19": allocateFlowFixedFee,
+  "fixture-allocate-variable-fee": allocateFlowVariableFee,
+  "fixture-allocate-tax-efficient-off": allocateFlowTaxEfficientOff,
+};
 const FIXED_TS_SECONDS = 1735689600;
 const syncStore = new Map();
 
@@ -71,11 +81,12 @@ export const handlers = [
   http.get("/api/import/portfolio/:id", async ({ params }) => {
     await delay(200);
 
-    if (params.id !== IMPORT_PORTFOLIO_ID) {
+    const portfolio = importPortfoliosById[params.id];
+    if (!portfolio) {
       return new HttpResponse(null, { status: 404 });
     }
 
-    return HttpResponse.json(importPortfolio);
+    return HttpResponse.json(portfolio);
   }),
 
   http.post("/api/v1/sync/portfolios", async ({ request }) => {

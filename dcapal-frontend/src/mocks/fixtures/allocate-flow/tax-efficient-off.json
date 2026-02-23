@@ -1,0 +1,33 @@
+{
+  "name": "Allocate Flow Tax Efficient Off",
+  "quoteCcy": "eur",
+  "fees": {
+    "feeStructure": {
+      "type": "zeroFee"
+    }
+  },
+  "assets": [
+    {
+      "symbol": "VWCE.MI",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "aclass": "EQUITY",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 101.25,
+      "averageBuyPrice": 98.5,
+      "qty": 100,
+      "targetWeight": 20
+    },
+    {
+      "symbol": "AGGH.MI",
+      "name": "iShares Core Global Aggregate Bond UCITS ETF",
+      "aclass": "EQUITY",
+      "baseCcy": "usd",
+      "provider": "YF",
+      "price": 101.25,
+      "averageBuyPrice": 100.1,
+      "qty": 10,
+      "targetWeight": 80
+    }
+  ]
+}

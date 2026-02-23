@@ -22,6 +22,7 @@ export const InputNumber = ({
   step,
   textSize,
   leadingNone,
+  dataTestId,
 }) => {
   const [state, setState] = useState(value || value === 0 ? value : "");
 
@@ -47,7 +48,7 @@ export const InputNumber = ({
       newValue = parseInt(newValue);
     }
 
-    if (newValue === NaN || newValue < min || newValue > max) {
+    if (isNaN(newValue) || newValue < min || newValue > max) {
       newValue = null;
     }
 
@@ -75,6 +76,7 @@ export const InputNumber = ({
       min={min}
       max={max}
       step={step ? step : "any"}
+      data-testid={dataTestId}
     />
   );
 };
