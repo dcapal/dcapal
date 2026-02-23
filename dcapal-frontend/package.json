@@ -82,6 +82,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3",
     "vite": "^6.4.1",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0",
     "vitest": "^4.0.18"
   },
   "msw": {

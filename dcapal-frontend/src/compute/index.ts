@@ -50,13 +50,18 @@ const createWorkerState = <TWorker extends object>(): ComputeWorkerState<TWorker
 const portfolioOptimizerState = createWorkerState<PortfolioOptimizerWorkerRpc>();
 
 const createPortfolioOptimizerWorkerInstance = (): Worker => {
-  return new Worker(
-    new URL("./workers/portfolioOptimizer.worker.js", import.meta.url),
-    {
+  const workerUrl = new URL("./workers/portfolioOptimizer.worker.js", import.meta.url);
+  if (import.meta.env.DEV) {
+    return new Worker(workerUrl, {
       type: "module",
       name: "portfolio-optimizer",
-    }
-  );
+    });
+  }
+
+  return new Worker(workerUrl, {
+    type: "classic",
+    name: "portfolio-optimizer",
+  });
 };
 
 const destroyWorkerState = async <TWorker extends object>(
@@ -93,8 +98,8 @@ const destroyWorkerState = async <TWorker extends object>(
   }
 };
 
-const PING_TIMEOUT_MS = 4_000;
-const INIT_TIMEOUT_MS = 15_000;
+const PING_TIMEOUT_MS = 20_000;
+const INIT_TIMEOUT_MS = 30_000;
 
 const withTimeout = async <T>(
   promise: Promise<T>,
