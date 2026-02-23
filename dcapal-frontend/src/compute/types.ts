@@ -42,14 +42,16 @@ export interface SolveRequest {
   useAllBudget: boolean;
 }
 
-export interface ComputeSolveSolution {
+export type AnalyzeResult = number | null;
+
+export interface Allocation {
   amounts?: Map<string, number>;
   shares?: Map<string, number>;
   theo_allocs?: Map<string, number>;
   budget_left?: number;
 }
 
-export type ComputeSolution = number | ComputeSolveSolution | null;
+export type AllocationResult = Allocation | null;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);

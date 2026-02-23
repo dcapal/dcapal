@@ -1,36 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useCollapse } from "react-collapsed";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import {
   currentPortfolio,
-  isWholeShares,
   setBudget,
 } from "@components/allocationFlow/portfolioSlice";
 import { Trans, useTranslation } from "react-i18next";
-import { analyze } from "@/compute";
-import { replacer } from "@utils/index.js";
+import { useComputeWorker } from "@/compute";
 import { Button } from "@/components/ui/button";
+import { useSuggestAmountToInvest } from "./useInvestCompute";
 
 const amtDecimals = 2;
-
-const buildProblemInput = (assets) => {
-  return Object.values(assets).reduce(
-    (as, a) => ({
-      ...as,
-      [a.symbol]: {
-        symbol: a.symbol,
-        target_weight: a.targetWeight / 100,
-        shares: a.qty,
-        price: a.price,
-        is_whole_shares: isWholeShares(a.aclass),
-        current_amount: a.amount,
-      },
-    }),
-    {}
-  );
-};
 
 export const InvestStep = ({
   useTaxEfficient,
@@ -43,36 +24,24 @@ export const InvestStep = ({
   const [cash, setCash] = useState(0);
   const dispatch = useDispatch();
   const { t } = useTranslation();
+  const [workerStatus, worker] = useComputeWorker();
+  const { isReady: isWorkerReady, isLoading: isWorkerLoading } = workerStatus;
 
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
   const totalAmount = useSelector(
     (state) => currentPortfolio(state).totalAmount
   );
   const assets = useSelector((state) => currentPortfolio(state).assets);
-  const [solution, setSolution] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { solution, isLoading } = useSuggestAmountToInvest({
+    assets,
+    totalAmount,
+    isWorkerReady,
+    worker,
+  });
 
   const handleButtonClick = () => {
     setCash(+Number(solution).toFixed(amtDecimals));
   };
-
-  useEffect(() => {
-    if (totalAmount === 0) return;
-
-    const solve = async () => {
-      const as = buildProblemInput(assets);
-      const sol = await analyze(as);
-      console.debug(`solution=${JSON.stringify(sol, replacer)}`);
-      setIsLoading(false);
-      if (sol) {
-        setSolution(sol);
-      }
-    };
-
-    solve();
-  }, []);
-
-  const { getCollapseProps, getToggleProps, isExpanded } = useCollapse();
 
   const onClickTaxEfficient = () => {
     setUseTaxEfficient(!useTaxEfficient);
@@ -95,12 +64,12 @@ export const InvestStep = ({
     dispatch(setAllocationFlowStep({ step: Step.END }));
   };
 
-  const isRunAllocationDisabled = cash + totalAmount <= 0;
+  const isRunAllocationDisabled = cash + totalAmount <= 0 || !isWorkerReady;
 
   let i18nKey = "";
 
   if (totalAmount !== 0) {
-    if (solution === null && isLoading) {
+    if (isWorkerLoading || !isWorkerReady || (solution === null && isLoading)) {
       i18nKey = "investStep.loading";
     } else if (Number(solution) !== 0) {
       i18nKey = "investStep.youShouldAllocateAmount";
@@ -125,13 +94,14 @@ export const InvestStep = ({
             isValid={true}
             min={0}
             leadingNone={true}
+            dataTestId="invest.cash.input"
           />
         </div>
         <div className="ml-2 pb-2 text-2xl font-light uppercase">
           {quoteCcy}
         </div>
       </div>
-      <div className="mt-2 text-xl font-light">
+      <div className="mt-2 text-xl font-light" data-testid="invest.recommendation.text">
         <Trans
           i18nKey={i18nKey}
           values={{
@@ -168,6 +138,7 @@ export const InvestStep = ({
             onClick={onClickTaxEfficient}
           >
             <input
+              data-testid="invest.taxEfficient.checkbox"
               id="tax-efficient-checkbox"
               type="checkbox"
               className="w-4 h-4 accent-neutral-500 cursor-pointer"
@@ -203,20 +174,17 @@ export const InvestStep = ({
             onClick={onClickUseAllBudget}
           >
             <input
-              id="tax-efficient-checkbox"
+              id="use-all-budget-checkbox"
               type="checkbox"
               className="w-4 h-4 accent-neutral-500 cursor-pointer"
               checked={useAllBudget}
               onChange={onClickUseAllBudget}
             />
             <label
-              htmlFor="#tax-efficient-checkbox"
+              htmlFor="#use-all-budget-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
-              {t("investStep.allocate")}{" "}
-              <span className="font-medium capitalize">
-                {t("investStep.allBudget")}
-              </span>
+              {t("investStep.allocate")} <span className="font-medium capitalize">{t("investStep.allBudget")}</span>
             </label>
           </div>
           <p className="text-sm font-light">
@@ -236,14 +204,14 @@ export const InvestStep = ({
             onClick={onClickWholeShares}
           >
             <input
-              id="tax-efficient-checkbox"
+              id="fractional-shares-checkbox"
               type="checkbox"
               className="w-4 h-4 accent-neutral-500 cursor-pointer"
               checked={!useWholeShares}
               onChange={onClickWholeShares}
             />
             <label
-              htmlFor="#tax-efficient-checkbox"
+              htmlFor="#fractional-shares-checkbox"
               className="ml-2 cursor-pointer select-none"
             >
               <Trans
@@ -274,6 +242,7 @@ export const InvestStep = ({
         <Button
           onClick={onClickRunAllocation}
           disabled={isRunAllocationDisabled}
+          data-testid="invest.runAllocation.button"
         >
           {t("investStep.runAllocation")}{" "}
         </Button>

@@ -1,7 +1,9 @@
-import { spawn, Thread, Worker } from "threads";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { wrap, type Remote } from "comlink";
 import {
+  type AllocationResult,
   type AnalyzeRequest,
-  type ComputeSolution,
+  type AnalyzeResult,
   type SolveAssets,
   type TransactionFeesInput,
   isAnalyzeRequest,
@@ -9,10 +11,12 @@ import {
 } from "./types";
 
 interface AnalyzerWorkerRpc {
-  analyzeAndSolve(assets: AnalyzeRequest): Promise<ComputeSolution>;
+  ping(): Promise<string>;
+  init(): Promise<void>;
+  analyzeAndSolve(assets: AnalyzeRequest): Promise<AnalyzeResult>;
 }
 
-interface SolverWorkerRpc {
+interface PortfolioOptimizerWorkerRpc extends AnalyzerWorkerRpc {
   makeAndSolve(
     budget: number,
     assets: SolveAssets,
@@ -20,120 +24,235 @@ interface SolverWorkerRpc {
     fees: TransactionFeesInput | null | undefined,
     isBuyOnly: boolean,
     useAllBudget: boolean
-  ): Promise<ComputeSolution>;
+  ): Promise<AllocationResult>;
 }
 
-type WorkerRpc = AnalyzerWorkerRpc | SolverWorkerRpc;
+type ComputeWorkerState<TWorker extends object> = {
+  worker: Worker | null;
+  proxy: Remote<TWorker> | null;
+  initPromise: Promise<void> | null;
+  createPromise: Promise<Remote<TWorker>> | null;
+  onMessage: ((event: MessageEvent) => void) | null;
+  onError: ((event: ErrorEvent) => void) | null;
+  onMessageError: ((event: MessageEvent) => void) | null;
+};
 
-interface WorkerState<TWorker extends WorkerRpc> {
-  instancePromise: Promise<TWorker> | null;
-  queueTail: Promise<unknown>;
-}
-
-const createWorkerState = <
-  TWorker extends WorkerRpc,
->(): WorkerState<TWorker> => ({
-  instancePromise: null,
-  queueTail: Promise.resolve(),
+const createWorkerState = <TWorker extends object>(): ComputeWorkerState<TWorker> => ({
+  worker: null,
+  proxy: null,
+  initPromise: null,
+  createPromise: null,
+  onMessage: null,
+  onError: null,
+  onMessageError: null,
 });
 
-const analyzerState = createWorkerState<AnalyzerWorkerRpc>();
-const solverState = createWorkerState<SolverWorkerRpc>();
+const portfolioOptimizerState = createWorkerState<PortfolioOptimizerWorkerRpc>();
 
-const enqueueSerialized = async <TWorker extends WorkerRpc, TResult>(
-  state: WorkerState<TWorker>,
-  task: () => Promise<TResult>
-): Promise<TResult> => {
-  const run = (): Promise<TResult> => task();
-  state.queueTail = state.queueTail.then(run, run);
-  return state.queueTail as Promise<TResult>;
+const createPortfolioOptimizerWorkerInstance = (): Worker => {
+  return new Worker(
+    new URL("./workers/portfolioOptimizer.worker.js?v=diag", import.meta.url)
+  );
 };
 
-const getWorker = async <TWorker extends WorkerRpc>(
-  state: WorkerState<TWorker>,
-  workerPath: string,
-  workerName: string
-): Promise<TWorker> => {
-  if (state.instancePromise) return state.instancePromise;
-
-  // TODO(migrate): threads' constructor types only accept string paths, but webpack worker loading uses URL.
-  const workerUrl = new URL(workerPath, import.meta.url) as unknown as string;
-  state.instancePromise = (
-    spawn(
-      new Worker(workerUrl, {
-        name: workerName,
-      })
-    ) as unknown as Promise<TWorker>
-  ).catch((error: unknown) => {
-    state.instancePromise = null;
-    throw error;
-  });
-
-  return state.instancePromise;
-};
-
-const terminateWorkerPromise = async <TWorker extends WorkerRpc>(
-  workerPromise: Promise<TWorker> | null
+const destroyWorkerState = async <TWorker extends object>(
+  state: ComputeWorkerState<TWorker>
 ): Promise<void> => {
-  if (!workerPromise) return;
+  const worker = state.worker;
+  const onMessage = state.onMessage;
+  const onError = state.onError;
+  const onMessageError = state.onMessageError;
+  state.worker = null;
+  state.proxy = null;
+  state.initPromise = null;
+  state.createPromise = null;
+  state.onMessage = null;
+  state.onError = null;
+  state.onMessageError = null;
+
+  if (!worker) return;
+
+  if (onMessage && typeof worker.removeEventListener === "function") {
+    worker.removeEventListener("message", onMessage);
+  }
+  if (onError && typeof worker.removeEventListener === "function") {
+    worker.removeEventListener("error", onError);
+  }
+  if (onMessageError && typeof worker.removeEventListener === "function") {
+    worker.removeEventListener("messageerror", onMessageError);
+  }
 
   try {
-    const worker = await workerPromise;
-    // TODO(migrate): narrow spawned thread proxy type from threads to avoid this cast.
-    await Thread.terminate(
-      worker as unknown as Parameters<typeof Thread.terminate>[0]
-    );
+    worker.terminate();
   } catch {
-    // no-op: if worker failed to spawn/terminate there's nothing else to do
+    // no-op
   }
 };
 
-const runWithWorker = async <TWorker extends WorkerRpc, TResult>(
-  state: WorkerState<TWorker>,
-  workerPath: string,
-  workerName: string,
-  operation: (worker: TWorker) => Promise<TResult>
-): Promise<TResult> => {
-  return enqueueSerialized(state, async () => {
-    const workerPromise = getWorker(state, workerPath, workerName);
+const PING_TIMEOUT_MS = 4_000;
+const INIT_TIMEOUT_MS = 15_000;
 
-    try {
-      const worker = await workerPromise;
-      return await operation(worker);
-    } catch (error) {
-      state.instancePromise = null;
-      await terminateWorkerPromise(workerPromise);
-      throw error;
-    }
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
   });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 };
 
-export const analyze = async (
+const getOrCreateWorker = async <Rpc extends { ping(): Promise<string>; init(): Promise<void> }>(
+  state: ComputeWorkerState<Rpc>,
+  createWorker: () => Worker,
+  workerName: string
+): Promise<Remote<Rpc>> => {
+  if (state.proxy && state.initPromise) {
+    await state.initPromise;
+    return state.proxy;
+  }
+
+  if (!state.createPromise) {
+    state.createPromise = (async () => {
+      if (!state.worker || !state.proxy) {
+        state.worker = createWorker();
+        state.onMessage = (event: MessageEvent) => {
+          console.info(`[${workerName}] worker message event`, event.data);
+        };
+        state.onError = (event: ErrorEvent) => {
+          console.error(`[${workerName}] worker error event`, event);
+        };
+        state.onMessageError = (event: MessageEvent) => {
+          console.error(`[${workerName}] worker messageerror event`, event);
+        };
+        if (typeof state.worker.addEventListener === "function") {
+          state.worker.addEventListener("message", state.onMessage);
+          state.worker.addEventListener("error", state.onError);
+          state.worker.addEventListener("messageerror", state.onMessageError);
+        }
+        state.proxy = wrap<Rpc>(state.worker);
+      }
+
+      const proxy = state.proxy;
+      if (!proxy) {
+        throw new Error(`${workerName} worker proxy is not available`);
+      }
+
+      if (!state.initPromise) {
+        state.initPromise = (async () => {
+          const ping = await withTimeout(
+            proxy.ping(),
+            PING_TIMEOUT_MS,
+            `${workerName} ping`
+          );
+          console.info(`[compute] ${workerName} worker ping=${ping}`);
+          await withTimeout(proxy.init(), INIT_TIMEOUT_MS, `${workerName} init`);
+        })().catch(async (error: unknown) => {
+          await destroyWorkerState(state);
+          throw error;
+        });
+      }
+
+      await state.initPromise;
+      return state.proxy;
+    })().finally(() => {
+      state.createPromise = null;
+    });
+  }
+
+  return state.createPromise;
+};
+
+const runWithRetry = async <
+  Rpc extends { ping(): Promise<string>; init(): Promise<void> },
+  Result
+>(
+  getWorker: () => Promise<Remote<Rpc>>,
+  state: ComputeWorkerState<Rpc>,
+  operation: (worker: Remote<Rpc>) => Promise<Result>
+): Promise<Result> => {
+  try {
+    const worker = await getWorker();
+    return await operation(worker);
+  } catch {
+    await destroyWorkerState(state);
+    const worker = await getWorker();
+    return await operation(worker);
+  }
+};
+
+const toError = (error: unknown): Error => {
+  if (error instanceof Error) return error;
+  return new Error(String(error));
+};
+
+const describeUnknownError = (error: unknown): string => {
+  if (error instanceof Error) {
+    const message = error.message ? error.message : "<empty message>";
+    return `${error.name}: ${message}`;
+  }
+
+  if (typeof error === "string") return error;
+  return String(error);
+};
+
+const getPortfolioOptimizerWorker = async (): Promise<
+  Remote<PortfolioOptimizerWorkerRpc>
+> => {
+  return getOrCreateWorker(
+    portfolioOptimizerState,
+    createPortfolioOptimizerWorkerInstance,
+    "portfolio-optimizer"
+  );
+};
+
+const initializeWorkers = async (): Promise<void> => {
+  const initializePortfolioOptimizer = getPortfolioOptimizerWorker()
+    .then(() => {
+      console.info("[compute] portfolio optimizer worker initialized");
+    })
+    .catch((error: unknown) => {
+      const normalizedError = toError(error);
+      console.error(
+        "[compute] portfolio optimizer worker initialization failed:",
+        describeUnknownError(error),
+        normalizedError
+      );
+      throw normalizedError;
+    });
+
+  await initializePortfolioOptimizer;
+};
+
+const analyzeWithWorker = async (
   assets: AnalyzeRequest
-): Promise<ComputeSolution> => {
+): Promise<AnalyzeResult> => {
   if (!isAnalyzeRequest(assets)) return null;
 
-  try {
-    return await runWithWorker(
-      analyzerState,
-      "./workers/analyzer.worker.js",
-      "wasm-analyzer-worker",
-      async (worker) => worker.analyzeAndSolve(assets)
-    );
-  } catch (error) {
-    console.error("Unexpected exception in dcapal-optimizer:", error);
-    return null;
-  }
+  return runWithRetry<PortfolioOptimizerWorkerRpc, AnalyzeResult>(
+    getPortfolioOptimizerWorker,
+    portfolioOptimizerState,
+    async (worker) => worker.analyzeAndSolve(assets)
+  );
 };
 
-export const solve = async (
+const solveWithWorker = async (
   budget: number,
   assets: SolveAssets,
   pfolioCcy: string,
   fees: TransactionFeesInput | null | undefined,
   isBuyOnly: boolean,
   useAllBudget: boolean
-): Promise<ComputeSolution> => {
+): Promise<AllocationResult> => {
   const request = {
     budget,
     assets,
@@ -145,38 +264,167 @@ export const solve = async (
 
   if (!isSolveRequest(request)) return null;
 
-  try {
-    return await runWithWorker(
-      solverState,
-      "./workers/solver.worker.js",
-      "wasm-solver-worker",
-      async (worker) =>
-        worker.makeAndSolve(
+  return runWithRetry<PortfolioOptimizerWorkerRpc, AllocationResult>(
+    getPortfolioOptimizerWorker,
+    portfolioOptimizerState,
+    async (worker) =>
+      worker.makeAndSolve(
+        budget,
+        assets,
+        pfolioCcy,
+        fees,
+        isBuyOnly,
+        useAllBudget
+      )
+  );
+};
+
+export interface ComputeWorkerStatus {
+  isLoading: boolean;
+  isReady: boolean;
+  error: Error | null;
+}
+
+export interface ComputeWorkerApi {
+  suggestAmountToInvest: (assets: AnalyzeRequest) => Promise<AnalyzeResult>;
+  solve: (
+    budget: number,
+    assets: SolveAssets,
+    pfolioCcy: string,
+    fees: TransactionFeesInput | null | undefined,
+    isBuyOnly: boolean,
+    useAllBudget: boolean
+  ) => Promise<AllocationResult>;
+}
+
+export const useComputeWorker = (): [ComputeWorkerStatus, ComputeWorkerApi] => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const init = async () => {
+      try {
+        if (typeof Blob !== "undefined" && typeof URL.createObjectURL === "function") {
+          const probeBlob = new Blob(
+            ['self.onmessage = (event) => { self.postMessage({ type: "probe-ok", value: event.data }); };'],
+            { type: "text/javascript" }
+          );
+          const probeWorker = new Worker(URL.createObjectURL(probeBlob));
+          const probeTimer = setTimeout(() => {
+            console.error("[compute] inline probe worker timed out");
+            probeWorker.terminate();
+          }, 1000);
+          probeWorker.addEventListener("message", () => {
+            clearTimeout(probeTimer);
+            console.info("[compute] inline probe worker responded");
+            probeWorker.terminate();
+          });
+          probeWorker.addEventListener("error", () => {
+            clearTimeout(probeTimer);
+            console.error("[compute] inline probe worker failed");
+            probeWorker.terminate();
+          });
+          probeWorker.postMessage("ping");
+        }
+
+        setIsLoading(true);
+        await initializeWorkers();
+        if (isCancelled) return;
+        setError(null);
+        setIsReady(true);
+      } catch (err: unknown) {
+        if (isCancelled) return;
+        const normalizedError = toError(err);
+        setError(normalizedError);
+        setIsReady(false);
+        console.error("Failed to initialize compute workers:", normalizedError);
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const suggestAmountToInvest = useCallback(async (assets: AnalyzeRequest) => {
+    try {
+      const result = await analyzeWithWorker(assets);
+      setError(null);
+      return result;
+    } catch (err: unknown) {
+      const normalizedError = toError(err);
+      setError(normalizedError);
+      console.error(
+        "Unexpected exception in portfolio optimizer worker (analyze):",
+        normalizedError
+      );
+      return null;
+    }
+  }, []);
+
+  const solve = useCallback(
+    async (
+      budget: number,
+      assets: SolveAssets,
+      pfolioCcy: string,
+      fees: TransactionFeesInput | null | undefined,
+      isBuyOnly: boolean,
+      useAllBudget: boolean
+    ) => {
+      try {
+        const result = await solveWithWorker(
           budget,
           assets,
           pfolioCcy,
           fees,
           isBuyOnly,
           useAllBudget
-        )
-    );
-  } catch (error) {
-    console.error("Unexpected exception in dcapal-optimizer:", error);
-    return null;
-  }
+        );
+        setError(null);
+        return result;
+      } catch (err: unknown) {
+        const normalizedError = toError(err);
+        setError(normalizedError);
+        console.error(
+          "Unexpected exception in portfolio optimizer worker (solve):",
+          normalizedError
+        );
+        return null;
+      }
+    },
+    []
+  );
+
+  const status = useMemo(
+    () => ({
+      isLoading,
+      isReady,
+      error,
+    }),
+    [error, isLoading, isReady]
+  );
+
+  const worker = useMemo(
+    () => ({
+      suggestAmountToInvest,
+      solve,
+    }),
+    [suggestAmountToInvest, solve]
+  );
+
+  return [status, worker];
 };
 
+export const __runAnalyzeForTests = analyzeWithWorker;
+export const __runSolveForTests = solveWithWorker;
+
 export const __resetComputeWorkersForTests = async (): Promise<void> => {
-  const analyzerPromise = analyzerState.instancePromise;
-  const solverPromise = solverState.instancePromise;
-
-  analyzerState.instancePromise = null;
-  solverState.instancePromise = null;
-  analyzerState.queueTail = Promise.resolve();
-  solverState.queueTail = Promise.resolve();
-
-  await Promise.all([
-    terminateWorkerPromise(analyzerPromise),
-    terminateWorkerPromise(solverPromise),
-  ]);
+  await destroyWorkerState(portfolioOptimizerState);
 };

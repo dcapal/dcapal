@@ -22,6 +22,7 @@ export const InputNumber = ({
   step,
   textSize,
   leadingNone,
+  dataTestId,
 }) => {
   const [state, setState] = useState(value || value === 0 ? value : "");
 
@@ -75,6 +76,7 @@ export const InputNumber = ({
       min={min}
       max={max}
       step={step ? step : "any"}
+      data-testid={dataTestId}
     />
   );
 };

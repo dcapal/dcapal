@@ -39,7 +39,7 @@ const startMocks = async () => {
   const { worker } = await import("./mocks/browser");
   await worker.start({
     quiet: true,
-    onUnhandledRequest({ request }, print) {
+    onUnhandledRequest(request, print) {
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/")) {
         print.error();

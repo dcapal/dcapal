@@ -1,39 +1,64 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { spawnMock, workerCtorMock, terminateMock } = vi.hoisted(() => ({
-  spawnMock: vi.fn(),
+const {
+  wrapMock,
+  workerCtorMock,
+  workerTerminateMock,
+  portfolioOptimizerRpc,
+} = vi.hoisted(() => ({
+  wrapMock: vi.fn(),
   workerCtorMock: vi.fn(),
-  terminateMock: vi.fn(),
+  workerTerminateMock: vi.fn(),
+  portfolioOptimizerRpc: {
+    ping: vi.fn(),
+    init: vi.fn(),
+    analyzeAndSolve: vi.fn(),
+    makeAndSolve: vi.fn(),
+  },
 }));
 
-vi.mock("threads", () => ({
-  spawn: spawnMock,
-  Thread: {
-    terminate: terminateMock,
-  },
-  Worker: function Worker(url: URL, options: { name: string }) {
+vi.mock("comlink", () => ({
+  wrap: wrapMock,
+}));
+
+class MockWorker {
+  url: URL;
+  options: WorkerOptions | undefined;
+
+  constructor(url: URL, options?: WorkerOptions) {
+    this.url = url;
+    this.options = options;
     workerCtorMock(url, options);
-    return { url, options };
-  },
-}));
+  }
 
-import { __resetComputeWorkersForTests, analyze, solve } from "./index";
+  terminate = workerTerminateMock;
+}
+
+vi.stubGlobal("Worker", MockWorker as unknown as typeof Worker);
+
+import {
+  __resetComputeWorkersForTests,
+  __runAnalyzeForTests,
+  __runSolveForTests,
+} from "./index";
 
 describe("compute boundary", () => {
   beforeEach(async () => {
     await __resetComputeWorkersForTests();
     vi.clearAllMocks();
-    terminateMock.mockResolvedValue(undefined);
+
+    portfolioOptimizerRpc.init.mockResolvedValue(undefined);
+    portfolioOptimizerRpc.ping.mockResolvedValue("pong");
+    portfolioOptimizerRpc.analyzeAndSolve.mockReset();
+    portfolioOptimizerRpc.makeAndSolve.mockReset();
+
+    wrapMock.mockReturnValue(portfolioOptimizerRpc);
   });
 
-  it("reuses analyzer worker across calls", async () => {
-    const analyzerRpc = {
-      analyzeAndSolve: vi
-        .fn()
-        .mockResolvedValueOnce(123.45)
-        .mockResolvedValueOnce(678.9),
-    };
-    spawnMock.mockResolvedValue(analyzerRpc);
+  it("reuses portfolio optimizer worker across analyze calls", async () => {
+    portfolioOptimizerRpc.analyzeAndSolve
+      .mockResolvedValueOnce(123.45)
+      .mockResolvedValueOnce(678.9);
 
     const assets = {
       SPY: {
@@ -44,38 +69,44 @@ describe("compute boundary", () => {
       },
     };
 
-    const result1 = await analyze(assets);
-    const result2 = await analyze(assets);
+    const result1 = await __runAnalyzeForTests(assets);
+    const result2 = await __runAnalyzeForTests(assets);
 
     expect(result1).toBe(123.45);
     expect(result2).toBe(678.9);
-    expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(workerCtorMock).toHaveBeenCalledTimes(1);
-    expect(workerCtorMock.mock.calls[0][1]).toStrictEqual({
-      name: "wasm-analyzer-worker",
-    });
-    expect(analyzerRpc.analyzeAndSolve).toHaveBeenCalledTimes(2);
-    expect(analyzerRpc.analyzeAndSolve).toHaveBeenNthCalledWith(1, assets);
-    expect(analyzerRpc.analyzeAndSolve).toHaveBeenNthCalledWith(2, assets);
-    expect(terminateMock).not.toHaveBeenCalled();
+    expect(wrapMock).toHaveBeenCalledTimes(1);
+    expect(portfolioOptimizerRpc.init).toHaveBeenCalledTimes(1);
+    expect(portfolioOptimizerRpc.analyzeAndSolve).toHaveBeenCalledTimes(2);
+    expect(workerTerminateMock).not.toHaveBeenCalled();
+    expect(String(workerCtorMock.mock.calls[0]?.[0])).toContain(
+      "portfolioOptimizer.worker.js"
+    );
   });
 
-  it("serializes solve calls on the same worker", async () => {
-    let releaseFirstCall: () => void = () => {};
-    const firstCall = new Promise<void>((resolve) => {
-      releaseFirstCall = resolve;
-    });
+  it("reuses the same worker across analyze and solve operations", async () => {
+    portfolioOptimizerRpc.analyzeAndSolve.mockResolvedValueOnce(1);
+    portfolioOptimizerRpc.makeAndSolve.mockResolvedValueOnce({ budget_left: 5 });
 
-    const solverRpc = {
-      makeAndSolve: vi
-        .fn()
-        .mockImplementationOnce(async () => {
-          await firstCall;
-          return { budget_left: 10 };
-        })
-        .mockResolvedValueOnce({ budget_left: 5 }),
-    };
-    spawnMock.mockResolvedValue(solverRpc);
+    const assets = { SPY: { symbol: "SPY", target_weight: 1, shares: 10, price: 500 } };
+    await __runAnalyzeForTests(assets);
+    await __runSolveForTests(1000, assets, "USD", null, true, false);
+
+    expect(workerCtorMock).toHaveBeenCalledTimes(1);
+    expect(wrapMock).toHaveBeenCalledTimes(1);
+    expect(portfolioOptimizerRpc.init).toHaveBeenCalledTimes(1);
+    expect(portfolioOptimizerRpc.analyzeAndSolve).toHaveBeenCalledTimes(1);
+    expect(portfolioOptimizerRpc.makeAndSolve).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not serialize solver calls", async () => {
+    let releaseFirstCall: (value: { budget_left: number }) => void = () => {};
+
+    portfolioOptimizerRpc.makeAndSolve
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (releaseFirstCall = resolve))
+      )
+      .mockResolvedValueOnce({ budget_left: 5 });
 
     const budget = 1000;
     const assets = {
@@ -87,52 +118,41 @@ describe("compute boundary", () => {
       },
     };
 
-    const call1 = solve(budget, assets, "EUR", null, true, false);
-    const call2 = solve(budget, assets, "EUR", null, true, false);
+    const call1 = __runSolveForTests(budget, assets, "EUR", null, true, false);
+    const call2 = __runSolveForTests(budget, assets, "EUR", null, true, false);
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.waitFor(() => {
+      expect(workerCtorMock).toHaveBeenCalledTimes(1);
+      expect(portfolioOptimizerRpc.makeAndSolve).toHaveBeenCalledTimes(2);
+    });
 
-    expect(spawnMock).toHaveBeenCalledTimes(1);
-    expect(solverRpc.makeAndSolve).toHaveBeenCalledTimes(1);
+    releaseFirstCall({ budget_left: 10 });
 
-    releaseFirstCall();
-
-    await expect(call1).resolves.toStrictEqual({ budget_left: 10 });
-    await expect(call2).resolves.toStrictEqual({ budget_left: 5 });
-
-    expect(solverRpc.makeAndSolve).toHaveBeenCalledTimes(2);
-    expect(terminateMock).not.toHaveBeenCalled();
+    const results = await Promise.all([call1, call2]);
+    expect(results).toContainEqual({ budget_left: 10 });
+    expect(results).toContainEqual({ budget_left: 5 });
   });
 
-  it("terminates failed analyzer worker and recreates it on next call", async () => {
-    const failingRpc = {
-      analyzeAndSolve: vi.fn().mockRejectedValue(new Error("boom")),
-    };
-    const healthyRpc = {
-      analyzeAndSolve: vi.fn().mockResolvedValue(42),
-    };
-    spawnMock
-      .mockResolvedValueOnce(failingRpc)
-      .mockResolvedValueOnce(healthyRpc);
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("recreates worker and retries once after analyze failure", async () => {
+    portfolioOptimizerRpc.analyzeAndSolve
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(42);
 
     const assets = { SPY: { symbol: "SPY" } };
+    const result = await __runAnalyzeForTests(assets);
 
-    const firstResult = await analyze(assets);
-    const secondResult = await analyze(assets);
-
-    expect(firstResult).toBeNull();
-    expect(secondResult).toBe(42);
-    expect(spawnMock).toHaveBeenCalledTimes(2);
-    expect(terminateMock).toHaveBeenCalledTimes(1);
-    expect(terminateMock).toHaveBeenCalledWith(failingRpc);
+    expect(result).toBe(42);
+    expect(workerCtorMock).toHaveBeenCalledTimes(2);
+    expect(wrapMock).toHaveBeenCalledTimes(2);
+    expect(workerTerminateMock).toHaveBeenCalledTimes(1);
+    expect(portfolioOptimizerRpc.analyzeAndSolve).toHaveBeenCalledTimes(2);
   });
 
   it("returns null and does not spawn workers for invalid payloads", async () => {
-    const analyzeResult = await analyze(
+    const analyzeResult = await __runAnalyzeForTests(
       null as unknown as Record<string, never>
     );
-    const solveResult = await solve(
+    const solveResult = await __runSolveForTests(
       "100" as unknown as number,
       { SPY: {} },
       "USD",
@@ -143,6 +163,7 @@ describe("compute boundary", () => {
 
     expect(analyzeResult).toBeNull();
     expect(solveResult).toBeNull();
-    expect(spawnMock).not.toHaveBeenCalled();
+    expect(workerCtorMock).not.toHaveBeenCalled();
+    expect(wrapMock).not.toHaveBeenCalled();
   });
 });

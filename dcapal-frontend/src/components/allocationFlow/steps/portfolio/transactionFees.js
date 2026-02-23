@@ -126,6 +126,7 @@ const FeeGroup = ({ selected, setSelected, asset }) => {
         label={t("transactionFee.noFees")}
         selected={selected}
         setSelected={setSelected}
+        testId="portfolio.fees.type.zero"
       />
       <FeeRadio
         key="fixed"
@@ -133,6 +134,7 @@ const FeeGroup = ({ selected, setSelected, asset }) => {
         label={t("transactionFee.fixed")}
         selected={selected}
         setSelected={setSelected}
+        testId="portfolio.fees.type.fixed"
       />
       <FeeRadio
         key="variable"
@@ -140,12 +142,13 @@ const FeeGroup = ({ selected, setSelected, asset }) => {
         label={t("transactionFee.variable")}
         selected={selected}
         setSelected={setSelected}
+        testId="portfolio.fees.type.variable"
       />
     </div>
   );
 };
 
-const FeeRadio = ({ type, label, selected, setSelected }) => {
+const FeeRadio = ({ type, label, selected, setSelected, testId }) => {
   const isSelected = selected === type;
 
   const onClick = () => {
@@ -164,7 +167,7 @@ const FeeRadio = ({ type, label, selected, setSelected }) => {
   });
 
   return (
-    <div className={className} onClick={onClick}>
+    <div className={className} onClick={onClick} data-testid={testId}>
       {label}
     </div>
   );
@@ -206,6 +209,7 @@ const FixedFeeForm = ({
             onChange={onChangeFeeAmount}
             isValid={true}
             min={0}
+            dataTestId="portfolio.fees.fixed.amount"
           />
         </div>
         <label className="text-start min-w-[2rem] ml-2 uppercase">
@@ -271,6 +275,7 @@ const VariableFeeForm = ({
             isValid={true}
             min={0}
             max={100}
+            dataTestId="portfolio.fees.variable.rate"
           />
         </div>
         <label className="text-start min-w-[2rem] ml-2 uppercase">%</label>
@@ -287,6 +292,7 @@ const VariableFeeForm = ({
             onChange={onChangeMinFee}
             isValid={isMinFeeValid}
             min={0}
+            dataTestId="portfolio.fees.variable.min"
           />
         </div>
         <label className="text-start min-w-[2rem] ml-2 uppercase">
@@ -305,6 +311,7 @@ const VariableFeeForm = ({
             onChange={onChangeMaxFee}
             isValid={true}
             min={0}
+            dataTestId="portfolio.fees.variable.max"
           />
         </div>
         <label className="text-start min-w-[2rem] ml-2 uppercase">
@@ -342,6 +349,7 @@ const MaxFeeImpactInput = ({ maxFeeImpact, onChangeMaxFeeImpact }) => {
           isValid={true}
           min={0}
           max={100}
+          dataTestId="portfolio.fees.maxImpact"
         />
       </div>
       <label className="text-start min-w-[2rem] ml-2 uppercase">%</label>
