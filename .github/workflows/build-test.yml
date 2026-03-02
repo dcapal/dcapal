@@ -92,7 +92,7 @@ jobs:
           wasm-pack build
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -292,7 +292,7 @@ jobs:
       - name: Run Playwright tests
         run: cd dcapal-frontend && npx playwright test
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
