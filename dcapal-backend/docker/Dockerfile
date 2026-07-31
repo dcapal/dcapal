@@ -1,6 +1,10 @@
+# syntax=docker/dockerfile:1.7
+
 # Bookworm, so it's the same as the runtime
 FROM rust:1-bookworm AS chef
-RUN cargo install cargo-chef
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    cargo install cargo-chef
 WORKDIR /var/dcapal
 
 FROM chef AS planner
@@ -17,13 +21,22 @@ COPY --from=planner /var/dcapal/recipe.json recipe.json
 RUN apt-get update
 RUN apt-get install build-essential cmake perl pkg-config libclang-dev musl-tools git -y
 
-RUN cargo chef cook --profile release-with-debug --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/var/dcapal/target \
+    cargo chef cook --profile release-with-debug --recipe-path recipe.json
 # Build application
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./dcapal-backend ./dcapal-backend
 COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
-RUN cargo build --profile release-with-debug --bin dcapal-backend --bin migration
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/var/dcapal/target \
+    cargo build --profile release-with-debug --bin dcapal-backend --bin migration \
+    && mkdir -p /var/dcapal/output \
+    && cp /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/output/dcapal-backend \
+    && cp /var/dcapal/target/release-with-debug/migration /var/dcapal/output/migration
 
 FROM debian:bookworm-slim AS runtime
 # Install runtime dependencies
@@ -34,8 +47,8 @@ RUN apt-get install -y ca-certificates curl libssl3 jq postgresql-client
 WORKDIR /var/dcapal/dcapal-backend
 RUN mkdir bin
 RUN mkdir data
-COPY --from=builder /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/dcapal-backend/bin
-COPY --from=builder /var/dcapal/target/release-with-debug/migration /var/dcapal/dcapal-backend/bin
+COPY --from=builder /var/dcapal/output/dcapal-backend /var/dcapal/dcapal-backend/bin
+COPY --from=builder /var/dcapal/output/migration /var/dcapal/dcapal-backend/bin
 COPY ./dcapal-backend/migration ./migration
 COPY ./dcapal-backend/migration/Cargo.toml ./migration/Cargo.toml
 COPY ./dcapal-backend/migration/src ./migration/src

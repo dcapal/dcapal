@@ -321,7 +321,23 @@ jobs:
           version: ${{ env.SUPABASE_VERSION }}
 
       - name: Set up Docker Buildx
+        id: setup-buildx
         uses: docker/setup-buildx-action@v4
+
+      - uses: actions/cache@v6
+        id: rust-docker-cache
+        with:
+          path: ${{ runner.temp }}/docker-rust-cache
+          key: ubuntu-docker-rust-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'dcapal-backend/docker/Dockerfile') }}
+          restore-keys: |
+            ubuntu-docker-rust-
+
+      - uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-dir: ${{ runner.temp }}/docker-rust-cache
+          dockerfile: dcapal-backend/docker/Dockerfile
+          skip-extraction: ${{ steps.rust-docker-cache.outputs.cache-hit }}
 
       - name: Build dcapal-backend image
         uses: docker/build-push-action@v7
