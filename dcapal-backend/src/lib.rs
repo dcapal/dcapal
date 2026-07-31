@@ -299,7 +299,7 @@ fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
             DcaError::StartupFailure(
                 format!(
                     "Error in building Redis poll config (user={}, hostname={}, port={})",
-                    &config.user, &config.hostname, &config.port
+                    config.user, config.hostname, config.port
                 ),
                 e.into(),
             )
@@ -323,7 +323,7 @@ async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
             DcaError::StartupFailure(
                 format!(
                     "Error in building Postgres poll config (user={}, hostname={}, port={}, db={})",
-                    &config.user, &config.hostname, &config.port, &config.database
+                    config.user, config.hostname, config.port, config.database
                 ),
                 e.into(),
             )
