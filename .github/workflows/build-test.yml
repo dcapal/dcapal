@@ -162,13 +162,14 @@ jobs:
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
-          cache: npm
-          cache-dependency-path: dcapal-frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      # The generated package is a local npm dependency and must exist before npm ci.
+      # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v8
         with:
@@ -176,12 +177,10 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
       - name: Install dependencies
-        working-directory: dcapal-frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check frontend formatting
-        working-directory: dcapal-frontend
-        run: npm run check
+        run: pnpm frontend:lint
 
   frontend-typecheck:
     name: check:typecheck:frontend
@@ -189,13 +188,14 @@ jobs:
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
-          cache: npm
-          cache-dependency-path: dcapal-frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      # The generated package is a local npm dependency and must exist before npm ci.
+      # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v8
         with:
@@ -203,12 +203,10 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
       - name: Install dependencies
-        working-directory: dcapal-frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck frontend
-        working-directory: dcapal-frontend
-        run: npm run typecheck
+        run: pnpm frontend:typecheck
 
   frontend-build-test:
     name: build:test:frontend
@@ -216,13 +214,14 @@ jobs:
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
-          cache: npm
-          cache-dependency-path: dcapal-frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      # The generated package is a local npm dependency and must exist before npm ci.
+      # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v8
         with:
@@ -230,16 +229,13 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
       - name: Install dependencies
-        working-directory: dcapal-frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build frontend
-        working-directory: dcapal-frontend
-        run: npm run build
+        run: pnpm frontend:build
 
       - name: Unit tests
-        working-directory: dcapal-frontend
-        run: npm run test:unit
+        run: pnpm frontend:test
 
   frontend-e2e-tests:
     name: test:e2e:frontend
@@ -248,13 +244,14 @@ jobs:
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
-          cache: npm
-          cache-dependency-path: dcapal-frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      # The generated package is a local npm dependency and must exist before npm ci.
+      # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v8
         with:
@@ -262,25 +259,22 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
       - name: Install dependencies
-        working-directory: dcapal-frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       # Version the browser cache so Playwright upgrades invalidate old binaries.
       - name: Cache Playwright browsers
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('dcapal-frontend/package-lock.json') }}
+          key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-ms-playwright-v1-
 
       - name: Install Playwright Browsers
-        working-directory: dcapal-frontend
-        run: npx playwright install --with-deps
+        run: pnpm --filter @dcapal/frontend exec playwright install --with-deps
 
       - name: Run Playwright tests
-        working-directory: dcapal-frontend
-        run: npx playwright test
+        run: pnpm frontend:test:e2e
 
       - uses: actions/upload-artifact@v7
         if: always()

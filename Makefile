@@ -15,7 +15,7 @@ help:
 ## Format codebase
 fmt:  ## Format codebase
 	cargo +nightly fmt --all -- --config-path rustfmt.nightly.toml
-	cd $(DCAPAL_FRONTEND_DIR) && npm run format
+	pnpm frontend:format
 
 ## Run Rust linters
 lint-rust: ## Run Rust linters
@@ -24,7 +24,7 @@ lint-rust: ## Run Rust linters
 
 ## Run JS linters
 lint-js: ## Run JS linters
-	cd $(DCAPAL_FRONTEND_DIR) && npm run check
+	pnpm frontend:lint
 
 ## Run linters on the codebase
 lint: lint-rust lint-js  ## Run linters on the codebase
@@ -43,18 +43,18 @@ build-optimizer: ## Build optimizer-wasm
 
 ## Build frontend
 build-frontend: ## Build frontend
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run build-dev
+	pnpm frontend:build:dev
 
 ## Build all
 build: build-backend build-optimizer build-frontend  ## Build all
 
 ## Test frontend (unit-tests)
 test-frontend-unit: ## Run frontend tests
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:unit
+	pnpm frontend:test
 
 ## Test frontend (e2e)
 test-frontend-e2e: ## Run frontend tests
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:e2e
+	pnpm frontend:test:e2e
 
 ## Test frontend
 test-frontend: test-frontend-unit test-frontend-e2e ## Run all frontend tests
@@ -66,7 +66,7 @@ run-backend-dev: ## Run backend (dev)
 ## Run frontend (dev)
 run-frontend-dev: ## Run frontend (dev)
 	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run start
+	pnpm frontend:dev
 
 ## Start Supabase with config
 supabase-up:  ## Start Supabase with config
