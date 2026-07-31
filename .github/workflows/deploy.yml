@@ -40,11 +40,12 @@ jobs:
     needs: optimizer-build
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-          cache: "npm"
-          cache-dependency-path: dcapal-frontend/package-lock.json
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Download dcapal-optimizer-wasm pkg
         uses: actions/download-artifact@v4
@@ -53,9 +54,7 @@ jobs:
           path: dcapal-optimizer-wasm/pkg
 
       - name: Install dependencies
-        run: |
-          cd dcapal-frontend
-          npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Configure .env.production
         env:
@@ -69,9 +68,7 @@ jobs:
           EOF
 
       - name: Build
-        run: |
-          cd dcapal-frontend
-          npm run build
+        run: pnpm frontend:build
 
       - name: Archive dcapal-frontend
         uses: actions/upload-artifact@v4
