@@ -1,7 +1,9 @@
 packages:
   - dcapal-frontend
+  - packages/api-client
 
 catalog:
+  "@faker-js/faker": ^10.0.0
   "@babel/core": ^7.29.0
   "@babel/parser": ^7.29.0
   "@babel/preset-env": ^7.29.0
@@ -20,9 +22,9 @@ catalog:
   "@supabase/auth-ui-react": ^0.4.7
   "@supabase/auth-ui-shared": ^0.1.8
   "@supabase/supabase-js": ^2.49.4
+  "@tanstack/react-query": ^5.90.21
   "@types/node": ^20.17.30
   "autoprefixer": ^10.4.21
-  "axios": ^1.13.5
   "babel-loader": ^9.2.1
   "class-variance-authority": ^0.7.1
   "classnames": ^2.5.1
@@ -41,6 +43,7 @@ catalog:
   "lucide-react": ^0.469.0
   "mini-css-extract-plugin": ^2.9.2
   "msw": ^2.12.10
+  "orval": ^8.5.1
   "postcss": ^8.5.3
   "postcss-loader": ^8.1.1
   "postcss-preset-env": ^9.6.0

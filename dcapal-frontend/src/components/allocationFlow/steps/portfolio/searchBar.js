@@ -1,112 +1,155 @@
-import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Fuse from "fuse.js";
 import { useSelector } from "react-redux";
 import {
-  fetchAssetsYF,
-  fetchAssetsDcaPal,
-  FetchError,
-  fetchPrice,
-  fetchPriceYF,
-  Provider,
-} from "@/api";
+  useGetAssetsData,
+  useGetAssetsFiat,
+  useGetAssetsCrypto,
+  useGetPrice,
+} from "@dcapal/api-client";
+
 import { Spinner } from "@components/spinner/spinner";
 import { currentPortfolio } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
+import { Provider, useYahooPrice } from "@/api/priceProviders";
+import {
+  PRICE_STALE_TIME,
+  SEARCH_STALE_TIME,
+  SESSION_STALE_TIME,
+} from "@/api/queryClient";
 
-let searchId = undefined;
-
-export const SearchBar = (props) => {
-  const [results, setResults] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { t } = useTranslation();
-
-  const searchOptions = {
-    shouldSort: true,
-    threshold: 0.1,
-    keys: ["symbol", "name"],
-  };
+const useDebouncedValue = (value, delayMs) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
-    if (!props.text || props.text.length < 1) {
-      setResults(null);
-      setIsLoading(false);
+    const timeoutId = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(timeoutId);
+  }, [value, delayMs]);
+
+  return debouncedValue;
+};
+
+const searchOptions = {
+  shouldSort: true,
+  threshold: 0.1,
+  keys: ["symbol", "name"],
+};
+
+const toDcaPalAsset = (asset, aclass) => ({
+  symbol: asset.id,
+  name: asset.symbol,
+  aclass,
+});
+
+const toYahooAsset = (quote) => ({
+  name: quote.longname || quote.shortname || "",
+  symbol: quote.symbol || "",
+  type: quote.quoteType || "",
+  exchange: quote.exchange || "",
+  aclass: 10,
+});
+
+export const SearchBar = (props) => {
+  const { t } = useTranslation();
+  const debouncedText = useDebouncedValue(props.text, 300);
+  const isSearchEnabled = debouncedText.trim().length >= 2;
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [invalidYahooSymbols, setInvalidYahooSymbols] = useState(
+    () => new Set()
+  );
+
+  const fiatQuery = useGetAssetsFiat({
+    query: {
+      enabled: isSearchEnabled,
+      staleTime: SESSION_STALE_TIME,
+    },
+  });
+  const cryptoQuery = useGetAssetsCrypto({
+    query: {
+      enabled: isSearchEnabled,
+      staleTime: SESSION_STALE_TIME,
+    },
+  });
+  const yahooQuery = useGetAssetsData(
+    { name: debouncedText.toLowerCase() },
+    {
+      query: {
+        enabled: isSearchEnabled,
+        staleTime: SEARCH_STALE_TIME,
+      },
     }
+  );
 
-    const delayedSearch = setTimeout(() => {
-      fetchSearchApi(props.text);
-    }, 300);
+  useEffect(() => {
+    setInvalidYahooSymbols(new Set());
+  }, [debouncedText]);
 
-    return () => clearTimeout(delayedSearch);
-  }, [props.text]);
+  const results = useMemo(() => {
+    if (!isSearchEnabled) return null;
 
-  const handleAddAssetInputChange = async (e) => {
-    const text = e.target.value;
-    props.setText(text);
-  };
+    const fuse = (assets) =>
+      new Fuse(assets, searchOptions)
+        .search(debouncedText)
+        .map((result) => result.item)
+        .sort((a, b) => a.symbol.localeCompare(b.symbol));
 
-  const fetchSearchApi = async (text) => {
-    if (!text || text.length < 2) return;
+    const fiatAssets = (fiatQuery.data?.data || []).map((asset) =>
+      toDcaPalAsset(asset, 30)
+    );
+    const cryptoAssets = (cryptoQuery.data?.data || []).map((asset) =>
+      toDcaPalAsset(asset, 20)
+    );
+    const yahooQuotes = yahooQuery.data?.data?.quotes;
+    const yahooAssets = Array.isArray(yahooQuotes)
+      ? yahooQuotes
+          .filter((quote) => {
+            const type = quote.quoteType?.toUpperCase();
+            return type === "EQUITY" || type === "ETF" || type === "MUTUALFUND";
+          })
+          .map(toYahooAsset)
+          .filter((asset) => asset.symbol)
+      : [];
 
-    searchId = crypto.randomUUID();
-    const currentSearchId = searchId;
-
-    const fromDcaPal = async (type) => {
-      const assets = await fetchAssetsDcaPal(type);
-      const fuse = new Fuse(assets, searchOptions);
-
-      const res = fuse
-        .search(text)
-        .map((r) => r.item)
-        .sort((a, b) => a.symbol - b.symbol);
-
-      return res;
+    return {
+      fiat: fuse(fiatAssets),
+      crypto: fuse(cryptoAssets),
+      yf: yahooAssets,
     };
+  }, [
+    cryptoQuery.data,
+    debouncedText,
+    fiatQuery.data,
+    isSearchEnabled,
+    yahooQuery.data,
+  ]);
 
-    const fromYF = async () => {
-      const assetsYF = await fetchAssetsYF(text.toLowerCase());
-      return assetsYF;
-    };
-
-    setIsLoading(true);
-
-    const [fiats, cryptos, equities] = await Promise.all([
-      fromDcaPal("fiat"),
-      fromDcaPal("crypto"),
-      fromYF(),
-    ]);
-
-    if (currentSearchId !== searchId) return;
-
-    setResults({
-      ...results,
-      fiat: fiats && fiats.length > 0 ? fiats : [],
-      crypto: cryptos && cryptos.length > 0 ? cryptos : [],
-      yf: equities && equities.length > 0 ? equities : [],
+  const removeAssetYf = useCallback((symbol) => {
+    setInvalidYahooSymbols((current) => {
+      const next = new Set(current);
+      next.add(symbol);
+      return next;
     });
+  }, []);
 
-    setIsLoading(false);
-  };
-
-  const removeAssetYf = (symbol) => {
-    if (!results || results.yf.length < 1) return;
-
-    const idx = results.yf.findIndex((r) => r.symbol === symbol);
-    if (idx >= 0) {
-      results.yf.splice(idx, 1);
-      setResults({
-        ...results,
-      });
-    }
-  };
-
+  const visibleYahooAssets = results?.yf.filter(
+    (asset) => !invalidYahooSymbols.has(asset.symbol)
+  );
+  const isLoading =
+    isSearchEnabled &&
+    [fiatQuery, cryptoQuery, yahooQuery].some(
+      (query) => query.isPending || query.isFetching
+    );
   const isEmptyResult =
     results &&
     !isLoading &&
     results.fiat.length === 0 &&
     results.crypto.length === 0 &&
-    results.yf.length === 0;
+    visibleYahooAssets.length === 0;
+
+  const handleAddAssetInputChange = (event) => {
+    setIsSearchOpen(event.target.value.length > 0);
+    props.setText(event.target.value);
+  };
 
   return (
     <div className="relative flex flex-col items-center justify-center">
@@ -116,50 +159,47 @@ export const SearchBar = (props) => {
         placeholder={t("searchBar.placeholder")}
         onChange={handleAddAssetInputChange}
       />
-      {isLoading && (
+      {isSearchOpen && isLoading && (
         <div className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
           <Spinner width="2.5rem" height="2.5rem" />
         </div>
       )}
-      {results && isEmptyResult && (
+      {isSearchOpen && results && isEmptyResult && (
         <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
           {t("searchBar.noAssetFoundFor")} '{props.text.toUpperCase()}'
         </div>
       )}
-      {results && !isEmptyResult && (
+      {isSearchOpen && results && !isEmptyResult && (
         <ul className="w-[calc(100%-2rem)] max-h-72 min-h-[10rem] overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40">
           {results.fiat.length > 0 && <SearchHeader text="cash" />}
-          {results.fiat.map((r) => (
+          {results.fiat.map((result) => (
             <SearchItemCW
-              key={r.symbol}
-              data={r}
-              currentSearchId={searchId}
+              key={result.symbol}
+              data={result}
               setText={props.setText}
               addAsset={props.addAsset}
-              closeSearchList={() => setResults(null)}
+              closeSearchList={() => setIsSearchOpen(false)}
             />
           ))}
           {results.crypto.length > 0 && <SearchHeader text="crypto" />}
-          {results.crypto.map((r) => (
+          {results.crypto.map((result) => (
             <SearchItemCW
-              key={r.symbol}
-              data={r}
-              currentSearchId={searchId}
+              key={result.symbol}
+              data={result}
               setText={props.setText}
               addAsset={props.addAsset}
-              closeSearchList={() => setResults(null)}
+              closeSearchList={() => setIsSearchOpen(false)}
             />
           ))}
-          {results.yf.length > 0 && <SearchHeader text="equity" />}
-          {results.yf.map((r) => (
+          {visibleYahooAssets.length > 0 && <SearchHeader text="equity" />}
+          {visibleYahooAssets.map((result) => (
             <SearchItemYF
-              key={r.symbol}
-              data={r}
-              currentSearchId={searchId}
+              key={result.symbol}
+              data={result}
               setText={props.setText}
               addAsset={props.addAsset}
               removeAsset={removeAssetYf}
-              closeSearchList={() => setResults(null)}
+              closeSearchList={() => setIsSearchOpen(false)}
             />
           ))}
         </ul>
@@ -168,57 +208,43 @@ export const SearchBar = (props) => {
   );
 };
 
-const SearchHeader = (props) => (
+const SearchHeader = ({ text }) => (
   <div className="sticky top-0 pl-2 pt-1 pb-1 bg-slate-200 text-xs font-semibold">
-    <div className="uppercase">{props.text}</div>
+    <div className="uppercase">{text}</div>
   </div>
 );
 
-const SearchItemCW = (props) => {
+const SearchItemCW = ({ data, setText, addAsset, closeSearchList }) => {
   const { i18n } = useTranslation();
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-
-  const [price, setPrice] = useState(null);
-  const cancelTokenSources = { price: useRef(null) };
-
-  useEffect(() => {
-    const fetchPromise = async () => {
-      cancelTokenSources.price.current = axios.CancelToken.source();
-      const token = cancelTokenSources.price.current.token;
-      const p = await fetchPrice(props.data.symbol, quoteCcy, token);
-      if (p) {
-        setPrice(p);
-      }
-    };
-
-    if (props.currentSearchId !== searchId) {
-      // Search canceled
-      cancelTokenSources.price.current?.cancel();
+  const quoteCcy = useSelector(
+    (state) => currentPortfolio(state)?.quoteCcy || ""
+  );
+  const priceQuery = useGetPrice(
+    data.symbol,
+    { quote: quoteCcy },
+    {
+      query: {
+        enabled: Boolean(quoteCcy),
+        staleTime: PRICE_STALE_TIME,
+      },
     }
-
-    fetchPromise();
-
-    return () => {
-      cancelTokenSources.price.current?.cancel();
-    };
-  }, [props.data.symbol, props.currentSearchId]);
+  );
+  const price = priceQuery.data?.data?.price;
 
   const handleResultClick = () => {
-    if (!price) return;
+    if (price == null) return;
 
-    props.setText(props.data.symbol);
-    props.addAsset({
-      symbol: props.data.symbol,
-      name: props.data.name,
-      aclass: props.data.aclass,
-      price: price,
-      baseCcy: props.data.symbol,
+    setText(data.symbol);
+    addAsset({
+      symbol: data.symbol,
+      name: data.name,
+      aclass: data.aclass,
+      price,
+      baseCcy: data.symbol,
       provider: Provider.DCA_PAL,
     });
-    props.closeSearchList();
+    closeSearchList();
   };
-
-  const isPrice = price ? true : false;
 
   return (
     <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer">
@@ -227,90 +253,70 @@ const SearchItemCW = (props) => {
         onClick={handleResultClick}
       >
         <div className="grow flex flex-col min-w-0">
-          <div className="font-medium uppercase">{props.data.symbol}</div>
+          <div className="font-medium uppercase">{data.symbol}</div>
           <div className="text-xs font-light capitalize truncate">
-            {props.data.name}
+            {data.name}
           </div>
         </div>
         <div className="mr-2">
-          <div>
-            {isPrice && (
-              <div className="flex items-center">
-                <div className="text-base font-medium m-1">
-                  {price.toLocaleString(i18n.language, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </div>
-                <div className="flex justify-start w-10 uppercase">
-                  {quoteCcy}
-                </div>
+          {price != null ? (
+            <div className="flex items-center">
+              <div className="text-base font-medium m-1">
+                {price.toLocaleString(i18n.language, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </div>
-            )}
-          </div>
-          <div>
-            {!isPrice && (
-              <div className="text-base font-medium">Loading...</div>
-            )}
-          </div>
+              <div className="flex justify-start w-10 uppercase">
+                {quoteCcy}
+              </div>
+            </div>
+          ) : (
+            <div className="text-base font-medium">Loading...</div>
+          )}
         </div>
       </div>
     </li>
   );
 };
 
-const SearchItemYF = (props) => {
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+const SearchItemYF = ({
+  data,
+  setText,
+  addAsset,
+  removeAsset,
+  closeSearchList,
+}) => {
+  const quoteCcy = useSelector(
+    (state) => currentPortfolio(state)?.quoteCcy || ""
+  );
   const validCcys = useSelector((state) => state.app.currencies);
   const { t, i18n } = useTranslation();
-
-  const [price, setPrice] = useState(null);
-  const [baseCcy, setBaseCcy] = useState("");
-
-  const cancelTokenSourcePrice = useRef(null);
+  const priceQuery = useYahooPrice({
+    symbol: data.symbol,
+    quote: quoteCcy,
+    validCcys,
+  });
+  const price = priceQuery.data?.price;
+  const baseCcy = priceQuery.data?.baseCcy;
 
   useEffect(() => {
-    const fetchData = async () => {
-      cancelTokenSourcePrice.current = axios.CancelToken.source();
-      const token = cancelTokenSourcePrice.current.token;
-      const p = await fetchPriceYF(
-        props.data.symbol,
-        quoteCcy,
-        validCcys,
-        token
-      );
-      if (p && !(p in FetchError)) {
-        const [px, base] = p;
-        setPrice(px);
-        setBaseCcy(base);
-      } else if (!p || p === FetchError.BAD_DATA) {
-        props.removeAsset(props.data.symbol);
-      }
-    };
-
-    if (props.currentSearchId !== searchId) {
-      // Search canceled
-      cancelTokenSourcePrice.current?.cancel();
-    }
-
-    fetchData();
-
-    return () => cancelTokenSourcePrice.current?.cancel();
-  }, [props.data.symbol, props.currentSearchId]);
+    if (priceQuery.isError) removeAsset(data.symbol);
+  }, [data.symbol, priceQuery.isError, removeAsset]);
 
   const handleResultClick = () => {
-    if (!price) return;
+    if (price == null) return;
 
-    props.setText(props.data.symbol);
-    props.addAsset({
-      symbol: props.data.symbol,
-      name: props.data.name,
-      aclass: props.data.aclass,
-      price: price,
-      baseCcy: baseCcy,
+    setText(data.symbol);
+    addAsset({
+      symbol: data.symbol,
+      name: data.name,
+      aclass: data.aclass,
+      price,
+      baseCcy,
       provider: Provider.YF,
     });
-    props.closeSearchList();
+    closeSearchList();
   };
 
   return (
@@ -320,34 +326,29 @@ const SearchItemYF = (props) => {
         onClick={handleResultClick}
       >
         <div className="grow flex flex-col min-w-0">
-          <div className="font-medium uppercase">{props.data.symbol}</div>
+          <div className="font-medium uppercase">{data.symbol}</div>
           <div className="text-xs font-light capitalize truncate">
-            {props.data.name}
+            {data.name}
           </div>
         </div>
         <div className="mr-2">
-          <div>
-            {price && (
-              <div className="flex items-center">
-                <div className="text-base font-medium m-1">
-                  {price.toLocaleString(i18n.language, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </div>
-                <div className="flex justify-start w-10 uppercase">
-                  {quoteCcy}
-                </div>
+          {price != null ? (
+            <div className="flex items-center">
+              <div className="text-base font-medium m-1">
+                {price.toLocaleString(i18n.language, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </div>
-            )}
-          </div>
-          <div>
-            {!price && (
-              <div className="text-base font-medium">
-                {t("searchBar.loading")}...
+              <div className="flex justify-start w-10 uppercase">
+                {quoteCcy}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="text-base font-medium">
+              {t("searchBar.loading")}...
+            </div>
+          )}
         </div>
       </div>
     </li>

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
-import { getFetcher } from "@/api";
+import { getPriceForProvider } from "@/api/priceProviders";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {
@@ -58,11 +58,13 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   dispatch(selectPortfolio({ id: imported.id }));
 
   for (const a of pfolio.assets) {
-    const price = await getFetcher(a.provider, validCcys)(
+    const price = await getPriceForProvider(
+      a.provider,
+      validCcys,
       a.symbol,
       pfolio.quoteCcy
     );
-    if (!price) {
+    if (price == null) {
       console.warn(
         "[ImportStep] Failed to fetch price for",
         a.symbol,
@@ -82,8 +84,10 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
       })
     );
 
-    dispatch(setQty({ symbol: a.symbol, qty: a.qty }));
-    dispatch(setTargetWeight({ symbol: a.symbol, weight: a.targetWeight }));
+    dispatch(setQty({ symbol: a.symbol, qty: Number(a.qty) }));
+    dispatch(
+      setTargetWeight({ symbol: a.symbol, weight: Number(a.targetWeight) })
+    );
 
     const assetFees = (() => {
       if (a.fees != null && typeof a.fees === "object") {

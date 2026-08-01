@@ -28,7 +28,7 @@ import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 import BAG from "@images/icons/bag.svg";
 import PIECHART from "@images/icons/piechart.svg";
 import PDF from "@images/icons/pdf-document.svg";
-import { getFetcher } from "@/api";
+import { getPriceForProvider } from "@/api/priceProviders";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
@@ -37,22 +37,33 @@ import { ResponsiveHelpIcon } from "@components/core/helpIcon";
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
 
-  if (Object.keys(assets) < 1) {
+  if (Object.keys(assets).length < 1) {
     dispatch(setRefreshTime({ time: Date.now() }));
     return;
   }
 
-  Object.values(assets).forEach(async (a) => {
-    const price = await getFetcher(a.provider, validCcys)(a.symbol, quoteCcy);
-    if (!price) {
+  const prices = await Promise.all(
+    Object.values(assets).map(async (asset) => ({
+      symbol: asset.symbol,
+      price: await getPriceForProvider(
+        asset.provider,
+        validCcys,
+        asset.symbol,
+        quoteCcy
+      ),
+    }))
+  );
+
+  prices.forEach(({ symbol, price }) => {
+    if (price == null) {
       console.warn(
-        "[ImportStep] Failed to fetch price for",
-        a.symbol,
-        `(provider=${a.provider} quoteCcy=${quoteCcy})`
+        "[PortfolioStep] Failed to fetch price for",
+        symbol,
+        `(quoteCcy=${quoteCcy})`
       );
       return;
     }
-    dispatch(setPrice({ symbol: a.symbol, price: price }));
+    dispatch(setPrice({ symbol, price }));
   });
 
   toast.success(t("common.refreshedPrices"));

@@ -1,8 +1,7 @@
 import { store } from "@app/store";
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
-import { syncPortfoliosAPI } from "@/api";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -76,8 +75,13 @@ export const parseFeeType = (typeStr) => {
   return null;
 };
 
+export const decimalToNumber = (value) => {
+  const number = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(number) ? number : 0;
+};
+
 export const parseFees = (fees) => {
-  if (!fees) return null;
+  if (!fees?.feeStructure) return null;
 
   const feeType = parseFeeType(fees.feeStructure.type);
   if (!feeType) return null;
@@ -87,28 +91,30 @@ export const parseFees = (fees) => {
   if (feeType === FeeType.ZERO_FEE) return parsed;
 
   if (feeType === FeeType.FIXED) {
-    if (fees.maxFeeImpact) {
-      parsed.maxFeeImpact = fees.maxFeeImpact;
+    if (fees.maxFeeImpact != null) {
+      parsed.maxFeeImpact = decimalToNumber(fees.maxFeeImpact);
     }
-    if (fees.feeStructure.feeAmount) {
-      parsed.feeStructure.feeAmount = fees.feeStructure.feeAmount;
+    if (fees.feeStructure.feeAmount != null) {
+      parsed.feeStructure.feeAmount = decimalToNumber(
+        fees.feeStructure.feeAmount
+      );
     }
 
     return parsed;
   }
 
   if (feeType === FeeType.VARIABLE) {
-    if (fees.maxFeeImpact) {
-      parsed.maxFeeImpact = fees.maxFeeImpact;
+    if (fees.maxFeeImpact != null) {
+      parsed.maxFeeImpact = decimalToNumber(fees.maxFeeImpact);
     }
-    if (fees.feeStructure.feeRate) {
-      parsed.feeStructure.feeRate = fees.feeStructure.feeRate;
+    if (fees.feeStructure.feeRate != null) {
+      parsed.feeStructure.feeRate = decimalToNumber(fees.feeStructure.feeRate);
     }
-    if (fees.feeStructure.minFee) {
-      parsed.feeStructure.minFee = fees.feeStructure.minFee;
+    if (fees.feeStructure.minFee != null) {
+      parsed.feeStructure.minFee = decimalToNumber(fees.feeStructure.minFee);
     }
-    if (fees.feeStructure.maxFee) {
-      parsed.feeStructure.maxFee = fees.feeStructure.maxFee;
+    if (fees.feeStructure.maxFee != null) {
+      parsed.feeStructure.maxFee = decimalToNumber(fees.feeStructure.maxFee);
     }
     return parsed;
   }
@@ -196,13 +202,42 @@ const initialState = () => {
   };
 };
 
-export const syncPortfolios = createAsyncThunk(
-  "portfolio/syncPortfolios",
-  async (_, { getState }) => {
-    const { pfolios, deletedPortfolios } = getState().pfolio;
-    return await syncPortfoliosAPI(pfolios, deletedPortfolios);
-  }
-);
+const applyServerSync = (state, payload) => {
+  if (!payload) return;
+
+  const { updatedPortfolios, deletedPortfolios } = payload;
+  updatedPortfolios?.forEach((portfolio) => {
+    state.pfolios[portfolio.id] = {
+      id: portfolio.id,
+      name: portfolio.name,
+      quoteCcy: portfolio.quoteCcy,
+      fees: parseFees(portfolio.fees),
+      assets: portfolio.assets.reduce((assets, asset) => {
+        const targetWeight = decimalToNumber(asset.targetWeight);
+        assets[asset.symbol] = {
+          ...asset,
+          price: decimalToNumber(asset.price),
+          qty: decimalToNumber(asset.qty),
+          targetWeight,
+          averageBuyPrice: decimalToNumber(asset.averageBuyPrice),
+          fees: parseFees(asset.fees),
+          aclass: parseAClass(asset.aclass),
+          weight: targetWeight,
+          amount: 0,
+        };
+        return assets;
+      }, {}),
+      nextIdx: 0,
+      totalAmount: 0,
+      budget: 0,
+      lastPriceRefresh: Date.now(),
+      lastUpdatedAt: Date.parse(portfolio.lastUpdatedAt) || Date.now(),
+    };
+  });
+  deletedPortfolios?.forEach((id) => {
+    if (id in state.pfolios) delete state.pfolios[id];
+  });
+};
 
 export const portfolioSlice = createSlice({
   name: "portfolio",
@@ -581,35 +616,9 @@ export const portfolioSlice = createSlice({
 
       pfolio.budget = 0;
     },
-  },
-  extraReducers: (builder) => {
-    builder.addCase(syncPortfolios.fulfilled, (state, action) => {
-      if (!action.payload) return;
-      const { updatedPortfolios, deletedPortfolios } = action.payload;
-      updatedPortfolios?.forEach((pf) => {
-        state.pfolios[pf.id] = {
-          ...pf,
-          fees: parseFees(pf.fees),
-          assets: pf.assets.reduce((acc, asset) => {
-            acc[asset.symbol] = {
-              ...asset,
-              fees: parseFees(asset.fees),
-              aclass: parseAClass(asset.aclass),
-              averageBuyPrice: asset.averageBuyPrice,
-              weight: asset.targetWeight,
-              amount: 0,
-            };
-            return acc;
-          }, {}),
-          nextIdx: pf.nextIdx || 0,
-          totalAmount: pf.totalAmount || 0,
-          budget: pf.budget || 0,
-        };
-      });
-      deletedPortfolios?.forEach((id) => {
-        if (id in state.pfolios) delete state.pfolios[id];
-      });
-    });
+    applySyncResult: (state, action) => {
+      applyServerSync(state, action.payload);
+    },
   },
 });
 
@@ -639,6 +648,7 @@ export const {
   setVariableFee,
   setVariableFeeAsset,
   clearBudget,
+  applySyncResult,
 } = portfolioSlice.actions;
 
 export default portfolioSlice.reducer;

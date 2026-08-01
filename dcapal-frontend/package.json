@@ -27,6 +27,7 @@
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {
+    "@dcapal/api-client": "workspace:*",
     "@heroicons/react": "catalog:",
     "@nivo/core": "catalog:",
     "@radix-ui/react-dialog": "catalog:",
@@ -39,7 +40,7 @@
     "@supabase/auth-ui-react": "catalog:",
     "@supabase/auth-ui-shared": "catalog:",
     "@supabase/supabase-js": "catalog:",
-    "axios": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "class-variance-authority": "catalog:",
     "classnames": "catalog:",
     "clsx": "catalog:",

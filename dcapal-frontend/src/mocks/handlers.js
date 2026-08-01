@@ -1,4 +1,5 @@
 import { delay, http, HttpResponse } from "msw";
+import { getDCAPalAPIsMock } from "@dcapal/api-client/mocks";
 
 import assetsFiat from "./fixtures/assets-fiat.json";
 import assetsCrypto from "./fixtures/assets-crypto.json";
@@ -133,4 +134,6 @@ export const handlers = [
     await delay(20);
     return HttpResponse.json({});
   }),
+
+  ...getDCAPalAPIsMock(),
 ];

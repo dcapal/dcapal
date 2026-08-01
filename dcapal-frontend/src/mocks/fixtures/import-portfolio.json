@@ -13,10 +13,10 @@
       "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
-      "price": 101.25,
-      "averageBuyPrice": 98.5,
-      "qty": 5,
-      "targetWeight": 60
+      "price": "101.25",
+      "averageBuyPrice": "98.5",
+      "qty": "5",
+      "targetWeight": "60"
     },
     {
       "symbol": "AGGH.MI",
@@ -24,10 +24,10 @@
       "aclass": "EQUITY",
       "baseCcy": "usd",
       "provider": "YF",
-      "price": 101.25,
-      "averageBuyPrice": 100.1,
-      "qty": 3,
-      "targetWeight": 40
+      "price": "101.25",
+      "averageBuyPrice": "100.1",
+      "qty": "3",
+      "targetWeight": "40"
     }
   ]
 }

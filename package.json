@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.31.0",
   "scripts": {
+    "api-client:generate": "make export-openapi && pnpm --filter @dcapal/api-client generate",
     "frontend:dev": "pnpm --filter @dcapal/frontend dev",
     "frontend:dev:ci": "pnpm --filter @dcapal/frontend dev:ci",
     "frontend:build": "pnpm --filter @dcapal/frontend build",

@@ -100,10 +100,10 @@ fn test_fee_structure_deserialization() {
     let json = r#"{
         "feeStructure": {
             "type": "variable",
-            "feeRate": 0.19,
-            "minFee": 2.95
+            "feeRate": "0.19",
+            "minFee": "2.95"
         },
-        "maxFeeImpact": 0.5
+        "maxFeeImpact": "0.5"
     }"#;
 
     let fees: TransactionFeesRequest = serde_json::from_str(json).unwrap();

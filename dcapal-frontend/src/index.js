@@ -2,11 +2,18 @@ import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import {
+  configureApiClientAuth,
+  configureApiClientBaseUrl,
+} from "@dcapal/api-client";
 
 import "./style.css";
 import { persistor, store } from "@app/store";
 import { Router } from "@routes/router";
 import { BrowserRouter } from "react-router-dom";
+import { DCAPAL_API, supabase } from "@app/config";
+import { queryClient } from "@/api/queryClient";
 
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
@@ -30,6 +37,27 @@ i18n
 
 document.documentElement.lang = i18n.language;
 i18n.on("languageChanged", (lang) => (document.documentElement.lang = lang));
+
+configureApiClientBaseUrl(DCAPAL_API);
+configureApiClientAuth({
+  getAccessToken: async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return session?.access_token;
+  },
+  refreshAccessToken: async () => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    return session?.access_token;
+  },
+  onAuthFailure: async () => {
+    await supabase.auth.signOut();
+  },
+});
 
 const startMocks = async () => {
   if (process.env.REACT_APP_E2E_MSW !== "1") {
@@ -57,11 +85,13 @@ const renderApp = () => {
     <React.StrictMode>
       <Provider store={store}>
         <PersistGate loading={null} persistor={persistor}>
-          <BrowserRouter>
-            <Suspense fallback={<div>Loading...</div>}>
-              <Router />
-            </Suspense>
-          </BrowserRouter>
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <Suspense fallback={<div>Loading...</div>}>
+                <Router />
+              </Suspense>
+            </BrowserRouter>
+          </QueryClientProvider>
         </PersistGate>
       </Provider>
     </React.StrictMode>

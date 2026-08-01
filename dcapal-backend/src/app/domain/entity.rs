@@ -68,6 +68,7 @@ impl Asset {
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema)]
 pub struct Price {
     pub price: f64,
+    #[schema(value_type = i64, format = Int64)]
     #[serde(with = "chrono::serde::ts_seconds")]
     pub ts: DateTime,
 }

@@ -1,41 +1,15 @@
-import { useEffect, useState } from "react";
-
-import { fetchImportedPortfolio } from "@/api";
+import { useGetImportedPortfolio } from "@dcapal/api-client";
 
 export const useFetchImportedPortfolio = (portfolioId) => {
-  const [portfolio, setPortfolio] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const query = useGetImportedPortfolio(portfolioId || "", {
+    query: {
+      enabled: Boolean(portfolioId),
+    },
+  });
 
-  useEffect(() => {
-    if (!portfolioId) {
-      setPortfolio(null);
-      setIsLoading(false);
-      return;
-    }
-
-    let ignore = false;
-    fetchPortfolio(portfolioId, setPortfolio, setIsLoading, ignore);
-
-    return () => {
-      ignore = true;
-    };
-  }, [portfolioId]);
-
-  return [portfolio, isLoading];
-};
-
-const fetchPortfolio = async (
-  portfolioId,
-  setPortfolio,
-  setIsLoading,
-  ignore
-) => {
-  const p = await fetchImportedPortfolio(portfolioId);
-  if (p && !ignore) {
-    setPortfolio(p);
-    setIsLoading(false);
-  } else {
-    setPortfolio(null);
-    setIsLoading(false);
-  }
+  return {
+    portfolio: query.data?.data ?? null,
+    isLoading: Boolean(portfolioId) && query.isPending,
+    isError: query.isError,
+  };
 };

@@ -359,21 +359,21 @@ pub enum FeeStructure {
 
     #[serde(rename = "fixed")]
     Fixed {
-        #[serde(rename = "feeAmount", with = "rust_decimal::serde::float")]
+        #[serde(rename = "feeAmount", with = "rust_decimal::serde::str")]
         fee_amount: Decimal,
     },
 
     #[serde(rename = "variable")]
     Variable {
-        #[serde(rename = "feeRate", with = "rust_decimal::serde::float")]
+        #[serde(rename = "feeRate", with = "rust_decimal::serde::str")]
         fee_rate: Decimal,
-        #[serde(rename = "minFee", with = "rust_decimal::serde::float")]
+        #[serde(rename = "minFee", with = "rust_decimal::serde::str")]
         min_fee: Decimal,
         #[serde(
             rename = "maxFee",
             default,
             skip_serializing_if = "Option::is_none",
-            with = "rust_decimal::serde::float_option"
+            with = "rust_decimal::serde::str_option"
         )]
         max_fee: Option<Decimal>,
     },

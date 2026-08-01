@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -9,7 +10,7 @@ use axum::{
     extract::State,
     response::{IntoResponse, Response},
 };
-use serde_json::Value;
+use serde_json::{Map, Value};
 use utoipa::openapi::OpenApi;
 
 use crate::AppContext;
@@ -65,7 +66,59 @@ fn inline_import_portfolio_request_schema(openapi: &mut Value) {
     let request_schema = openapi
         .pointer_mut(schema_path)
         .unwrap_or_else(|| panic!("missing OpenAPI schema path: {schema_path}"));
-    *request_schema = super::PORTFOLIO_JSON_SCHEMA.clone();
+
+    let mut schema = super::PORTFOLIO_JSON_SCHEMA.clone();
+    let definitions = schema
+        .get("$defs")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+
+    if let Some(schema_object) = schema.as_object_mut() {
+        schema_object.remove("$defs");
+    }
+
+    inline_local_schema_refs(&mut schema, &definitions, &mut HashSet::new());
+    *request_schema = schema;
+}
+
+fn inline_local_schema_refs(
+    value: &mut Value,
+    definitions: &Map<String, Value>,
+    active_definitions: &mut HashSet<String>,
+) {
+    let local_reference = value
+        .as_object()
+        .and_then(|object| object.get("$ref"))
+        .and_then(Value::as_str)
+        .and_then(|reference| reference.strip_prefix("#/$defs/"))
+        .map(str::to_owned);
+
+    if let Some(name) = local_reference {
+        if let Some(definition) = definitions.get(&name) {
+            if active_definitions.insert(name.clone()) {
+                let mut replacement = definition.clone();
+                inline_local_schema_refs(&mut replacement, definitions, active_definitions);
+                active_definitions.remove(&name);
+                *value = replacement;
+            }
+        }
+        return;
+    }
+
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                inline_local_schema_refs(item, definitions, active_definitions);
+            }
+        }
+        Value::Object(object) => {
+            for child in object.values_mut() {
+                inline_local_schema_refs(child, definitions, active_definitions);
+            }
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]
@@ -185,9 +238,30 @@ mod tests {
         assert_eq!(schema.get("type").and_then(Value::as_str), Some("object"));
         assert!(schema.get("properties").is_some());
 
-        let expected_schema: Value =
-            serde_json::from_str(super::super::PORTFOLIO_SCHEMA_STR).expect("valid schema JSON");
-        assert_eq!(schema, &expected_schema);
+        assert!(schema.get("$defs").is_none());
+        assert_no_local_schema_refs(schema);
+    }
+
+    fn assert_no_local_schema_refs(value: &Value) {
+        match value {
+            Value::Array(items) => {
+                for item in items {
+                    assert_no_local_schema_refs(item);
+                }
+            }
+            Value::Object(object) => {
+                if let Some(reference) = object.get("$ref").and_then(Value::as_str) {
+                    assert!(
+                        !reference.starts_with("#/$defs/"),
+                        "unexpected local schema reference: {reference}"
+                    );
+                }
+                for child in object.values() {
+                    assert_no_local_schema_refs(child);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn response_schema_ref(response: &RefOr<utoipa::openapi::Response>) -> Option<String> {

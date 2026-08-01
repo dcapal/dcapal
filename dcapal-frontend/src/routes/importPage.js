@@ -24,7 +24,7 @@ export default function ImportPage() {
   const searchParams = new URLSearchParams(location.search);
   const portfolioId = searchParams.get("p");
 
-  const [portfolio, isLoading] = useFetchImportedPortfolio(portfolioId);
+  const { portfolio, isLoading } = useFetchImportedPortfolio(portfolioId);
 
   useEffect(() => {
     if (isLoading) return;
@@ -34,7 +34,7 @@ export default function ImportPage() {
     } else {
       navigateToPortfolios(portfolio, Step.IMPORT, dispatch, navigate);
     }
-  }, [portfolio, isLoading]);
+  }, [dispatch, isLoading, navigate, portfolio]);
 
   return (
     <div
