@@ -86,7 +86,7 @@ backend-db-down: supabase-down  ## Stop the backend database
 
 ## Check that the backend database is already running
 backend-db-check:  ## Check backend database connectivity
-	@DATABASE_URL="$(DATABASE_URL)" psql "$$DATABASE_URL" -c "SELECT 1" >/dev/null
+	@psql "$(DATABASE_URL)" -c "SELECT 1" >/dev/null
 
 ## Apply pending SQLx migrations to the backend database
 backend-migrate: backend-db-check  ## Apply backend database migrations
