@@ -88,17 +88,17 @@ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 wasm-pack build --release
 ```
 
-Install NPM dependencies. Note: this is installing `dcapal-optimizer-wasm` package as well.
+Install JavaScript dependencies from the repository root. The optimizer build must happen first because the frontend uses its generated package as a local dependency.
 
 ```bash
-cd ../dcapal-frontend
-npm install # Install dcapal-optimizer-wasm pkg as well
+cd ..
+pnpm install --frozen-lockfile
 ```
 
 Run frontend server
 
 ```bash
-npm run start
+pnpm frontend:dev
 ```
 
 ## Architecture

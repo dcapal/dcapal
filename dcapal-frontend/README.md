@@ -16,11 +16,19 @@ VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_ANON_KEY=<anon_key>
 ```
 
-Run the frontend server
+From the repository root, build the local optimizer package, install the workspace dependencies, and run the frontend server:
 
 ```shell
-cd dcapal/dcapal-frontend
-npm run start
+wasm-pack build --dev dcapal-optimizer-wasm
+pnpm install --frozen-lockfile
+pnpm frontend:dev
+```
+
+After the root install, the frontend package can also be run from its directory:
+
+```shell
+cd dcapal-frontend
+pnpm dev
 ```
 
 ## E2E smoke tests
@@ -29,8 +37,7 @@ Run Playwright smoke tests with deterministic MSW fixtures for backend APIs
 (`/api/assets/*`, `/api/price/*`, import endpoints, and sync endpoints):
 
 ```shell
-cd dcapal/dcapal-frontend
-npm run test:e2e
+pnpm frontend:test:e2e
 ```
 
 These smoke tests do not require local backend containers.
