@@ -95,13 +95,13 @@ fn inline_local_schema_refs(
         .map(str::to_owned);
 
     if let Some(name) = local_reference {
-        if let Some(definition) = definitions.get(&name) {
-            if active_definitions.insert(name.clone()) {
-                let mut replacement = definition.clone();
-                inline_local_schema_refs(&mut replacement, definitions, active_definitions);
-                active_definitions.remove(&name);
-                *value = replacement;
-            }
+        if let Some(definition) = definitions.get(&name)
+            && active_definitions.insert(name.clone())
+        {
+            let mut replacement = definition.clone();
+            inline_local_schema_refs(&mut replacement, definitions, active_definitions);
+            active_definitions.remove(&name);
+            *value = replacement;
         }
         return;
     }
