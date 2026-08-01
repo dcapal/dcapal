@@ -13,7 +13,9 @@
     "dev:ci": "webpack-dev-server --config webpack.dev.js --mode development --no-open",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:coverage": "FRONTEND_COVERAGE=1 playwright test --project=coverage-chromium --project=coverage-mobile --workers=1",
+    "coverage:report": "node scripts/coverage-report.mjs"
   },
   "repository": {
     "type": "git",
@@ -76,6 +78,9 @@
     "@babel/preset-typescript": "catalog:",
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
+    "istanbul-lib-coverage": "catalog:",
+    "istanbul-lib-report": "catalog:",
+    "istanbul-reports": "catalog:",
     "autoprefixer": "catalog:",
     "babel-loader": "catalog:",
     "copy-webpack-plugin": "catalog:",
@@ -96,6 +101,7 @@
     "tailwindcss": "catalog:",
     "terser-webpack-plugin": "catalog:",
     "typescript": "catalog:",
+    "v8-to-istanbul": "catalog:",
     "vitest": "catalog:",
     "webpack": "catalog:",
     "webpack-cli": "catalog:",

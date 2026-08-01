@@ -19,7 +19,7 @@ export const PreferencesDialog = () => {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button data-testid="portfolio-preferences" variant="outline">
           <SlidersHorizontal />
         </Button>
       </DialogTrigger>

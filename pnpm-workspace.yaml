@@ -9,6 +9,7 @@ catalog:
   "@babel/preset-env": ^7.29.0
   "@babel/preset-react": ^7.28.5
   "@babel/preset-typescript": ^7.28.5
+  "@vitest/coverage-v8": 4.0.18
   "@heroicons/react": ^2.2.0
   "@nivo/core": ^0.87.0
   "@playwright/test": ^1.58.2
@@ -39,6 +40,9 @@ catalog:
   "html-webpack-plugin": ^5.6.3
   "i18next": ^23.16.8
   "i18next-browser-languagedetector": ^8.0.5
+  "istanbul-lib-coverage": ^3.2.2
+  "istanbul-lib-report": ^3.0.1
+  "istanbul-reports": ^3.2.0
   "jsonwebtoken": ^9.0.2
   "lucide-react": ^0.469.0
   "mini-css-extract-plugin": ^2.9.2
@@ -70,6 +74,7 @@ catalog:
   "typescript": ^5.9.3
   "vanilla-cookieconsent": ^3.1.0
   "vaul": ^1.1.2
+  "v8-to-istanbul": ^9.3.0
   "vitest": ^4.0.18
   "webpack": ^5.99.6
   "webpack-cli": ^5.1.4

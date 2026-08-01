@@ -2,8 +2,10 @@
   "name": "Imported Fixture Portfolio",
   "quoteCcy": "eur",
   "fees": {
+    "maxFeeImpact": "5",
     "feeStructure": {
-      "type": "zeroFee"
+      "type": "fixed",
+      "feeAmount": "1.25"
     }
   },
   "assets": [
@@ -16,7 +18,16 @@
       "price": "101.25",
       "averageBuyPrice": "98.5",
       "qty": "5",
-      "targetWeight": "60"
+      "targetWeight": "60",
+      "fees": {
+        "maxFeeImpact": "2",
+        "feeStructure": {
+          "type": "variable",
+          "feeRate": "0.25",
+          "minFee": "0.5",
+          "maxFee": "3"
+        }
+      }
     },
     {
       "symbol": "AGGH.MI",

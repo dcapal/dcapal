@@ -72,13 +72,19 @@ export const AssetCard = ({
       : 0;
 
   return (
-    <div className="relative w-full max-w-[36rem] flex flex-col my-2 first:mt-0 px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white">
-      <div
+    <div
+      data-testid="asset-card"
+      data-symbol={symbol}
+      className="relative w-full max-w-[36rem] flex flex-col my-2 first:mt-0 px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white"
+    >
+      <button
+        type="button"
+        aria-label={`Remove ${symbol}`}
         className="absolute flex justify-center items-center w-8 h-8 -right-4 -top-3.5 rounded-full bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 cursor-pointer"
         onClick={onClickDelete}
       >
-        <img className="w-3/5" alt="Remove asset" src={CLOSE_SVG} />
-      </div>
+        <img className="w-3/5" alt="" src={CLOSE_SVG} />
+      </button>
       <div className="mb-2 flex items-center justify-between">
         <div className="min-w-0 flex flex-col">
           <div className="text-lg truncate font-medium capitalize" title={name}>
@@ -262,6 +268,7 @@ export const AssetCard = ({
       )}
       <div className="w-full mt-4 flex flex-col gap-3">
         <div
+          data-testid="transaction-fees"
           className="flex gap-1 items-center font-light text-xs"
           {...getToggleProps()}
         >

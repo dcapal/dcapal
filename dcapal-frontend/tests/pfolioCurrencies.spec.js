@@ -1,24 +1,20 @@
-// @ts-check
-import { test, expect } from "@playwright/test";
+import { expect, test } from "./support/fixtures";
 
-test("it loads and fetches portfolio currencies", async ({ page }) => {
+test("an investor can choose a quote currency", async ({ page }) => {
+  /*
+   * GIVEN an investor has opened the allocation flow
+   * WHEN they start a new portfolio
+   * THEN the fiat currency catalog is loaded and EUR and USD can be chosen
+   */
   await page.goto("/");
-
-  await expect(page).toHaveTitle(
-    /DcaPal - A smart assistant for your periodic investments | DcaPal/
-  );
-
-  await Promise.all([
-    page.getByTestId("importStep.allocateYourSavings").first().click(),
-    page.waitForResponse("/api/assets/fiat"),
-  ]);
+  await page.getByTestId("importStep.allocateYourSavings").first().click();
 
   const ccyGroup = page.getByTestId("ccyGroup");
-  await ccyGroup.waitFor();
-
-  const ccyRadios = ccyGroup.getByTestId("ccyRadio");
-  expect(await ccyRadios.count()).toBeGreaterThan(0);
-
-  await expect(ccyRadios.filter({ hasText: "usd" })).toBeVisible();
-  await expect(ccyRadios.filter({ hasText: "eur" })).toBeVisible();
+  await expect(ccyGroup).toBeVisible();
+  await expect(
+    ccyGroup.getByTestId("ccyRadio").filter({ hasText: "usd" })
+  ).toBeVisible();
+  await expect(
+    ccyGroup.getByTestId("ccyRadio").filter({ hasText: "eur" })
+  ).toBeVisible();
 });

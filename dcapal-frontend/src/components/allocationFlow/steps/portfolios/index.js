@@ -150,7 +150,10 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
   const isFormValid = name && selectedCcy;
 
   return (
-    <div className="w-full flex flex-col gap-4">
+    <div
+      data-testid="new-portfolio-form"
+      className="w-full flex flex-col gap-4"
+    >
       <div className="w-full flex flex-col gap-1">
         <label className="text-sm font-light">{t("common.name")}</label>
         <InputText value={name} onChange={setName} isValid={true} />

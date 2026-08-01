@@ -28,7 +28,7 @@ export const TransactionFees = ({ asset }) => {
       : pfolio.fees;
   });
 
-  const feeType = useSelector((state) => {
+  const selectedFeeType = useSelector((state) => {
     const pfolio = currentPortfolio(state);
     return asset
       ? asset in pfolio.assets && pfolio.assets[asset].fees
@@ -36,6 +36,8 @@ export const TransactionFees = ({ asset }) => {
         : null
       : pfolio.fees.feeStructure.type;
   });
+
+  const feeType = selectedFeeType ?? fees?.feeStructure?.type;
 
   const maxFeeImpact = fees?.maxFeeImpact || null;
   const fixedFeeAmount = fees?.feeStructure?.feeAmount || null;
@@ -82,7 +84,11 @@ export const TransactionFees = ({ asset }) => {
 
   return (
     <div className="w-full flex flex-col gap-2 items-start justify-center">
-      <FeeGroup selected={feeType} setSelected={setSelected} asset={asset} />
+      <FeeGroup
+        selected={selectedFeeType}
+        setSelected={setSelected}
+        asset={asset}
+      />
       {feeType === FeeType.ZERO_FEE && <NoFeesForm />}
       {feeType === FeeType.FIXED && (
         <FixedFeeForm

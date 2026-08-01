@@ -11,7 +11,142 @@ import priceConversions from "./fixtures/price-conversions.json";
 
 const IMPORT_PORTFOLIO_ID = "fixture-import-portfolio";
 const FIXED_TS_SECONDS = 1735689600;
-const syncStore = new Map();
+const syncStores = new Map();
+const syncRequestCounts = new Map();
+
+const getScenarioName = (request) =>
+  request.headers.get("x-e2e-scenario") || "default";
+
+const getScenario = (request) => getScenarioName(request).split(":")[0];
+
+const getSyncStore = (scenarioName) => {
+  if (!syncStores.has(scenarioName)) syncStores.set(scenarioName, new Map());
+  return syncStores.get(scenarioName);
+};
+
+const getSyncRequestCount = (scenarioName) => {
+  const count = (syncRequestCounts.get(scenarioName) || 0) + 1;
+  syncRequestCounts.set(scenarioName, count);
+  return count;
+};
+
+const errorResponse = (message, status = 500) =>
+  HttpResponse.json({ message }, { status });
+
+const getSearchQuotes = (scenario) => {
+  if (scenario === "search-empty") return [];
+
+  if (scenario === "search-yahoo-bad-price") {
+    return [
+      {
+        quoteType: "ETF",
+        longname: "Broken Yahoo price",
+        shortname: "Broken Yahoo price",
+        symbol: "BAD.YF",
+        exchange: "NMS",
+      },
+    ];
+  }
+
+  if (scenario === "search-yahoo-quote-currency") {
+    return [
+      {
+        quoteType: "ETF",
+        longname: "Euro quoted fund",
+        shortname: "Euro fund",
+        symbol: "EUR.YF",
+        exchange: "MIL",
+      },
+    ];
+  }
+
+  if (scenario === "search-yahoo-unsupported-currency") {
+    return [
+      {
+        quoteType: "ETF",
+        longname: "Unsupported currency fund",
+        shortname: "Unsupported currency fund",
+        symbol: "JPY.YF",
+        exchange: "LSE",
+      },
+    ];
+  }
+
+  return assetsSearch.quotes;
+};
+
+const getChart = (scenario, symbol) => {
+  if (scenario === "search-yahoo-bad-price") {
+    return {
+      ...assetsChart,
+      chart: {
+        ...assetsChart.chart,
+        result: [
+          {
+            ...assetsChart.chart.result[0],
+            meta: { currency: "USD" },
+            indicators: { quote: [{ close: [0, null] }] },
+          },
+        ],
+      },
+    };
+  }
+
+  if (scenario === "search-yahoo-quote-currency" && symbol === "EUR.YF") {
+    return {
+      ...assetsChart,
+      chart: {
+        ...assetsChart.chart,
+        result: [
+          {
+            ...assetsChart.chart.result[0],
+            meta: { currency: "EUR" },
+            indicators: { quote: [{ close: [12.34] }] },
+          },
+        ],
+      },
+    };
+  }
+
+  if (scenario === "search-yahoo-unsupported-currency" && symbol === "JPY.YF") {
+    return {
+      ...assetsChart,
+      chart: {
+        ...assetsChart.chart,
+        result: [
+          {
+            ...assetsChart.chart.result[0],
+            meta: { currency: "JPY" },
+            indicators: { quote: [{ close: [10.5] }] },
+          },
+        ],
+      },
+    };
+  }
+
+  return assetsChart;
+};
+
+const getImportedPortfolio = (scenario) => {
+  if (scenario !== "import-unresolved-price") return importPortfolio;
+
+  return {
+    ...importPortfolio,
+    assets: [
+      {
+        symbol: "broken",
+        name: "Asset without a price",
+        aclass: "EQUITY",
+        baseCcy: "usd",
+        provider: "DCAPal",
+        price: "0",
+        averageBuyPrice: "0",
+        qty: "1",
+        targetWeight: "100",
+      },
+    ],
+  };
+};
 
 const getConversionPrice = (base, quote) => {
   const baseRates = priceConversions[String(base).toLowerCase()] || {};
@@ -35,27 +170,51 @@ export const handlers = [
   }),
 
   http.get("/api/assets/search", async ({ request }) => {
-    await delay(30);
+    const scenario = getScenario(request);
+    await delay(scenario === "search-loading" ? 1000 : 30);
     const url = new URL(request.url);
     const query = url.searchParams.get("name");
+
+    if (scenario === "search-http-error") {
+      return errorResponse("Yahoo search service unavailable", 502);
+    }
+
+    if (scenario === "search-malformed") {
+      return HttpResponse.json({ quotes: { malformed: true } });
+    }
 
     if (!query) {
       return HttpResponse.json({ quotes: [] });
     }
 
-    return HttpResponse.json(assetsSearch);
+    return HttpResponse.json({ quotes: getSearchQuotes(scenario) });
   }),
 
-  http.get("/api/assets/chart/:symbol", async () => {
+  http.get("/api/assets/chart/:symbol", async ({ params, request }) => {
     await delay(40);
-    return HttpResponse.json(assetsChart);
+    return HttpResponse.json(
+      getChart(getScenario(request), String(params.symbol || ""))
+    );
   }),
 
   http.get("/api/price/:asset", async ({ params, request }) => {
     await delay(20);
     const base = String(params.asset || "").toLowerCase();
+    const scenario = getScenario(request);
     const url = new URL(request.url);
     const quote = String(url.searchParams.get("quote") || "").toLowerCase();
+
+    if (
+      scenario === "search-dcapal-price-error" ||
+      scenario === "import-unresolved-price"
+    ) {
+      const failingAssets =
+        scenario === "import-unresolved-price" ? ["broken"] : ["usd", "btc"];
+      if (failingAssets.includes(base)) {
+        return errorResponse(`Price unavailable for ${base}`, 502);
+      }
+    }
+
     const price = getConversionPrice(base, quote);
 
     return HttpResponse.json({
@@ -69,18 +228,22 @@ export const handlers = [
     return HttpResponse.json(importCreatedResponse, { status: 201 });
   }),
 
-  http.get("/api/import/portfolio/:id", async ({ params }) => {
+  http.get("/api/import/portfolio/:id", async ({ params, request }) => {
     await delay(200);
 
     if (params.id !== IMPORT_PORTFOLIO_ID) {
       return new HttpResponse(null, { status: 404 });
     }
 
-    return HttpResponse.json(importPortfolio);
+    return HttpResponse.json(getImportedPortfolio(getScenario(request)));
   }),
 
   http.post("/api/v1/sync/portfolios", async ({ request }) => {
     await delay(30);
+
+    const scenarioName = getScenarioName(request);
+    const scenario = getScenario(request);
+    const requestCount = getSyncRequestCount(scenarioName);
 
     const auth = request.headers.get("authorization") || "";
     if (!auth.toLowerCase().startsWith("bearer ")) {
@@ -88,6 +251,16 @@ export const handlers = [
         { message: "Missing bearer token" },
         { status: 401 }
       );
+    }
+
+    if (
+      (scenario === "sync-refresh" ||
+        scenario === "sync-refresh-failure" ||
+        scenario === "sync-second-401" ||
+        scenario === "sync-signout-failure") &&
+      requestCount === 1
+    ) {
+      return errorResponse("Expired bearer token", 401);
     }
 
     const req = await request.json();
@@ -98,6 +271,32 @@ export const handlers = [
       ? req.deletedPortfolios
       : [];
 
+    if (
+      (scenario === "sync-second-401" || scenario === "sync-signout-failure") &&
+      requestCount === 2
+    ) {
+      return errorResponse("Bearer token still rejected", 401);
+    }
+
+    if (scenario === "sync-server-wins" && requestCount === 1) {
+      return HttpResponse.json({
+        updatedPortfolios: clientPortfolios.map((portfolio) => ({
+          ...portfolio,
+          name: "Server portfolio",
+          lastUpdatedAt: "2099-01-01T00:00:00.000Z",
+        })),
+        deletedPortfolios: [],
+      });
+    }
+
+    if (scenario === "sync-deleted") {
+      return HttpResponse.json({
+        updatedPortfolios: [],
+        deletedPortfolios: clientPortfolios.map((portfolio) => portfolio.id),
+      });
+    }
+
+    const syncStore = getSyncStore(scenarioName);
     const updatedPortfolios = [];
 
     for (const clientPf of clientPortfolios) {
@@ -129,9 +328,50 @@ export const handlers = [
     });
   }),
 
-  // Stabilize auth-ui/supabase calls during login smoke tests.
-  http.all(/https?:\/\/127\.0\.0\.1:54321\/.*/, async () => {
+  http.all(/https?:\/\/127\.0\.0\.1:54321\/.*/, async ({ request }) => {
     await delay(20);
+
+    const scenario = getScenario(request);
+    const url = new URL(request.url);
+
+    if (url.pathname.endsWith("/auth/v1/token")) {
+      if (scenario === "sync-refresh-failure") {
+        return errorResponse("Refresh token rejected", 400);
+      }
+
+      return HttpResponse.json({
+        access_token: "refreshed-fixture-token",
+        refresh_token: "refreshed-fixture-refresh-token",
+        token_type: "bearer",
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: {
+          id: "fixture-user",
+          aud: "authenticated",
+          role: "authenticated",
+          email: "fixture@example.com",
+          user_metadata: { name: "Fixture User" },
+        },
+      });
+    }
+
+    if (url.pathname.endsWith("/auth/v1/logout")) {
+      if (scenario === "sync-signout-failure") {
+        return errorResponse("Sign out failed", 500);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }
+
+    if (url.pathname.endsWith("/auth/v1/user")) {
+      return HttpResponse.json({
+        id: "fixture-user",
+        aud: "authenticated",
+        role: "authenticated",
+        email: "fixture@example.com",
+        user_metadata: { name: "Fixture User" },
+      });
+    }
+
     return HttpResponse.json({});
   }),
 

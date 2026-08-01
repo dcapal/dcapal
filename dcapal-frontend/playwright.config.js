@@ -1,6 +1,20 @@
 // @ts-check
 const { defineConfig, devices } = require("@playwright/test");
 
+const coverageProjects =
+  process.env.FRONTEND_COVERAGE === "1"
+    ? [
+        {
+          name: "coverage-chromium",
+          use: { ...devices["Desktop Chrome"] },
+        },
+        {
+          name: "coverage-mobile",
+          use: { ...devices["Pixel 5"] },
+        },
+      ]
+    : [];
+
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -47,6 +61,8 @@ module.exports = defineConfig({
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
     },
+
+    ...coverageProjects,
 
     /* Test against mobile viewports. */
     // {

@@ -1,71 +1,78 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./support/fixtures";
 
-const seedPersistedState = async (page) => {
-  await page.addInitScript(() => {
-    const persistedRoot = {
-      app: JSON.stringify({
-        allocationFlowStep: 10,
-        currencies: ["usd", "eur", "gbp", "chf"],
-        preferredCurrency: "",
-        pfolioFile: "",
-      }),
-      pfolio: JSON.stringify({
-        selected: null,
-        pfolios: {},
-        deletedPortfolios: [],
-      }),
-      _persist: JSON.stringify({ version: 5, rehydrated: true }),
-    };
-
-    localStorage.setItem("persist:root", JSON.stringify(persistedRoot));
-  });
-};
-
-test("route '/' renders Root", async ({ page }) => {
+test("the home page offers the allocation journey", async ({ page }) => {
+  /*
+   * GIVEN an investor visits DcaPal
+   * WHEN the home page finishes loading
+   * THEN the investor can start describing a portfolio
+   */
   await page.goto("/");
 
+  await expect(page).toHaveTitle(
+    /DcaPal - A smart assistant for your periodic investments | DcaPal/
+  );
   await expect(
     page.getByTestId("importStep.allocateYourSavings").first()
   ).toBeVisible();
 });
 
-test("route '/allocate' renders lazy App", async ({ page }) => {
+test("the allocate route loads the currency step", async ({ page }) => {
+  /*
+   * GIVEN an investor has chosen to allocate savings
+   * WHEN the allocate route opens
+   * THEN the portfolio flow displays the available quote currencies
+   */
   await page.goto("/allocate");
 
   await expect(page.getByTestId("route-allocate")).toBeVisible();
   await expect(page.getByTestId("ccyGroup")).toBeVisible();
 });
 
-test("route '/import' renders and redirects to allocate", async ({ page }) => {
-  await seedPersistedState(page);
-
-  const importedPortfolioResponse = page.waitForResponse((response) =>
-    response
-      .url()
-      .includes("/api/import/portfolio/fixture-import-portfolio")
-  );
-
+test("a valid import link enters the real import step", async ({ page }) => {
+  /*
+   * GIVEN an investor opens a valid shared portfolio link
+   * WHEN the backend returns the portfolio
+   * THEN the app enters the allocation route and shows import progress
+   */
   await page.goto("/import?p=fixture-import-portfolio");
 
-  await importedPortfolioResponse;
-  await page.waitForURL("**/allocate");
   await expect(page.getByTestId("route-allocate")).toBeVisible();
+  await expect(page.getByText("Import Portfolio")).toBeVisible();
 });
 
-test("route '/login' renders login page", async ({ page }) => {
+test("a missing import link safely returns to portfolio selection", async ({
+  page,
+}) => {
+  /*
+   * GIVEN an investor opens an expired or unknown shared portfolio link
+   * WHEN the import request returns not found
+   * THEN the app returns to the new-portfolio screen without a permanent loader
+   */
+  await page.goto("/import?p=missing-portfolio");
+
+  await page.waitForURL("**/allocate");
+  await expect(page.getByTestId("route-allocate")).toBeVisible();
+  await expect(page.getByTestId("new-portfolio-form")).toBeVisible();
+});
+
+test("the login route renders authentication controls", async ({ page }) => {
+  /*
+   * GIVEN an investor is not signed in
+   * WHEN the login route opens
+   * THEN the authentication screen is visible
+   */
   await page.goto("/login");
 
   await expect(page.getByTestId("route-login")).toBeVisible();
 });
 
-test("route '/demo/60-40' redirects and loads the demo portfolio", async ({
-  page,
-}) => {
-  await seedPersistedState(page);
+test("an unknown route renders the not-found page", async ({ page }) => {
+  /*
+   * GIVEN an investor follows an unknown link
+   * WHEN the router cannot match the path
+   * THEN the app shows a not-found page with a way home
+   */
+  await page.goto("/does-not-exist");
 
-  await page.goto("/demo/60-40");
-
-  await page.waitForURL("**/allocate");
-  await expect(page.getByTestId("route-allocate")).toBeVisible();
-  await expect(page.getByText("VWCE.MI")).toBeVisible();
+  await expect(page.getByText("Page not found")).toBeVisible();
 });

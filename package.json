@@ -12,6 +12,8 @@
     "frontend:format": "pnpm --filter @dcapal/frontend format",
     "frontend:typecheck": "pnpm --filter @dcapal/frontend typecheck",
     "frontend:test": "pnpm --filter @dcapal/frontend test",
-    "frontend:test:e2e": "pnpm --filter @dcapal/frontend test:e2e"
+    "frontend:test:e2e": "pnpm --filter @dcapal/frontend test:e2e",
+    "frontend:test:e2e:coverage": "pnpm --filter @dcapal/frontend test:e2e:coverage",
+    "frontend:coverage:report": "pnpm --filter @dcapal/frontend coverage:report"
   }
 }

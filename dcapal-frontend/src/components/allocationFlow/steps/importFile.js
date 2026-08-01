@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -70,7 +70,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
         a.symbol,
         `(provider=${a.provider} quoteCcy=${pfolio.quoteCcy})`
       );
-      continue;
+      return false;
     }
 
     dispatch(
@@ -106,6 +106,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
 export const ImportStep = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
+  const importStarted = useRef(false);
   const [pfolioId] = useState(crypto.randomUUID());
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -114,19 +115,24 @@ export const ImportStep = () => {
   const validCcys = useSelector((state) => state.app.currencies);
 
   const pfolioFile = useSelector((state) => state.app.pfolioFile);
-  const pfolio = pfolioFile ? JSON.parse(pfolioFile) : {};
-  if (Object.keys(pfolio).length > 0) {
-    pfolio.name = pfolio.name ?? getDefaultPortfolioName();
-  }
+  const pfolio = useMemo(() => {
+    const parsed = pfolioFile ? JSON.parse(pfolioFile) : {};
+    if (Object.keys(parsed).length > 0) {
+      parsed.name = parsed.name ?? getDefaultPortfolioName();
+    }
+    return parsed;
+  }, [pfolioFile]);
 
   useEffect(() => {
-    return () => {
-      dispatch(setPfolioFile({ file: "" }));
-    };
-  }, []);
+    if (
+      Object.keys(pfolio).length === 0 ||
+      validCcys.length === 0 ||
+      importStarted.current
+    ) {
+      return;
+    }
 
-  useEffect(() => {
-    if (Object.keys(pfolio).length === 0) return;
+    importStarted.current = true;
 
     const runImport = async () => {
       const [success] = await Promise.all([
@@ -143,13 +149,15 @@ export const ImportStep = () => {
         setError(true);
       }
 
+      dispatch(setPfolioFile({ file: "" }));
       setIsLoading(false);
     };
 
     runImport();
-  }, [pfolio]);
+  }, [dispatch, pfolio, validCcys]);
 
   const onClickGoBack = () => {
+    dispatch(setPfolioFile({ file: "" }));
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
     navigate("/");
   };
@@ -174,7 +182,7 @@ export const ImportStep = () => {
           </>
         )}
         {!isLoading && error && (
-          <>
+          <div data-testid="import-error" className="contents">
             <h1 className="text-3xl font-bold">
               {t("importStep.importPortfolio")}
             </h1>
@@ -182,13 +190,14 @@ export const ImportStep = () => {
               <span className="text-4xl">⚠️</span>
               {t("importStep.ops")}...
             </span>
-            <span
+            <button
+              type="button"
               className="font-medium underline cursor-pointer"
               onClick={onClickGoBack}
             >
               {t("common.goBack")}
-            </span>
-          </>
+            </button>
+          </div>
         )}
       </div>
     </div>

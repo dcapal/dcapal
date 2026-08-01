@@ -11,6 +11,7 @@
   "scripts": {
     "generate": "orval --config orval.config.ts",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "msw": "catalog:",
     "orval": "catalog:",
     "typescript": "catalog:",

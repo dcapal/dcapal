@@ -168,7 +168,10 @@ export const PortfolioStep = () => {
   };
 
   return (
-    <div className="w-full flex flex-col pt-2 items-center">
+    <div
+      data-testid="portfolio-editor"
+      className="w-full flex flex-col pt-2 items-center"
+    >
       <div className="w-full my-2">
         <SearchBar
           text={searchText}

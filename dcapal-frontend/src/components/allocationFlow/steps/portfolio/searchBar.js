@@ -154,13 +154,17 @@ export const SearchBar = (props) => {
   return (
     <div className="relative flex flex-col items-center justify-center">
       <input
+        data-testid="portfolio-search"
         className="w-full h-12 px-6 pb-px border-2 rounded-3xl border-neutral-500/40 focus:border-neutral-500 focus-visible:outline-none uppercase placeholder:normal-case z-20"
         value={props.text}
         placeholder={t("searchBar.placeholder")}
         onChange={handleAddAssetInputChange}
       />
       {isSearchOpen && isLoading && (
-        <div className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
+        <div
+          data-testid="search-loading"
+          className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic"
+        >
           <Spinner width="2.5rem" height="2.5rem" />
         </div>
       )}
@@ -215,7 +219,7 @@ const SearchHeader = ({ text }) => (
 );
 
 const SearchItemCW = ({ data, setText, addAsset, closeSearchList }) => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const quoteCcy = useSelector(
     (state) => currentPortfolio(state)?.quoteCcy || ""
   );
@@ -230,6 +234,7 @@ const SearchItemCW = ({ data, setText, addAsset, closeSearchList }) => {
     }
   );
   const price = priceQuery.data?.data?.price;
+  const isPriceUnavailable = priceQuery.isError;
 
   const handleResultClick = () => {
     if (price == null) return;
@@ -247,7 +252,11 @@ const SearchItemCW = ({ data, setText, addAsset, closeSearchList }) => {
   };
 
   return (
-    <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer">
+    <li
+      data-testid="asset-result"
+      data-symbol={data.symbol}
+      className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer"
+    >
       <div
         className="flex items-center justify-between h-10 uppercase"
         onClick={handleResultClick}
@@ -272,7 +281,9 @@ const SearchItemCW = ({ data, setText, addAsset, closeSearchList }) => {
               </div>
             </div>
           ) : (
-            <div className="text-base font-medium">Loading...</div>
+            <div className="text-base font-medium">
+              {isPriceUnavailable ? t("searchBar.unavailable") : "Loading..."}
+            </div>
           )}
         </div>
       </div>
@@ -320,7 +331,11 @@ const SearchItemYF = ({
   };
 
   return (
-    <li className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer">
+    <li
+      data-testid="asset-result"
+      data-symbol={data.symbol}
+      className="pl-2 pt-1 pb-1 hover:bg-slate-400/50 cursor-pointer"
+    >
       <div
         className="flex items-center justify-between h-10 uppercase"
         onClick={handleResultClick}

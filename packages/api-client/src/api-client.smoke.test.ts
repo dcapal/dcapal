@@ -7,7 +7,7 @@ import { getGetPriceMockHandler } from "./gen-mocks";
 import {
   configureApiClientBaseUrl,
   resetApiClientConfiguration,
-} from "./mutator/api-fetch";
+} from ".";
 
 const server = setupServer(
   getGetPriceMockHandler({ price: 123.45, ts: 1_700_000_000 }),
