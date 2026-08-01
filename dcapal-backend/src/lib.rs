@@ -15,10 +15,7 @@ use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use hyper::header;
 use metrics::{Unit, counter, describe_counter, describe_histogram};
-use sea_orm::{
-    sqlx,
-    sqlx::{PgPool, postgres::PgPoolOptions},
-};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
@@ -41,7 +38,9 @@ use crate::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
                 ImportedRepository, MiscRepository, StatsRepository,
-                market_data::MarketDataRepository, portfolio::PortfolioRepository,
+                market_data::MarketDataRepository,
+                portfolio::PortfolioRepository,
+                postgres::{SqlxPortfolioRepository, SqlxUserRepository},
                 user::UserRepository,
             },
         },
@@ -87,8 +86,8 @@ struct Repository {
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
-    pub portfolio: Arc<PortfolioRepository>,
-    pub user: Arc<UserRepository>,
+    pub portfolio: Arc<dyn PortfolioRepository>,
+    pub user: Arc<dyn UserRepository>,
 }
 
 pub struct DcaServer {
@@ -130,8 +129,8 @@ impl DcaServer {
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
-            portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
-            user: Arc::new(UserRepository::new(postgres.clone())),
+            portfolio: Arc::new(SqlxPortfolioRepository::new(postgres.clone())),
+            user: Arc::new(SqlxUserRepository::new(postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {

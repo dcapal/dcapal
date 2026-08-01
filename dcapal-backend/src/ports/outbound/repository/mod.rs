@@ -11,6 +11,7 @@ use crate::{DateTime, app::services::ip2location::GeoData, error::Result};
 pub mod dto;
 pub mod market_data;
 pub mod portfolio;
+pub mod postgres;
 pub mod user;
 
 const REDIS_BASE: &str = "dcapal:be";

@@ -50,7 +50,7 @@ pub enum DcaError {
     #[error(transparent)]
     JwtError(#[from] jsonwebtoken::errors::Error),
     #[error(transparent)]
-    DatabaseError(#[from] sea_orm::error::DbErr),
+    DatabaseError(#[from] sqlx::Error),
     #[error("Third-party API reqwest failed")]
     Rquest(#[from] rquest::Error),
 }
@@ -64,15 +64,6 @@ impl Debug for DcaError {
         }
 
         Ok(())
-    }
-}
-
-impl From<sea_orm::TransactionError<DcaError>> for DcaError {
-    fn from(err: sea_orm::TransactionError<DcaError>) -> Self {
-        match err {
-            sea_orm::TransactionError::Connection(e) => DcaError::DatabaseError(e),
-            sea_orm::TransactionError::Transaction(e) => e,
-        }
     }
 }
 

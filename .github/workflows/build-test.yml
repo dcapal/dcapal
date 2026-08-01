@@ -19,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
-          toolchain: stable
+          toolchain: 1.97.1
           components: rustfmt
 
       - name: Check backend formatting
@@ -33,9 +33,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
-          toolchain: stable
+          toolchain: 1.97.1
           components: clippy
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
@@ -56,29 +56,54 @@ jobs:
   backend-test:
     name: test:backend
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_VERSION: 2.110.0
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
         with:
-          toolchain: stable
+          node-version-file: ".nvmrc"
+
+      - name: Cache Supabase CLI npm packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-supabase-cli-${{ env.SUPABASE_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: ${{ env.SUPABASE_VERSION }}
+
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          toolchain: 1.97.1
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v1
           shared-key: rust
 
+      - name: Start backend database
+        run: make backend-db-up
+
       - name: Test backend
-        working-directory: dcapal-backend
-        run: RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
+        run: make test-backend
+
+      - name: Stop backend database
+        if: always()
+        run: make backend-db-down
 
   backend-openapi-check:
     name: check:openapi:backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
-          toolchain: stable
+          toolchain: 1.97.1
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
         with:
@@ -96,9 +121,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
-          toolchain: stable
+          toolchain: 1.97.1
           components: clippy, rustfmt
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
@@ -123,9 +148,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
-          toolchain: stable
+          toolchain: 1.97.1
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
         with:

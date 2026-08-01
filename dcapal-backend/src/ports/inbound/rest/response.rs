@@ -5,9 +5,11 @@ use uuid::Uuid;
 
 use crate::{
     DateTime,
-    app::domain::db::{portfolio_asset, portfolios},
     error::DcaError,
-    ports::inbound::rest::FeeStructure,
+    ports::{
+        inbound::rest::FeeStructure,
+        outbound::repository::postgres::types::{PortfolioAssetRow, PortfolioRow},
+    },
 };
 
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
@@ -48,12 +50,10 @@ pub struct PortfolioAssetResponse {
     pub fees: Option<TransactionFeesResponse>,
 }
 
-impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResponse {
+impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
     type Error = DcaError;
 
-    fn try_from(
-        input: (portfolios::Model, Vec<portfolio_asset::Model>),
-    ) -> Result<Self, Self::Error> {
+    fn try_from(input: (PortfolioRow, Vec<PortfolioAssetRow>)) -> Result<Self, Self::Error> {
         let (portfolio, assets) = input;
         let portfolio_assets: Vec<PortfolioAssetResponse> = assets
             .iter()
@@ -159,7 +159,7 @@ impl TryFrom<(portfolios::Model, Vec<portfolio_asset::Model>)> for PortfolioResp
                 None
             },
             assets: portfolio_assets,
-            last_updated_at: portfolio.last_updated_at.into(),
+            last_updated_at: portfolio.last_updated_at,
         })
     }
 }
@@ -188,24 +188,24 @@ mod test {
     fn map_model_to_response() {
         let portfolio_id = Uuid::new_v4();
 
-        let portfolio_model = portfolios::Model {
+        let portfolio_model = PortfolioRow {
             id: portfolio_id,
             user_id: Uuid::new_v4(),
             name: String::from("my_pf"),
             currency: String::from("EUR"),
             deleted: false,
-            last_updated_at: Utc::now().into(),
+            last_updated_at: Utc::now(),
             max_fee_impact: None,
             fee_type: Some(String::from("Fixed")),
             fee_amount: Some(dec!(2.95)),
             fee_rate: None,
             min_fee: None,
             max_fee: None,
-            created_at: Utc::now().into(),
-            updated_at: Utc::now().into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
 
-        let asset_model = portfolio_asset::Model {
+        let asset_model = PortfolioAssetRow {
             id: Uuid::new_v4(),
             symbol: String::from("VWCE"),
             portfolio_id,
@@ -223,8 +223,8 @@ mod test {
             min_fee: None,
             max_fee: None,
             average_buy_price: Some(dec!(90.0)),
-            created_at: Utc::now().into(),
-            updated_at: Utc::now().into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
         let assets_model = vec![asset_model.clone()];
 
@@ -250,7 +250,7 @@ mod test {
                 average_buy_price: dec!(90.0),
                 fees: None,
             }],
-            last_updated_at: portfolio_model.last_updated_at.into(),
+            last_updated_at: portfolio_model.last_updated_at,
         };
 
         let actual: PortfolioResponse = (portfolio_model, assets_model).try_into().unwrap();

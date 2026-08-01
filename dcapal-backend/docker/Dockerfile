@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Bookworm, so it's the same as the runtime
-FROM rust:1-bookworm AS chef
+FROM rust:1.97-bookworm AS chef
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     cargo install cargo-chef
@@ -49,9 +49,6 @@ RUN mkdir bin
 RUN mkdir data
 COPY --from=builder /var/dcapal/output/dcapal-backend /var/dcapal/dcapal-backend/bin
 COPY --from=builder /var/dcapal/output/migration /var/dcapal/dcapal-backend/bin
-COPY ./dcapal-backend/migration ./migration
-COPY ./dcapal-backend/migration/Cargo.toml ./migration/Cargo.toml
-COPY ./dcapal-backend/migration/src ./migration/src
 # Create start script
 COPY ./dcapal-backend/scripts/start.sh ./start.sh
 RUN chmod +x ./start.sh

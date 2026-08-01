@@ -417,9 +417,9 @@ mod tests {
         let solution = problem.problem.solve()?;
 
         // Expect
-        println!("{}: {}", &vwce, solution[problem.vars[&vwce]]);
-        println!("{}: {}", &aggh, solution[problem.vars[&aggh]]);
-        println!("{}: {}", &reit, solution[problem.vars[&reit]]);
+        println!("{}: {}", vwce, solution[problem.vars[&vwce]]);
+        println!("{}: {}", aggh, solution[problem.vars[&aggh]]);
+        println!("{}: {}", reit, solution[problem.vars[&reit]]);
         Ok(())
     }
 
@@ -433,9 +433,9 @@ mod tests {
         let solution = problem.problem.solve()?;
 
         // Expect
-        println!("{}: {}", &vwce, solution[problem.vars[&vwce]]);
-        println!("{}: {}", &aggh, solution[problem.vars[&aggh]]);
-        println!("{}: {}", &reit, solution[problem.vars[&reit]]);
+        println!("{}: {}", vwce, solution[problem.vars[&vwce]]);
+        println!("{}: {}", aggh, solution[problem.vars[&aggh]]);
+        println!("{}: {}", reit, solution[problem.vars[&reit]]);
         Ok(())
     }
 
@@ -507,11 +507,11 @@ mod tests {
         let vars = refine_solution(&problem, &vars);
 
         // Expect
-        println!("{}: {}", &vwce, vars[&vwce]);
-        println!("{}: {}", &aggh, vars[&aggh]);
-        println!("{}: {}", &epra, vars[&epra]);
-        println!("{}: {}", &btc, vars[&btc]);
-        println!("{}: {}", &eth, vars[&eth]);
+        println!("{}: {}", vwce, vars[&vwce]);
+        println!("{}: {}", aggh, vars[&aggh]);
+        println!("{}: {}", epra, vars[&epra]);
+        println!("{}: {}", btc, vars[&btc]);
+        println!("{}: {}", eth, vars[&eth]);
         Ok(())
     }
 }
