@@ -1,6 +1,20 @@
 // @ts-check
 const { defineConfig, devices } = require("@playwright/test");
 
+const coverageProjects =
+  process.env.FRONTEND_COVERAGE === "1"
+    ? [
+        {
+          name: "coverage-chromium",
+          use: { ...devices["Desktop Chrome"] },
+        },
+        {
+          name: "coverage-mobile",
+          use: { ...devices["Pixel 5"] },
+        },
+      ]
+    : [];
+
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -48,6 +62,8 @@ module.exports = defineConfig({
       use: { ...devices["Desktop Safari"] },
     },
 
+    ...coverageProjects,
+
     /* Test against mobile viewports. */
     // {
     //   name: 'Mobile Chrome',
@@ -71,7 +87,7 @@ module.exports = defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "REACT_APP_E2E_MSW=1 npm run start:ci",
+    command: "REACT_APP_E2E_MSW=1 pnpm run dev:ci",
     url: "http://127.0.0.1:3000",
     timeout: 120000,
     reuseExistingServer: !process.env.CI,

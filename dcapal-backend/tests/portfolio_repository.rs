@@ -1,0 +1,129 @@
+use chrono::Utc;
+use dcapal_backend::{
+    error::DcaError,
+    ports::{
+        inbound::rest::{
+            FeeStructure,
+            request::{PortfolioAssetRequest, PortfolioRequest},
+        },
+        outbound::repository::{portfolio::PortfolioRepository, postgres::SqlxPortfolioRepository},
+    },
+};
+use rust_decimal::dec;
+use sqlx::PgPool;
+use uuid::Uuid;
+
+const USER_ID: Uuid = Uuid::from_u128(1);
+const OTHER_USER_ID: Uuid = Uuid::from_u128(2);
+const PORTFOLIO_ID: Uuid = Uuid::from_u128(0x10000000000000000000000000000001);
+
+fn asset(symbol: &str) -> PortfolioAssetRequest {
+    PortfolioAssetRequest {
+        symbol: symbol.to_string(),
+        name: format!("{symbol} asset"),
+        aclass: "Stock".to_string(),
+        base_ccy: "EUR".to_string(),
+        provider: "IBKR".to_string(),
+        qty: dec!(2),
+        target_weight: dec!(1),
+        price: dec!(120),
+        average_buy_price: dec!(110),
+        fees: Some(
+            dcapal_backend::ports::inbound::rest::request::TransactionFeesRequest {
+                max_fee_impact: None,
+                fee_structure: FeeStructure::ZeroFee,
+            },
+        ),
+    }
+}
+
+fn portfolio_request(assets: Vec<PortfolioAssetRequest>) -> PortfolioRequest {
+    PortfolioRequest {
+        id: PORTFOLIO_ID,
+        name: "Updated portfolio".to_string(),
+        quote_ccy: "USD".to_string(),
+        fees: Some(
+            dcapal_backend::ports::inbound::rest::request::TransactionFeesRequest {
+                max_fee_impact: Some(dec!(0.5)),
+                fee_structure: FeeStructure::Fixed {
+                    fee_amount: dec!(1.25),
+                },
+            },
+        ),
+        assets,
+        last_updated_at: Utc::now(),
+    }
+}
+
+#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+async fn reads_portfolios_with_their_assets(pool: PgPool) -> dcapal_backend::error::Result<()> {
+    let repository = SqlxPortfolioRepository::new(pool);
+    let portfolios = repository.get_user_portfolios_with_assets(USER_ID).await?;
+
+    assert_eq!(portfolios.len(), 1);
+    assert_eq!(portfolios[0].0.id, PORTFOLIO_ID);
+    assert_eq!(portfolios[0].1.len(), 2);
+    assert_eq!(portfolios[0].1[0].symbol, "VWCE");
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+async fn upsert_updates_assets_and_removes_missing_assets(
+    pool: PgPool,
+) -> dcapal_backend::error::Result<()> {
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let (portfolio, assets) = repository
+        .upsert(USER_ID, portfolio_request(vec![asset("VWCE")]))
+        .await?;
+
+    assert_eq!(portfolio.currency, "USD");
+    assert_eq!(portfolio.fee_type.as_deref(), Some("Fixed"));
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0].symbol, "VWCE");
+    assert_eq!(assets[0].quantity, dec!(2));
+
+    let asset_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM portfolio_asset WHERE portfolio_id = $1")
+            .bind(PORTFOLIO_ID)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(asset_count, 1);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+async fn ownership_is_required_for_upsert_and_delete(
+    pool: PgPool,
+) -> dcapal_backend::error::Result<()> {
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let result = repository
+        .upsert(OTHER_USER_ID, portfolio_request(vec![asset("VWCE")]))
+        .await;
+
+    assert!(matches!(result, Err(DcaError::BadRequest(_))));
+    repository.soft_delete(OTHER_USER_ID, PORTFOLIO_ID).await?;
+
+    let deleted: bool = sqlx::query_scalar("SELECT deleted FROM portfolios WHERE id = $1")
+        .bind(PORTFOLIO_ID)
+        .fetch_one(&pool)
+        .await?;
+    assert!(!deleted);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+async fn soft_delete_updates_an_owned_portfolio(pool: PgPool) -> dcapal_backend::error::Result<()> {
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    repository.soft_delete(USER_ID, PORTFOLIO_ID).await?;
+
+    let deleted: bool = sqlx::query_scalar("SELECT deleted FROM portfolios WHERE id = $1")
+        .bind(PORTFOLIO_ID)
+        .fetch_one(&pool)
+        .await?;
+    assert!(deleted);
+
+    Ok(())
+}

@@ -4,16 +4,21 @@ use utoipa::ToSchema;
 
 use crate::{DateTime, app::infra::utils::Expiring};
 
+/// Stable identifier used for a supported asset.
 pub type AssetId = String;
+
+/// Stable identifier used for a tradable base/quote market pair.
 pub type MarketId = String;
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+/// A cryptocurrency identified by its provider id and display symbol.
 pub struct Crypto {
     pub id: AssetId,
     pub symbol: String,
 }
 
 impl Crypto {
+    /// Creates a cryptocurrency whose display symbol is the upper-case id.
     pub fn new_with_id(id: AssetId) -> Self {
         let symbol = id.to_uppercase();
         Self { id, symbol }
@@ -21,12 +26,14 @@ impl Crypto {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+/// A fiat currency identified by its provider id and display symbol.
 pub struct Fiat {
     pub id: AssetId,
     pub symbol: String,
 }
 
 impl Fiat {
+    /// Creates a fiat asset with the supplied provider id and symbol.
     pub fn new(id: AssetId, symbol: String) -> Self {
         Self { id, symbol }
     }
@@ -34,18 +41,21 @@ impl Fiat {
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 #[serde(tag = "type")]
+/// A supported asset, either a cryptocurrency or a fiat currency.
 pub enum Asset {
     Crypto(Crypto),
     Fiat(Fiat),
 }
 
 #[derive(Debug, Clone, Copy, strum_macros::Display)]
+/// The broad asset category used when selecting market-data catalogs.
 pub enum AssetKind {
     Crypto,
     Fiat,
 }
 
 impl Asset {
+    /// Returns the provider id shared by both asset variants.
     pub fn id(&self) -> &AssetId {
         match self {
             Asset::Crypto(a) => &a.id,
@@ -53,10 +63,12 @@ impl Asset {
         }
     }
 
+    /// Returns whether this asset represents a fiat currency.
     pub fn is_fiat(&self) -> bool {
         matches!(self, Asset::Fiat(_))
     }
 
+    /// Returns the category used by market-data catalog queries.
     pub fn kind(&self) -> AssetKind {
         match self {
             Asset::Crypto(_) => AssetKind::Crypto,
@@ -66,8 +78,11 @@ impl Asset {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema)]
+/// A price and the timestamp at which it was observed.
 pub struct Price {
     pub price: f64,
+    /// Serialized as Unix seconds in the REST/OpenAPI representation.
+    #[schema(value_type = i64, format = Int64)]
     #[serde(with = "chrono::serde::ts_seconds")]
     pub ts: DateTime,
 }
@@ -75,6 +90,7 @@ pub struct Price {
 impl Price {
     const VALIDITY_MINS: u32 = 5;
 
+    /// Creates a price observation with its source timestamp.
     pub fn new(price: f64, ts: DateTime) -> Self {
         Self { price, ts }
     }
@@ -104,12 +120,14 @@ impl Expiring for Price {
 }
 
 #[derive(Debug, Clone, Copy, strum_macros::Display)]
+/// Supported intervals for historical OHLC market-data queries.
 pub enum OHLCFrequency {
     Minutes5,
     Daily,
 }
 
 impl OHLCFrequency {
+    /// Returns the historical range needed to cover the requested interval.
     pub fn ohlc_range(&self, ts: DateTime) -> (DateTime, DateTime) {
         match self {
             OHLCFrequency::Minutes5 => Self::ohlc_range_minutes_5(ts),
@@ -153,6 +171,7 @@ impl OHLCFrequency {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+/// A base/quote market with an optional cached price observation.
 pub struct Market {
     pub id: MarketId,
     pub pair: String,
@@ -163,6 +182,7 @@ pub struct Market {
 }
 
 impl Market {
+    /// Creates a market and derives its display pair from the asset ids.
     pub fn new(id: MarketId, base: Asset, quote: Asset, price: Option<Price>) -> Self {
         Self {
             id,
@@ -173,18 +193,22 @@ impl Market {
         }
     }
 
+    /// Returns the latest cached price, if one is available.
     pub fn price(&self) -> &Option<Price> {
         &self.price
     }
 
+    /// Replaces the cached price observation.
     pub fn set_price(&mut self, price: Price) {
         self.price.replace(price);
     }
 
+    /// Returns whether both sides of the market are fiat currencies.
     pub fn is_fiat(&self) -> bool {
         self.base.is_fiat() && self.quote.is_fiat()
     }
 
+    /// Returns whether the cached price has crossed its five-minute validity window.
     pub fn is_price_outdated(&self) -> bool {
         let last_price = self.price();
         last_price.is_some() && last_price.as_ref().unwrap().is_outdated()

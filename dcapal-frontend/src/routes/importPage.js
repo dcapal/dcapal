@@ -15,6 +15,7 @@ const navigateToPortfolios = (portfolio, step, dispatch, navigate) => {
   navigate("/allocate");
 };
 
+/** Loads a shared portfolio link and routes it into the allocation flow. */
 export default function ImportPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -24,7 +25,7 @@ export default function ImportPage() {
   const searchParams = new URLSearchParams(location.search);
   const portfolioId = searchParams.get("p");
 
-  const [portfolio, isLoading] = useFetchImportedPortfolio(portfolioId);
+  const { portfolio, isLoading } = useFetchImportedPortfolio(portfolioId);
 
   useEffect(() => {
     if (isLoading) return;
@@ -34,7 +35,7 @@ export default function ImportPage() {
     } else {
       navigateToPortfolios(portfolio, Step.IMPORT, dispatch, navigate);
     }
-  }, [portfolio, isLoading]);
+  }, [dispatch, isLoading, navigate, portfolio]);
 
   return (
     <div

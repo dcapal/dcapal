@@ -31,9 +31,9 @@ parking_lot = { workspace = true }
 redis = { workspace = true }
 reqwest = { workspace = true }
 rust_decimal = { workspace = true }
-sea-orm = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sqlx = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
@@ -52,3 +52,6 @@ rquest = { workspace = true }
 [[bin]]
 name = "generate_openapi"
 path = "tools/generate_openapi.rs"
+
+[dev-dependencies]
+migration = { path = "migration" }
