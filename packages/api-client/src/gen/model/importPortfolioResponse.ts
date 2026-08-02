@@ -5,6 +5,9 @@
  * OpenAPI spec version: 0.9.0
  */
 
+/**
+ * Metadata returned after a portfolio is stored for sharing.
+ */
 export interface ImportPortfolioResponse {
   expires_at: string;
   id: string;

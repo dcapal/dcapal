@@ -6,6 +6,9 @@
  */
 import type { TransactionFeesRequest } from './transactionFeesRequest';
 
+/**
+ * An asset and its allocation values submitted for synchronization.
+ */
 export interface PortfolioAssetRequest {
   aclass: string;
   averageBuyPrice: string;

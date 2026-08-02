@@ -7,6 +7,9 @@
 import type { Crypto } from './crypto';
 import type { Fiat } from './fiat';
 
+/**
+ * A supported asset, either a cryptocurrency or a fiat currency.
+ */
 export type Asset = Crypto & {
   type: 'Crypto';
 } | Fiat & {

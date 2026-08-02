@@ -6,6 +6,9 @@
  */
 import type { String } from './string';
 
+/**
+ * A fiat currency identified by its provider id and display symbol.
+ */
 export interface Fiat {
   id: String;
   symbol: string;

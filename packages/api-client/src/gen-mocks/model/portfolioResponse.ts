@@ -7,6 +7,9 @@
 import type { PortfolioAssetResponse } from './portfolioAssetResponse';
 import type { TransactionFeesResponse } from './transactionFeesResponse';
 
+/**
+ * A synchronized portfolio returned to the authenticated client.
+ */
 export interface PortfolioResponse {
   assets: PortfolioAssetResponse[];
   fees?: null | TransactionFeesResponse;

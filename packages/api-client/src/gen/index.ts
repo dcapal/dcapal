@@ -75,6 +75,9 @@ export const getRootUrl = () => {
   return `/`
 }
 
+/**
+ * @summary Returns the service greeting used by the root health-style endpoint.
+ */
 export const root = async ( options?: Parameters<typeof apiFetch>[1]): Promise<rootResponseSuccess> => {
 
   return apiFetch<rootResponseSuccess>(getRootUrl(),
@@ -143,6 +146,9 @@ export function useRoot<TData = Awaited<ReturnType<typeof root>>, TError = unkno
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof root>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Returns the service greeting used by the root health-style endpoint.
+ */
 
 export function useRoot<TData = Awaited<ReturnType<typeof root>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof root>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
@@ -188,6 +194,9 @@ export const getGetAssetsChartUrl = (symbol: string,
   return stringifiedParams.length > 0 ? `/assets/chart/${symbol}?${stringifiedParams}` : `/assets/chart/${symbol}`
 }
 
+/**
+ * @summary Proxies a historical chart request to the configured market-data provider.
+ */
 export const getAssetsChart = async (symbol: string,
     params: GetAssetsChartParams, options?: Parameters<typeof apiFetch>[1]): Promise<getAssetsChartResponseSuccess> => {
 
@@ -262,6 +271,9 @@ export function useGetAssetsChart<TData = Awaited<ReturnType<typeof getAssetsCha
     params: GetAssetsChartParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsChart>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Proxies a historical chart request to the configured market-data provider.
+ */
 
 export function useGetAssetsChart<TData = Awaited<ReturnType<typeof getAssetsChart>>, TError = unknown>(
  symbol: string,
@@ -300,6 +312,9 @@ export const getGetAssetsCryptoUrl = () => {
   return `/assets/crypto`
 }
 
+/**
+ * @summary Returns the cached cryptocurrency asset catalog.
+ */
 export const getAssetsCrypto = async ( options?: Parameters<typeof apiFetch>[1]): Promise<getAssetsCryptoResponseSuccess> => {
 
   return apiFetch<getAssetsCryptoResponseSuccess>(getGetAssetsCryptoUrl(),
@@ -368,6 +383,9 @@ export function useGetAssetsCrypto<TData = Awaited<ReturnType<typeof getAssetsCr
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsCrypto>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Returns the cached cryptocurrency asset catalog.
+ */
 
 export function useGetAssetsCrypto<TData = Awaited<ReturnType<typeof getAssetsCrypto>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsCrypto>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
@@ -405,6 +423,9 @@ export const getGetAssetsFiatUrl = () => {
   return `/assets/fiat`
 }
 
+/**
+ * @summary Returns the cached fiat asset catalog.
+ */
 export const getAssetsFiat = async ( options?: Parameters<typeof apiFetch>[1]): Promise<getAssetsFiatResponseSuccess> => {
 
   return apiFetch<getAssetsFiatResponseSuccess>(getGetAssetsFiatUrl(),
@@ -473,6 +494,9 @@ export function useGetAssetsFiat<TData = Awaited<ReturnType<typeof getAssetsFiat
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsFiat>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Returns the cached fiat asset catalog.
+ */
 
 export function useGetAssetsFiat<TData = Awaited<ReturnType<typeof getAssetsFiat>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsFiat>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
@@ -517,6 +541,9 @@ export const getGetAssetsDataUrl = (params: GetAssetsDataParams,) => {
   return stringifiedParams.length > 0 ? `/assets/search?${stringifiedParams}` : `/assets/search`
 }
 
+/**
+ * @summary Proxies an asset-name search to the configured market-data provider.
+ */
 export const getAssetsData = async (params: GetAssetsDataParams, options?: Parameters<typeof apiFetch>[1]): Promise<getAssetsDataResponseSuccess> => {
 
   return apiFetch<getAssetsDataResponseSuccess>(getGetAssetsDataUrl(params),
@@ -585,6 +612,9 @@ export function useGetAssetsData<TData = Awaited<ReturnType<typeof getAssetsData
  params: GetAssetsDataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsData>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Proxies an asset-name search to the configured market-data provider.
+ */
 
 export function useGetAssetsData<TData = Awaited<ReturnType<typeof getAssetsData>>, TError = unknown>(
  params: GetAssetsDataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAssetsData>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
@@ -629,6 +659,9 @@ export const getImportPortfolioUrl = () => {
   return `/import/portfolio`
 }
 
+/**
+ * @summary Validates and stores a shared portfolio payload.
+ */
 export const importPortfolio = async (importPortfolioBody: ImportPortfolioBody, options?: Parameters<typeof apiFetch>[1]): Promise<importPortfolioResponseSuccess> => {
 
   return apiFetch<importPortfolioResponseSuccess>(getImportPortfolioUrl(),
@@ -675,7 +708,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ImportPortfolioMutationBody = ImportPortfolioBody
     export type ImportPortfolioMutationError = void
 
-    export const useImportPortfolio = <TError = void,
+    /**
+ * @summary Validates and stores a shared portfolio payload.
+ */
+export const useImportPortfolio = <TError = void,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importPortfolio>>, TError,{data: ImportPortfolioBody}, TContext>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importPortfolio>>,
@@ -711,6 +747,9 @@ export const getGetImportedPortfolioUrl = (id: string,) => {
   return `/import/portfolio/${id}`
 }
 
+/**
+ * @summary Returns a stored shared portfolio or a not-found response when it expired.
+ */
 export const getImportedPortfolio = async (id: string, options?: Parameters<typeof apiFetch>[1]): Promise<getImportedPortfolioResponseSuccess> => {
 
   return apiFetch<getImportedPortfolioResponseSuccess>(getGetImportedPortfolioUrl(id),
@@ -779,6 +818,9 @@ export function useGetImportedPortfolio<TData = Awaited<ReturnType<typeof getImp
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportedPortfolio>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Returns a stored shared portfolio or a not-found response when it expired.
+ */
 
 export function useGetImportedPortfolio<TData = Awaited<ReturnType<typeof getImportedPortfolio>>, TError = void>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportedPortfolio>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
@@ -831,6 +873,9 @@ export const getGetPriceUrl = (asset: string,
   return stringifiedParams.length > 0 ? `/price/${asset}?${stringifiedParams}` : `/price/${asset}`
 }
 
+/**
+ * @summary Returns the current conversion price for a base asset and quote currency.
+ */
 export const getPrice = async (asset: string,
     params: GetPriceParams, options?: Parameters<typeof apiFetch>[1]): Promise<getPriceResponseSuccess> => {
 
@@ -905,6 +950,9 @@ export function useGetPrice<TData = Awaited<ReturnType<typeof getPrice>>, TError
     params: GetPriceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPrice>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Returns the current conversion price for a base asset and quote currency.
+ */
 
 export function useGetPrice<TData = Awaited<ReturnType<typeof getPrice>>, TError = void>(
  asset: string,
@@ -950,6 +998,9 @@ export const getSyncPortfoliosUrl = () => {
   return `/v1/sync/portfolios`
 }
 
+/**
+ * @summary Applies authenticated local portfolio changes and returns the server state.
+ */
 export const syncPortfolios = async (syncPortfoliosRequest: SyncPortfoliosRequest, options?: Parameters<typeof apiFetch>[1]): Promise<syncPortfoliosResponseSuccess> => {
 
   return apiFetch<syncPortfoliosResponseSuccess>(getSyncPortfoliosUrl(),
@@ -996,7 +1047,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SyncPortfoliosMutationBody = SyncPortfoliosRequest
     export type SyncPortfoliosMutationError = void
 
-    export const useSyncPortfolios = <TError = void,
+    /**
+ * @summary Applies authenticated local portfolio changes and returns the server state.
+ */
+export const useSyncPortfolios = <TError = void,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPortfolios>>, TError,{data: SyncPortfoliosRequest}, TContext>, request?: SecondParameter<typeof apiFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof syncPortfolios>>,

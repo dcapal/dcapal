@@ -6,6 +6,9 @@
  */
 import type { PortfolioResponse } from './portfolioResponse';
 
+/**
+ * Server changes returned after portfolio synchronization.
+ */
 export interface SyncPortfoliosResponse {
   deletedPortfolios: string[];
   updatedPortfolios: PortfolioResponse[];

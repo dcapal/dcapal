@@ -5,6 +5,12 @@
  * OpenAPI spec version: 0.9.0
  */
 
+/**
+ * Transaction-fee policy exchanged by the REST API.
+ *
+ * Decimal values are serialized as strings so clients do not lose precision
+ * while crossing the JSON boundary.
+ */
 export type FeeStructure = {
   type: 'zeroFee';
 } | {

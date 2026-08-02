@@ -6,6 +6,9 @@
  */
 import type { TransactionFeesResponse } from './transactionFeesResponse';
 
+/**
+ * An asset returned with decimal values preserved as JSON strings.
+ */
 export interface PortfolioAssetResponse {
   aclass: string;
   averageBuyPrice: string;

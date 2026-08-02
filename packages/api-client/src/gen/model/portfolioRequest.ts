@@ -7,6 +7,9 @@
 import type { PortfolioAssetRequest } from './portfolioAssetRequest';
 import type { TransactionFeesRequest } from './transactionFeesRequest';
 
+/**
+ * A portfolio submitted as part of an authenticated synchronization.
+ */
 export interface PortfolioRequest {
   assets: PortfolioAssetRequest[];
   fees?: null | TransactionFeesRequest;

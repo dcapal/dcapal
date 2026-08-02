@@ -13,7 +13,7 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 - [x] (2026-08-02) Inventory changed hand-written source, public symbols, generated boundaries, and existing comment conventions.
 - [x] (2026-08-02) Add TSDoc/JSDoc to changed frontend, test-support, API-client, and coverage source.
 - [x] (2026-08-02) Add Rust documentation comments to changed public domain and REST symbols, plus rationale comments for non-obvious wire/schema behavior.
-- [x] (2026-08-02) Document the OpenAPI/Orval generated boundary without editing generated output that regeneration would overwrite.
+- [x] (2026-08-02) Document the OpenAPI/Orval generated boundary and regenerate output from the documented source.
 - [x] (2026-08-02) Run formatting, typechecks, tests, and documentation-focused checks; review the final diff.
 - [x] (2026-08-02) Commit and push the documentation changes; verify the GitHub pipeline.
 
@@ -35,6 +35,9 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 - Decision: Document hand-written changed source, not generated Orval output.
   Rationale: comments added to generated files would be lost when `pnpm --filter @dcapal/api-client generate` runs. The stable documentation surface is the OpenAPI source, `orval.config.ts`, package README/exports, and the hand-written mutator.
   Date/Author: 2026-08-02 / Codex.
+- Decision: Regenerate the checked-in OpenAPI document and Orval output after adding Rust API documentation.
+  Rationale: `utoipa` publishes Rust item documentation in the OpenAPI schema, and Orval is responsible for carrying those descriptions into generated TypeScript. This keeps generated comments reproducible without hand-editing them.
+  Date/Author: 2026-08-02 / Codex.
 - Decision: Add comments to every public type, function, and constant in changed hand-written files, even when the symbol's implementation predates this branch.
   Rationale: the request is about the changed code surface, and a public symbol in a changed module is part of the maintenance surface.
   Date/Author: 2026-08-02 / Codex.
@@ -47,11 +50,11 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 
 ## Outcomes & Retrospective
 
-Documented the changed hand-written frontend components, hooks, API boundaries, test support, coverage tooling, Rust domain/REST/OpenAPI surfaces, and the API-client package boundary. Added concise public API comments and retained only rationale comments for non-obvious precision, authentication, caching, schema, and coverage constraints. The Orval-generated files under `packages/api-client/src/gen` and `src/gen-mocks` were intentionally left untouched; the README, generator config, package entry point, and hand-written mutator now explain that boundary.
+Documented the changed hand-written frontend components, hooks, API boundaries, test support, coverage tooling, Rust domain/REST/OpenAPI surfaces, and the API-client package boundary. Added concise public API comments and retained only rationale comments for non-obvious precision, authentication, caching, schema, and coverage constraints. The Orval-generated files under `packages/api-client/src/gen` and `src/gen-mocks` were never hand-edited; they were regenerated from the documented Rust/OpenAPI source and now contain only generator-produced descriptions. The README, generator config, package entry point, and hand-written mutator explain that boundary.
 
 Validation completed successfully: frontend lint, frontend typecheck, frontend unit tests (6), API-client typecheck, API-client tests (15), backend tests (9), Rust formatting, development build, diff checks, 76/76 Chromium coverage journeys, and 76/76 Firefox/WebKit journeys. The coverage report generated successfully and no global percentage threshold was introduced. User-owned `MIGRATION.md` and `agent_docs/` remained untracked and unstaged.
 
-Commit `862e90b` was pushed to `agent/tanstack-orval-api-client`. The follow-up plan-status commit and its GitHub pipeline run are the final completion checks.
+The documentation commits were pushed to `agent/tanstack-orval-api-client`. The OpenAPI verification job then identified the expected checked-in-spec drift caused by the new Rust docs; the regenerated spec/client fix will be included before the requested rebase and replacement pipeline run.
 
 ## Context and Orientation
 
@@ -126,4 +129,4 @@ No new runtime dependency is required. Documentation uses the existing language 
 Revision note (2026-08-02): Created in response to the request to document the code changed by this branch, with a generated-code boundary to preserve Orval reproducibility.
 Revision note (2026-08-02): Updated after the inventory and documentation pass; recorded the generated-file evidence and completed the comment milestones before validation.
 Revision note (2026-08-02): Recorded successful local validation, including both browser lanes and the changed-line coverage report; commit and CI verification remain.
-Revision note (2026-08-02): Recorded commit `862e90b` and its successful push; only the plan-status follow-up and resulting CI run remain.
+Revision note (2026-08-02): Regenerated the checked-in OpenAPI document and Orval production/MSW output from the documented Rust source after CI caught the expected schema drift; no generated file was edited manually.

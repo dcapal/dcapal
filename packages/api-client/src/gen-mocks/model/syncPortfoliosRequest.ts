@@ -6,6 +6,9 @@
  */
 import type { PortfolioRequest } from './portfolioRequest';
 
+/**
+ * Authenticated request containing local portfolio changes and deletions.
+ */
 export interface SyncPortfoliosRequest {
   deletedPortfolios: string[];
   portfolios: PortfolioRequest[];

@@ -6,6 +6,9 @@
  */
 import type { String } from './string';
 
+/**
+ * A cryptocurrency identified by its provider id and display symbol.
+ */
 export interface Crypto {
   id: String;
   symbol: string;

@@ -6,6 +6,9 @@
  */
 import type { FeeStructure } from './feeStructure';
 
+/**
+ * Portfolio- or asset-level transaction-fee settings.
+ */
 export interface TransactionFeesRequest {
   feeStructure: FeeStructure;
   /** @nullable */

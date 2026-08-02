@@ -6,6 +6,9 @@
  */
 import type { FeeStructure } from './feeStructure';
 
+/**
+ * Transaction-fee settings returned with synchronized portfolio data.
+ */
 export interface TransactionFeesResponse {
   feeStructure: FeeStructure;
   /** @nullable */

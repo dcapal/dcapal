@@ -5,7 +5,11 @@
  * OpenAPI spec version: 0.9.0
  */
 
+/**
+ * A price and the timestamp at which it was observed.
+ */
 export interface Price {
   price: number;
+  /** Serialized as Unix seconds in the REST/OpenAPI representation. */
   ts: number;
 }
