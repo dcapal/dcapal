@@ -1,6 +1,6 @@
 import { useGetImportedPortfolio } from "@dcapal/api-client";
 
-export const useFetchImportedPortfolio = (portfolioId) => {
+export const useFetchImportedPortfolio = (portfolioId?: string | null) => {
   const query = useGetImportedPortfolio(portfolioId || "", {
     query: {
       enabled: Boolean(portfolioId),

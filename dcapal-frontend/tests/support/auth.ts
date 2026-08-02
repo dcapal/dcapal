@@ -1,4 +1,26 @@
-export const fixtureSession = (overrides = {}) => ({
+import type { Page } from "@playwright/test";
+
+type FixtureSession = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  expires_at: number;
+  user: {
+    id: string;
+    aud: string;
+    role: string;
+    email: string;
+    user_metadata: { name: string };
+  };
+  [key: string]: unknown;
+};
+
+type SessionOverrides = Partial<FixtureSession>;
+
+export const fixtureSession = (
+  overrides: SessionOverrides = {}
+): FixtureSession => ({
   access_token: "fixture-token.fixture-session.signature",
   refresh_token: "fixture-refresh-token",
   token_type: "bearer",
@@ -14,7 +36,10 @@ export const fixtureSession = (overrides = {}) => ({
   ...overrides,
 });
 
-export const seedAuthenticatedSession = async (page, overrides = {}) => {
+export const seedAuthenticatedSession = async (
+  page: Page,
+  overrides: SessionOverrides = {}
+): Promise<void> => {
   const session = fixtureSession(overrides);
   await page.addInitScript((value) => {
     const serialized = JSON.stringify(value);

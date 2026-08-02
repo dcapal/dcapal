@@ -1,9 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import v8ToIstanbul from "v8-to-istanbul";
+import type { Page, TestInfo } from "@playwright/test";
 
-const normalizeSourcePath = (sourcePath) => {
-  let normalized = decodeURIComponent(String(sourcePath)).replaceAll("\\", "/");
+type BrowserCoverageEntries = Awaited<
+  ReturnType<Page["coverage"]["stopJSCoverage"]>
+>;
+
+const normalizeSourcePath = (sourcePath: string): string => {
+  let normalized = decodeURIComponent(String(sourcePath)).replace(/\\/g, "/");
   const srcMarker = normalized.lastIndexOf("/src/");
 
   if (srcMarker >= 0) {
@@ -20,13 +25,16 @@ const normalizeSourcePath = (sourcePath) => {
   return normalized;
 };
 
-export const writeBrowserCoverage = async (entries, testInfo) => {
+export const writeBrowserCoverage = async (
+  entries: BrowserCoverageEntries,
+  testInfo: TestInfo
+): Promise<void> => {
   const repoRoot = path.resolve(testInfo.config.rootDir, "../..");
   const coverageDir = path.resolve(
     testInfo.config.rootDir,
     "../coverage/playwright"
   );
-  const fragment = {};
+  const fragment: Record<string, any> = {};
 
   for (const entry of entries) {
     if (!entry.url?.includes("127.0.0.1:3000") || !entry.source) continue;
@@ -57,7 +65,7 @@ export const writeBrowserCoverage = async (entries, testInfo) => {
     testInfo.retry,
   ]
     .join("-")
-    .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
 
   await writeFile(
     path.join(coverageDir, `${fileName}.json`),

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { QueryFunctionContext } from "@tanstack/react-query";
 import {
   getAssetsChart,
   getGetPriceQueryKey,
@@ -17,7 +18,27 @@ export const FetchError = Object.freeze({
   REQUEST_CANCELED: "REQUEST_CANCELED",
 });
 
-const toUnixTimestamp = (date, startOfDay) => {
+export type Provider = (typeof Provider)[keyof typeof Provider];
+export type FetchError = (typeof FetchError)[keyof typeof FetchError];
+
+type PriceRequest = {
+  symbol: string;
+  quote: string;
+  signal?: AbortSignal;
+};
+
+type YahooPriceRequest = PriceRequest & {
+  validCcys: string[];
+};
+
+type YahooPrice = {
+  price: number;
+  baseCcy: string;
+};
+
+type PriceQueryContext = Pick<QueryFunctionContext, "signal">;
+
+const toUnixTimestamp = (date: Date, startOfDay: boolean) => {
   const value = new Date(date.getTime());
   if (startOfDay) value.setUTCHours(0, 0, 0, 0);
   return Math.floor(value.getTime() / 1000);
@@ -32,15 +53,24 @@ const getLastFourDays = () => {
   };
 };
 
-const isValidClosePrice = (value) =>
+const isValidClosePrice = (value: number | null): value is number =>
   typeof value === "number" && Number.isFinite(value) && value !== 0;
 
-export const fetchDcaPalPrice = async ({ symbol, quote, signal }) => {
+export const fetchDcaPalPrice = async ({
+  symbol,
+  quote,
+  signal,
+}: PriceRequest): Promise<number> => {
   const response = await getPrice(symbol, { quote }, { signal });
   return response.data.price;
 };
 
-export const fetchYahooPrice = async ({ symbol, quote, validCcys, signal }) => {
+export const fetchYahooPrice = async ({
+  symbol,
+  quote,
+  validCcys,
+  signal,
+}: YahooPriceRequest): Promise<YahooPrice> => {
   const response = await getAssetsChart(symbol, getLastFourDays(), { signal });
   const chart = response.data.chart;
   const result = chart?.result?.[0];
@@ -71,18 +101,21 @@ export const fetchYahooPrice = async ({ symbol, quote, validCcys, signal }) => {
   };
 };
 
-export const getYahooPriceQueryKey = (symbol, quote, validCcys) => [
-  "price-provider",
-  Provider.YF,
+export const getYahooPriceQueryKey = (
+  symbol: string,
+  quote: string,
+  validCcys: string[]
+) => ["price-provider", Provider.YF, symbol, quote, [...validCcys].sort()];
+
+export const useYahooPrice = ({
   symbol,
   quote,
-  [...validCcys].sort(),
-];
-
-export const useYahooPrice = ({ symbol, quote, validCcys, enabled = true }) =>
-  useQuery({
+  validCcys,
+  enabled = true,
+}: YahooPriceRequest & { enabled?: boolean }) =>
+  useQuery<YahooPrice>({
     queryKey: getYahooPriceQueryKey(symbol, quote, validCcys),
-    queryFn: ({ signal }) =>
+    queryFn: ({ signal }: PriceQueryContext) =>
       fetchYahooPrice({ symbol, quote, validCcys, signal }),
     enabled:
       enabled &&
@@ -93,27 +126,32 @@ export const useYahooPrice = ({ symbol, quote, validCcys, enabled = true }) =>
     staleTime: PRICE_STALE_TIME,
   });
 
-export const getDcaPalPrice = (symbol, quote) =>
+export const getDcaPalPrice = (symbol: string, quote: string) =>
   queryClient.fetchQuery({
     queryKey: getGetPriceQueryKey(symbol, { quote }),
-    queryFn: ({ signal }) => fetchDcaPalPrice({ symbol, quote, signal }),
+    queryFn: ({ signal }: PriceQueryContext) =>
+      fetchDcaPalPrice({ symbol, quote, signal }),
     staleTime: PRICE_STALE_TIME,
   });
 
-export const getYahooPrice = (symbol, quote, validCcys) =>
+export const getYahooPrice = (
+  symbol: string,
+  quote: string,
+  validCcys: string[]
+) =>
   queryClient.fetchQuery({
     queryKey: getYahooPriceQueryKey(symbol, quote, validCcys),
-    queryFn: ({ signal }) =>
+    queryFn: ({ signal }: PriceQueryContext) =>
       fetchYahooPrice({ symbol, quote, validCcys, signal }),
     staleTime: PRICE_STALE_TIME,
   });
 
 export const getPriceForProvider = async (
-  provider,
-  validCcys,
-  symbol,
-  quote
-) => {
+  provider: Provider,
+  validCcys: string[],
+  symbol: string,
+  quote: string
+): Promise<number | null> => {
   try {
     if (provider === Provider.DCA_PAL) {
       return await getDcaPalPrice(symbol, quote);
@@ -121,8 +159,10 @@ export const getPriceForProvider = async (
 
     const result = await getYahooPrice(symbol, quote, validCcys);
     return result.price;
-  } catch (error) {
-    if (error?.message === FetchError.BAD_DATA) return null;
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === FetchError.BAD_DATA) {
+      return null;
+    }
     console.error(error);
     return null;
   }

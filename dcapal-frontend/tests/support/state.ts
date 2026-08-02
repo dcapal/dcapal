@@ -1,6 +1,51 @@
-const clone = (value) => JSON.parse(JSON.stringify(value));
+import type { Page } from "@playwright/test";
 
-export const makeAsset = (overrides = {}) => ({
+export type AssetFixture = {
+  idx: number;
+  symbol: string;
+  name: string;
+  aclass: number;
+  baseCcy: string;
+  price: number;
+  provider: string;
+  qty: number;
+  amount: number;
+  weight: number;
+  targetWeight: number;
+  averageBuyPrice: number;
+  fees: null | Record<string, unknown>;
+};
+
+export type PortfolioFixture = {
+  id: string;
+  name: string;
+  assets: Record<string, AssetFixture>;
+  quoteCcy: string;
+  nextIdx: number;
+  totalAmount: number;
+  budget: number;
+  fees: Record<string, unknown>;
+  lastPriceRefresh: number;
+  lastUpdatedAt: number | string;
+};
+
+type AssetOverrides = Partial<AssetFixture>;
+type PortfolioOverrides = Partial<PortfolioFixture> & {
+  assets?: Record<string, AssetFixture>;
+};
+
+type PersistedStateOptions = {
+  portfolios?: Record<string, PortfolioFixture>;
+  selected?: string | null;
+  step?: number;
+  currencies?: string[];
+  preferredCurrency?: string;
+  pfolioFile?: string;
+};
+
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+export const makeAsset = (overrides: AssetOverrides = {}): AssetFixture => ({
   idx: 0,
   symbol: "VWCE.MI",
   name: "Vanguard FTSE All-World UCITS ETF",
@@ -17,7 +62,9 @@ export const makeAsset = (overrides = {}) => ({
   ...overrides,
 });
 
-export const makePortfolio = (overrides = {}) => {
+export const makePortfolio = (
+  overrides: PortfolioOverrides = {}
+): PortfolioFixture => {
   const assets = overrides.assets || {
     "VWCE.MI": makeAsset(),
   };
@@ -51,7 +98,7 @@ export const persistedRoot = ({
   currencies = ["usd", "eur", "gbp", "chf"],
   preferredCurrency = "",
   pfolioFile = "",
-} = {}) => ({
+}: PersistedStateOptions = {}) => ({
   app: JSON.stringify({
     allocationFlowStep: step,
     currencies,
@@ -66,7 +113,10 @@ export const persistedRoot = ({
   _persist: JSON.stringify({ version: 6, rehydrated: true }),
 });
 
-export const seedPersistedState = async (page, options = {}) => {
+export const seedPersistedState = async (
+  page: Page,
+  options: PersistedStateOptions = {}
+): Promise<void> => {
   const root = persistedRoot(options);
   await page.addInitScript((value) => {
     if (!window.localStorage.getItem("persist:root")) {
@@ -75,7 +125,10 @@ export const seedPersistedState = async (page, options = {}) => {
   }, root);
 };
 
-export const portfolioState = (portfolio, options = {}) => {
+export const portfolioState = (
+  portfolio: PortfolioFixture,
+  options: Partial<PersistedStateOptions> = {}
+) => {
   const copy = clone(portfolio);
   return {
     portfolios: { [copy.id]: copy },
@@ -84,7 +137,10 @@ export const portfolioState = (portfolio, options = {}) => {
   };
 };
 
-export const createPortfolioFixtures = () => ({
+export const createPortfolioFixtures = (): Record<
+  "positive" | "negative" | "zero",
+  PortfolioFixture
+> => ({
   positive: makePortfolio({
     id: "portfolio-positive",
     name: "Positive gain",

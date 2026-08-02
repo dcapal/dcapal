@@ -1,7 +1,8 @@
 import { expect, test } from "../support/fixtures";
+import type { Page } from "@playwright/test";
 import { makePortfolio, seedPersistedState } from "../support/state";
 
-const seedList = async (page) => {
+const seedList = async (page: Page): Promise<void> => {
   const portfolio = makePortfolio({
     id: "managed-portfolio",
     name: "Managed portfolio",

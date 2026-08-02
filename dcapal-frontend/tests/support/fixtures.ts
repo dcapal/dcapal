@@ -1,12 +1,19 @@
 import { test as base } from "@playwright/test";
+import type { TestInfo } from "@playwright/test";
 
 import { writeBrowserCoverage } from "./coverage";
 
-export const test = base.extend({
+type TestFixtures = {
+  scenario: string;
+  scenarioHeader: void;
+  browserCoverage: void;
+};
+
+export const test = base.extend<TestFixtures>({
   scenario: ["default", { option: true }],
 
   scenarioHeader: [
-    async ({ page, scenario }, use, testInfo) => {
+    async ({ page, scenario }, use, testInfo: TestInfo) => {
       await page.setExtraHTTPHeaders({
         "x-e2e-scenario": `${scenario}:${testInfo.testId}`,
       });

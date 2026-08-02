@@ -1,7 +1,8 @@
 import { expect, test } from "../support/fixtures";
+import type { Page, Request } from "@playwright/test";
 import { scenarios } from "../support/scenarios";
 
-const openEditor = async (page, currency = "usd") => {
+const openEditor = async (page: Page, currency = "usd"): Promise<void> => {
   await page.goto("/");
   await page.getByTestId("importStep.allocateYourSavings").first().click();
   const form = page.getByTestId("new-portfolio-form");
@@ -49,8 +50,8 @@ test.describe("normal asset search", () => {
      * THEN the search stays closed and no result is presented
      */
     await openEditor(page);
-    const assetRequests = [];
-    page.on("request", (request) => {
+    const assetRequests: Request[] = [];
+    page.on("request", (request: Request) => {
       if (request.url().includes("/api/assets/")) assetRequests.push(request);
     });
     await page.getByTestId("portfolio-search").fill("v");
@@ -74,7 +75,7 @@ test.describe("normal asset search", () => {
     );
     await expect(result).toContainText("93.15");
     await expect(result).toContainText("eur");
-    await result.click();
+    await result.getByText("VWCE.MI", { exact: true }).click();
     await expect(
       page.locator('[data-testid="asset-card"][data-symbol="VWCE.MI"]')
     ).toContainText("93.15");

@@ -1,7 +1,8 @@
 import { expect, test } from "../support/fixtures";
+import type { Locator, Page } from "@playwright/test";
 import { makePortfolio, seedPersistedState } from "../support/state";
 
-const openFeePreferences = async (page) => {
+const openFeePreferences = async (page: Page): Promise<Locator> => {
   const portfolio = makePortfolio({
     id: "fees-portfolio",
     name: "Fees portfolio",

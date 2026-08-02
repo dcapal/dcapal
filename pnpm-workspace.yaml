@@ -24,6 +24,8 @@ catalog:
   "@supabase/auth-ui-shared": ^0.1.8
   "@supabase/supabase-js": ^2.49.4
   "@tanstack/react-query": ^5.90.21
+  "@types/react": ^18.3.23
+  "@types/react-dom": ^18.3.7
   "@types/node": ^20.17.30
   "autoprefixer": ^10.4.21
   "babel-loader": ^9.2.1

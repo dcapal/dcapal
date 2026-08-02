@@ -1,9 +1,27 @@
 import { expect, test } from "./support/fixtures";
+import type { Page, Request } from "@playwright/test";
 import { seedAuthenticatedSession } from "./support/auth";
 import { scenarios } from "./support/scenarios";
-import { makePortfolio, seedPersistedState } from "./support/state";
+import {
+  makePortfolio,
+  type PortfolioFixture,
+  seedPersistedState,
+} from "./support/state";
 
-const seedSyncPortfolio = async (page, { authenticated = true, name } = {}) => {
+type SyncSeedOptions = {
+  authenticated?: boolean;
+  name?: string;
+};
+
+type SyncSeedResult = {
+  portfolio: PortfolioFixture;
+  syncRequests: Request[];
+};
+
+const seedSyncPortfolio = async (
+  page: Page,
+  { authenticated = true, name }: SyncSeedOptions = {}
+): Promise<SyncSeedResult> => {
   const portfolio = makePortfolio({
     id: "sync-portfolio",
     name: name || "Sync portfolio",
@@ -16,8 +34,8 @@ const seedSyncPortfolio = async (page, { authenticated = true, name } = {}) => {
   });
   if (authenticated) await seedAuthenticatedSession(page);
 
-  const syncRequests = [];
-  page.on("request", (request) => {
+  const syncRequests: Request[] = [];
+  page.on("request", (request: Request) => {
     if (request.url().includes("/api/v1/sync/portfolios")) {
       syncRequests.push(request);
     }
@@ -26,7 +44,10 @@ const seedSyncPortfolio = async (page, { authenticated = true, name } = {}) => {
   return { portfolio, syncRequests };
 };
 
-const waitForSyncCount = async (requests, count) => {
+const waitForSyncCount = async (
+  requests: Request[],
+  count: number
+): Promise<void> => {
   await expect.poll(() => requests.length).toBeGreaterThanOrEqual(count);
 };
 
@@ -61,7 +82,7 @@ test.describe("authenticated synchronization", () => {
        */
       const { syncRequests } = await seedSyncPortfolio(page);
       await waitForSyncCount(syncRequests, 1);
-      const initialPayload = JSON.parse(syncRequests[0].postData());
+      const initialPayload = JSON.parse(syncRequests[0].postData() || "{}");
       expect(initialPayload.portfolios[0].assets[0].price).toBe("100");
       await syncRequests[0].response();
       await page.waitForTimeout(100);
@@ -162,8 +183,8 @@ test.describe("refresh failure", () => {
      * WHEN Supabase rejects the refresh token
      * THEN the expired session is cleared and the application remains rendered
      */
-    const requests = [];
-    page.on("request", (request) => requests.push(request));
+    const requests: Request[] = [];
+    page.on("request", (request: Request) => requests.push(request));
     await seedSyncPortfolio(page);
     await expect(page.getByTestId("route-allocate")).toBeVisible();
     await expect
@@ -187,8 +208,8 @@ test.describe("second unauthorized response", () => {
      * WHEN the retried request is rejected again
      * THEN the auth failure callback signs the session out
      */
-    const requests = [];
-    page.on("request", (request) => requests.push(request));
+    const requests: Request[] = [];
+    page.on("request", (request: Request) => requests.push(request));
     await seedSyncPortfolio(page);
     await expect
       .poll(

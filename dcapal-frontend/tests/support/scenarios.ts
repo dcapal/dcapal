@@ -18,4 +18,6 @@ export const scenarios = Object.freeze({
   syncRefreshFailure: "sync-refresh-failure",
   syncSecond401: "sync-second-401",
   syncSignoutFailure: "sync-signout-failure",
-});
+} as const);
+
+export type Scenario = (typeof scenarios)[keyof typeof scenarios];

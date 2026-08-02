@@ -11,29 +11,40 @@ import priceConversions from "./fixtures/price-conversions.json";
 
 const IMPORT_PORTFOLIO_ID = "fixture-import-portfolio";
 const FIXED_TS_SECONDS = 1735689600;
-const syncStores = new Map();
-const syncRequestCounts = new Map();
-
-const getScenarioName = (request) =>
-  request.headers.get("x-e2e-scenario") || "default";
-
-const getScenario = (request) => getScenarioName(request).split(":")[0];
-
-const getSyncStore = (scenarioName) => {
-  if (!syncStores.has(scenarioName)) syncStores.set(scenarioName, new Map());
-  return syncStores.get(scenarioName);
+type FixtureRecord = Record<string, any>;
+type SyncPortfolio = FixtureRecord & {
+  id?: string;
+  lastUpdatedAt?: string;
+};
+type SyncRequestBody = {
+  portfolios?: SyncPortfolio[];
+  deletedPortfolios?: string[];
 };
 
-const getSyncRequestCount = (scenarioName) => {
+const syncStores = new Map<string, Map<string, SyncPortfolio>>();
+const syncRequestCounts = new Map<string, number>();
+
+const getScenarioName = (request: Request): string =>
+  request.headers.get("x-e2e-scenario") || "default";
+
+const getScenario = (request: Request): string =>
+  getScenarioName(request).split(":")[0];
+
+const getSyncStore = (scenarioName: string): Map<string, SyncPortfolio> => {
+  if (!syncStores.has(scenarioName)) syncStores.set(scenarioName, new Map());
+  return syncStores.get(scenarioName) as Map<string, SyncPortfolio>;
+};
+
+const getSyncRequestCount = (scenarioName: string): number => {
   const count = (syncRequestCounts.get(scenarioName) || 0) + 1;
   syncRequestCounts.set(scenarioName, count);
   return count;
 };
 
-const errorResponse = (message, status = 500) =>
+const errorResponse = (message: string, status = 500) =>
   HttpResponse.json({ message }, { status });
 
-const getSearchQuotes = (scenario) => {
+const getSearchQuotes = (scenario: string): FixtureRecord[] => {
   if (scenario === "search-empty") return [];
 
   if (scenario === "search-yahoo-bad-price") {
@@ -72,18 +83,20 @@ const getSearchQuotes = (scenario) => {
     ];
   }
 
-  return assetsSearch.quotes;
+  return assetsSearch.quotes as FixtureRecord[];
 };
 
-const getChart = (scenario, symbol) => {
+const getChart = (scenario: string, symbol: string): FixtureRecord => {
   if (scenario === "search-yahoo-bad-price") {
     return {
-      ...assetsChart,
+      ...(assetsChart as unknown as FixtureRecord),
       chart: {
-        ...assetsChart.chart,
+        ...((assetsChart as unknown as FixtureRecord).chart as FixtureRecord),
         result: [
           {
-            ...assetsChart.chart.result[0],
+            ...(
+              (assetsChart as unknown as FixtureRecord).chart as FixtureRecord
+            ).result[0],
             meta: { currency: "USD" },
             indicators: { quote: [{ close: [0, null] }] },
           },
@@ -94,12 +107,14 @@ const getChart = (scenario, symbol) => {
 
   if (scenario === "search-yahoo-quote-currency" && symbol === "EUR.YF") {
     return {
-      ...assetsChart,
+      ...(assetsChart as unknown as FixtureRecord),
       chart: {
-        ...assetsChart.chart,
+        ...((assetsChart as unknown as FixtureRecord).chart as FixtureRecord),
         result: [
           {
-            ...assetsChart.chart.result[0],
+            ...(
+              (assetsChart as unknown as FixtureRecord).chart as FixtureRecord
+            ).result[0],
             meta: { currency: "EUR" },
             indicators: { quote: [{ close: [12.34] }] },
           },
@@ -110,12 +125,14 @@ const getChart = (scenario, symbol) => {
 
   if (scenario === "search-yahoo-unsupported-currency" && symbol === "JPY.YF") {
     return {
-      ...assetsChart,
+      ...(assetsChart as unknown as FixtureRecord),
       chart: {
-        ...assetsChart.chart,
+        ...((assetsChart as unknown as FixtureRecord).chart as FixtureRecord),
         result: [
           {
-            ...assetsChart.chart.result[0],
+            ...(
+              (assetsChart as unknown as FixtureRecord).chart as FixtureRecord
+            ).result[0],
             meta: { currency: "JPY" },
             indicators: { quote: [{ close: [10.5] }] },
           },
@@ -124,10 +141,10 @@ const getChart = (scenario, symbol) => {
     };
   }
 
-  return assetsChart;
+  return assetsChart as FixtureRecord;
 };
 
-const getImportedPortfolio = (scenario) => {
+const getImportedPortfolio = (scenario: string): FixtureRecord => {
   if (scenario !== "import-unresolved-price") return importPortfolio;
 
   return {
@@ -148,13 +165,14 @@ const getImportedPortfolio = (scenario) => {
   };
 };
 
-const getConversionPrice = (base, quote) => {
-  const baseRates = priceConversions[String(base).toLowerCase()] || {};
-  return baseRates[String(quote).toLowerCase()] || 1;
+const getConversionPrice = (base: string, quote: string): number => {
+  const rates = priceConversions as Record<string, Record<string, number>>;
+  const baseRates = rates[base.toLowerCase()] || {};
+  return baseRates[quote.toLowerCase()] || 1;
 };
 
-const toMillis = (isoTs) => {
-  const ts = Date.parse(isoTs);
+const toMillis = (isoTs: string | undefined): number => {
+  const ts = Date.parse(isoTs || "");
   return Number.isNaN(ts) ? -1 : ts;
 };
 
@@ -263,7 +281,7 @@ export const handlers = [
       return errorResponse("Expired bearer token", 401);
     }
 
-    const req = await request.json();
+    const req = (await request.json()) as SyncRequestBody;
     const clientPortfolios = Array.isArray(req.portfolios)
       ? req.portfolios
       : [];

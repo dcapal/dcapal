@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { ChangeEvent } from "react";
 import Fuse from "fuse.js";
+import type { IFuseOptions } from "fuse.js";
 import { useSelector } from "react-redux";
 import {
   useGetAssetsData,
@@ -18,7 +20,67 @@ import {
   SESSION_STALE_TIME,
 } from "@/api/queryClient";
 
-const useDebouncedValue = (value, delayMs) => {
+type SearchState = {
+  app: {
+    currencies: string[];
+  };
+  pfolio: {
+    selected: string | null;
+    pfolios: Record<string, unknown>;
+  };
+};
+
+type SearchAsset = {
+  symbol: string;
+  name: string;
+  aclass: number;
+  type?: string;
+  exchange?: string;
+};
+
+type AssetToAdd = SearchAsset & {
+  price: number;
+  baseCcy?: string;
+  provider: Provider;
+};
+
+type SearchBarProps = {
+  text: string;
+  setText: (text: string) => void;
+  addAsset: (asset: AssetToAdd) => void;
+};
+
+type SearchResults = {
+  fiat: SearchAsset[];
+  crypto: SearchAsset[];
+  yf: SearchAsset[];
+};
+
+type SearchItemProps = {
+  data: SearchAsset;
+  setText: (text: string) => void;
+  addAsset: (asset: AssetToAdd) => void;
+  closeSearchList: () => void;
+};
+
+type SearchItemYfProps = SearchItemProps & {
+  removeAsset: (symbol: string) => void;
+};
+
+type DcaPalAsset = {
+  id: string;
+  symbol: string;
+};
+
+type YahooSearchQuote = {
+  longname?: string | null;
+  shortname?: string | null;
+  symbol?: string | null;
+  quoteType?: string | null;
+  exchange?: string | null;
+};
+
+const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
@@ -29,19 +91,19 @@ const useDebouncedValue = (value, delayMs) => {
   return debouncedValue;
 };
 
-const searchOptions = {
+const searchOptions: IFuseOptions<SearchAsset> = {
   shouldSort: true,
   threshold: 0.1,
   keys: ["symbol", "name"],
 };
 
-const toDcaPalAsset = (asset, aclass) => ({
+const toDcaPalAsset = (asset: DcaPalAsset, aclass: number): SearchAsset => ({
   symbol: asset.id,
   name: asset.symbol,
   aclass,
 });
 
-const toYahooAsset = (quote) => ({
+const toYahooAsset = (quote: YahooSearchQuote): SearchAsset => ({
   name: quote.longname || quote.shortname || "",
   symbol: quote.symbol || "",
   type: quote.quoteType || "",
@@ -49,7 +111,7 @@ const toYahooAsset = (quote) => ({
   aclass: 10,
 });
 
-export const SearchBar = (props) => {
+export const SearchBar = (props: SearchBarProps) => {
   const { t } = useTranslation();
   const debouncedText = useDebouncedValue(props.text, 300);
   const isSearchEnabled = debouncedText.trim().length >= 2;
@@ -87,7 +149,7 @@ export const SearchBar = (props) => {
   const results = useMemo(() => {
     if (!isSearchEnabled) return null;
 
-    const fuse = (assets) =>
+    const fuse = (assets: SearchAsset[]) =>
       new Fuse(assets, searchOptions)
         .search(debouncedText)
         .map((result) => result.item)
@@ -123,7 +185,7 @@ export const SearchBar = (props) => {
     yahooQuery.data,
   ]);
 
-  const removeAssetYf = useCallback((symbol) => {
+  const removeAssetYf = useCallback((symbol: string) => {
     setInvalidYahooSymbols((current) => {
       const next = new Set(current);
       next.add(symbol);
@@ -131,22 +193,23 @@ export const SearchBar = (props) => {
     });
   }, []);
 
-  const visibleYahooAssets = results?.yf.filter(
-    (asset) => !invalidYahooSymbols.has(asset.symbol)
-  );
+  const visibleYahooAssets = results
+    ? results.yf.filter((asset) => !invalidYahooSymbols.has(asset.symbol))
+    : [];
   const isLoading =
     isSearchEnabled &&
     [fiatQuery, cryptoQuery, yahooQuery].some(
       (query) => query.isPending || query.isFetching
     );
-  const isEmptyResult =
+  const isEmptyResult = Boolean(
     results &&
     !isLoading &&
     results.fiat.length === 0 &&
     results.crypto.length === 0 &&
-    visibleYahooAssets.length === 0;
+    visibleYahooAssets.length === 0
+  );
 
-  const handleAddAssetInputChange = (event) => {
+  const handleAddAssetInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     setIsSearchOpen(event.target.value.length > 0);
     props.setText(event.target.value);
   };
@@ -163,18 +226,18 @@ export const SearchBar = (props) => {
       {isSearchOpen && isLoading && (
         <div
           data-testid="search-loading"
-          className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic"
+          className="w-[calc(100%-2rem)] px-6 py-3 overflow-auto absolute inset-x-4 top-[3rem] bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic"
         >
           <Spinner width="2.5rem" height="2.5rem" />
         </div>
       )}
       {isSearchOpen && results && isEmptyResult && (
-        <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
+        <div className="w-[calc(100%-2rem)] px-6 py-4 overflow-auto absolute inset-x-4 top-[3rem] bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40 flex items-center justify-center font-light italic">
           {t("searchBar.noAssetFoundFor")} '{props.text.toUpperCase()}'
         </div>
       )}
       {isSearchOpen && results && !isEmptyResult && (
-        <ul className="w-[calc(100%-2rem)] max-h-72 min-h-[10rem] overflow-auto absolute inset-x-4 top-12 bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40">
+        <ul className="w-[calc(100%-2rem)] max-h-72 min-h-[10rem] overflow-auto absolute inset-x-4 top-[3rem] bg-white rounded-sm ring-1 ring-slate-500/50 shadow-lg z-40">
           {results.fiat.length > 0 && <SearchHeader text="cash" />}
           {results.fiat.map((result) => (
             <SearchItemCW
@@ -212,16 +275,21 @@ export const SearchBar = (props) => {
   );
 };
 
-const SearchHeader = ({ text }) => (
+const SearchHeader = ({ text }: { text: string }) => (
   <div className="sticky top-0 pl-2 pt-1 pb-1 bg-slate-200 text-xs font-semibold">
     <div className="uppercase">{text}</div>
   </div>
 );
 
-const SearchItemCW = ({ data, setText, addAsset, closeSearchList }) => {
+const SearchItemCW = ({
+  data,
+  setText,
+  addAsset,
+  closeSearchList,
+}: SearchItemProps) => {
   const { i18n, t } = useTranslation();
   const quoteCcy = useSelector(
-    (state) => currentPortfolio(state)?.quoteCcy || ""
+    (state) => currentPortfolio(state as SearchState)?.quoteCcy || ""
   );
   const priceQuery = useGetPrice(
     data.symbol,
@@ -297,11 +365,13 @@ const SearchItemYF = ({
   addAsset,
   removeAsset,
   closeSearchList,
-}) => {
+}: SearchItemYfProps) => {
   const quoteCcy = useSelector(
-    (state) => currentPortfolio(state)?.quoteCcy || ""
+    (state) => currentPortfolio(state as SearchState)?.quoteCcy || ""
   );
-  const validCcys = useSelector((state) => state.app.currencies);
+  const validCcys = useSelector(
+    (state) => (state as SearchState).app.currencies
+  );
   const { t, i18n } = useTranslation();
   const priceQuery = useYahooPrice({
     symbol: data.symbol,

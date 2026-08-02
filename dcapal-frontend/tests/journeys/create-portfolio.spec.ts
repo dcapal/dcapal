@@ -1,6 +1,10 @@
 import { expect, test } from "../support/fixtures";
+import type { Page } from "@playwright/test";
 
-const startNewPortfolio = async (page, currency = "eur") => {
+const startNewPortfolio = async (
+  page: Page,
+  currency = "eur"
+): Promise<void> => {
   await page.goto("/");
   await page.getByTestId("importStep.allocateYourSavings").first().click();
 
