@@ -1,21 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDispatch, useSelector } from "react-redux";
-import { useAppStore } from "@/state/appStore";
+import { Step, useAppStore } from "@/state/appStore";
+import { getNewPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 import { PortfolioCard } from "./portfolioCard";
 import { useNavigate } from "react-router-dom";
 import { InputText } from "@components/core/inputText";
 import { CcyGroup } from "@components/allocationFlow/steps/ccy/ccyGroup";
-import {
-  Step,
-  setAllocationFlowStep,
-  setPreferredCurrency,
-} from "@app/appSlice";
-import {
-  addPortfolio,
-  getNewPortfolio,
-  selectPortfolio,
-} from "@components/allocationFlow/portfolioSlice";
 import classNames from "classnames";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@app/config";
@@ -23,7 +13,7 @@ import { supabase } from "@app/config";
 /** Lists saved portfolios and exposes the new-portfolio flow. */
 export const PortfoliosStep = () => {
   const { t } = useTranslation();
-  const pfolios = useSelector((state) => state.pfolio.pfolios);
+  const pfolios = usePortfolioStore((state) => state.pfolios);
   const [showNewPfolio, setShowNewPfolio] = useState(
     Object.keys(pfolios).length === 0
   );
@@ -111,13 +101,20 @@ const sortCcy = (a, b) => {
 };
 
 const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const addPortfolio = usePortfolioStore((state) => state.addPortfolio);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
   const [name, setName] = useState("");
 
   const ccys = useAppStore((state) => state.currencies);
   const preferredCcy = useAppStore((state) => state.preferredCurrency);
+  const setPreferredCurrency = useAppStore(
+    (state) => state.setPreferredCurrency
+  );
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const sortedCcys = [...ccys].sort(sortCcy);
 
   const [selectedCcy, setSelectedCcy] = useState(
@@ -139,10 +136,10 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
     pfolio.name = name;
     pfolio.quoteCcy = selectedCcy;
 
-    dispatch(addPortfolio({ pfolio: pfolio }));
-    dispatch(selectPortfolio({ id: pfolio.id }));
-    dispatch(setPreferredCurrency({ ccy: selectedCcy }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    addPortfolio({ pfolio: pfolio });
+    selectPortfolio({ id: pfolio.id });
+    setPreferredCurrency({ ccy: selectedCcy });
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const onClickGoBack = () => {

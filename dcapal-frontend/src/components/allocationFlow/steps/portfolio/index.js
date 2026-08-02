@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
-import { useAppStore } from "@/state/appStore";
+import { Step, useAppStore } from "@/state/appStore";
+import { useCurrentPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 
 import toast from "react-hot-toast";
 
@@ -10,19 +10,6 @@ import { PDFDownloadLink } from "@react-pdf/renderer";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 import { PortfolioSummaryDocument } from "./documentSummary";
-
-import {
-  addAsset,
-  currentPortfolio,
-  selectPortfolio,
-  setAverageBuyPrice,
-  setPrice,
-  setQty,
-  setRefreshTime,
-  setTargetWeight,
-} from "@components/allocationFlow/portfolioSlice";
-
-import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 
@@ -37,11 +24,18 @@ import { ResponsiveHelpIcon } from "@components/core/helpIcon";
 
 // Prices are refreshed on the existing five-minute boundary so a portfolio
 // does not silently change while the user is editing it.
-const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
+const refreshAssetPrices = async (
+  assets,
+  quoteCcy,
+  validCcys,
+  setPrice,
+  setRefreshTime,
+  t
+) => {
   console.debug("Refreshing prices (", new Date(), ")");
 
   if (Object.keys(assets).length < 1) {
-    dispatch(setRefreshTime({ time: Date.now() }));
+    setRefreshTime({ time: Date.now() });
     return;
   }
 
@@ -66,11 +60,11 @@ const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
       );
       return;
     }
-    dispatch(setPrice({ symbol, price }));
+    setPrice({ symbol, price });
   });
 
   toast.success(t("common.refreshedPrices"));
-  dispatch(setRefreshTime({ time: Date.now() }));
+  setRefreshTime({ time: Date.now() });
 };
 
 const computePortfolioGain = (assets) => {
@@ -95,16 +89,26 @@ export const PortfolioStep = () => {
   const [searchText, setSearchText] = useState("");
 
   const { t, i18n } = useTranslation();
-  const pfolioName = useSelector((state) => currentPortfolio(state).name);
-  const assetStore = useSelector((state) => currentPortfolio(state).assets);
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
+  const pfolio = useCurrentPortfolio();
+  const pfolioName = pfolio?.name || "";
+  const assetStore = pfolio?.assets || {};
+  const quoteCcy = pfolio?.quoteCcy || "";
   const validCcys = useAppStore((state) => state.currencies);
-  const lastRefreshTime = useSelector(
-    (state) => currentPortfolio(state).lastPriceRefresh
-  );
+  const lastRefreshTime = pfolio?.lastPriceRefresh || 0;
 
   const isMobile = !useMediaQuery(MEDIA_SMALL);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const addAsset = usePortfolioStore((state) => state.addAsset);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
+  const setPrice = usePortfolioStore((state) => state.setPrice);
+  const setQty = usePortfolioStore((state) => state.setQty);
+  const setRefreshTime = usePortfolioStore((state) => state.setRefreshTime);
+  const setAverageBuyPrice = usePortfolioStore(
+    (state) => state.setAverageBuyPrice
+  );
+  const setTargetWeight = usePortfolioStore((state) => state.setTargetWeight);
 
   useEffect(() => {
     let timeout = null;
@@ -116,12 +120,26 @@ export const PortfolioStep = () => {
       );
 
       if (now > nextRefresh) {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
+        await refreshAssetPrices(
+          assetStore,
+          quoteCcy,
+          validCcys,
+          setPrice,
+          setRefreshTime,
+          t
+        );
         return;
       }
 
       timeout = setTimeout(async () => {
-        await refreshAssetPrices(assetStore, quoteCcy, validCcys, dispatch, t);
+        await refreshAssetPrices(
+          assetStore,
+          quoteCcy,
+          validCcys,
+          setPrice,
+          setRefreshTime,
+          t
+        );
       }, nextRefresh - now);
     };
 
@@ -149,26 +167,24 @@ export const PortfolioStep = () => {
   const hasAssetsWithQty = assets.some((a) => a.qty > 0);
 
   const addAssetToPortfolio = (asset) => {
-    dispatch(
-      addAsset({
-        symbol: asset.symbol,
-        name: asset.name,
-        aclass: asset.aclass,
-        price: asset.price,
-        baseCcy: asset.baseCcy,
-        provider: asset.provider,
-      })
-    );
+    addAsset({
+      symbol: asset.symbol,
+      name: asset.name,
+      aclass: asset.aclass,
+      price: asset.price,
+      baseCcy: asset.baseCcy,
+      provider: asset.provider,
+    });
     setSearchText("");
   };
 
   const onClickGoBack = () => {
-    dispatch(selectPortfolio({ id: null }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    selectPortfolio({ id: null });
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
   };
 
   const onClickAddLiquidity = () => {
-    dispatch(setAllocationFlowStep({ step: Step.INVEST }));
+    setAllocationFlowStep({ step: Step.INVEST });
   };
 
   return (
@@ -222,25 +238,21 @@ export const PortfolioStep = () => {
       <div className="w-full flex flex-col items-center">
         {assets.map((a, idx) => {
           const setAssetQty = (qty) => {
-            dispatch(setQty({ symbol: a.symbol, qty: qty }));
+            setQty({ symbol: a.symbol, qty: qty });
           };
 
           const setAssetTargetWeight = (w) => {
-            dispatch(
-              setTargetWeight({
-                symbol: a.symbol,
-                weight: w,
-              })
-            );
+            setTargetWeight({
+              symbol: a.symbol,
+              weight: w,
+            });
           };
 
           const setAssetAverageBuyPrice = (abp) => {
-            dispatch(
-              setAverageBuyPrice({
-                symbol: a.symbol,
-                averageBuyPrice: abp || null,
-              })
-            );
+            setAverageBuyPrice({
+              symbol: a.symbol,
+              averageBuyPrice: abp || null,
+            });
           };
 
           return (

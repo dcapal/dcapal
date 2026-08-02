@@ -2,7 +2,10 @@
 export * from "./gen";
 
 /** Request model used by the typed portfolio synchronization endpoint. */
-export type { SyncPortfoliosRequest } from "./gen/model";
+export type {
+  SyncPortfoliosRequest,
+  SyncPortfoliosResponse,
+} from "./gen/model";
 
 /** Hand-written client configuration and error APIs. */
 export {

@@ -1,13 +1,15 @@
 import React, { useRef } from "react";
-import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
 export const LaunchBtn = () => {
   const inputPfolio = useRef(null);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const setPfolioFile = useAppStore((state) => state.setPfolioFile);
   const navigate = useNavigate();
   const { t } = useTranslation();
   const onClickUpload = () => {
@@ -22,8 +24,8 @@ export const LaunchBtn = () => {
     if (e.target.files && e.target.files.length > 0) {
       const reader = new FileReader();
       reader.onload = function (event) {
-        dispatch(setPfolioFile({ file: event.target.result }));
-        dispatch(setAllocationFlowStep({ step: Step.IMPORT }));
+        setPfolioFile({ file: event.target.result });
+        setAllocationFlowStep({ step: Step.IMPORT });
         navigate("/allocate");
       };
       reader.readAsText(e.target.files[0]);
@@ -31,8 +33,8 @@ export const LaunchBtn = () => {
   };
 
   const onClickStart = () => {
-    dispatch(setPfolioFile({ file: "" }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    setPfolioFile({ file: "" });
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
     navigate("/allocate");
   };
 
