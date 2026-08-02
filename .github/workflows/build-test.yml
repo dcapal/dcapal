@@ -41,12 +41,6 @@ jobs:
           cache-on-failure: false
           rustflags: ""
           components: clippy
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Toolchain info
         run: |
           cargo --version --verbose
@@ -87,12 +81,6 @@ jobs:
           cache-shared-key: rust
           cache-on-failure: false
           rustflags: ""
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Start backend database
         run: make backend-db-up
 
@@ -114,12 +102,6 @@ jobs:
           cache-shared-key: rust
           cache-on-failure: false
           rustflags: ""
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Generate OpenAPI spec
         run: make export-openapi
 
@@ -138,12 +120,6 @@ jobs:
           cache-on-failure: false
           rustflags: ""
           components: clippy, rustfmt
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Toolchain info
         run: |
           cargo --version --verbose
@@ -167,12 +143,6 @@ jobs:
           cache-shared-key: rust
           cache-on-failure: false
           rustflags: ""
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
