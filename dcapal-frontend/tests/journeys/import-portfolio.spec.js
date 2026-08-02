@@ -12,8 +12,15 @@ test.describe("successful portfolio import", () => {
      * WHEN the portfolio and fresh prices finish loading
      * THEN the allocation editor shows the imported decimal data and fee policy
      */
+    const importResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith("/api/import/portfolio/fixture-import-portfolio") &&
+        response.ok()
+    );
     await page.goto("/import?p=fixture-import-portfolio");
-    await expect(page.getByTestId("route-import")).toBeVisible();
+    await importResponse;
     await expect(page.getByTestId("route-allocate")).toBeVisible();
 
     await expect(page.getByTestId("portfolio-editor")).toBeVisible({

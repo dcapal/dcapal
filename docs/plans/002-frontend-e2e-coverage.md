@@ -23,6 +23,8 @@ The demo portfolio route is explicitly out of scope. The optimizer implementatio
 - [x] (2026-08-02) Collected and merged browser V8 coverage with API-client Vitest coverage.
 - [x] (2026-08-02) Added changed-line reporting and the non-blocking GitHub coverage job.
 - [x] (2026-08-02) Ran the complete local verification matrix and inspected every changed in-scope executable line.
+- [x] (2026-08-02) Reviewed the PR feedback and recorded the requirement that new frontend runtime source files use TypeScript.
+- [x] (2026-08-02) Applied the PR feedback by converting the new frontend serializer to TypeScript, hardened both retried E2E journeys, and made the combined CI matrix green locally.
 
 ## Surprises & Discoveries
 
@@ -46,6 +48,14 @@ The demo portfolio route is explicitly out of scope. The optimizer implementatio
   Evidence: the persistence journey reopens the app in a fresh context seeded from the previous storage state, and MSW E2E mode disables Webpack HMR/live reload.
 - Observation: The local default sandbox could not reliably launch repeated Chromium coverage processes after the manual browser smoke check.
   Evidence: the unprivileged attempt produced macOS `MachPortRendezvous` permission failures and `EMFILE` watcher errors; the clean 76-test coverage run passed with elevated process access.
+- Observation: The first CI coverage run passed all 76 browser tests and all 15 API-client tests, then failed while finding `HEAD^` in the shallow PR merge checkout. The fallback Istanbul HTML report also contained CSS source-map filenames with `?` characters, which GitHub artifact upload rejects.
+  Evidence: Actions run `30723868878`, job `91432090385`; the coverage report failed at `git diff --unified=0 HEAD^`, and artifact upload rejected `spinner.css?...html`.
+- Observation: The compatibility job reported two retried tests: successful portfolio import in Chromium and quantity/price/weight editing in WebKit.
+  Evidence: Actions run `30723868878`, job `91432090373`; both passed on retry, but the first assertion observed the transient import route and the second observed the previous weight warning state.
+- Observation: The PR review requires new frontend runtime source files to be TypeScript as the migration continues.
+  Evidence: unresolved review thread `PRRT_kwDOIeNHNM6VpwiF` on `dcapal-frontend/src/api/portfolioSync.js`.
+- Observation: The first local coverage report reused a stale webpack dev server and therefore mapped the serializer to the deleted JavaScript path.
+  Evidence: the existing process on port 3000 served `portfolioSync.js`; after restarting it, fresh V8 fragments mapped the runtime to `portfolioSync.ts`.
 
 ## Decision Log
 
@@ -61,8 +71,8 @@ The demo portfolio route is explicitly out of scope. The optimizer implementatio
 - Decision: Use native Playwright V8 coverage and merge it with Vitest V8 coverage instead of Babel/Istanbul browser instrumentation.
   Rationale: Chromium already exposes the coverage data needed for the agreed coverage job, and native collection leaves normal Webpack bundles unchanged.
   Date/Author: 2026-08-01 / user and Codex.
-- Decision: Run a separate Chromium coverage job with desktop and mobile viewports, while keeping the existing Chromium/Firefox/WebKit compatibility job.
-  Rationale: Coverage is a source-code measurement and does not need three browser engines, but the changed responsive rendering still needs one mobile viewport.
+- Decision: Use one two-lane E2E matrix job: a Chrome lane runs desktop/mobile coverage and the other-browsers lane runs Firefox/WebKit compatibility checks.
+  Rationale: The coverage desktop project is the same Chromium user journey as the compatibility project, so running it once avoids duplicate Chrome work. Firefox and WebKit still run sequentially under the CI worker limit, while the two lanes can run in parallel.
   Date/Author: 2026-08-01 / user and Codex.
 - Decision: Select MSW data with an `x-e2e-scenario` request header set by a Playwright fixture.
   Rationale: Each test can choose a deterministic backend scenario without adding a production test route, exposing a frontend test API, or intercepting requests in Playwright.
@@ -79,13 +89,15 @@ The demo portfolio route is explicitly out of scope. The optimizer implementatio
 
 ## Outcomes & Retrospective
 
-Implemented the plan with 38 user-journey tests. The normal compatibility suite runs those journeys in Chromium, Firefox, and WebKit (114 executions); the coverage suite runs the same 38 tests in desktop and mobile Chromium (76 executions). The demo portfolio scenario remains excluded.
+Implemented the plan with 38 user-journey tests. The two-lane CI matrix runs the journeys in desktop/mobile Chromium for coverage and in Firefox/WebKit for compatibility; the demo portfolio scenario remains excluded.
 
-The API-client transport suite has 15 MSW-backed tests. The combined report includes browser and API-client V8 coverage in `dcapal-frontend/coverage/frontend/`, including HTML, LCOV, JSON, text, and `changed-lines.md`. The final report shows 697/697 changed executable lines covered. It reports global branch/function totals for diagnostics but enforces no global percentage threshold.
+The API-client transport suite has 15 MSW-backed tests. The combined report includes browser and API-client V8 coverage in `coverage/frontend/`, including HTML, LCOV, JSON, text, and `changed-lines.md`. The final report shows 745/745 changed in-scope executable lines covered. It reports global branch/function totals for diagnostics but enforces no global percentage threshold.
 
-GitHub Actions now publishes the combined report as `frontend-coverage-report` and appends the changed-line summary to the job summary. The coverage job is `frontend-e2e-coverage`; the existing three-browser compatibility job remains separate.
+GitHub Actions publishes the combined report as `frontend-coverage-report` and appends the changed-line summary to the job summary. The E2E job uses `chrome` and `other-browsers` matrix lanes; only the Chrome lane runs API coverage and report generation.
 
 Small runtime fixes were needed for safe, deterministic user-visible behavior: the import flow now avoids duplicate StrictMode requests and keeps its file state until the result is known; unresolved import prices show an actionable error and Go back; search and portfolio screens expose stable state selectors; and E2E MSW mode disables development-server HMR/live reload to keep persisted-state journeys stable.
+
+Follow-up hardening converts the portfolio sync serializer to `portfolioSync.ts`, removes the successful-import assertion on a transient loading route in favour of the import response and final editor state, and uses the enabled Confirm weights action as the final readiness check in the editing journey.
 
 ## Context and Orientation
 
@@ -93,7 +105,7 @@ The repository is a root pnpm workspace. The frontend package is `dcapal-fronten
 
 A user journey is one readable path through the application that starts with a user goal and ends with an observable result. MSW (Mock Service Worker) is the existing request-interception library: its browser worker sees `fetch` requests and returns scenario data, while the React application remains unaware that the backend is simulated. V8 coverage is the JavaScript execution information produced by Chromium. Istanbul is the common report format used to combine coverage from the browser and Vitest. Changed-line coverage compares the report with the PR base (`origin/master`) and lists whether each changed source line was executed.
 
-The branch's changed handwritten runtime includes `dcapal-frontend/src/api/portfolioSync.js`, `priceProviders.js`, and `queryClient.js`; application startup in `src/index.js`; `src/app/index.js`; allocation state in `src/components/allocationFlow/portfolioSlice.js`; import and portfolio screens; `src/components/allocationFlow/steps/portfolio/searchBar.js`; the import and synchronization hooks; and the router's `SyncCoordinator` integration. The handwritten API transport is `packages/api-client/src/mutator/api-fetch.ts`.
+The branch's changed handwritten runtime includes `dcapal-frontend/src/api/portfolioSync.ts`, `priceProviders.js`, and `queryClient.js`; application startup in `src/index.js`; `src/app/index.js`; allocation state in `src/components/allocationFlow/portfolioSlice.js`; import and portfolio screens; `src/components/allocationFlow/steps/portfolio/searchBar.js`; the import and synchronization hooks; and the router's `SyncCoordinator` integration. The handwritten API transport is `packages/api-client/src/mutator/api-fetch.ts`.
 
 The coverage denominator includes those changed runtime files and the transport file, plus any handwritten helper directly added for the runtime behavior. It excludes generated files under `packages/api-client/src/gen` and `packages/api-client/src/gen-mocks`, test files, MSW fixtures and handler plumbing, build/configuration files, coverage helpers, deleted code, and the test-only MSW bootstrap branch. The API-client public exports and transport behavior remain covered through real imports and focused tests. The existing demo route is not a required journey.
 
@@ -150,7 +162,7 @@ Add the Vitest V8 coverage provider to the API-client package and configure cove
 
 ### Milestone 4: Collect and merge coverage
 
-Add a coverage-aware Playwright fixture or reporter under `dcapal-frontend/tests/support`. For Chromium coverage runs, start `page.coverage.startJSCoverage()` before navigation and stop it after the journey. Convert each returned V8 script using `v8-to-istanbul` and its Webpack source map, then write one Istanbul JSON fragment per test or worker. Do not collect coverage in the normal three-browser compatibility job.
+Add a coverage-aware Playwright fixture or reporter under `dcapal-frontend/tests/support`. For Chromium coverage runs, start `page.coverage.startJSCoverage()` before navigation and stop it after the journey. Convert each returned V8 script using `v8-to-istanbul` and its Webpack source map, then write one Istanbul JSON fragment per test or worker. Do not collect coverage in the other-browsers compatibility lane.
 
 Add a root coverage reporting script, for example under `scripts/coverage`, that merges browser fragments and the API-client Vitest `coverage-final.json` with `istanbul-lib-coverage`, then writes HTML, LCOV, JSON, and text reports. Preserve source paths so a reader can open a file in the combined report and distinguish `dcapal-frontend` from `packages/api-client`.
 
@@ -158,7 +170,7 @@ Add a changed-line reporter that compares `git diff --unified=0 origin/master...
 
 ### Milestone 5: Publish the report in GitHub Actions
 
-Keep the current `test:e2e:frontend` job for desktop Chromium, Firefox, and WebKit compatibility. Add a separate `test:coverage:frontend` job in `.github/workflows/build-test.yml`. It should reuse the optimizer artifact and frozen pnpm install, install Playwright browsers, run Chromium desktop and mobile coverage projects, run API-client Vitest coverage, merge reports, and write the changed-line Markdown to `$GITHUB_STEP_SUMMARY`.
+Use one matrix `test:e2e:frontend` job in `.github/workflows/build-test.yml` with a Chrome lane and an other-browsers lane. The Chrome lane reuses the optimizer artifact and frozen pnpm install, installs Playwright browsers, runs Chromium desktop/mobile coverage projects, runs API-client Vitest coverage, merges reports, and writes the changed-line Markdown to `$GITHUB_STEP_SUMMARY`. The other-browsers lane runs Firefox and WebKit without coverage. The checkout must include enough history for the changed-line base comparison.
 
 Upload the combined HTML, LCOV, JSON, text, and changed-line files as a named artifact with the same practical retention period as the existing Playwright report. Do not add a PR-comment action, third-party coverage service, or a coverage threshold. The job must still fail if tests or report generation fail.
 
@@ -194,7 +206,7 @@ Run commands from the repository root unless the command uses a package filter.
 
 6. Add native browser coverage collection and the merge/changed-line script. Run the coverage command locally with the Chromium desktop and mobile projects. Expect HTML, LCOV, JSON, text, and changed-line Markdown files. Inspect the Markdown and confirm no changed in-scope executable line is uncovered.
 
-7. Add the CI job and run the same commands locally. Verify that the ordinary frontend E2E job still runs the three existing browser projects and that the coverage job runs only Chromium desktop/mobile plus the package tests. The implemented scripts are `pnpm frontend:test:e2e:coverage`, `pnpm --filter @dcapal/api-client test:coverage`, and `pnpm frontend:coverage:report`.
+7. Add the CI matrix and run the same commands locally. Verify that the Chrome lane runs desktop/mobile coverage plus package coverage, while the other-browsers lane runs Firefox and WebKit without coverage. The implemented scripts are `pnpm frontend:test:e2e:coverage`, `pnpm --filter @dcapal/api-client test:coverage`, and `pnpm frontend:coverage:report`.
 
 8. Run the final repository checks:
 
@@ -203,7 +215,8 @@ Run commands from the repository root unless the command uses a package filter.
    pnpm frontend:typecheck
    pnpm frontend:test
    pnpm frontend:build:dev
-   pnpm frontend:test:e2e
+   pnpm frontend:test:e2e:coverage
+   pnpm frontend:test:e2e --project=firefox --project=webkit
    pnpm --filter @dcapal/api-client typecheck
    pnpm --filter @dcapal/api-client test
    pnpm frontend:coverage:report
@@ -221,7 +234,7 @@ The API-client transport tests pass with MSW-backed real fetches and cover every
 
 The combined report contains HTML, LCOV, JSON, and text output. The changed-line Markdown report lists all changed in-scope executable lines relative to `origin/master` and shows every one as covered. GitHub Actions publishes the report in the coverage job summary and uploads it as an artifact. CI does not fail because a percentage is below a threshold; it fails only for test, collection, conversion, merge, or report-generation errors.
 
-The compatibility job retains desktop Chromium, Firefox, and WebKit coverage. The coverage job runs Chromium desktop and mobile. The demo portfolio route is not part of the acceptance suite. The final local matrix passed: 114/114 compatibility executions, 76/76 coverage executions, 15/15 API-client coverage tests, 697/697 changed executable lines, frontend lint, frontend typecheck, frontend unit tests, API-client typecheck/tests, and the development build.
+The matrix retains desktop Chromium coverage, Firefox, and WebKit compatibility, and adds mobile Chromium coverage. The demo portfolio route is not part of the acceptance suite. The final local matrix shows both lanes green, 15/15 API-client coverage tests, 745/745 changed executable lines, frontend lint, frontend typecheck, frontend unit tests, API-client typecheck/tests, and the development build.
 
 ## Idempotence and Recovery
 
@@ -255,7 +268,7 @@ The expected test-support layout is:
 
 The exact helper names may change if the final design remains equivalent. Keep the journey files small enough that a reviewer can understand the user goal and expected result without reading the fixture implementation.
 
-The expected GitHub artifacts are a Playwright report from the compatibility job and a combined frontend coverage artifact containing the HTML report, `lcov.info`, JSON, text summary, and changed-line Markdown.
+The expected GitHub artifacts are `playwright-report-other-browsers` and `frontend-coverage-report`. The latter contains the HTML report, `lcov.info`, JSON, text summary, and changed-line Markdown.
 
 ## Interfaces and Dependencies
 
@@ -267,7 +280,8 @@ The coverage converter must turn each browser V8 entry into an Istanbul coverage
 
 The changed-line reporter must take the PR base ref and coverage map as inputs, restrict its output to the agreed in-scope paths, and produce deterministic Markdown. Its output must include the file, line number, covered/uncovered status, and a final count.
 
-The coverage GitHub job must depend on the same optimizer artifact as the existing frontend jobs, use `pnpm install --frozen-lockfile`, publish the report through `actions/upload-artifact`, and append the changed-line summary to `$GITHUB_STEP_SUMMARY`. It must not add a global threshold or external service.
+The E2E matrix job must depend on the same optimizer artifact as the existing frontend jobs, use `pnpm install --frozen-lockfile`, fetch the base history required for changed-line comparison, publish the report through `actions/upload-artifact`, and append the changed-line summary to `$GITHUB_STEP_SUMMARY`. It must not add a global threshold or external service.
 
 Revision note (2026-08-01): Created after the confirmed batch-grilling session. The plan records the real-browser/MSW boundary, the explicit demo exclusion, the changed-line-only acceptance rule, native Chromium coverage, the transport test seam, deterministic browser time, user-journey comments, and GitHub artifact/report behavior.
 Revision note (2026-08-02): Implemented and locally verified. The report covers all 697 changed in-scope executable lines, and the workflow publishes the combined report without a percentage gate.
+Revision note (2026-08-02): Follow-up after PR review and CI inspection. New frontend runtime source is TypeScript, E2E/coverage runs in a two-lane matrix, coverage checkout uses full history, non-code source-map entries are excluded from artifact reports, and the two retried journeys use stable final-state assertions.

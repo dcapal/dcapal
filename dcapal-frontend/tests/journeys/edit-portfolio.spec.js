@@ -65,9 +65,6 @@ test("an investor edits quantities, prices, and allocation weights", async ({
   await bond.getByRole("spinbutton").nth(2).blur();
 
   await expect(
-    page.getByText(/Target weights must sum up to 100%/)
-  ).toHaveCount(0);
-  await expect(
     page.getByRole("button", { name: "Confirm weights" })
   ).toBeEnabled();
 });

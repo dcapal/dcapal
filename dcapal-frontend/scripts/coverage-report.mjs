@@ -63,6 +63,11 @@ const isInScope = (filePath) => {
     return false;
   }
 
+  // Webpack source maps can expose imported CSS as browser coverage entries.
+  // Istanbul would otherwise create report filenames from those URLs, and
+  // artifact upload rejects the query string in names such as `styles.css?...`.
+  if (!/\.(?:[cm]?js|[cm]?ts|jsx|tsx)$/.test(relativePath)) return false;
+
   if (
     generatedPathParts.some((part) => `/${relativePath}`.includes(part)) ||
     /\.test\.[jt]sx?$/.test(relativePath) ||

@@ -12,6 +12,12 @@
     "skipLibCheck": true,
     "baseUrl": "./",
     "paths": {
+      "@dcapal/api-client": [
+        "../packages/api-client/src/index.ts"
+      ],
+      "@dcapal/api-client/*": [
+        "../packages/api-client/src/*"
+      ],
       "@/*": [
         "src/*"
       ],

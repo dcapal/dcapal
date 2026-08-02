@@ -1,4 +1,5 @@
 export * from "./gen";
+export type { SyncPortfoliosRequest } from "./gen/model";
 export {
   ApiClientError,
   configureApiClientAuth,
