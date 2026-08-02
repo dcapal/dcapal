@@ -103,7 +103,8 @@
     "searchBar": {
       "placeholder": "Search Crypto, ETF and much more",
       "noAssetFoundFor": "No asset found for ",
-      "loading": "Loading"
+      "loading": "Loading",
+      "unavailable": "Unavailable"
     },
     "transactionFee": {
       "default": "Default",

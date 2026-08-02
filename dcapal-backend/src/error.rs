@@ -9,6 +9,7 @@ use tracing::error;
 
 use crate::app::domain::entity::{AssetId, MarketId};
 
+/// Errors returned by the backend application and its integrations.
 #[derive(thiserror::Error)]
 pub enum DcaError {
     #[error("{0}")]
@@ -50,7 +51,7 @@ pub enum DcaError {
     #[error(transparent)]
     JwtError(#[from] jsonwebtoken::errors::Error),
     #[error(transparent)]
-    DatabaseError(#[from] sea_orm::error::DbErr),
+    DatabaseError(#[from] sqlx::Error),
     #[error("Third-party API reqwest failed")]
     Rquest(#[from] rquest::Error),
 }
@@ -67,22 +68,15 @@ impl Debug for DcaError {
     }
 }
 
-impl From<sea_orm::TransactionError<DcaError>> for DcaError {
-    fn from(err: sea_orm::TransactionError<DcaError>) -> Self {
-        match err {
-            sea_orm::TransactionError::Connection(e) => DcaError::DatabaseError(e),
-            sea_orm::TransactionError::Transaction(e) => e,
-        }
-    }
-}
-
 impl DcaError {
+    /// Iterates over the source errors attached to this error.
     pub fn iter_sources(&self) -> ErrorIter<'_> {
         ErrorIter {
             current: (self as &dyn std::error::Error).source(),
         }
     }
 
+    /// Converts a failsafe result into an application error with service context.
     pub fn from_failsafe(e: failsafe::Error<DcaError>, service: &str) -> Self {
         match e {
             failsafe::Error::Inner(e) => e,
@@ -91,6 +85,7 @@ impl DcaError {
     }
 }
 
+/// The backend's application-wide result type.
 pub type Result<T> = std::result::Result<T, DcaError>;
 
 impl IntoResponse for DcaError {
@@ -107,6 +102,7 @@ impl IntoResponse for DcaError {
 }
 
 #[derive(Copy, Clone, Debug)]
+/// Iterator over the source errors attached to a [`DcaError`].
 pub struct ErrorIter<'a> {
     current: Option<&'a (dyn std::error::Error + 'static)>,
 }
