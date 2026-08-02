@@ -32,6 +32,10 @@ serde = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 thiserror = { workspace = true }
 
+# rand 0.9 still pulls getrandom 0.3; keep its WASM backend enabled until rand 0.10 lands.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_03 = { workspace = true }
+
 [dev-dependencies]
 env_logger = { workspace = true }
 glob = { workspace = true }
