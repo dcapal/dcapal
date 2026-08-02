@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import Fuse from "fuse.js";
 import type { IFuseOptions } from "fuse.js";
-import { useSelector } from "react-redux";
 import {
   useGetAssetsData,
   useGetAssetsFiat,
@@ -11,25 +10,15 @@ import {
 } from "@dcapal/api-client";
 
 import { Spinner } from "@components/spinner/spinner";
-import { currentPortfolio } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 import { Provider, useYahooPrice } from "@/api/priceProviders";
 import { useAppStore } from "@/state/appStore";
+import { useCurrentPortfolio } from "@/state/portfolioStore";
 import {
   PRICE_STALE_TIME,
   SEARCH_STALE_TIME,
   SESSION_STALE_TIME,
 } from "@/api/queryClient";
-
-type SearchState = {
-  app: {
-    currencies: string[];
-  };
-  pfolio: {
-    selected: string | null;
-    pfolios: Record<string, unknown>;
-  };
-};
 
 type SearchAsset = {
   symbol: string;
@@ -290,9 +279,7 @@ const SearchItemCW = ({
   closeSearchList,
 }: SearchItemProps) => {
   const { i18n, t } = useTranslation();
-  const quoteCcy = useSelector(
-    (state) => currentPortfolio(state as SearchState)?.quoteCcy || ""
-  );
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
   const priceQuery = useGetPrice(
     data.symbol,
     { quote: quoteCcy },
@@ -368,9 +355,7 @@ const SearchItemYF = ({
   removeAsset,
   closeSearchList,
 }: SearchItemYfProps) => {
-  const quoteCcy = useSelector(
-    (state) => currentPortfolio(state as SearchState)?.quoteCcy || ""
-  );
+  const quoteCcy = useCurrentPortfolio()?.quoteCcy || "";
   const validCcys = useAppStore((state) => state.currencies);
   const { t, i18n } = useTranslation();
   const priceQuery = useYahooPrice({

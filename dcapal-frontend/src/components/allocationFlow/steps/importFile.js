@@ -1,34 +1,34 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { getPriceForProvider } from "@/api/priceProviders";
-import { useAppStore } from "@/state/appStore";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {
   ACLASS,
   FeeType,
-  addAsset,
-  addPortfolio,
   getDefaultFees,
   getDefaultPortfolioName,
-  getNewPortfolio,
   parseAClass,
   parseFees,
-  selectPortfolio,
-  setFeesAsset,
-  setQty,
-  setTargetWeight,
-} from "@components/allocationFlow/portfolioSlice";
+  getNewPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 
 import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
-// Shared portfolio files contain user data, so prices are refreshed from the
-// configured provider instead of trusting the serialized price value.
-const importPfolio = async (id, pfolio, validCcys, dispatch) => {
+const importPfolio = async (id, pfolio, validCcys, portfolioActions) => {
+  const {
+    addAsset,
+    addPortfolio,
+    selectPortfolio,
+    setFeesAsset,
+    setQty,
+    setTargetWeight,
+  } = portfolioActions;
+
   const stopWithError = (...args) => {
     console.log(args);
   };
@@ -56,8 +56,8 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
     return false;
   }
 
-  dispatch(addPortfolio({ pfolio: imported }));
-  dispatch(selectPortfolio({ id: imported.id }));
+  addPortfolio({ pfolio: imported });
+  selectPortfolio({ id: imported.id });
 
   for (const a of pfolio.assets) {
     const price = await getPriceForProvider(
@@ -75,21 +75,17 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
       return false;
     }
 
-    dispatch(
-      addAsset({
-        symbol: a.symbol,
-        name: a.name,
-        aclass: a.aclass ? parseAClass(a.aclass) : ACLASS.UNDEFINED,
-        baseCcy: a.baseCcy,
-        price: price,
-        provider: a.provider,
-      })
-    );
+    addAsset({
+      symbol: a.symbol,
+      name: a.name,
+      aclass: a.aclass ? parseAClass(a.aclass) : ACLASS.UNDEFINED,
+      baseCcy: a.baseCcy,
+      price: price,
+      provider: a.provider,
+    });
 
-    dispatch(setQty({ symbol: a.symbol, qty: Number(a.qty) }));
-    dispatch(
-      setTargetWeight({ symbol: a.symbol, weight: Number(a.targetWeight) })
-    );
+    setQty({ symbol: a.symbol, qty: a.qty });
+    setTargetWeight({ symbol: a.symbol, weight: a.targetWeight });
 
     const assetFees = (() => {
       if (a.fees != null && typeof a.fees === "object") {
@@ -99,7 +95,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
       }
     })();
 
-    dispatch(setFeesAsset({ symbol: a.symbol, fees: assetFees }));
+    setFeesAsset({ symbol: a.symbol, fees: assetFees });
   }
 
   return true;
@@ -111,13 +107,21 @@ export const ImportStep = () => {
   const [error, setError] = useState(false);
   const importStarted = useRef(false);
   const [pfolioId] = useState(crypto.randomUUID());
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const addAsset = usePortfolioStore((state) => state.addAsset);
+  const addPortfolio = usePortfolioStore((state) => state.addPortfolio);
+  const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
+  const setFeesAsset = usePortfolioStore((state) => state.setFeesAsset);
+  const setQty = usePortfolioStore((state) => state.setQty);
+  const setTargetWeight = usePortfolioStore((state) => state.setTargetWeight);
 
   const validCcys = useAppStore((state) => state.currencies);
-
   const pfolioFile = useAppStore((state) => state.pfolioFile);
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const setPfolioFile = useAppStore((state) => state.setPfolioFile);
   const pfolio = useMemo(() => {
     const parsed = pfolioFile ? JSON.parse(pfolioFile) : {};
     if (Object.keys(parsed).length > 0) {
@@ -142,26 +146,33 @@ export const ImportStep = () => {
         // Pass `pfolioId` to `importPfolio` to overcome component re-render
         // issues that ended up adding the imported portfolio multiple times
         // with different UUIDs
-        importPfolio(pfolioId, pfolio, validCcys, dispatch),
+        importPfolio(pfolioId, pfolio, validCcys, {
+          addAsset,
+          addPortfolio,
+          selectPortfolio,
+          setFeesAsset,
+          setQty,
+          setTargetWeight,
+        }),
         timeout(1000),
       ]);
 
       if (success) {
-        dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+        setAllocationFlowStep({ step: Step.PORTFOLIO });
       } else {
         setError(true);
       }
 
-      dispatch(setPfolioFile({ file: "" }));
+      setPfolioFile({ file: "" });
       setIsLoading(false);
     };
 
     runImport();
-  }, [dispatch, pfolio, validCcys]);
+  }, [pfolio, pfolioId, setAllocationFlowStep, setPfolioFile, validCcys]);
 
   const onClickGoBack = () => {
-    dispatch(setPfolioFile({ file: "" }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    setPfolioFile({ file: "" });
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
     navigate("/");
   };
 

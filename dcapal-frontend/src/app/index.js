@@ -1,24 +1,23 @@
 import React, { useEffect } from "react";
-import { useDispatch } from "react-redux";
 import { Toaster } from "react-hot-toast";
 import { useGetAssetsFiat } from "@dcapal/api-client";
 
 import { AllocationFlow } from "@components/allocationFlow";
-import { setCurrencies } from "@app/appSlice";
+import { useAppStore } from "@/state/appStore";
 import { SESSION_STALE_TIME } from "@/api/queryClient";
 import { ContainerPage } from "@routes/containerPage";
 
 /** Renders the allocation application inside the route-level shell. */
 export const App = () => {
-  const dispatch = useDispatch();
+  const setCurrencies = useAppStore((state) => state.setCurrencies);
   const fiatAssetsQuery = useGetAssetsFiat({
     query: { staleTime: SESSION_STALE_TIME },
   });
 
   useEffect(() => {
     const currencies = fiatAssetsQuery.data?.data?.map((asset) => asset.id);
-    if (currencies) dispatch(setCurrencies({ currencies }));
-  }, [dispatch, fiatAssetsQuery.data]);
+    if (currencies) setCurrencies({ currencies });
+  }, [fiatAssetsQuery.data, setCurrencies]);
 
   return (
     <ContainerPage

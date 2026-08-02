@@ -1,24 +1,32 @@
 import React, { useEffect } from "react";
-import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { Spinner } from "@components/spinner/spinner";
 import { useFetchImportedPortfolio } from "@hooks/useFetchImportedPortfolio";
 
 import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
-const navigateToPortfolios = (portfolio, step, dispatch, navigate) => {
-  dispatch(setPfolioFile({ file: portfolio ? JSON.stringify(portfolio) : "" }));
-  dispatch(setAllocationFlowStep({ step: step }));
+const navigateToPortfolios = (
+  portfolio,
+  step,
+  setPfolioFile,
+  setAllocationFlowStep,
+  navigate
+) => {
+  setPfolioFile({ file: portfolio ? JSON.stringify(portfolio) : "" });
+  setAllocationFlowStep({ step });
   navigate("/allocate");
 };
 
 /** Loads a shared portfolio link and routes it into the allocation flow. */
 export default function ImportPage() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const setPfolioFile = useAppStore((state) => state.setPfolioFile);
   const location = useLocation();
   const { t } = useTranslation();
 
@@ -31,11 +39,23 @@ export default function ImportPage() {
     if (isLoading) return;
 
     if (!portfolio) {
-      navigateToPortfolios(null, Step.PORTFOLIOS, dispatch, navigate);
+      navigateToPortfolios(
+        null,
+        Step.PORTFOLIOS,
+        setPfolioFile,
+        setAllocationFlowStep,
+        navigate
+      );
     } else {
-      navigateToPortfolios(portfolio, Step.IMPORT, dispatch, navigate);
+      navigateToPortfolios(
+        portfolio,
+        Step.IMPORT,
+        setPfolioFile,
+        setAllocationFlowStep,
+        navigate
+      );
     }
-  }, [dispatch, isLoading, navigate, portfolio]);
+  }, [isLoading, navigate, portfolio, setAllocationFlowStep, setPfolioFile]);
 
   return (
     <div

@@ -1,12 +1,7 @@
 import React, { useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
-import { useAppStore } from "@/state/appStore";
-import {
-  currentPortfolio,
-  setQuoteCurrency,
-} from "@components/allocationFlow/portfolioSlice";
+import { Step, useAppStore } from "@/state/appStore";
+import { useCurrentPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 import { CcyGroup } from "./ccyGroup";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -31,10 +26,13 @@ const sortCcy = (a, b) => {
 };
 
 export const CcyStep = ({ ...props }) => {
-  const portfolioState = useSelector(currentPortfolio);
-  const [selected, setSelected] = useState(portfolioState.quoteCcy ?? "");
+  const portfolioState = useCurrentPortfolio();
+  const [selected, setSelected] = useState(portfolioState?.quoteCcy ?? "");
   const ccys = useAppStore((state) => state.currencies);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const setQuoteCurrency = usePortfolioStore((state) => state.setQuoteCurrency);
   const navigate = useNavigate();
   const { t } = useTranslation();
   const onClickBack = () => {
@@ -42,8 +40,8 @@ export const CcyStep = ({ ...props }) => {
   };
 
   const onClickNext = () => {
-    dispatch(setQuoteCurrency({ quoteCcy: selected }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setQuoteCurrency({ quoteCcy: selected });
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const sortedCcys = [...ccys].sort(sortCcy);

@@ -7,19 +7,14 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useSyncPortfolios as useSyncPortfoliosMutation } from "@dcapal/api-client";
 
 import { supabase } from "@app/config";
-import { applySyncResult } from "@components/allocationFlow/portfolioSlice";
 import { toSyncPayload } from "@/api/portfolioSync";
-
-type SyncState = {
-  pfolio: {
-    pfolios: Parameters<typeof toSyncPayload>[0];
-    deletedPortfolios: Parameters<typeof toSyncPayload>[1];
-  };
-};
+import {
+  applySyncPortfoliosResult,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 
 type SyncContextValue = {
   isAuthenticated: boolean;
@@ -39,19 +34,22 @@ export const SyncCoordinator = ({
   children,
   intervalMs = 5000,
 }: SyncCoordinatorProps) => {
-  const dispatch = useDispatch();
-  const pfolios = useSelector((state: SyncState) => state.pfolio.pfolios);
-  const deletedPortfolios = useSelector(
-    (state: SyncState) => state.pfolio.deletedPortfolios
+  const pfolios = usePortfolioStore((state) => state.pfolios);
+  const deletedPortfolios = usePortfolioStore(
+    (state) => state.deletedPortfolios
   );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const { mutateAsync, isPending } = useSyncPortfoliosMutation({
     mutation: {
-      onSuccess: (response) => dispatch(applySyncResult(response.data)),
+      onSuccess: (response) => {
+        usePortfolioStore.setState((state) =>
+          applySyncPortfoliosResult(state, response.data)
+        );
+      },
     },
   });
-  // The interval callback must read the latest Redux state without being
+  // The interval callback must read the latest store state without being
   // recreated every five seconds.
   const stateRef = useRef({ pfolios, deletedPortfolios });
   const pendingRef = useRef(isPending);

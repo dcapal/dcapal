@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useCollapse } from "react-collapsed";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import {
-  currentPortfolio,
   isWholeShares,
-  setBudget,
-} from "@components/allocationFlow/portfolioSlice";
+  useCurrentPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 import { Trans, useTranslation } from "react-i18next";
 import { analyze } from "@/compute";
 import { replacer } from "@utils/index.js";
@@ -41,14 +40,16 @@ export const InvestStep = ({
   setUseAllBudget,
 }) => {
   const [cash, setCash] = useState(0);
-  const dispatch = useDispatch();
-  const { t } = useTranslation();
-
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const totalAmount = useSelector(
-    (state) => currentPortfolio(state).totalAmount
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
   );
-  const assets = useSelector((state) => currentPortfolio(state).assets);
+  const { t } = useTranslation();
+  const setBudget = usePortfolioStore((state) => state.setBudget);
+  const pfolio = useCurrentPortfolio();
+
+  const quoteCcy = pfolio?.quoteCcy || "";
+  const totalAmount = pfolio?.totalAmount || 0;
+  const assets = pfolio?.assets || {};
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -87,12 +88,12 @@ export const InvestStep = ({
   };
 
   const onClickGoBack = () => {
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const onClickRunAllocation = () => {
-    dispatch(setBudget({ budget: cash }));
-    dispatch(setAllocationFlowStep({ step: Step.END }));
+    setBudget({ budget: cash });
+    setAllocationFlowStep({ step: Step.END });
   };
 
   const isRunAllocationDisabled = cash + totalAmount <= 0;

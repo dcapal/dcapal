@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import { toast } from "react-hot-toast";
 import {
   ACLASS,
-  clearBudget,
-  currentPortfolio,
   feeTypeToString,
   isWholeShares,
-  setQty,
-} from "@components/allocationFlow/portfolioSlice";
+  useCurrentPortfolio,
+  usePortfolioStore,
+} from "@/state/portfolioStore";
 import { AllocateCard } from "./allocateCard";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -136,13 +134,18 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdated, setIsUpdated] = useState(false);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
 
   const { t } = useTranslation();
-  const budget = useSelector((state) => currentPortfolio(state).budget);
-  const assets = useSelector((state) => currentPortfolio(state).assets);
-  const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);
-  const fees = useSelector((state) => currentPortfolio(state).fees);
+  const pfolio = useCurrentPortfolio();
+  const setQty = usePortfolioStore((state) => state.setQty);
+  const clearBudget = usePortfolioStore((state) => state.clearBudget);
+  const budget = pfolio?.budget || 0;
+  const assets = pfolio?.assets || {};
+  const quoteCcy = pfolio?.quoteCcy || "";
+  const fees = pfolio?.fees || null;
 
   const cards = solution ? buildCards(assets, solution, quoteCcy, fees) : [];
 
@@ -200,12 +203,10 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
 
     if (updatedAssets.length > 0) {
       updatedAssets.forEach((card) => {
-        dispatch(
-          setQty({
-            symbol: card.symbol,
-            qty: card.qty,
-          })
-        );
+        setQty({
+          symbol: card.symbol,
+          qty: card.qty,
+        });
       });
 
       // Set updated state
@@ -227,13 +228,13 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
       });
     }
 
-    dispatch(clearBudget({}));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    clearBudget();
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const onClickGoBack = () => {
-    dispatch(clearBudget({}));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    clearBudget();
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   return (

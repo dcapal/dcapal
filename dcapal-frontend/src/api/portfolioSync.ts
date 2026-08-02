@@ -1,9 +1,10 @@
-import type { SyncPortfoliosRequest } from "@dcapal/api-client";
-
 import {
-  aclassToString,
-  feeTypeToString,
-} from "@components/allocationFlow/portfolioSlice";
+  syncPortfolios,
+  type SyncPortfoliosRequest,
+  type SyncPortfoliosResponse,
+} from "@dcapal/api-client";
+
+import { aclassToString, feeTypeToString } from "@/state/portfolioDomain";
 
 type FeeState = {
   feeStructure?: {
@@ -88,7 +89,7 @@ const toFeesPayload = (
   return null;
 };
 
-/** Converts persisted Redux portfolio state into the REST sync request shape. */
+/** Converts local portfolio state into the REST sync request shape. */
 export const toSyncPayload = (
   pfolios: Record<string, PortfolioState>,
   deletedPortfolios: string[]
@@ -114,3 +115,14 @@ export const toSyncPayload = (
   })),
   deletedPortfolios,
 });
+
+/** Sends local portfolio changes through the configured generated API client. */
+export const syncPortfoliosAPI = async (
+  pfolios: Parameters<typeof toSyncPayload>[0],
+  deletedPortfolios: Parameters<typeof toSyncPayload>[1]
+): Promise<SyncPortfoliosResponse> => {
+  const response = await syncPortfolios(
+    toSyncPayload(pfolios, deletedPortfolios)
+  );
+  return response.data;
+};
