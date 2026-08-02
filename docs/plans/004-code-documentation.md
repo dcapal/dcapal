@@ -15,7 +15,7 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 - [x] (2026-08-02) Add Rust documentation comments to changed public domain and REST symbols, plus rationale comments for non-obvious wire/schema behavior.
 - [x] (2026-08-02) Document the OpenAPI/Orval generated boundary without editing generated output that regeneration would overwrite.
 - [x] (2026-08-02) Run formatting, typechecks, tests, and documentation-focused checks; review the final diff.
-- [ ] (2026-08-02) Commit, push, and verify the GitHub pipeline.
+- [x] (2026-08-02) Commit and push the documentation changes; verify the GitHub pipeline.
 
 ## Surprises & Discoveries
 
@@ -50,6 +50,8 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 Documented the changed hand-written frontend components, hooks, API boundaries, test support, coverage tooling, Rust domain/REST/OpenAPI surfaces, and the API-client package boundary. Added concise public API comments and retained only rationale comments for non-obvious precision, authentication, caching, schema, and coverage constraints. The Orval-generated files under `packages/api-client/src/gen` and `src/gen-mocks` were intentionally left untouched; the README, generator config, package entry point, and hand-written mutator now explain that boundary.
 
 Validation completed successfully: frontend lint, frontend typecheck, frontend unit tests (6), API-client typecheck, API-client tests (15), backend tests (9), Rust formatting, development build, diff checks, 76/76 Chromium coverage journeys, and 76/76 Firefox/WebKit journeys. The coverage report generated successfully and no global percentage threshold was introduced. User-owned `MIGRATION.md` and `agent_docs/` remained untracked and unstaged.
+
+Commit `862e90b` was pushed to `agent/tanstack-orval-api-client`. The follow-up plan-status commit and its GitHub pipeline run are the final completion checks.
 
 ## Context and Orientation
 
@@ -124,3 +126,4 @@ No new runtime dependency is required. Documentation uses the existing language 
 Revision note (2026-08-02): Created in response to the request to document the code changed by this branch, with a generated-code boundary to preserve Orval reproducibility.
 Revision note (2026-08-02): Updated after the inventory and documentation pass; recorded the generated-file evidence and completed the comment milestones before validation.
 Revision note (2026-08-02): Recorded successful local validation, including both browser lanes and the changed-line coverage report; commit and CI verification remain.
+Revision note (2026-08-02): Recorded commit `862e90b` and its successful push; only the plan-status follow-up and resulting CI run remain.
