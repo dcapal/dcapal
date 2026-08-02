@@ -68,7 +68,8 @@
     "tailwindcss-animate": "catalog:",
     "threads": "catalog:",
     "vanilla-cookieconsent": "catalog:",
-    "vaul": "catalog:"
+    "vaul": "catalog:",
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@babel/core": "catalog:",

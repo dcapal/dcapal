@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { useAppStore } from "@/state/appStore";
 import {
   currentPortfolio,
   setQuoteCurrency,
@@ -32,7 +33,7 @@ const sortCcy = (a, b) => {
 export const CcyStep = ({ ...props }) => {
   const portfolioState = useSelector(currentPortfolio);
   const [selected, setSelected] = useState(portfolioState.quoteCcy ?? "");
-  const ccys = useSelector((state) => state.app.currencies);
+  const ccys = useAppStore((state) => state.currencies);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();

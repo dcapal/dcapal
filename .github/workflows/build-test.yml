@@ -336,6 +336,10 @@ jobs:
       POSTGRES_DB: postgres
       SUPABASE_VERSION: 2.110.0
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:

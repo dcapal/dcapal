@@ -14,6 +14,7 @@ import { Spinner } from "@components/spinner/spinner";
 import { currentPortfolio } from "@components/allocationFlow/portfolioSlice";
 import { useTranslation } from "react-i18next";
 import { Provider, useYahooPrice } from "@/api/priceProviders";
+import { useAppStore } from "@/state/appStore";
 import {
   PRICE_STALE_TIME,
   SEARCH_STALE_TIME,
@@ -370,9 +371,7 @@ const SearchItemYF = ({
   const quoteCcy = useSelector(
     (state) => currentPortfolio(state as SearchState)?.quoteCcy || ""
   );
-  const validCcys = useSelector(
-    (state) => (state as SearchState).app.currencies
-  );
+  const validCcys = useAppStore((state) => state.currencies);
   const { t, i18n } = useTranslation();
   const priceQuery = useYahooPrice({
     symbol: data.symbol,

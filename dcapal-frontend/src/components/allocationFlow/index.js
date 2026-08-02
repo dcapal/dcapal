@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Step, setAllocationFlowStep } from "@app/appSlice";
+import { useAppStore } from "@/state/appStore";
 import { EndStep } from "./steps/end";
 import { ImportStep } from "./steps/importFile";
 import { InvestStep } from "./steps/invest";
@@ -8,7 +9,7 @@ import { PortfolioStep } from "./steps/portfolio";
 import { PortfoliosStep } from "./steps/portfolios";
 
 export const AllocationFlow = () => {
-  const step = useSelector((state) => state.app.allocationFlowStep);
+  const step = useAppStore((state) => state.allocationFlowStep);
   const selectedPfolio = useSelector((state) => state.pfolio.selected);
 
   const [useTaxEfficient, setUseTaxEfficient] = useState(true);
