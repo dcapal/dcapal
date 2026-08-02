@@ -11,7 +11,7 @@ use axum_extra::{TypedHeader, headers::CacheControl};
 use hyper::StatusCode;
 use lazy_static::lazy_static;
 use metrics::counter;
-use sea_orm::prelude::Decimal;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::{
     IntoParams, ToSchema,

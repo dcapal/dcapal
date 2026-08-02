@@ -15,10 +15,7 @@ use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use hyper::header;
 use metrics::{Unit, counter, describe_counter, describe_histogram};
-use sea_orm::{
-    sqlx,
-    sqlx::{PgPool, postgres::PgPoolOptions},
-};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
@@ -41,7 +38,9 @@ use crate::{
             adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
             repository::{
                 ImportedRepository, MiscRepository, StatsRepository,
-                market_data::MarketDataRepository, portfolio::PortfolioRepository,
+                market_data::MarketDataRepository,
+                portfolio::PortfolioRepository,
+                postgres::{SqlxPortfolioRepository, SqlxUserRepository},
                 user::UserRepository,
             },
         },
@@ -53,14 +52,19 @@ pub mod config;
 pub mod error;
 pub mod ports;
 
+/// The timestamp type shared by API and persistence models.
 pub type DateTime = chrono::DateTime<Utc>;
 
+/// Redis connection settings used by backend integrations.
 pub struct RedisConfig {
+    /// Redis host name.
     pub hostname: String,
+    /// Redis port.
     pub port: u32,
 }
 
 #[allow(dead_code)]
+/// Shared application state made available to HTTP handlers and workers.
 pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
@@ -72,6 +76,7 @@ pub struct AppContextInner {
     providers: Arc<PriceProviders>,
 }
 
+/// Shared application context passed through the backend.
 pub type AppContext = Arc<AppContextInner>;
 
 #[derive(Clone)]
@@ -87,10 +92,11 @@ struct Repository {
     pub mkt_data: Arc<MarketDataRepository>,
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
-    pub portfolio: Arc<PortfolioRepository>,
-    pub user: Arc<UserRepository>,
+    pub portfolio: Arc<dyn PortfolioRepository>,
+    pub user: Arc<dyn UserRepository>,
 }
 
+/// The HTTP server and background workers that make up the backend process.
 pub struct DcaServer {
     addr: SocketAddr,
     app: IntoMakeServiceWithConnectInfo<Router<()>, SocketAddr>,
@@ -100,6 +106,7 @@ pub struct DcaServer {
 }
 
 impl DcaServer {
+    /// Builds a server and initializes its external service clients and repositories.
     pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
 
@@ -130,8 +137,8 @@ impl DcaServer {
             mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
-            portfolio: Arc::new(PortfolioRepository::new(postgres.clone())),
-            user: Arc::new(UserRepository::new(postgres.clone())),
+            portfolio: Arc::new(SqlxPortfolioRepository::new(postgres.clone())),
+            user: Arc::new(SqlxUserRepository::new(postgres.clone())),
         });
 
         let providers = Arc::new(PriceProviders {
@@ -215,6 +222,7 @@ impl DcaServer {
         })
     }
 
+    /// Starts the HTTP server and its background workers until shutdown.
     pub async fn start(&mut self, _signal_handler: BoxFuture<'_, ()>) -> Result<()> {
         info!("Initializing metrics");
         self.init_metrics().await;
@@ -253,6 +261,7 @@ impl DcaServer {
         Ok(())
     }
 
+    /// Registers backend metrics and refreshes counters stored in Redis.
     pub async fn init_metrics(&self) {
         describe_counter!(
             infra::stats::VISITORS_TOTAL,

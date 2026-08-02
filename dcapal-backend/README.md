@@ -1,6 +1,26 @@
 # DcaPal backend service
 
-TBD
+The backend uses PostgreSQL through SQLx. Local PostgreSQL is provided by the
+Supabase CLI, and the migration runner keeps the existing production tables in
+place while creating SQLx migration history in `_sqlx_migrations`.
+
+## Run backend tests
+
+The test suite uses real PostgreSQL databases through `sqlx::test`. Start the
+database first, then run the tests:
+
+```bash
+make backend-db-up
+make test-backend
+make backend-db-down
+```
+
+`make test-backend` checks the configured `DATABASE_URL` and fails if the
+database is not already running. To apply pending migrations manually, run:
+
+```bash
+make backend-migrate
+```
 
 ## How-to
 

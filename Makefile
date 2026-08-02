@@ -3,8 +3,10 @@ DCAPAL_BACKEND_DIR := ./dcapal-backend
 DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
 SUPABASE_WORKDIR := ./config
+SUPABASE_DATABASE_URL ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
+DATABASE_URL ?= $(SUPABASE_DATABASE_URL)
 
-.PHONY: help supabase-up supabase-down docker-dev-up docker-dev-down dev-up dev-down export-openapi
+.PHONY: help supabase-up supabase-down backend-db-up backend-db-down backend-db-check backend-migrate test-backend docker-dev-up docker-dev-down dev-up dev-down export-openapi
 
 ## Show this help message
 help:
@@ -75,6 +77,24 @@ supabase-up:  ## Start Supabase with config
 ## Stop Supabase
 supabase-down:  ## Stop Supabase
 	cd $(DCAPAL_BACKEND_DIR) && npx supabase stop --workdir $(SUPABASE_WORKDIR)
+
+## Start the Supabase database used by backend development and tests
+backend-db-up: supabase-up  ## Start the backend database
+
+## Stop the Supabase database used by backend development and tests
+backend-db-down: supabase-down  ## Stop the backend database
+
+## Check that the backend database is already running
+backend-db-check:  ## Check backend database connectivity
+	@psql "$(DATABASE_URL)" -c "SELECT 1" >/dev/null
+
+## Apply pending SQLx migrations to the backend database
+backend-migrate: backend-db-check  ## Apply backend database migrations
+	@DATABASE_URL="$(DATABASE_URL)" cargo run -p migration
+
+## Run the full backend test suite against an already-running database
+test-backend: backend-db-check  ## Run backend tests (requires backend-db-up)
+	@DATABASE_URL="$(DATABASE_URL)" RUST_LOG=dcapal_backend=debug cargo test -p dcapal-backend -p migration -- --nocapture
 
 ## Start development Docker containers
 docker-dev-up:  ## Start development Docker containers

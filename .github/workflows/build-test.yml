@@ -19,9 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          cache: false
+          rustflags: ""
           components: rustfmt
 
       - name: Check backend formatting
@@ -33,16 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
           components: clippy
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Toolchain info
         run: |
           cargo --version --verbose
@@ -56,35 +54,54 @@ jobs:
   backend-test:
     name: test:backend
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_VERSION: 2.110.0
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
         with:
-          toolchain: stable
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
+          node-version-file: ".nvmrc"
+
+      - name: Cache Supabase CLI npm packages
+        uses: actions/cache@v6
         with:
-          prefix-key: v1
-          shared-key: rust
+          path: ~/.npm
+          key: ${{ runner.os }}-supabase-cli-${{ env.SUPABASE_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: ${{ env.SUPABASE_VERSION }}
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
+      - name: Start backend database
+        run: make backend-db-up
 
       - name: Test backend
-        working-directory: dcapal-backend
-        run: RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
+        run: make test-backend
+
+      - name: Stop backend database
+        if: always()
+        run: make backend-db-down
 
   backend-openapi-check:
     name: check:openapi:backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
       - name: Generate OpenAPI spec
         run: make export-openapi
 
@@ -96,16 +113,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
           components: clippy, rustfmt
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
       - name: Toolchain info
         run: |
           cargo --version --verbose
@@ -123,15 +137,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-      # Share dependency, target, and installed Rust binary data across Rust jobs.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v1
-          shared-key: rust
-
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
