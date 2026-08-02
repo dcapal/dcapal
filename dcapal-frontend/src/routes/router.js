@@ -19,16 +19,15 @@ import {
 import AuthPage from "@routes/loginPage";
 import SignUpPage from "@routes/signUpPage";
 import ResetPasswordPage from "@routes/resetPassword";
-import { useSyncPortfolios } from "@hooks/useSyncPortfolios";
+import { SyncCoordinator } from "@hooks/useSyncPortfolios";
 
 import(/* webpackPrefetch: true */ "@app");
 
 const App = lazy(() => import("@app"));
 
+/** Defines application routes and keeps the sync coordinator around them. */
 export const Router = () => {
   const [session, setSession] = useState(null);
-
-  useSyncPortfolios();
 
   useEffect(() => {
     const initSession = async () => {
@@ -119,5 +118,6 @@ export const Router = () => {
     });
   }
 
-  return useRoutes(routesConfig);
+  const routes = useRoutes(routesConfig);
+  return <SyncCoordinator>{routes}</SyncCoordinator>;
 };

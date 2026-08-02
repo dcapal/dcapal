@@ -50,6 +50,7 @@ const computePortfolioGain = (assets) => {
   return ((totalValue - totalCost) / totalCost) * 100;
 };
 
+/** Displays a saved portfolio and its edit, duplicate, and delete actions. */
 export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const [state, setState] = useState(CardState.VIEW);
   const [newName, setNewName] = useState(name);
@@ -96,13 +97,20 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const hasAssetsWithQty = assets.some((a) => a.qty > 0);
 
   return (
-    <div className="relative w-full max-w-[36rem] flex flex-col px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white cursor-pointer hover:ring-2 hover:ring-neutral-400 active:ring-2 active:ring-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-500">
-      <div
+    <div
+      data-testid="portfolio-card"
+      data-portfolio-id={id}
+      className="relative w-full max-w-[36rem] flex flex-col px-3 pt-2 pb-3 shadow-md ring-1 ring-black/5 rounded-md bg-white cursor-pointer hover:ring-2 hover:ring-neutral-400 active:ring-2 active:ring-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-500"
+    >
+      <button
+        type="button"
+        aria-label="Edit portfolio"
+        data-testid="portfolio-edit"
         className="absolute flex justify-center items-center w-8 h-8 -right-4 -top-3.5 rounded-full bg-neutral-500 hover:bg-neutral-600 active:bg-neutral-800 cursor-pointer"
         onClick={onClickEdit}
       >
-        <img className="w-3/5" alt="Edit portfolio" src={editIcon} />
-      </div>
+        <img className="w-3/5" alt="" src={editIcon} />
+      </button>
       {state === CardState.VIEW && (
         <div className="w-full flex flex-col" onClick={onClickPortfolio}>
           <div className="text-lg truncate font-medium" title={name}>

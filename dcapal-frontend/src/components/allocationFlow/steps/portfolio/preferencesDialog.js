@@ -13,13 +13,14 @@ import { TransactionFees } from "./transactionFees";
 import { SlidersHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+/** Provides portfolio-level preferences, including transaction fees. */
 export const PreferencesDialog = () => {
   const { t } = useTranslation();
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button data-testid="portfolio-preferences" variant="outline">
           <SlidersHorizontal />
         </Button>
       </DialogTrigger>

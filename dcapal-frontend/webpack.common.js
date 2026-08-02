@@ -7,6 +7,10 @@ const TerserPlugin = require("terser-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
+const vanillaCookieConsentDist = path.dirname(
+  require.resolve("vanilla-cookieconsent/dist/cookieconsent.css"),
+);
+
 module.exports = (_env, argv) => {
   const devMode = argv.mode !== "production";
   console.log("Webpack build mode:", argv.mode);
@@ -40,7 +44,7 @@ module.exports = (_env, argv) => {
           test: /.s?css$/,
           include: [
             path.resolve(__dirname, "src"),
-            path.resolve(__dirname, "node_modules/vanilla-cookieconsent/dist"),
+            vanillaCookieConsentDist,
           ],
           use: [
             argv.mode === "production"

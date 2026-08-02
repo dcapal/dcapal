@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
-import { getFetcher } from "@/api";
+import { getPriceForProvider } from "@/api/priceProviders";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {
@@ -26,6 +26,8 @@ import {
 
 import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
+// Shared portfolio files contain user data, so prices are refreshed from the
+// configured provider instead of trusting the serialized price value.
 const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   const stopWithError = (...args) => {
     console.log(args);
@@ -58,17 +60,19 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   dispatch(selectPortfolio({ id: imported.id }));
 
   for (const a of pfolio.assets) {
-    const price = await getFetcher(a.provider, validCcys)(
+    const price = await getPriceForProvider(
+      a.provider,
+      validCcys,
       a.symbol,
       pfolio.quoteCcy
     );
-    if (!price) {
+    if (price == null) {
       console.warn(
         "[ImportStep] Failed to fetch price for",
         a.symbol,
         `(provider=${a.provider} quoteCcy=${pfolio.quoteCcy})`
       );
-      continue;
+      return false;
     }
 
     dispatch(
@@ -82,8 +86,10 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
       })
     );
 
-    dispatch(setQty({ symbol: a.symbol, qty: a.qty }));
-    dispatch(setTargetWeight({ symbol: a.symbol, weight: a.targetWeight }));
+    dispatch(setQty({ symbol: a.symbol, qty: Number(a.qty) }));
+    dispatch(
+      setTargetWeight({ symbol: a.symbol, weight: Number(a.targetWeight) })
+    );
 
     const assetFees = (() => {
       if (a.fees != null && typeof a.fees === "object") {
@@ -99,9 +105,11 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   return true;
 };
 
+/** Imports a shared portfolio file into the allocation flow. */
 export const ImportStep = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
+  const importStarted = useRef(false);
   const [pfolioId] = useState(crypto.randomUUID());
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -110,19 +118,24 @@ export const ImportStep = () => {
   const validCcys = useSelector((state) => state.app.currencies);
 
   const pfolioFile = useSelector((state) => state.app.pfolioFile);
-  const pfolio = pfolioFile ? JSON.parse(pfolioFile) : {};
-  if (Object.keys(pfolio).length > 0) {
-    pfolio.name = pfolio.name ?? getDefaultPortfolioName();
-  }
+  const pfolio = useMemo(() => {
+    const parsed = pfolioFile ? JSON.parse(pfolioFile) : {};
+    if (Object.keys(parsed).length > 0) {
+      parsed.name = parsed.name ?? getDefaultPortfolioName();
+    }
+    return parsed;
+  }, [pfolioFile]);
 
   useEffect(() => {
-    return () => {
-      dispatch(setPfolioFile({ file: "" }));
-    };
-  }, []);
+    if (
+      Object.keys(pfolio).length === 0 ||
+      validCcys.length === 0 ||
+      importStarted.current
+    ) {
+      return;
+    }
 
-  useEffect(() => {
-    if (Object.keys(pfolio).length === 0) return;
+    importStarted.current = true;
 
     const runImport = async () => {
       const [success] = await Promise.all([
@@ -139,13 +152,15 @@ export const ImportStep = () => {
         setError(true);
       }
 
+      dispatch(setPfolioFile({ file: "" }));
       setIsLoading(false);
     };
 
     runImport();
-  }, [pfolio]);
+  }, [dispatch, pfolio, validCcys]);
 
   const onClickGoBack = () => {
+    dispatch(setPfolioFile({ file: "" }));
     dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
     navigate("/");
   };
@@ -170,7 +185,7 @@ export const ImportStep = () => {
           </>
         )}
         {!isLoading && error && (
-          <>
+          <div data-testid="import-error" className="contents">
             <h1 className="text-3xl font-bold">
               {t("importStep.importPortfolio")}
             </h1>
@@ -178,13 +193,14 @@ export const ImportStep = () => {
               <span className="text-4xl">⚠️</span>
               {t("importStep.ops")}...
             </span>
-            <span
+            <button
+              type="button"
               className="font-medium underline cursor-pointer"
               onClick={onClickGoBack}
             >
               {t("common.goBack")}
-            </span>
-          </>
+            </button>
+          </div>
         )}
       </div>
     </div>
