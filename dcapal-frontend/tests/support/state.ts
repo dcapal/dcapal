@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+/** Minimal persisted asset shape used to seed a browser journey. */
 export type AssetFixture = {
   idx: number;
   symbol: string;
@@ -16,6 +17,7 @@ export type AssetFixture = {
   fees: null | Record<string, unknown>;
 };
 
+/** Minimal persisted portfolio shape used to seed a browser journey. */
 export type PortfolioFixture = {
   id: string;
   name: string;
@@ -43,8 +45,10 @@ type PersistedStateOptions = {
   pfolioFile?: string;
 };
 
+// JSON cloning matches the serialization boundary used by Redux Persist.
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
+/** Creates a complete asset fixture with optional scenario-specific overrides. */
 export const makeAsset = (overrides: AssetOverrides = {}): AssetFixture => ({
   idx: 0,
   symbol: "VWCE.MI",
@@ -62,6 +66,7 @@ export const makeAsset = (overrides: AssetOverrides = {}): AssetFixture => ({
   ...overrides,
 });
 
+/** Creates a complete portfolio fixture with optional scenario-specific overrides. */
 export const makePortfolio = (
   overrides: PortfolioOverrides = {}
 ): PortfolioFixture => {
@@ -91,6 +96,7 @@ export const makePortfolio = (
   };
 };
 
+/** Builds the serialized Redux-persist root expected by the application. */
 export const persistedRoot = ({
   portfolios = {},
   selected = null,
@@ -113,6 +119,7 @@ export const persistedRoot = ({
   _persist: JSON.stringify({ version: 6, rehydrated: true }),
 });
 
+/** Seeds persisted application state before the first page load. */
 export const seedPersistedState = async (
   page: Page,
   options: PersistedStateOptions = {}
@@ -125,6 +132,7 @@ export const seedPersistedState = async (
   }, root);
 };
 
+/** Builds a persisted-state option set centered on one portfolio. */
 export const portfolioState = (
   portfolio: PortfolioFixture,
   options: Partial<PersistedStateOptions> = {}
@@ -137,6 +145,7 @@ export const portfolioState = (
   };
 };
 
+/** Creates gain/loss examples for portfolio-card journey assertions. */
 export const createPortfolioFixtures = (): Record<
   "positive" | "negative" | "zero",
   PortfolioFixture

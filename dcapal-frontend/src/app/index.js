@@ -8,6 +8,7 @@ import { setCurrencies } from "@app/appSlice";
 import { SESSION_STALE_TIME } from "@/api/queryClient";
 import { ContainerPage } from "@routes/containerPage";
 
+/** Renders the allocation application inside the route-level shell. */
 export const App = () => {
   const dispatch = useDispatch();
   const fiatAssetsQuery = useGetAssetsFiat({
@@ -50,4 +51,5 @@ export const App = () => {
   );
 };
 
+/** Default export consumed by the lazy allocation route. */
 export default App;

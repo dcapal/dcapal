@@ -9,6 +9,7 @@ type TestFixtures = {
   browserCoverage: void;
 };
 
+/** Playwright test with scenario headers and optional browser coverage capture. */
 export const test = base.extend<TestFixtures>({
   scenario: ["default", { option: true }],
 
@@ -24,6 +25,7 @@ export const test = base.extend<TestFixtures>({
 
   browserCoverage: [
     async ({ page }, use, testInfo) => {
+      // Coverage is opt-in because normal browser runs should stay lightweight.
       const coverageEnabled =
         process.env.FRONTEND_COVERAGE === "1" &&
         testInfo.project.name.startsWith("coverage-");
@@ -45,4 +47,5 @@ export const test = base.extend<TestFixtures>({
   ],
 });
 
+/** Playwright assertions paired with the custom test fixture. */
 export { expect } from "@playwright/test";

@@ -103,6 +103,7 @@ const MenuBtn = ({ onClick }) => {
   );
 };
 
+/** Renders navigation links and authenticated account actions. */
 export const NavBar = () => {
   const [menuVisible, setMenuVisible] = useState(false);
 

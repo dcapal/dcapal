@@ -26,6 +26,8 @@ import {
 
 import IMPORT_PORTFOLIO_SVG from "@images/headers/import-portfolio.svg";
 
+// Shared portfolio files contain user data, so prices are refreshed from the
+// configured provider instead of trusting the serialized price value.
 const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   const stopWithError = (...args) => {
     console.log(args);
@@ -103,6 +105,7 @@ const importPfolio = async (id, pfolio, validCcys, dispatch) => {
   return true;
 };
 
+/** Imports a shared portfolio file into the allocation flow. */
 export const ImportStep = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);

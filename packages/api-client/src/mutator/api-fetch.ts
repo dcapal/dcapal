@@ -5,12 +5,17 @@ type ApiFetchRequestInit = RequestInit & {
   __apiFetchSkipAuthHandling?: boolean;
 };
 
+/** Authentication callbacks used by the generated client without coupling it to Supabase. */
 export interface ApiClientAuthHooks {
+  /** Returns the current access token, if one is available. */
   getAccessToken?: () => MaybePromise<string | null | undefined>;
+  /** Refreshes the access token after an unauthorized response. */
   refreshAccessToken?: () => MaybePromise<string | null | undefined>;
+  /** Receives authentication failures after refresh or retry cannot recover. */
   onAuthFailure?: (error: unknown) => MaybePromise<void>;
 }
 
+/** Error raised when the REST response is not successful. */
 export class ApiClientError extends Error {
   readonly status: number;
   readonly payload: unknown;
@@ -27,6 +32,7 @@ let apiBaseUrl = "";
 let authHooks: ApiClientAuthHooks | null = null;
 
 function normalizeBaseUrl(baseUrl: string | null | undefined): string {
+  // Normalizing once prevents generated paths from producing doubled slashes.
   const trimmed = baseUrl?.trim();
   return trimmed ? trimmed.replace(/\/+$/, "") : "";
 }
@@ -39,18 +45,21 @@ function resolveUrl(url: string): string {
   return `${apiBaseUrl}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
+/** Sets the base URL prepended to generated relative API paths. */
 export function configureApiClientBaseUrl(
   baseUrl: string | null | undefined,
 ): void {
   apiBaseUrl = normalizeBaseUrl(baseUrl);
 }
 
+/** Installs optional token-refresh and authentication-failure callbacks. */
 export function configureApiClientAuth(
   hooks: ApiClientAuthHooks | null,
 ): void {
   authHooks = hooks;
 }
 
+/** Clears the mutable client configuration, primarily for tests and app teardown. */
 export function resetApiClientConfiguration(): void {
   apiBaseUrl = "";
   authHooks = null;
@@ -70,6 +79,7 @@ function withAuthorizationHeader(
 }
 
 function toNativeRequestInit(options: ApiFetchRequestInit): RequestInit {
+  // These flags control the mutator only and must never reach the platform fetch.
   const {
     __apiFetchRetryAttempted: _retryAttempted,
     __apiFetchSkipAuthHandling: _skipAuthHandling,
@@ -82,6 +92,7 @@ function toNativeRequestInit(options: ApiFetchRequestInit): RequestInit {
 async function resolveRequestInit(
   options: ApiFetchRequestInit,
 ): Promise<ApiFetchRequestInit> {
+  // Never replace an explicit Authorization header supplied by a caller.
   const getAccessToken = authHooks?.getAccessToken;
   if (
     !getAccessToken ||
@@ -111,6 +122,7 @@ function parseResponseBody(body: string | null): unknown {
 }
 
 async function readResponseBody(response: Response): Promise<unknown> {
+  // Empty-body statuses are successful protocol responses, not JSON parse errors.
   if ([204, 205, 304].includes(response.status)) return {};
   return parseResponseBody(await response.text());
 }
@@ -119,6 +131,7 @@ function toUnauthorizedError(): ApiClientError {
   return new ApiClientError(401, { type: "unauthorized" });
 }
 
+/** Mutator used by Orval to add base URL, auth, refresh, and error behavior. */
 export async function apiFetch<T>(
   url: string,
   options: RequestInit,

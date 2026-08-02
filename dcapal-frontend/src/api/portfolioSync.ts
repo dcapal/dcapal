@@ -38,12 +38,15 @@ type PortfolioState = {
   lastUpdatedAt: number | string | Date;
 };
 
+// Keep decimal values as strings at the REST boundary so JSON parsing cannot
+// round them before the backend receives them.
 const decimalString = (value: number | null | undefined): string =>
   String(value ?? 0);
 
 const toFeesPayload = (
   fees: FeeState | undefined
 ): SyncPortfoliosRequest["portfolios"][number]["fees"] => {
+  // The API models fee decimals as strings to preserve their exact value.
   if (!fees?.feeStructure) return null;
 
   const { type, feeAmount, feeRate, minFee, maxFee } = fees.feeStructure;
@@ -85,6 +88,7 @@ const toFeesPayload = (
   return null;
 };
 
+/** Converts persisted Redux portfolio state into the REST sync request shape. */
 export const toSyncPayload = (
   pfolios: Record<string, PortfolioState>,
   deletedPortfolios: string[]

@@ -8,17 +8,22 @@ import {
 
 import { queryClient, PRICE_STALE_TIME } from "./queryClient";
 
+/** Identifies the backend or market-data provider used for an asset price. */
 export const Provider = Object.freeze({
   DCA_PAL: "DCAPal",
   YF: "YF",
 });
 
+/** Classifies the recoverable failures returned by price-provider adapters. */
 export const FetchError = Object.freeze({
   BAD_DATA: "BAD_DATA",
   REQUEST_CANCELED: "REQUEST_CANCELED",
 });
 
+/** The provider values accepted by the frontend price adapters. */
 export type Provider = (typeof Provider)[keyof typeof Provider];
+
+/** The fetch-error values understood by the frontend price adapters. */
 export type FetchError = (typeof FetchError)[keyof typeof FetchError];
 
 type PriceRequest = {
@@ -45,6 +50,8 @@ const toUnixTimestamp = (date: Date, startOfDay: boolean) => {
 };
 
 const getLastFourDays = () => {
+  // Yahoo's chart endpoint needs a window because the latest close is not
+  // guaranteed to be present at the current timestamp.
   const date = new Date();
   date.setDate(date.getDate() - 4);
   return {
@@ -56,6 +63,7 @@ const getLastFourDays = () => {
 const isValidClosePrice = (value: number | null): value is number =>
   typeof value === "number" && Number.isFinite(value) && value !== 0;
 
+/** Fetches an asset price directly from the DCA-Pal API. */
 export const fetchDcaPalPrice = async ({
   symbol,
   quote,
@@ -65,6 +73,7 @@ export const fetchDcaPalPrice = async ({
   return response.data.price;
 };
 
+/** Fetches a Yahoo close price and converts it to the requested quote currency. */
 export const fetchYahooPrice = async ({
   symbol,
   quote,
@@ -101,12 +110,14 @@ export const fetchYahooPrice = async ({
   };
 };
 
+/** Builds the cache key for a Yahoo price request. */
 export const getYahooPriceQueryKey = (
   symbol: string,
   quote: string,
   validCcys: string[]
 ) => ["price-provider", Provider.YF, symbol, quote, [...validCcys].sort()];
 
+/** Reads a Yahoo price through the shared TanStack Query cache. */
 export const useYahooPrice = ({
   symbol,
   quote,
@@ -126,6 +137,7 @@ export const useYahooPrice = ({
     staleTime: PRICE_STALE_TIME,
   });
 
+/** Reads or fetches a DCA-Pal price through the shared query cache. */
 export const getDcaPalPrice = (symbol: string, quote: string) =>
   queryClient.fetchQuery({
     queryKey: getGetPriceQueryKey(symbol, { quote }),
@@ -134,6 +146,7 @@ export const getDcaPalPrice = (symbol: string, quote: string) =>
     staleTime: PRICE_STALE_TIME,
   });
 
+/** Reads or fetches a converted Yahoo price through the shared query cache. */
 export const getYahooPrice = (
   symbol: string,
   quote: string,
@@ -146,6 +159,7 @@ export const getYahooPrice = (
     staleTime: PRICE_STALE_TIME,
   });
 
+/** Resolves a provider price and turns unusable provider data into `null`. */
 export const getPriceForProvider = async (
   provider: Provider,
   validCcys: string[],

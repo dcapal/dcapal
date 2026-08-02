@@ -15,6 +15,7 @@ const navigateToPortfolios = (portfolio, step, dispatch, navigate) => {
   navigate("/allocate");
 };
 
+/** Loads a shared portfolio link and routes it into the allocation flow. */
 export default function ImportPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();

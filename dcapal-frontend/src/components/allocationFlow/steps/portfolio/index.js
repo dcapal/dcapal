@@ -34,6 +34,8 @@ import { Button } from "@/components/ui/button";
 import { PreferencesDialog } from "./preferencesDialog";
 import { ResponsiveHelpIcon } from "@components/core/helpIcon";
 
+// Prices are refreshed on the existing five-minute boundary so a portfolio
+// does not silently change while the user is editing it.
 const refreshAssetPrices = async (assets, quoteCcy, validCcys, dispatch, t) => {
   console.debug("Refreshing prices (", new Date(), ")");
 
@@ -87,6 +89,7 @@ const computePortfolioGain = (assets) => {
   return ((totalValue - totalCost) / totalCost) * 100;
 };
 
+/** Renders the selected portfolio editor and coordinates price refreshes. */
 export const PortfolioStep = () => {
   const [searchText, setSearchText] = useState("");
 

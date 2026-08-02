@@ -16,6 +16,7 @@ import classNames from "classnames";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import { Trans, useTranslation } from "react-i18next";
 
+/** Edits portfolio-wide or asset-specific transaction fee rules. */
 export const TransactionFees = ({ asset }) => {
   const dispatch = useDispatch();
   const quoteCcy = useSelector((state) => currentPortfolio(state).quoteCcy);

@@ -11,6 +11,8 @@ import priceConversions from "./fixtures/price-conversions.json";
 
 const IMPORT_PORTFOLIO_ID = "fixture-import-portfolio";
 const FIXED_TS_SECONDS = 1735689600;
+// Fixtures intentionally allow malformed provider payloads because journeys
+// cover the UI's handling of invalid backend responses.
 type FixtureRecord = Record<string, any>;
 type SyncPortfolio = FixtureRecord & {
   id?: string;
@@ -21,6 +23,7 @@ type SyncRequestBody = {
   deletedPortfolios?: string[];
 };
 
+// Keep each scenario's remote state separate so tests can run in any order.
 const syncStores = new Map<string, Map<string, SyncPortfolio>>();
 const syncRequestCounts = new Map<string, number>();
 
@@ -176,6 +179,7 @@ const toMillis = (isoTs: string | undefined): number => {
   return Number.isNaN(ts) ? -1 : ts;
 };
 
+/** MSW handlers that model the backend responses used by frontend journeys. */
 export const handlers = [
   http.get("/api/assets/fiat", async () => {
     await delay(30);

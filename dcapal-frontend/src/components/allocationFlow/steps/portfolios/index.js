@@ -19,6 +19,7 @@ import classNames from "classnames";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@app/config";
 
+/** Lists saved portfolios and exposes the new-portfolio flow. */
 export const PortfoliosStep = () => {
   const { t } = useTranslation();
   const pfolios = useSelector((state) => state.pfolio.pfolios);

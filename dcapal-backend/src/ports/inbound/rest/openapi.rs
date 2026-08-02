@@ -15,22 +15,26 @@ use utoipa::openapi::OpenApi;
 
 use crate::AppContext;
 
+/// Converts the generated OpenAPI document to JSON and applies repository schema fixes.
 pub fn openapi_value(openapi: &OpenApi) -> Result<Value> {
     let mut value = serde_json::to_value(openapi)?;
     inline_import_portfolio_request_schema(&mut value);
     Ok(value)
 }
 
+/// Serves the checked-in OpenAPI representation through the REST application.
 pub async fn get_openapi_json(State(ctx): State<AppContext>) -> Response {
     Json(ctx.openapi_value.clone()).into_response()
 }
 
+/// Serializes an OpenAPI document with a trailing newline for stable diffs.
 pub fn openapi_json(openapi: &OpenApi) -> Result<String> {
     let mut json = serde_json::to_string_pretty(&openapi_value(openapi)?)?;
     json.push('\n');
     Ok(json)
 }
 
+/// Writes the OpenAPI document through a temporary file to avoid partial output.
 pub fn write_openapi_to_file(openapi: &OpenApi, output: &Path) -> Result<()> {
     let json = openapi_json(openapi)?;
     write_file_atomically(output, &json)
@@ -61,6 +65,8 @@ fn write_file_atomically(path: &Path, content: &str) -> Result<()> {
 }
 
 fn inline_import_portfolio_request_schema(openapi: &mut Value) {
+    // Some OpenAPI consumers do not resolve local `$defs` references in an
+    // inline request body, so publish the portfolio schema as a self-contained object.
     let schema_path =
         "/paths/~1import~1portfolio/post/requestBody/content/application~1json/schema";
     let request_schema = openapi
@@ -87,6 +93,7 @@ fn inline_local_schema_refs(
     definitions: &Map<String, Value>,
     active_definitions: &mut HashSet<String>,
 ) {
+    // Track the current reference chain so a recursive schema cannot recurse forever.
     let local_reference = value
         .as_object()
         .and_then(|object| object.get("$ref"))

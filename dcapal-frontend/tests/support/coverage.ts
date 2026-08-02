@@ -8,6 +8,7 @@ type BrowserCoverageEntries = Awaited<
 >;
 
 const normalizeSourcePath = (sourcePath: string): string => {
+  // V8 reports webpack URLs while Istanbul expects repository-relative paths.
   let normalized = decodeURIComponent(String(sourcePath)).replace(/\\/g, "/");
   const srcMarker = normalized.lastIndexOf("/src/");
 
@@ -25,6 +26,7 @@ const normalizeSourcePath = (sourcePath: string): string => {
   return normalized;
 };
 
+/** Writes one browser's V8 coverage as an Istanbul fragment for aggregation. */
 export const writeBrowserCoverage = async (
   entries: BrowserCoverageEntries,
   testInfo: TestInfo

@@ -18,6 +18,7 @@ type FixtureSession = {
 
 type SessionOverrides = Partial<FixtureSession>;
 
+/** Creates a deterministic Supabase session for browser journeys. */
 export const fixtureSession = (
   overrides: SessionOverrides = {}
 ): FixtureSession => ({
@@ -36,6 +37,7 @@ export const fixtureSession = (
   ...overrides,
 });
 
+/** Seeds the browser storage entries read by the Supabase client on startup. */
 export const seedAuthenticatedSession = async (
   page: Page,
   overrides: SessionOverrides = {}

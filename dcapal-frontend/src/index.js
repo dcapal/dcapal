@@ -38,6 +38,8 @@ i18n
 document.documentElement.lang = i18n.language;
 i18n.on("languageChanged", (lang) => (document.documentElement.lang = lang));
 
+// Configure the generated client before rendering so every initial query uses
+// the same API base URL and authentication callbacks.
 configureApiClientBaseUrl(DCAPAL_API);
 configureApiClientAuth({
   getAccessToken: async () => {
@@ -59,6 +61,7 @@ configureApiClientAuth({
   },
 });
 
+// Start MSW only for browser journeys; production must use the real API.
 const startMocks = async () => {
   if (process.env.REACT_APP_E2E_MSW !== "1") {
     return;

@@ -43,6 +43,8 @@ pub struct PortfolioResponse {
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// An asset held by a portfolio.
+///
+/// Decimal values are serialized as JSON strings to preserve precision.
 pub struct PortfolioAssetResponse {
     /// The provider symbol for the asset.
     pub symbol: String,

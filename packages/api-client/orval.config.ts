@@ -1,5 +1,6 @@
 import { defineConfig } from "orval";
 
+/** Keeps production hooks and MSW handlers generated from the same OpenAPI document. */
 export default defineConfig({
   api: {
     input: "../../dcapal-backend/docs/openapi.json",

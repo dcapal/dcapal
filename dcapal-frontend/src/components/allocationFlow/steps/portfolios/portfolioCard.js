@@ -50,6 +50,7 @@ const computePortfolioGain = (assets) => {
   return ((totalValue - totalCost) / totalCost) * 100;
 };
 
+/** Displays a saved portfolio and its edit, duplicate, and delete actions. */
 export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const [state, setState] = useState(CardState.VIEW);
   const [newName, setNewName] = useState(name);

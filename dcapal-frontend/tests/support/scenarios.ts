@@ -1,3 +1,4 @@
+/** Scenario names shared by Playwright fixtures and MSW request handlers. */
 export const scenarios = Object.freeze({
   default: "default",
   importSuccess: "import-success",
@@ -20,4 +21,5 @@ export const scenarios = Object.freeze({
   syncSignoutFailure: "sync-signout-failure",
 } as const);
 
+/** The set of scenario values accepted by the Playwright fixture. */
 export type Scenario = (typeof scenarios)[keyof typeof scenarios];

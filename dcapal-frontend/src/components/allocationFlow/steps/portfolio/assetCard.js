@@ -37,6 +37,7 @@ const GainBadge = ({ gain, i18n }) => {
   );
 };
 
+/** Displays one portfolio asset and its editable allocation values. */
 export const AssetCard = ({
   symbol,
   name,

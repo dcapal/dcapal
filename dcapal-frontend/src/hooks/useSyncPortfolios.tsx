@@ -34,6 +34,7 @@ type SyncCoordinatorProps = {
 
 const SyncContext = createContext<SyncContextValue | null>(null);
 
+/** Provides authenticated portfolio synchronization to the route tree. */
 export const SyncCoordinator = ({
   children,
   intervalMs = 5000,
@@ -50,6 +51,8 @@ export const SyncCoordinator = ({
       onSuccess: (response) => dispatch(applySyncResult(response.data)),
     },
   });
+  // The interval callback must read the latest Redux state without being
+  // recreated every five seconds.
   const stateRef = useRef({ pfolios, deletedPortfolios });
   const pendingRef = useRef(isPending);
   stateRef.current = { pfolios, deletedPortfolios };
@@ -110,6 +113,7 @@ export const SyncCoordinator = ({
   );
 };
 
+/** Reads the synchronization state supplied by `SyncCoordinator`. */
 export const useSyncPortfolios = () => {
   const context = useContext(SyncContext);
   if (!context) {

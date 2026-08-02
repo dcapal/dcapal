@@ -49,6 +49,7 @@ lazy_static! {
         jsonschema::draft7::new(&PORTFOLIO_JSON_SCHEMA).unwrap();
 }
 
+/// Builds the REST router and the OpenAPI document from the same route set.
 pub fn build_openapi_router() -> (Router<AppContext>, OpenApi) {
     OpenApiRouter::with_openapi(base_openapi())
         .routes(routes!(root))
@@ -81,6 +82,7 @@ fn base_openapi() -> OpenApi {
         (status = 200, description = "Service greeting", body = String)
     )
 )]
+/// Returns the service greeting used by the root health-style endpoint.
 pub async fn root() -> &'static str {
     "Greetings from DCA-Pal APIs!"
 }
@@ -96,6 +98,7 @@ pub async fn root() -> &'static str {
         )
     )
 )]
+/// Returns the cached fiat asset catalog.
 pub async fn get_assets_fiat(State(ctx): State<AppContext>) -> Result<Response> {
     let service = &ctx.services.mkt_data;
 
@@ -120,6 +123,7 @@ pub async fn get_assets_fiat(State(ctx): State<AppContext>) -> Result<Response> 
         )
     )
 )]
+/// Returns the cached cryptocurrency asset catalog.
 pub async fn get_assets_crypto(State(ctx): State<AppContext>) -> Result<Response> {
     let service = &ctx.services.mkt_data;
 
@@ -135,6 +139,7 @@ pub async fn get_assets_crypto(State(ctx): State<AppContext>) -> Result<Response
 
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
+/// Query parameters for provider-backed asset search.
 pub struct GetAssetsQuery {
     /// Asset name query.
     name: String,
@@ -152,6 +157,7 @@ pub struct GetAssetsQuery {
         )
     )
 )]
+/// Proxies an asset-name search to the configured market-data provider.
 pub async fn get_assets_data(
     State(ctx): State<AppContext>,
     Query(params): Query<GetAssetsQuery>,
@@ -162,6 +168,7 @@ pub async fn get_assets_data(
 #[derive(Debug, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 #[into_params(parameter_in = Query)]
+/// Time range parameters for a historical asset chart.
 pub struct GetAssetChartQuery {
     /// Chart start timestamp (unix seconds).
     start_period: i64,
@@ -171,6 +178,7 @@ pub struct GetAssetChartQuery {
 
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Path)]
+/// Path parameters identifying a charted asset.
 pub struct GetAssetChartPath {
     /// Asset symbol.
     symbol: String,
@@ -209,6 +217,7 @@ pub struct GetAssetChartPath {
         )
     )
 )]
+/// Proxies a historical chart request to the configured market-data provider.
 pub async fn get_assets_chart(
     Path(path): Path<GetAssetChartPath>,
     Query(params): Query<GetAssetChartQuery>,
@@ -223,6 +232,7 @@ pub async fn get_assets_chart(
 
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
+/// Quote-currency parameter for a conversion-price request.
 pub struct GetPriceQuery {
     /// Quote currency.
     quote: String,
@@ -230,6 +240,7 @@ pub struct GetPriceQuery {
 
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Path)]
+/// Base-asset parameter for a conversion-price request.
 pub struct GetPricePath {
     /// Base asset symbol.
     asset: String,
@@ -248,6 +259,7 @@ pub struct GetPricePath {
         (status = 404, description = "Price not available")
     )
 )]
+/// Returns the current conversion price for a base asset and quote currency.
 pub async fn get_price(
     Path(path): Path<GetPricePath>,
     Query(query): Query<GetPriceQuery>,
@@ -269,12 +281,14 @@ pub async fn get_price(
 }
 
 fn cache_control<T: Expiring>(t: &T) -> CacheControl {
+    // Cache only until the domain object itself becomes stale.
     CacheControl::new()
         .with_public()
         .with_max_age(Duration::from_secs(t.time_to_live().as_secs()))
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+/// Metadata returned after a portfolio is stored for sharing.
 pub struct ImportPortfolioResponse {
     pub id: String,
     pub expires_at: String,
@@ -302,6 +316,7 @@ impl From<ImportedPortfolio> for ImportPortfolioResponse {
         (status = 400, description = "Input portfolio does not match schema requirements")
     )
 )]
+/// Validates and stores a shared portfolio payload.
 pub async fn import_portfolio(
     State(ctx): State<AppContext>,
     Json(payload): Json<serde_json::Value>,
@@ -325,6 +340,7 @@ pub async fn import_portfolio(
 
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Path)]
+/// Path parameters identifying a stored shared portfolio.
 pub struct GetImportedPortfolioPath {
     /// Imported portfolio id.
     id: String,
@@ -339,6 +355,7 @@ pub struct GetImportedPortfolioPath {
         (status = 404, description = "Portfolio not found or expired")
     )
 )]
+/// Returns a stored shared portfolio or a not-found response when it expired.
 pub async fn get_imported_portfolio(
     Path(path): Path<GetImportedPortfolioPath>,
     State(ctx): State<AppContext>,
@@ -353,6 +370,10 @@ pub async fn get_imported_portfolio(
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
+/// Transaction-fee policy exchanged by the REST API.
+///
+/// Decimal values are serialized as strings so clients do not lose precision
+/// while crossing the JSON boundary.
 pub enum FeeStructure {
     #[serde(rename = "zeroFee")]
     ZeroFee,

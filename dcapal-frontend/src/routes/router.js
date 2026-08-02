@@ -25,6 +25,7 @@ import(/* webpackPrefetch: true */ "@app");
 
 const App = lazy(() => import("@app"));
 
+/** Defines application routes and keeps the sync coordinator around them. */
 export const Router = () => {
   const [session, setSession] = useState(null);
 

@@ -111,6 +111,7 @@ const toYahooAsset = (quote: YahooSearchQuote): SearchAsset => ({
   aclass: 10,
 });
 
+/** Searches catalog and Yahoo assets and adds a selected result to the portfolio. */
 export const SearchBar = (props: SearchBarProps) => {
   const { t } = useTranslation();
   const debouncedText = useDebouncedValue(props.text, 300);

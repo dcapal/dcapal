@@ -6,6 +6,7 @@ import coverageLib from "istanbul-lib-coverage";
 import reportLib from "istanbul-lib-report";
 import reports from "istanbul-reports";
 
+/** Combines browser and API-client coverage into one frontend report. */
 const { createCoverageMap } = coverageLib;
 const { createContext } = reportLib;
 
@@ -18,6 +19,8 @@ const apiCoverageFile = path.join(
 );
 const reportDir = path.join(repoRoot, "coverage/frontend");
 
+// Generated operations and fixtures are implementation artifacts, not frontend
+// source lines that this report is intended to assess.
 const generatedPathParts = [
   "/src/gen/",
   "/src/gen-mocks/",
@@ -28,6 +31,8 @@ const generatedPathParts = [
 const toPosix = (value) => String(value).replaceAll("\\", "/");
 
 const normalizeCoveragePath = (filePath) => {
+  // Browser source maps use several URL forms; normalize them before merging
+  // fragments so one source file has one coverage entry.
   let value = decodeURIComponent(String(filePath));
   if (value.startsWith("file://")) value = new URL(value).pathname;
   value = toPosix(value);
@@ -53,6 +58,8 @@ const normalizeCoveragePath = (filePath) => {
 };
 
 const isInScope = (filePath) => {
+  // Keep the report aligned with executable frontend source, excluding tests,
+  // generated code, and declaration-only files.
   const relativePath = toPosix(path.relative(repoRoot, filePath));
   if (
     !(
@@ -103,6 +110,8 @@ const mergeCoverageObject = (coverageMap, coverageObject) => {
 };
 
 const getBaseRef = () => {
+  // CI checks the branch against origin/master; the HEAD^ fallback keeps local
+  // runs useful in shallow or freshly cloned repositories.
   if (process.env.COVERAGE_BASE_REF) return process.env.COVERAGE_BASE_REF;
 
   try {
@@ -117,6 +126,7 @@ const getBaseRef = () => {
 };
 
 const parseChangedLines = (diff) => {
+  // The report compares only added/changed source lines, not the whole file.
   const changedLines = new Map();
   let currentFile = null;
 
@@ -173,6 +183,8 @@ const isNonExecutableSourceLine = (line) => {
 };
 
 const getCoveredFunctionLines = (coverage, sourceLines) => {
+  // Babel can attach a hit to a transpiled wrapper instead of the original
+  // arrow-function line, so recover those lines only for visible declarations.
   if (!coverage) return new Set();
 
   const coveredLines = new Set();
@@ -203,6 +215,7 @@ const getCoveredFunctionLines = (coverage, sourceLines) => {
 };
 
 const getChangedLineReport = async (coverageMap) => {
+  // A percentage over the whole repository would hide uncovered new code.
   const { baseRef, changedLines } = getChangedLines();
   const rows = [];
 
@@ -285,6 +298,7 @@ const writeTextSummary = async (coverageMap) => {
   return text;
 };
 
+/** Builds the HTML/LCOV summaries and the changed-line Markdown report. */
 const main = async () => {
   const coverageMap = createCoverageMap({});
 
