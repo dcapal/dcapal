@@ -17,7 +17,7 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 - [x] (2026-08-02) Run formatting, typechecks, tests, and documentation-focused checks; review the final diff.
 - [x] (2026-08-02) Commit and push the initial documentation changes; inspect the resulting GitHub pipeline.
 - [x] (2026-08-02) Rebase onto the latest `origin/master`, preserve upstream persistence changes, and revalidate the merged tree.
-- [ ] (2026-08-02) Force-push the rebased branch and verify the replacement GitHub pipeline.
+- [x] (2026-08-02) Force-push the rebased branch and verify the replacement GitHub pipeline.
 
 ## Surprises & Discoveries
 
@@ -65,7 +65,7 @@ Documented the changed hand-written frontend components, hooks, API boundaries, 
 
 Validation before the rebase completed successfully: frontend lint, frontend typecheck, frontend unit tests (6), API-client typecheck, API-client tests (15), backend unit tests, Rust formatting, development build, diff checks, 76/76 Chromium coverage journeys, and 76/76 Firefox/WebKit journeys. After the rebase, the merged tree passed frontend lint/typecheck/unit tests, API-client typecheck/tests, Rust formatting, OpenAPI/Orval generation, and the full backend target (15 tests) against local Supabase PostgreSQL. The coverage report generated successfully and no global percentage threshold was introduced. User-owned `MIGRATION.md` and `agent_docs/` remained untracked and unstaged.
 
-The initial documentation commits were pushed to `agent/tanstack-orval-api-client`. The first pipeline identified expected checked-in-spec drift caused by the new Rust docs; the spec/client was regenerated, the branch was rebased onto `origin/master`, and the rebased branch still needs its force-push and replacement pipeline verification.
+The initial documentation commits were pushed to `agent/tanstack-orval-api-client`. The first pipeline identified expected checked-in-spec drift caused by the new Rust docs; the spec/client was regenerated, the branch was rebased onto `origin/master` at `4cb258e`, and the rebased branch was force-pushed with lease. Replacement GitHub Actions run `30741409774` completed successfully for the rebased head `ba93e5d`.
 
 ## Context and Orientation
 
@@ -142,3 +142,4 @@ Revision note (2026-08-02): Updated after the inventory and documentation pass; 
 Revision note (2026-08-02): Recorded successful local validation, including both browser lanes and the changed-line coverage report; commit and CI verification remain.
 Revision note (2026-08-02): Regenerated the checked-in OpenAPI document and Orval production/MSW output from the documented Rust source after CI caught the expected schema drift; no generated file was edited manually.
 Revision note (2026-08-02): Rebasing onto `origin/master` required preserving upstream SQLx persistence changes and resolving documentation/spec conflicts; the final local backend and frontend checks passed with the installed Rust 1.97.1 toolchain and local PostgreSQL.
+Revision note (2026-08-02): Force-pushed the rebased branch and verified replacement GitHub Actions run `30741409774` completed successfully; the documentation plan is complete.
