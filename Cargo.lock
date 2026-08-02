@@ -943,6 +943,7 @@ dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "env_logger",
+ "getrandom 0.3.4",
  "getrandom 0.4.1",
  "glob",
  "js-sys",
