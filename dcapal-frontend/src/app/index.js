@@ -1,25 +1,24 @@
 import React, { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { Toaster } from "react-hot-toast";
+import { useGetAssetsFiat } from "@dcapal/api-client";
 
 import { AllocationFlow } from "@components/allocationFlow";
 import { setCurrencies } from "@app/appSlice";
-import { fetchAssetsDcaPal } from "@/api";
+import { SESSION_STALE_TIME } from "@/api/queryClient";
 import { ContainerPage } from "@routes/containerPage";
 
-const loadCurrencies = async (dispatch) => {
-  const res = await fetchAssetsDcaPal("fiat");
-  const ccys = res.map((c) => c.symbol);
-
-  dispatch(setCurrencies({ currencies: ccys }));
-};
-
+/** Renders the allocation application inside the route-level shell. */
 export const App = () => {
   const dispatch = useDispatch();
+  const fiatAssetsQuery = useGetAssetsFiat({
+    query: { staleTime: SESSION_STALE_TIME },
+  });
 
   useEffect(() => {
-    loadCurrencies(dispatch);
-  }, []);
+    const currencies = fiatAssetsQuery.data?.data?.map((asset) => asset.id);
+    if (currencies) dispatch(setCurrencies({ currencies }));
+  }, [dispatch, fiatAssetsQuery.data]);
 
   return (
     <ContainerPage
@@ -52,4 +51,5 @@ export const App = () => {
   );
 };
 
+/** Default export consumed by the lazy allocation route. */
 export default App;

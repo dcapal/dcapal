@@ -43,6 +43,8 @@ pub struct PortfolioResponse {
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// An asset held by a portfolio.
+///
+/// Decimal values are serialized as JSON strings to preserve precision.
 pub struct PortfolioAssetResponse {
     /// The provider symbol for the asset.
     pub symbol: String,
@@ -54,16 +56,16 @@ pub struct PortfolioAssetResponse {
     pub base_ccy: String,
     /// The data provider for the asset.
     pub provider: String,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(with = "rust_decimal::serde::str")]
     /// The quantity held.
     pub qty: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(with = "rust_decimal::serde::str")]
     /// The target portfolio weight.
     pub target_weight: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(with = "rust_decimal::serde::str")]
     /// The latest known price.
     pub price: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(with = "rust_decimal::serde::str")]
     /// The average price paid for the holding.
     pub average_buy_price: Decimal,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -192,7 +194,7 @@ pub struct TransactionFeesResponse {
     #[serde(
         skip_serializing_if = "Option::is_none",
         default,
-        with = "rust_decimal::serde::float_option"
+        with = "rust_decimal::serde::str_option"
     )]
     /// The maximum allowed fee impact, when configured.
     pub max_fee_impact: Option<Decimal>,
@@ -279,5 +281,10 @@ mod test {
 
         let actual: PortfolioResponse = (portfolio_model, assets_model).try_into().unwrap();
         assert_eq!(actual, expected);
+
+        let serialized = serde_json::to_value(&actual).unwrap();
+        assert_eq!(serialized["assets"][0]["qty"], "10.0");
+        assert_eq!(serialized["assets"][0]["averageBuyPrice"], "90.0");
+        assert_eq!(serialized["fees"]["feeStructure"]["feeAmount"], "2.95");
     }
 }

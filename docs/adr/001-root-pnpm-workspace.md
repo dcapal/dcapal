@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. The temporary decision not to add an Orval client is superseded by
+[ADR 002](./002-openapi-tanstack-api-client.md).
 
 ## Context
 

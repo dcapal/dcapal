@@ -3,6 +3,8 @@ const common = require("./webpack.common.js");
 
 const path = require("path");
 
+const isE2eMode = process.env.REACT_APP_E2E_MSW === "1";
+
 module.exports = (env, argv) =>
   merge(common(env, argv), {
     mode: "development",
@@ -12,6 +14,8 @@ module.exports = (env, argv) =>
         directory: path.resolve(__dirname, "./dist"),
       },
       compress: true,
+      hot: !isE2eMode,
+      liveReload: !isE2eMode,
       allowedHosts: "all",
       port: 3000,
       historyApiFallback: true,
