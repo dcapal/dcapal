@@ -7,12 +7,14 @@
     "jsx": "react-jsx",
     "module": "ESNext",
     "target": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "baseUrl": "./",
     "paths": {
+      "threads": [
+        "./node_modules/threads/dist/index.d.ts"
+      ],
       "@dcapal/api-client": [
         "../packages/api-client/src/index.ts"
       ],
@@ -26,31 +28,31 @@
         "../packages/api-client/src/*"
       ],
       "@/*": [
-        "src/*"
+        "./src/*"
       ],
       "@app/*": [
-        "src/app/*"
+        "./src/app/*"
       ],
       "@components/*": [
-        "src/components/*"
+        "./src/components/*"
       ],
       "@demo/*": [
-        "demo/*"
+        "./demo/*"
       ],
       "@hooks/*": [
-        "src/hooks/*"
+        "./src/hooks/*"
       ],
       "@images/*": [
-        "images/*"
+        "./images/*"
       ],
       "@routes/*": [
-        "src/routes/*"
+        "./src/routes/*"
       ],
       "@utils/*": [
-        "src/utils/*"
+        "./src/utils/*"
       ],
       "@workers/*": [
-        "src/workers/*"
+        "./src/workers/*"
       ]
     }
   },

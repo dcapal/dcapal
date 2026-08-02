@@ -2,6 +2,13 @@
   "name": "dcapal",
   "private": true,
   "packageManager": "pnpm@10.31.0",
+  "pnpm": {
+    "overrides": {
+      "@react-spring/web": "^10.1.2",
+      "@supabase/auth-ui-react>react": "^19.2.8",
+      "@supabase/auth-ui-react>react-dom": "^19.2.8"
+    }
+  },
   "scripts": {
     "api-client:generate": "make export-openapi && pnpm --filter @dcapal/api-client generate",
     "frontend:dev": "pnpm --filter @dcapal/frontend dev",

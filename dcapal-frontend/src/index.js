@@ -9,6 +9,7 @@ import {
 import "./style.css";
 import { Router } from "@routes/router";
 import { BrowserRouter } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { DCAPAL_API, supabase } from "@app/config";
 import { queryClient } from "@/api/queryClient";
 
@@ -82,15 +83,17 @@ const startMocks = async () => {
 const renderApp = () => {
   const root = createRoot(document.getElementById("app"));
   root.render(
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Suspense fallback={<div>Loading...</div>}>
-            <Router />
-          </Suspense>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </React.StrictMode>
+    <HelmetProvider>
+      <React.StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <Suspense fallback={<div>Loading...</div>}>
+              <Router />
+            </Suspense>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </React.StrictMode>
+    </HelmetProvider>
   );
 };
 
