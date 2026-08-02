@@ -8,7 +8,7 @@ use optimize::{
     advanced::{self, TheoreticalAllocation},
     basic,
 };
-use rand::{Rng, distr};
+use rand::{RngExt, distr};
 use rust_decimal::{
     Decimal,
     prelude::{One, ToPrimitive},
