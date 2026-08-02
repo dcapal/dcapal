@@ -12,8 +12,8 @@ tests also need to exercise PostgreSQL constraints and transactions.
 
 ## Decision
 
-Use SQLx 0.9.0 with Rust 1.97.1. Keep a separate migration crate and embed the
-service-root SQL migrations with `sqlx::migrate!`. Preserve the four existing
+Use SQLx 0.9.0 with the stable Rust toolchain. Keep a separate migration crate
+and embed the service-root SQL migrations with `sqlx::migrate!`. Preserve the four existing
 numeric migration versions as reversible `.up.sql` and `.down.sql` files. The
 up files are idempotent so they can run against the existing tables; SQLx uses
 `_sqlx_migrations` and leaves `seaql_migrations` untouched.

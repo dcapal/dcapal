@@ -19,9 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          cache: false
+          rustflags: ""
           components: rustfmt
 
       - name: Check backend formatting
@@ -33,9 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          cache: false
+          rustflags: ""
           components: clippy
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
@@ -77,9 +79,10 @@ jobs:
         with:
           version: ${{ env.SUPABASE_VERSION }}
 
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          cache: false
+          rustflags: ""
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
         with:
@@ -101,9 +104,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          cache: false
+          rustflags: ""
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
         with:
@@ -121,9 +125,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          cache: false
+          rustflags: ""
           components: clippy, rustfmt
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
@@ -148,9 +153,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.97.1
+          cache: false
+          rustflags: ""
       # Share dependency, target, and installed Rust binary data across Rust jobs.
       - uses: Swatinem/rust-cache@v2
         with:

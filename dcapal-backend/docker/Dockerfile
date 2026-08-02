@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # Bookworm, so it's the same as the runtime
-FROM rust:1.97-bookworm AS chef
+FROM rust:bookworm AS chef
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     cargo install cargo-chef

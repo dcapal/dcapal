@@ -49,9 +49,9 @@ The migration must be observable in two ways. A fresh Supabase PostgreSQL databa
   Rationale: This is the current SQLx release and supplies the pool, typed row decoding, migration runner, and `sqlx::test` features required by the backend.
   Date/Author: 2026-08-01 / Codex and user.
 
-- Decision: Pin the workspace, CI, and backend build image to Rust 1.97.1.
-  Rationale: This is the latest stable toolchain available during the migration and keeps local, CI, and container builds on the same compiler.
-  Date/Author: 2026-08-01 / Codex and user.
+- Decision: Use the stable Rust toolchain for the workspace, CI, and backend build image.
+  Rationale: The root `rust-toolchain.toml` is the single source of truth for the selected toolchain. `Cargo.toml` keeps `rust-version = "1.97.1"` as the minimum supported compiler version.
+  Date/Author: 2026-08-02 / Codex and user.
 
 - Decision: Preserve all four historical schema steps as SQLx migrations with numeric timestamp versions and reversible `.up.sql` / `.down.sql` files.
   Rationale: Fresh databases retain the existing schema history, while idempotent up migrations can safely run against production tables that were created by SeaORM.
