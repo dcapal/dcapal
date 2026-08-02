@@ -7,6 +7,9 @@ wasm-pack.log
 TODO.md
 .DS_Store
 
+# ExecPlans are local working documents and must not be committed.
+docs/exec-plans/
+
 # IDE stuff
 .vscode
 .idea
