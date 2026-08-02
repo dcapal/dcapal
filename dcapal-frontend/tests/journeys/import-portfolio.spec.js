@@ -60,8 +60,15 @@ test.describe("unresolved import prices", () => {
      * WHEN the price lookup fails
      * THEN the app shows a safe error state and the investor can go back
      */
+    const importResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith("/api/import/portfolio/fixture-import-portfolio") &&
+        response.ok()
+    );
     await page.goto("/import?p=fixture-import-portfolio");
-    await expect(page.getByTestId("route-import")).toBeVisible();
+    await importResponse;
     await expect(page.getByTestId("route-allocate")).toBeVisible();
 
     await expect(page.getByTestId("import-error")).toBeVisible({

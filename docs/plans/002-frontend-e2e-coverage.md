@@ -25,6 +25,7 @@ The demo portfolio route is explicitly out of scope. The optimizer implementatio
 - [x] (2026-08-02) Ran the complete local verification matrix and inspected every changed in-scope executable line.
 - [x] (2026-08-02) Reviewed the PR feedback and recorded the requirement that new frontend runtime source files use TypeScript.
 - [x] (2026-08-02) Applied the PR feedback by converting the new frontend serializer to TypeScript, hardened both retried E2E journeys, and made the combined CI matrix green locally.
+- [x] (2026-08-02) Fixed the additional Firefox transition race found by the first CI run and re-ran the complete Firefox/WebKit lane successfully.
 
 ## Surprises & Discoveries
 
@@ -56,6 +57,8 @@ The demo portfolio route is explicitly out of scope. The optimizer implementatio
   Evidence: unresolved review thread `PRRT_kwDOIeNHNM6VpwiF` on `dcapal-frontend/src/api/portfolioSync.js`.
 - Observation: The first local coverage report reused a stale webpack dev server and therefore mapped the serializer to the deleted JavaScript path.
   Evidence: the existing process on port 3000 served `portfolioSync.js`; after restarting it, fresh V8 fragments mapped the runtime to `portfolioSync.ts`.
+- Observation: The first matrix run found the same transient import-route race in the unresolved-price journey under Firefox.
+  Evidence: Actions run `30737132749`, job `91468054893`; 75 tests passed, while the test timed out waiting for `route-import` before reaching its expected error state. The journey now waits for the import response and asserts only the final allocation/error state.
 
 ## Decision Log
 
@@ -97,7 +100,7 @@ GitHub Actions publishes the combined report as `frontend-coverage-report` and a
 
 Small runtime fixes were needed for safe, deterministic user-visible behavior: the import flow now avoids duplicate StrictMode requests and keeps its file state until the result is known; unresolved import prices show an actionable error and Go back; search and portfolio screens expose stable state selectors; and E2E MSW mode disables development-server HMR/live reload to keep persisted-state journeys stable.
 
-Follow-up hardening converts the portfolio sync serializer to `portfolioSync.ts`, removes the successful-import assertion on a transient loading route in favour of the import response and final editor state, and uses the enabled Confirm weights action as the final readiness check in the editing journey.
+Follow-up hardening converts the portfolio sync serializer to `portfolioSync.ts`, replaces transient import-route assertions with the import response and final editor/error states, and uses the enabled Confirm weights action as the final readiness check in the editing journey. The repaired Firefox/WebKit lane passed 76/76 locally after CI exposed the unresolved-price variant of the same race.
 
 ## Context and Orientation
 
