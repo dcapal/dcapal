@@ -13,17 +13,20 @@ use crate::{
     },
 };
 
+/// Coordinates bidirectional portfolio synchronization between clients and storage.
 pub struct PortfolioService {
-    portfolio_repository: Arc<PortfolioRepository>,
+    portfolio_repository: Arc<dyn PortfolioRepository>,
 }
 
 impl PortfolioService {
-    pub fn new(portfolio_repository: Arc<PortfolioRepository>) -> Self {
+    /// Creates a portfolio service using the supplied persistence port.
+    pub fn new(portfolio_repository: Arc<dyn PortfolioRepository>) -> Self {
         Self {
             portfolio_repository,
         }
     }
 
+    /// Synchronizes a user's local portfolios with the server state.
     pub async fn sync_portfolios(
         &self,
         user_id: Uuid,
@@ -80,7 +83,9 @@ impl PortfolioService {
 
         // Process deleted portfolios
         for deleted_pf in req.deleted_portfolios {
-            self.portfolio_repository.soft_delete(deleted_pf).await?;
+            self.portfolio_repository
+                .soft_delete(user_id, deleted_pf)
+                .await?;
         }
 
         Ok(SyncPortfoliosResponse {

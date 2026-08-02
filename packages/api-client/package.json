@@ -1,0 +1,28 @@
+{
+  "name": "@dcapal/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mocks": "./src/gen-mocks/index.ts",
+    "./model": "./src/gen/model/index.ts"
+  },
+  "scripts": {
+    "generate": "orval --config orval.config.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "msw": "catalog:",
+    "orval": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

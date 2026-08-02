@@ -6,65 +6,143 @@ on:
   pull_request:
     branches: ["master", "dev", "rc/**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  backend-build-test:
+  backend-format:
+    name: check:fmt:backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
+          cache: false
+          rustflags: ""
+          components: rustfmt
 
+      - name: Check backend formatting
+        working-directory: dcapal-backend
+        run: cargo fmt --all -- --check
+
+  backend-lint:
+    name: check:lint:backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
+          components: clippy
       - name: Toolchain info
         run: |
           cargo --version --verbose
           rustc --version
           cargo clippy --version
 
-      - name: Install SeaORM CLI
-        run: cargo install sea-orm-cli
+      - name: Lint backend
+        working-directory: dcapal-backend
+        run: cargo clippy -- -D warnings
 
-      - name: Lint
-        run: |
-          cd dcapal-backend
-          cargo fmt --all -- --check
-          cargo clippy -- -D warnings
+  backend-test:
+    name: test:backend
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_VERSION: 2.110.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
 
-      - name: Build and Test
-        run: |
-          cd dcapal-backend
-          RUST_LOG=dcapal-backend=debug cargo test -- --nocapture
+      - name: Cache Supabase CLI npm packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-supabase-cli-${{ env.SUPABASE_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: ${{ env.SUPABASE_VERSION }}
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
+      - name: Start backend database
+        run: make backend-db-up
+
+      - name: Test backend
+        run: make test-backend
+
+      - name: Stop backend database
+        if: always()
+        run: make backend-db-down
 
   backend-openapi-check:
+    name: check:openapi:backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
       - name: Generate OpenAPI spec
         run: make export-openapi
 
       - name: Verify OpenAPI spec is up to date
         run: git diff --exit-code -- dcapal-backend/docs/openapi.json
 
-  optimizer-build-test:
+  optimizer-lint:
+    name: check:lint:optimizer
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
+      - name: Toolchain info
+        run: |
+          cargo --version --verbose
+          rustc --version
+          cargo clippy --version
 
+      - name: Lint optimizer
+        working-directory: dcapal-optimizer-wasm
+        run: |
+          cargo fmt -- --check
+          cargo clippy -- -D warnings
+
+  optimizer-build-test:
+    name: build:test:optimizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          cache-shared-key: rust
+          cache-on-failure: false
+          rustflags: ""
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
@@ -72,86 +150,182 @@ jobs:
         run: |
           cargo --version --verbose
           rustc --version
-          cargo clippy --version
 
-      - name: Lint
+      - name: Test optimizer
+        working-directory: dcapal-optimizer-wasm
         run: |
-          cd dcapal-optimizer-wasm
-          cargo fmt -- --check
-          cargo clippy -- -D warnings
-
-      - name: Test
-        run: |
-          cd dcapal-optimizer-wasm
           RUST_LOG=info cargo test -- --nocapture
           wasm-pack test --headless --chrome
 
-      - name: Build
-        run: |
-          cd dcapal-optimizer-wasm
-          wasm-pack build
+      - name: Build optimizer package
+        working-directory: dcapal-optimizer-wasm
+        run: wasm-pack build
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
 
-  frontend-check:
+  frontend-format:
+    name: check:fmt:frontend
     runs-on: ubuntu-slim
     needs: optimizer-build-test
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
-          cache-dependency-path: dcapal-frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Check formatting
-        run: |
-          cd dcapal-frontend
-          npm ci
-          npm run check
-
-      - name: Typecheck
-        run: |
-          cd dcapal-frontend
-          npm run typecheck
-
-  frontend-build-test:
-    runs-on: ubuntu-latest
-    needs: [frontend-check, optimizer-build-test]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-          cache-dependency-path: dcapal-frontend/package-lock.json
-
+      # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
 
       - name: Install dependencies
-        run: |
-          cd dcapal-frontend
-          npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: |
-          cd dcapal-frontend
-          npm run build
+      - name: Check frontend formatting
+        run: pnpm frontend:lint
+
+  frontend-typecheck:
+    name: check:typecheck:frontend
+    runs-on: ubuntu-slim
+    needs: optimizer-build-test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # The generated package is a local dependency and must exist before pnpm install.
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v8
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck frontend
+        run: pnpm frontend:typecheck
+
+  frontend-build-test:
+    name: build:test:frontend
+    runs-on: ubuntu-latest
+    needs: optimizer-build-test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # The generated package is a local dependency and must exist before pnpm install.
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v8
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm frontend:build
 
       - name: Unit tests
-        run: |
-          cd dcapal-frontend
-          npm run test:unit
+        run: pnpm frontend:test
+
+  frontend-e2e-tests:
+    name: test:e2e:frontend (${{ matrix.lane }})
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    needs: optimizer-build-test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: chrome
+            collect_coverage: true
+          - lane: other-browsers
+            collect_coverage: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # The generated package is a local dependency and must exist before pnpm install.
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v8
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Version the browser cache so Playwright upgrades invalidate old binaries.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-v1-
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @dcapal/frontend exec playwright install --with-deps
+
+      - name: Run Chrome coverage journeys
+        if: ${{ matrix.collect_coverage }}
+        run: pnpm frontend:test:e2e:coverage
+
+      - name: Run other browser journeys
+        if: ${{ !matrix.collect_coverage }}
+        run: pnpm frontend:test:e2e --project=firefox --project=webkit
+
+      - name: Run API-client coverage tests
+        if: ${{ matrix.collect_coverage }}
+        run: pnpm --filter @dcapal/api-client test:coverage
+
+      - name: Build combined coverage report
+        if: ${{ matrix.collect_coverage }}
+        run: pnpm frontend:coverage:report
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && !matrix.collect_coverage }}
+        with:
+          name: playwright-report-other-browsers
+          path: dcapal-frontend/playwright-report/
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && matrix.collect_coverage }}
+        with:
+          name: frontend-coverage-report
+          path: coverage/frontend/
+          retention-days: 30
 
   backend-smoke-test:
+    name: test:smoke:backend
     timeout-minutes: 60
     runs-on: ubuntu-latest
     env:
@@ -160,23 +334,60 @@ jobs:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
       POSTGRES_DB: postgres
+      SUPABASE_VERSION: 2.110.0
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
+
+      # Supabase setup-cli installs the pinned package through npm.
+      - name: Cache Supabase CLI npm packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-supabase-cli-${{ env.SUPABASE_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: ${{ env.SUPABASE_VERSION }}
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        id: setup-buildx
+        uses: docker/setup-buildx-action@v4
+
+      - uses: actions/cache@v6
+        id: rust-docker-cache
+        with:
+          path: ${{ runner.temp }}/docker-rust-cache
+          key: ubuntu-docker-rust-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'dcapal-backend/docker/Dockerfile') }}
+          restore-keys: |
+            ubuntu-docker-rust-
+
+      - uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-dir: ${{ runner.temp }}/docker-rust-cache
+          dockerfile: dcapal-backend/docker/Dockerfile
+          skip-extraction: ${{ steps.rust-docker-cache.outputs.cache-hit }}
+
       - name: Build dcapal-backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./dcapal-backend/docker/Dockerfile
           load: true
           push: false
           tags: dcapal-backend:smoke
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Smoke owns its scope and reads the publish scope for shared layers.
+          cache-from: |
+            type=gha,scope=dcapal-backend-smoke
+            type=gha,scope=dcapal-backend-publish
+          cache-to: type=gha,scope=dcapal-backend-smoke,mode=max,ignore-error=true
+
       - name: Configure dcapal env
         run: |
           cat > dcapal-backend/dcapal.env << EOF
@@ -186,6 +397,7 @@ jobs:
           POSTGRES_DB=${POSTGRES_DB}
           POSTGRES_PORT=${POSTGRES_PORT}
           EOF
+
       - name: Configure dcapal.yml
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
@@ -221,6 +433,7 @@ jobs:
               password: ${POSTGRES_PASSWORD}
               database: ${POSTGRES_DB}
           EOF
+
       - name: Configure docker compose override
         run: |
           cat > dcapal-backend/docker-compose.override.yml << EOF
@@ -229,8 +442,10 @@ jobs:
               image: dcapal-backend:smoke
               env_file: dcapal.env
           EOF
-      - name: Install Supabase
-        run: make supabase-up
+
+      - name: Start Supabase
+        run: cd dcapal-backend && supabase start --workdir ./config
+
       - name: Run backend stack and wait for health
         run: |
           cd dcapal-backend
@@ -238,6 +453,7 @@ jobs:
                          -f ./docker/docker-compose.local.yml \
                          -f docker-compose.override.yml \
                          up --no-build --wait --wait-timeout 120
+
       - name: Print backend logs on failure
         if: failure()
         run: |
@@ -246,6 +462,7 @@ jobs:
                          -f ./docker/docker-compose.local.yml \
                          -f docker-compose.override.yml \
                          logs
+
       - name: Stop backend stack
         if: always()
         run: |
@@ -254,47 +471,7 @@ jobs:
                          -f ./docker/docker-compose.local.yml \
                          -f docker-compose.override.yml \
                          down
+
       - name: Stop Supabase
         if: always()
-        run: make supabase-down
-
-  frontend-e2e-tests:
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
-    needs: [frontend-check, optimizer-build-test]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-          cache-dependency-path: dcapal-frontend/package-lock.json
-      - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v7
-        with:
-          name: dcapal-optimizer-wasm-pkg
-          path: dcapal-optimizer-wasm/pkg
-
-      - name: Install dependencies
-        run: cd dcapal-frontend && npm ci
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('dcapal-frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-ms-playwright-
-
-      - name: Install Playwright Browsers
-        run: cd dcapal-frontend && npx playwright install --with-deps
-
-      - name: Run Playwright tests
-        run: cd dcapal-frontend && npx playwright test
-
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: playwright-report
-          path: dcapal-frontend/playwright-report/
-          retention-days: 30
+        run: cd dcapal-backend && supabase stop --workdir ./config

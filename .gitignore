@@ -1,10 +1,16 @@
 **/target
+**/node_modules/
 **/*.rs.bk
 **/bin/
 **/pkg/
 wasm-pack.log
 TODO.md
 .DS_Store
+**/coverage/
+dcapal-frontend/test-results/
+
+# ExecPlans are local working documents and must not be committed.
+docs/exec-plans/
 
 # IDE stuff
 .vscode

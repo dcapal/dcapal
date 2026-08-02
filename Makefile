@@ -3,8 +3,10 @@ DCAPAL_BACKEND_DIR := ./dcapal-backend
 DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
 SUPABASE_WORKDIR := ./config
+SUPABASE_DATABASE_URL ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
+DATABASE_URL ?= $(SUPABASE_DATABASE_URL)
 
-.PHONY: help supabase-up supabase-down docker-dev-up docker-dev-down dev-up dev-down export-openapi
+.PHONY: help supabase-up supabase-down backend-db-up backend-db-down backend-db-check backend-migrate test-backend docker-dev-up docker-dev-down dev-up dev-down export-openapi
 
 ## Show this help message
 help:
@@ -15,7 +17,7 @@ help:
 ## Format codebase
 fmt:  ## Format codebase
 	cargo +nightly fmt --all -- --config-path rustfmt.nightly.toml
-	cd $(DCAPAL_FRONTEND_DIR) && npm run format
+	pnpm frontend:format
 
 ## Run Rust linters
 lint-rust: ## Run Rust linters
@@ -24,7 +26,7 @@ lint-rust: ## Run Rust linters
 
 ## Run JS linters
 lint-js: ## Run JS linters
-	cd $(DCAPAL_FRONTEND_DIR) && npm run check
+	pnpm frontend:lint
 
 ## Run linters on the codebase
 lint: lint-rust lint-js  ## Run linters on the codebase
@@ -43,18 +45,18 @@ build-optimizer: ## Build optimizer-wasm
 
 ## Build frontend
 build-frontend: ## Build frontend
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run build-dev
+	pnpm frontend:build:dev
 
 ## Build all
 build: build-backend build-optimizer build-frontend  ## Build all
 
 ## Test frontend (unit-tests)
 test-frontend-unit: ## Run frontend tests
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:unit
+	pnpm frontend:test
 
 ## Test frontend (e2e)
 test-frontend-e2e: ## Run frontend tests
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run test:e2e
+	pnpm frontend:test:e2e
 
 ## Test frontend
 test-frontend: test-frontend-unit test-frontend-e2e ## Run all frontend tests
@@ -66,7 +68,7 @@ run-backend-dev: ## Run backend (dev)
 ## Run frontend (dev)
 run-frontend-dev: ## Run frontend (dev)
 	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev
-	cd $(DCAPAL_FRONTEND_DIR) && npm i && npm run start
+	pnpm frontend:dev
 
 ## Start Supabase with config
 supabase-up:  ## Start Supabase with config
@@ -75,6 +77,24 @@ supabase-up:  ## Start Supabase with config
 ## Stop Supabase
 supabase-down:  ## Stop Supabase
 	cd $(DCAPAL_BACKEND_DIR) && npx supabase stop --workdir $(SUPABASE_WORKDIR)
+
+## Start the Supabase database used by backend development and tests
+backend-db-up: supabase-up  ## Start the backend database
+
+## Stop the Supabase database used by backend development and tests
+backend-db-down: supabase-down  ## Stop the backend database
+
+## Check that the backend database is already running
+backend-db-check:  ## Check backend database connectivity
+	@psql "$(DATABASE_URL)" -c "SELECT 1" >/dev/null
+
+## Apply pending SQLx migrations to the backend database
+backend-migrate: backend-db-check  ## Apply backend database migrations
+	@DATABASE_URL="$(DATABASE_URL)" cargo run -p migration
+
+## Run the full backend test suite against an already-running database
+test-backend: backend-db-check  ## Run backend tests (requires backend-db-up)
+	@DATABASE_URL="$(DATABASE_URL)" RUST_LOG=dcapal_backend=debug cargo test -p dcapal-backend -p migration -- --nocapture
 
 ## Start development Docker containers
 docker-dev-up:  ## Start development Docker containers
