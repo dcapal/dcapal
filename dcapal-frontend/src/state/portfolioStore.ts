@@ -304,8 +304,7 @@ const portfolioStoreMigrations: Record<number, (state: unknown) => unknown> = {
     }
 
     const anyAsset = Object.values(assets)[0] as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (anyAsset && !("aclass" in anyAsset)) {
       return {};
     }
@@ -1051,9 +1050,9 @@ export const usePortfolioStore = create<PortfolioStore>()(
         set((state) => {
           const pfolio = currentPortfolio(state);
           if (!pfolio) return state;
-          if (
-            !(pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.FIXED)
-          ) {
+          if (!(
+            pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.FIXED
+          )) {
             return state;
           }
 
@@ -1112,11 +1111,9 @@ export const usePortfolioStore = create<PortfolioStore>()(
         set((state) => {
           const pfolio = currentPortfolio(state);
           if (!pfolio) return state;
-          if (
-            !(
-              pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.VARIABLE
-            )
-          ) {
+          if (!(
+            pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.VARIABLE
+          )) {
             return state;
           }
 

@@ -39,6 +39,11 @@ const createWorkerState = <
 
 const analyzerState = createWorkerState<AnalyzerWorkerRpc>();
 const solverState = createWorkerState<SolverWorkerRpc>();
+const analyzerWorkerUrl = new URL(
+  "./workers/analyzer.worker.js",
+  import.meta.url
+);
+const solverWorkerUrl = new URL("./workers/solver.worker.js", import.meta.url);
 
 const enqueueSerialized = async <TWorker extends WorkerRpc, TResult>(
   state: WorkerState<TWorker>,
@@ -51,16 +56,15 @@ const enqueueSerialized = async <TWorker extends WorkerRpc, TResult>(
 
 const getWorker = async <TWorker extends WorkerRpc>(
   state: WorkerState<TWorker>,
-  workerPath: string,
+  workerUrl: URL,
   workerName: string
 ): Promise<TWorker> => {
   if (state.instancePromise) return state.instancePromise;
 
   // TODO(migrate): threads' constructor types only accept string paths, but webpack worker loading uses URL.
-  const workerUrl = new URL(workerPath, import.meta.url) as unknown as string;
   state.instancePromise = (
     spawn(
-      new Worker(workerUrl, {
+      new Worker(workerUrl as unknown as string, {
         name: workerName,
       })
     ) as unknown as Promise<TWorker>
@@ -90,12 +94,12 @@ const terminateWorkerPromise = async <TWorker extends WorkerRpc>(
 
 const runWithWorker = async <TWorker extends WorkerRpc, TResult>(
   state: WorkerState<TWorker>,
-  workerPath: string,
+  workerUrl: URL,
   workerName: string,
   operation: (worker: TWorker) => Promise<TResult>
 ): Promise<TResult> => {
   return enqueueSerialized(state, async () => {
-    const workerPromise = getWorker(state, workerPath, workerName);
+    const workerPromise = getWorker(state, workerUrl, workerName);
 
     try {
       const worker = await workerPromise;
@@ -116,7 +120,7 @@ export const analyze = async (
   try {
     return await runWithWorker(
       analyzerState,
-      "./workers/analyzer.worker.js",
+      analyzerWorkerUrl,
       "wasm-analyzer-worker",
       async (worker) => worker.analyzeAndSolve(assets)
     );
@@ -148,7 +152,7 @@ export const solve = async (
   try {
     return await runWithWorker(
       solverState,
-      "./workers/solver.worker.js",
+      solverWorkerUrl,
       "wasm-solver-worker",
       async (worker) =>
         worker.makeAndSolve(
