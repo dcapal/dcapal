@@ -7,9 +7,11 @@
 import type { PortfolioResponse } from './portfolioResponse';
 
 /**
- * Server changes returned after portfolio synchronization.
+ * The result of synchronizing the client's portfolio set.
  */
 export interface SyncPortfoliosResponse {
+  /** Portfolio identifiers that the client should remove. */
   deletedPortfolios: string[];
+  /** Portfolios whose server state should be applied by the client. */
   updatedPortfolios: PortfolioResponse[];
 }

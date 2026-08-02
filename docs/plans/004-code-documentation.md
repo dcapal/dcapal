@@ -15,7 +15,9 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 - [x] (2026-08-02) Add Rust documentation comments to changed public domain and REST symbols, plus rationale comments for non-obvious wire/schema behavior.
 - [x] (2026-08-02) Document the OpenAPI/Orval generated boundary and regenerate output from the documented source.
 - [x] (2026-08-02) Run formatting, typechecks, tests, and documentation-focused checks; review the final diff.
-- [x] (2026-08-02) Commit and push the documentation changes; verify the GitHub pipeline.
+- [x] (2026-08-02) Commit and push the initial documentation changes; inspect the resulting GitHub pipeline.
+- [x] (2026-08-02) Rebase onto the latest `origin/master`, preserve upstream persistence changes, and revalidate the merged tree.
+- [ ] (2026-08-02) Force-push the rebased branch and verify the replacement GitHub pipeline.
 
 ## Surprises & Discoveries
 
@@ -29,6 +31,12 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
   Evidence: `packages/api-client/src/gen/index.ts` and generated model files begin with the Orval header.
 - Observation: The browser coverage report remains informative without enforcing a repository-wide threshold.
   Evidence: the report completed with 98.96% statements, 99.50% branches, and 99.16% lines, and emitted the changed-line table.
+- Observation: The requested rebase brought an upstream SQLx persistence migration into the branch and caused two documentation/serialization conflicts in `response.rs` plus one OpenAPI description conflict.
+  Evidence: `origin/master` was at `4cb258e`; resolution retained upstream row types and field documentation while preserving the branch's decimal-as-string wire format.
+- Observation: The rebased backend requires Rust 1.97.1, while this machine's `stable` alias is Rust 1.93.1.
+  Evidence: the repository build reported the requirement; the installed `1.97.1-aarch64-apple-darwin` toolchain allowed generation and testing with `RUSTUP_TOOLCHAIN=1.97.1`.
+- Observation: The full backend test suite requires a running PostgreSQL database.
+  Evidence: `make backend-db-up` followed by `RUSTUP_TOOLCHAIN=1.97.1 make test-backend` passed the SQLx migration, repository, and backend tests.
 
 ## Decision Log
 
@@ -37,6 +45,9 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
   Date/Author: 2026-08-02 / Codex.
 - Decision: Regenerate the checked-in OpenAPI document and Orval output after adding Rust API documentation.
   Rationale: `utoipa` publishes Rust item documentation in the OpenAPI schema, and Orval is responsible for carrying those descriptions into generated TypeScript. This keeps generated comments reproducible without hand-editing them.
+  Date/Author: 2026-08-02 / Codex.
+- Decision: When rebasing `response.rs`, preserve upstream SQLx-era structure and documentation while keeping decimal fields serialized as strings.
+  Rationale: the upstream migration changes persistence types and adds useful field comments, while the branch requirement is to avoid precision loss across the JSON boundary. These intents are compatible.
   Date/Author: 2026-08-02 / Codex.
 - Decision: Add comments to every public type, function, and constant in changed hand-written files, even when the symbol's implementation predates this branch.
   Rationale: the request is about the changed code surface, and a public symbol in a changed module is part of the maintenance surface.
@@ -52,9 +63,9 @@ The user-visible proof is maintainability: TypeScript and Rust documentation che
 
 Documented the changed hand-written frontend components, hooks, API boundaries, test support, coverage tooling, Rust domain/REST/OpenAPI surfaces, and the API-client package boundary. Added concise public API comments and retained only rationale comments for non-obvious precision, authentication, caching, schema, and coverage constraints. The Orval-generated files under `packages/api-client/src/gen` and `src/gen-mocks` were never hand-edited; they were regenerated from the documented Rust/OpenAPI source and now contain only generator-produced descriptions. The README, generator config, package entry point, and hand-written mutator explain that boundary.
 
-Validation completed successfully: frontend lint, frontend typecheck, frontend unit tests (6), API-client typecheck, API-client tests (15), backend tests (9), Rust formatting, development build, diff checks, 76/76 Chromium coverage journeys, and 76/76 Firefox/WebKit journeys. The coverage report generated successfully and no global percentage threshold was introduced. User-owned `MIGRATION.md` and `agent_docs/` remained untracked and unstaged.
+Validation before the rebase completed successfully: frontend lint, frontend typecheck, frontend unit tests (6), API-client typecheck, API-client tests (15), backend unit tests, Rust formatting, development build, diff checks, 76/76 Chromium coverage journeys, and 76/76 Firefox/WebKit journeys. After the rebase, the merged tree passed frontend lint/typecheck/unit tests, API-client typecheck/tests, Rust formatting, OpenAPI/Orval generation, and the full backend target (15 tests) against local Supabase PostgreSQL. The coverage report generated successfully and no global percentage threshold was introduced. User-owned `MIGRATION.md` and `agent_docs/` remained untracked and unstaged.
 
-The documentation commits were pushed to `agent/tanstack-orval-api-client`. The OpenAPI verification job then identified the expected checked-in-spec drift caused by the new Rust docs; the regenerated spec/client fix will be included before the requested rebase and replacement pipeline run.
+The initial documentation commits were pushed to `agent/tanstack-orval-api-client`. The first pipeline identified expected checked-in-spec drift caused by the new Rust docs; the spec/client was regenerated, the branch was rebased onto `origin/master`, and the rebased branch still needs its force-push and replacement pipeline verification.
 
 ## Context and Orientation
 
@@ -130,3 +141,4 @@ Revision note (2026-08-02): Created in response to the request to document the c
 Revision note (2026-08-02): Updated after the inventory and documentation pass; recorded the generated-file evidence and completed the comment milestones before validation.
 Revision note (2026-08-02): Recorded successful local validation, including both browser lanes and the changed-line coverage report; commit and CI verification remain.
 Revision note (2026-08-02): Regenerated the checked-in OpenAPI document and Orval production/MSW output from the documented Rust source after CI caught the expected schema drift; no generated file was edited manually.
+Revision note (2026-08-02): Rebasing onto `origin/master` required preserving upstream SQLx persistence changes and resolving documentation/spec conflicts; the final local backend and frontend checks passed with the installed Rust 1.97.1 toolchain and local PostgreSQL.

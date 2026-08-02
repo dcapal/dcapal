@@ -2,6 +2,7 @@
   "components": {
     "schemas": {
       "Asset": {
+        "description": "A supported asset, either a cryptocurrency or a fiat currency.",
         "oneOf": [
           {
             "allOf": [
@@ -48,6 +49,7 @@
         ]
       },
       "Crypto": {
+        "description": "A cryptocurrency identified by its provider id and display symbol.",
         "properties": {
           "id": {
             "$ref": "#/components/schemas/String"
@@ -63,6 +65,7 @@
         "type": "object"
       },
       "FeeStructure": {
+        "description": "Transaction-fee policy exchanged by the REST API.\n\nDecimal values are serialized as strings so clients do not lose precision\nwhile crossing the JSON boundary.",
         "oneOf": [
           {
             "properties": {
@@ -127,6 +130,7 @@
         ]
       },
       "Fiat": {
+        "description": "A fiat currency identified by its provider id and display symbol.",
         "properties": {
           "id": {
             "$ref": "#/components/schemas/String"
@@ -142,6 +146,7 @@
         "type": "object"
       },
       "ImportPortfolioResponse": {
+        "description": "Metadata returned after a portfolio is stored for sharing.",
         "properties": {
           "expires_at": {
             "type": "string"
@@ -157,6 +162,7 @@
         "type": "object"
       },
       "PortfolioAssetRequest": {
+        "description": "An asset and its allocation values submitted for synchronization.",
         "properties": {
           "aclass": {
             "type": "string"
@@ -210,7 +216,7 @@
         "type": "object"
       },
       "PortfolioAssetResponse": {
-        "description": "An asset held by a portfolio.",
+        "description": "An asset held by a portfolio.\n\nDecimal values are serialized as JSON strings to preserve precision.",
         "properties": {
           "aclass": {
             "description": "The asset class.",
@@ -274,6 +280,7 @@
         "type": "object"
       },
       "PortfolioRequest": {
+        "description": "A portfolio submitted as part of an authenticated synchronization.",
         "properties": {
           "assets": {
             "items": {
@@ -365,12 +372,14 @@
         "type": "object"
       },
       "Price": {
+        "description": "A price and the timestamp at which it was observed.",
         "properties": {
           "price": {
             "format": "double",
             "type": "number"
           },
           "ts": {
+            "description": "Serialized as Unix seconds in the REST/OpenAPI representation.",
             "format": "int64",
             "type": "integer"
           }
@@ -385,6 +394,7 @@
         "type": "string"
       },
       "SyncPortfoliosRequest": {
+        "description": "Authenticated request containing local portfolio changes and deletions.",
         "properties": {
           "deletedPortfolios": {
             "items": {
@@ -432,6 +442,7 @@
         "type": "object"
       },
       "TransactionFeesRequest": {
+        "description": "Portfolio- or asset-level transaction-fee settings.",
         "properties": {
           "feeStructure": {
             "$ref": "#/components/schemas/FeeStructure"
@@ -637,7 +648,8 @@
             },
             "description": "Service greeting"
           }
-        }
+        },
+        "summary": "Returns the service greeting used by the root health-style endpoint."
       }
     },
     "/assets/chart/{symbol}": {
@@ -708,7 +720,8 @@
             },
             "description": "Provider payload passthrough"
           }
-        }
+        },
+        "summary": "Proxies a historical chart request to the configured market-data provider."
       }
     },
     "/assets/crypto": {
@@ -728,7 +741,8 @@
             },
             "description": "Crypto assets"
           }
-        }
+        },
+        "summary": "Returns the cached cryptocurrency asset catalog."
       }
     },
     "/assets/fiat": {
@@ -748,7 +762,8 @@
             },
             "description": "Fiat assets"
           }
-        }
+        },
+        "summary": "Returns the cached fiat asset catalog."
       }
     },
     "/assets/search": {
@@ -776,7 +791,8 @@
             },
             "description": "Provider payload passthrough"
           }
-        }
+        },
+        "summary": "Proxies an asset-name search to the configured market-data provider."
       }
     },
     "/import/portfolio": {
@@ -1049,7 +1065,8 @@
           "400": {
             "description": "Input portfolio does not match schema requirements"
           }
-        }
+        },
+        "summary": "Validates and stores a shared portfolio payload."
       }
     },
     "/import/portfolio/{id}": {
@@ -1078,7 +1095,8 @@
           "404": {
             "description": "Portfolio not found or expired"
           }
-        }
+        },
+        "summary": "Returns a stored shared portfolio or a not-found response when it expired."
       }
     },
     "/price/{asset}": {
@@ -1118,7 +1136,8 @@
           "404": {
             "description": "Price not available"
           }
-        }
+        },
+        "summary": "Returns the current conversion price for a base asset and quote currency."
       }
     },
     "/v1/sync/portfolios": {
@@ -1159,7 +1178,8 @@
           "400": {
             "description": "Bad request"
           }
-        }
+        },
+        "summary": "Applies authenticated local portfolio changes and returns the server state."
       }
     }
   }

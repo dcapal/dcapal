@@ -7,10 +7,14 @@
 import type { FeeStructure } from './feeStructure';
 
 /**
- * Transaction-fee settings returned with synchronized portfolio data.
+ * Transaction fee settings returned by the API.
  */
 export interface TransactionFeesResponse {
+  /** The fee calculation model. */
   feeStructure: FeeStructure;
-  /** @nullable */
+  /**
+     * The maximum allowed fee impact, when configured.
+     * @nullable
+     */
   maxFeeImpact?: string | null;
 }
