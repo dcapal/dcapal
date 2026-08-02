@@ -14,6 +14,7 @@ use crate::{AppContext, DateTime, app::infra::claim::Claims, ports::inbound::res
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Authenticated request containing local portfolio changes and deletions.
 pub struct SyncPortfoliosRequest {
     pub portfolios: Vec<PortfolioRequest>,
     pub deleted_portfolios: Vec<Uuid>,
@@ -21,6 +22,7 @@ pub struct SyncPortfoliosRequest {
 
 #[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
+/// A portfolio submitted as part of an authenticated synchronization.
 pub struct PortfolioRequest {
     pub id: Uuid,
     pub name: String,
@@ -32,6 +34,7 @@ pub struct PortfolioRequest {
 
 #[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
+/// An asset and its allocation values submitted for synchronization.
 pub struct PortfolioAssetRequest {
     pub symbol: String,
     pub name: String,
@@ -47,6 +50,7 @@ pub struct PortfolioAssetRequest {
 
 #[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
+/// Portfolio- or asset-level transaction-fee settings.
 pub struct TransactionFeesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee_impact: Option<Decimal>,
@@ -69,6 +73,7 @@ pub struct TransactionFeesRequest {
         (status = 400, description = "Bad request")
     )
 )]
+/// Applies authenticated local portfolio changes and returns the server state.
 pub async fn sync_portfolios(
     State(ctx): State<AppContext>,
     claims: Claims,
@@ -100,10 +105,10 @@ fn test_fee_structure_deserialization() {
     let json = r#"{
         "feeStructure": {
             "type": "variable",
-            "feeRate": 0.19,
-            "minFee": 2.95
+            "feeRate": "0.19",
+            "minFee": "2.95"
         },
-        "maxFeeImpact": 0.5
+        "maxFeeImpact": "0.5"
     }"#;
 
     let fees: TransactionFeesRequest = serde_json::from_str(json).unwrap();

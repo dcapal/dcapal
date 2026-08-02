@@ -19,6 +19,7 @@ import classNames from "classnames";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@app/config";
 
+/** Lists saved portfolios and exposes the new-portfolio flow. */
 export const PortfoliosStep = () => {
   const { t } = useTranslation();
   const pfolios = useSelector((state) => state.pfolio.pfolios);
@@ -150,7 +151,10 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
   const isFormValid = name && selectedCcy;
 
   return (
-    <div className="w-full flex flex-col gap-4">
+    <div
+      data-testid="new-portfolio-form"
+      className="w-full flex flex-col gap-4"
+    >
       <div className="w-full flex flex-col gap-1">
         <label className="text-sm font-light">{t("common.name")}</label>
         <InputText value={name} onChange={setName} isValid={true} />

@@ -1,8 +1,7 @@
 import { store } from "@app/store";
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import i18n from "i18next";
-import { syncPortfoliosAPI } from "@/api";
 
 const updateWeight = (asset, totalAmount) => {
   const qty = asset.qty || 0;
@@ -14,6 +13,7 @@ const updateWeight = (asset, totalAmount) => {
   asset.weight = weight * 100;
 };
 
+/** Numeric asset-class values persisted by the portfolio reducer. */
 export const ACLASS = Object.freeze({
   UNDEFINED: 0,
   EQUITY: 10,
@@ -21,6 +21,7 @@ export const ACLASS = Object.freeze({
   CURRENCY: 30,
 });
 
+/** Returns whether an asset class must be traded in whole shares. */
 export const isWholeShares = (aclass) => {
   switch (aclass) {
     case ACLASS.EQUITY:
@@ -37,10 +38,12 @@ const aclassMap = {
   [ACLASS.CURRENCY]: "CURRENCY",
 };
 
+/** Converts a persisted numeric asset class to its REST enum name. */
 export const aclassToString = (aclass) => {
   return aclassMap[aclass] || "UNDEFINED";
 };
 
+/** Converts a REST asset-class name to the reducer's numeric value. */
 export const parseAClass = (aclassStr) => {
   if (aclassStr === "EQUITY") return ACLASS.EQUITY;
   if (aclassStr === "CRYPTO") return ACLASS.CRYPTO;
@@ -49,12 +52,14 @@ export const parseAClass = (aclassStr) => {
   return ACLASS.UNDEFINED;
 };
 
+/** Numeric fee-policy values persisted by the portfolio reducer. */
 export const FeeType = Object.freeze({
   ZERO_FEE: 10,
   FIXED: 20,
   VARIABLE: 30,
 });
 
+/** Converts a persisted numeric fee type to its REST enum name. */
 export const feeTypeToString = (type) => {
   switch (type) {
     case FeeType.ZERO_FEE:
@@ -68,6 +73,7 @@ export const feeTypeToString = (type) => {
   }
 };
 
+/** Converts a REST fee-policy name to the reducer's numeric value. */
 export const parseFeeType = (typeStr) => {
   if (typeStr === "zeroFee") return FeeType.ZERO_FEE;
   if (typeStr === "fixed") return FeeType.FIXED;
@@ -76,8 +82,15 @@ export const parseFeeType = (typeStr) => {
   return null;
 };
 
+/** Converts a REST decimal string to a finite UI number without propagating NaN. */
+export const decimalToNumber = (value) => {
+  const number = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(number) ? number : 0;
+};
+
+/** Converts REST fee data, including decimal strings, into reducer state. */
 export const parseFees = (fees) => {
-  if (!fees) return null;
+  if (!fees?.feeStructure) return null;
 
   const feeType = parseFeeType(fees.feeStructure.type);
   if (!feeType) return null;
@@ -87,28 +100,30 @@ export const parseFees = (fees) => {
   if (feeType === FeeType.ZERO_FEE) return parsed;
 
   if (feeType === FeeType.FIXED) {
-    if (fees.maxFeeImpact) {
-      parsed.maxFeeImpact = fees.maxFeeImpact;
+    if (fees.maxFeeImpact != null) {
+      parsed.maxFeeImpact = decimalToNumber(fees.maxFeeImpact);
     }
-    if (fees.feeStructure.feeAmount) {
-      parsed.feeStructure.feeAmount = fees.feeStructure.feeAmount;
+    if (fees.feeStructure.feeAmount != null) {
+      parsed.feeStructure.feeAmount = decimalToNumber(
+        fees.feeStructure.feeAmount
+      );
     }
 
     return parsed;
   }
 
   if (feeType === FeeType.VARIABLE) {
-    if (fees.maxFeeImpact) {
-      parsed.maxFeeImpact = fees.maxFeeImpact;
+    if (fees.maxFeeImpact != null) {
+      parsed.maxFeeImpact = decimalToNumber(fees.maxFeeImpact);
     }
-    if (fees.feeStructure.feeRate) {
-      parsed.feeStructure.feeRate = fees.feeStructure.feeRate;
+    if (fees.feeStructure.feeRate != null) {
+      parsed.feeStructure.feeRate = decimalToNumber(fees.feeStructure.feeRate);
     }
-    if (fees.feeStructure.minFee) {
-      parsed.feeStructure.minFee = fees.feeStructure.minFee;
+    if (fees.feeStructure.minFee != null) {
+      parsed.feeStructure.minFee = decimalToNumber(fees.feeStructure.minFee);
     }
-    if (fees.feeStructure.maxFee) {
-      parsed.feeStructure.maxFee = fees.feeStructure.maxFee;
+    if (fees.feeStructure.maxFee != null) {
+      parsed.feeStructure.maxFee = decimalToNumber(fees.feeStructure.maxFee);
     }
     return parsed;
   }
@@ -116,6 +131,7 @@ export const parseFees = (fees) => {
   return null;
 };
 
+/** Creates the complete fee state for a selected fee policy. */
 export const getDefaultFees = (type) => {
   if (!type) {
     return null;
@@ -148,6 +164,7 @@ export const getDefaultFees = (type) => {
   }
 };
 
+/** Creates an empty portfolio with the defaults used by the allocation flow. */
 export const getNewPortfolio = () => {
   return {
     id: crypto.randomUUID(),
@@ -163,6 +180,7 @@ export const getNewPortfolio = () => {
   };
 };
 
+/** Returns a localized portfolio name that does not duplicate an existing one. */
 export const getDefaultPortfolioName = () => {
   const defaultName = i18n.t("importStep.defaultPortfolioName");
   const defaultNameCount = Object.values(store.getState().pfolio.pfolios)
@@ -174,6 +192,7 @@ export const getDefaultPortfolioName = () => {
     : `${defaultName}`;
 };
 
+/** Reads the selected portfolio from either a Redux store or slice state. */
 export const currentPortfolio = (state) => {
   if ("pfolio" in state) {
     return getPortfolio(state.pfolio.selected, state.pfolio.pfolios);
@@ -196,14 +215,46 @@ const initialState = () => {
   };
 };
 
-export const syncPortfolios = createAsyncThunk(
-  "portfolio/syncPortfolios",
-  async (_, { getState }) => {
-    const { pfolios, deletedPortfolios } = getState().pfolio;
-    return await syncPortfoliosAPI(pfolios, deletedPortfolios);
-  }
-);
+// Convert server-owned decimal strings and timestamps at the Redux boundary
+// so the editor can keep using the numeric values expected by its controls.
+const applyServerSync = (state, payload) => {
+  if (!payload) return;
 
+  const { updatedPortfolios, deletedPortfolios } = payload;
+  updatedPortfolios?.forEach((portfolio) => {
+    state.pfolios[portfolio.id] = {
+      id: portfolio.id,
+      name: portfolio.name,
+      quoteCcy: portfolio.quoteCcy,
+      fees: parseFees(portfolio.fees),
+      assets: portfolio.assets.reduce((assets, asset) => {
+        const targetWeight = decimalToNumber(asset.targetWeight);
+        assets[asset.symbol] = {
+          ...asset,
+          price: decimalToNumber(asset.price),
+          qty: decimalToNumber(asset.qty),
+          targetWeight,
+          averageBuyPrice: decimalToNumber(asset.averageBuyPrice),
+          fees: parseFees(asset.fees),
+          aclass: parseAClass(asset.aclass),
+          weight: targetWeight,
+          amount: 0,
+        };
+        return assets;
+      }, {}),
+      nextIdx: 0,
+      totalAmount: 0,
+      budget: 0,
+      lastPriceRefresh: Date.now(),
+      lastUpdatedAt: Date.parse(portfolio.lastUpdatedAt) || Date.now(),
+    };
+  });
+  deletedPortfolios?.forEach((id) => {
+    if (id in state.pfolios) delete state.pfolios[id];
+  });
+};
+
+/** Redux slice containing editable portfolios and pending server deletions. */
 export const portfolioSlice = createSlice({
   name: "portfolio",
   initialState: initialState(),
@@ -581,38 +632,13 @@ export const portfolioSlice = createSlice({
 
       pfolio.budget = 0;
     },
-  },
-  extraReducers: (builder) => {
-    builder.addCase(syncPortfolios.fulfilled, (state, action) => {
-      if (!action.payload) return;
-      const { updatedPortfolios, deletedPortfolios } = action.payload;
-      updatedPortfolios?.forEach((pf) => {
-        state.pfolios[pf.id] = {
-          ...pf,
-          fees: parseFees(pf.fees),
-          assets: pf.assets.reduce((acc, asset) => {
-            acc[asset.symbol] = {
-              ...asset,
-              fees: parseFees(asset.fees),
-              aclass: parseAClass(asset.aclass),
-              averageBuyPrice: asset.averageBuyPrice,
-              weight: asset.targetWeight,
-              amount: 0,
-            };
-            return acc;
-          }, {}),
-          nextIdx: pf.nextIdx || 0,
-          totalAmount: pf.totalAmount || 0,
-          budget: pf.budget || 0,
-        };
-      });
-      deletedPortfolios?.forEach((id) => {
-        if (id in state.pfolios) delete state.pfolios[id];
-      });
-    });
+    applySyncResult: (state, action) => {
+      applyServerSync(state, action.payload);
+    },
   },
 });
 
+/** Action creators for all portfolio and asset editing operations. */
 export const {
   addPortfolio,
   deletePortfolio,
@@ -639,6 +665,8 @@ export const {
   setVariableFee,
   setVariableFeeAsset,
   clearBudget,
+  applySyncResult,
 } = portfolioSlice.actions;
 
+/** Reducer consumed by the application store. */
 export default portfolioSlice.reducer;
