@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { InputText } from "@components/core/inputText";
-import { useDispatch } from "react-redux";
+import { Step, useAppStore } from "@/state/appStore";
 import { usePortfolioStore } from "@/state/portfolioStore";
-import { Step, setAllocationFlowStep } from "@app/appSlice";
 
 import EDIT_SVG from "@images/icons/edit.svg";
 import CLOSE_SVG from "@images/icons/close-menu.svg";
@@ -50,8 +49,10 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
   const [state, setState] = useState(CardState.VIEW);
   const [newName, setNewName] = useState(name);
 
-  const dispatch = useDispatch();
   const { t, i18n } = useTranslation();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const deletePortfolio = usePortfolioStore((state) => state.deletePortfolio);
   const duplicatePortfolio = usePortfolioStore(
     (state) => state.duplicatePortfolio
@@ -61,7 +62,7 @@ export const PortfolioCard = ({ id, name, ccy, totalAmount, assets }) => {
 
   const onClickPortfolio = () => {
     selectPortfolio({ id: id });
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const { syncNow, isAuthenticated } = useSyncPortfolios();

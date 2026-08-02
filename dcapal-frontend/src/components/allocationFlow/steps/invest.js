@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
 import { useCollapse } from "react-collapsed";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { InputNumber, InputNumberType } from "@components/core/inputNumber";
 import {
   isWholeShares,
@@ -41,7 +40,9 @@ export const InvestStep = ({
   setUseAllBudget,
 }) => {
   const [cash, setCash] = useState(0);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const { t } = useTranslation();
   const setBudget = usePortfolioStore((state) => state.setBudget);
   const pfolio = useCurrentPortfolio();
@@ -87,12 +88,12 @@ export const InvestStep = ({
   };
 
   const onClickGoBack = () => {
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const onClickRunAllocation = () => {
     setBudget({ budget: cash });
-    dispatch(setAllocationFlowStep({ step: Step.END }));
+    setAllocationFlowStep({ step: Step.END });
   };
 
   const isRunAllocationDisabled = cash + totalAmount <= 0;

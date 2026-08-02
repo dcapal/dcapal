@@ -1,7 +1,5 @@
 import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { Provider } from "react-redux";
-import { PersistGate } from "redux-persist/integration/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   configureApiClientAuth,
@@ -9,7 +7,6 @@ import {
 } from "@dcapal/api-client";
 
 import "./style.css";
-import { persistor, store } from "@app/store";
 import { Router } from "@routes/router";
 import { BrowserRouter } from "react-router-dom";
 import { DCAPAL_API, supabase } from "@app/config";
@@ -86,17 +83,13 @@ const renderApp = () => {
   const root = createRoot(document.getElementById("app"));
   root.render(
     <React.StrictMode>
-      <Provider store={store}>
-        <PersistGate loading={null} persistor={persistor}>
-          <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
-              <Suspense fallback={<div>Loading...</div>}>
-                <Router />
-              </Suspense>
-            </BrowserRouter>
-          </QueryClientProvider>
-        </PersistGate>
-      </Provider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Router />
+          </Suspense>
+        </BrowserRouter>
+      </QueryClientProvider>
     </React.StrictMode>
   );
 };

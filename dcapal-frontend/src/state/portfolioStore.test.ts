@@ -4,7 +4,7 @@ const { syncPortfoliosAPI } = vi.hoisted(() => ({
   syncPortfoliosAPI: vi.fn(),
 }));
 
-vi.mock("@/api", () => ({
+vi.mock("@/api/portfolioSync", () => ({
   syncPortfoliosAPI,
 }));
 

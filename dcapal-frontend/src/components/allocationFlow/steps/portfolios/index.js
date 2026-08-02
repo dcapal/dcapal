@@ -1,17 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDispatch } from "react-redux";
-import { useAppStore } from "@/state/appStore";
+import { Step, useAppStore } from "@/state/appStore";
 import { getNewPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 import { PortfolioCard } from "./portfolioCard";
 import { useNavigate } from "react-router-dom";
 import { InputText } from "@components/core/inputText";
 import { CcyGroup } from "@components/allocationFlow/steps/ccy/ccyGroup";
-import {
-  Step,
-  setAllocationFlowStep,
-  setPreferredCurrency,
-} from "@app/appSlice";
 import classNames from "classnames";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@app/config";
@@ -107,7 +101,6 @@ const sortCcy = (a, b) => {
 };
 
 const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const addPortfolio = usePortfolioStore((state) => state.addPortfolio);
@@ -116,6 +109,12 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
 
   const ccys = useAppStore((state) => state.currencies);
   const preferredCcy = useAppStore((state) => state.preferredCurrency);
+  const setPreferredCurrency = useAppStore(
+    (state) => state.setPreferredCurrency
+  );
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const sortedCcys = [...ccys].sort(sortCcy);
 
   const [selectedCcy, setSelectedCcy] = useState(
@@ -139,8 +138,8 @@ const NewPortfolioForm = ({ pfoliosCount, cancelCb }) => {
 
     addPortfolio({ pfolio: pfolio });
     selectPortfolio({ id: pfolio.id });
-    dispatch(setPreferredCurrency({ ccy: selectedCcy }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setPreferredCurrency({ ccy: selectedCcy });
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const onClickGoBack = () => {

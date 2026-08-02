@@ -1,41 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Step } from "@app/appSlice";
 import {
   APP_STORE_PERSIST_KEY,
-  bindAppStoreToRedux,
   migrateAppStoreState,
   resetAppStoreForTests,
   setAppStoreStorageForTests,
+  Step,
   useAppStore,
-  type AppStoreState,
 } from "./appStore";
-
-type ReduxState = { app: AppStoreState };
-
-type ReduxStoreMock = {
-  getState: () => ReduxState;
-  subscribe: (listener: () => void) => () => void;
-  updateApp: (appState: AppStoreState) => void;
-};
-
-const createReduxStoreMock = (
-  initialAppState: AppStoreState
-): ReduxStoreMock => {
-  let state: ReduxState = { app: initialAppState };
-  const listeners = new Set<() => void>();
-
-  return {
-    getState: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    updateApp: (appState) => {
-      state = { app: appState };
-      listeners.forEach((listener) => listener());
-    },
-  };
-};
 
 type MockStorage = {
   getItem: (name: string) => string | null;
@@ -69,7 +40,7 @@ describe("appStore", () => {
     expect(state.pfolioFile).toBe("");
   });
 
-  it("updates state through local actions", () => {
+  it("updates the final step and import fields through local actions", () => {
     const store = useAppStore.getState();
 
     store.setAllocationFlowStep({ step: Step.IMPORT });
@@ -84,13 +55,13 @@ describe("appStore", () => {
     expect(next.pfolioFile).toBe('{"name":"demo"}');
   });
 
-  it("hydrates from redux app state", () => {
-    useAppStore.getState().hydrateFromRedux({
-      allocationFlowStep: Step.END,
-      currencies: ["chf"],
-      preferredCurrency: "chf",
-      pfolioFile: '{"name":"imported"}',
-    });
+  it("updates state through local actions", () => {
+    const store = useAppStore.getState();
+
+    store.setAllocationFlowStep({ step: Step.END });
+    store.setCurrencies({ currencies: ["chf"] });
+    store.setPreferredCurrency({ ccy: "chf" });
+    store.setPfolioFile({ file: '{"name":"imported"}' });
 
     const next = useAppStore.getState();
     expect(next.allocationFlowStep).toBe(Step.END);
@@ -99,53 +70,13 @@ describe("appStore", () => {
     expect(next.pfolioFile).toBe('{"name":"imported"}');
   });
 
-  it("mirrors redux changes through bridge and stops after unsubscribe", () => {
-    const reduxStore = createReduxStoreMock({
-      allocationFlowStep: Step.PORTFOLIOS,
-      currencies: ["eur"],
-      preferredCurrency: "eur",
-      pfolioFile: "",
-    });
-
-    const unsubscribe = bindAppStoreToRedux(reduxStore);
-
-    expect(useAppStore.getState().currencies).toStrictEqual(["eur"]);
-    expect(useAppStore.getState().preferredCurrency).toBe("eur");
-
-    reduxStore.updateApp({
-      allocationFlowStep: Step.IMPORT,
-      currencies: ["usd"],
-      preferredCurrency: "usd",
-      pfolioFile: '{"id":1}',
-    });
-
-    expect(useAppStore.getState().allocationFlowStep).toBe(Step.IMPORT);
-    expect(useAppStore.getState().currencies).toStrictEqual(["usd"]);
-    expect(useAppStore.getState().preferredCurrency).toBe("usd");
-    expect(useAppStore.getState().pfolioFile).toBe('{"id":1}');
-
-    unsubscribe();
-
-    reduxStore.updateApp({
-      allocationFlowStep: Step.END,
-      currencies: ["cad"],
-      preferredCurrency: "cad",
-      pfolioFile: '{"id":2}',
-    });
-
-    expect(useAppStore.getState().allocationFlowStep).toBe(Step.IMPORT);
-    expect(useAppStore.getState().currencies).toStrictEqual(["usd"]);
-    expect(useAppStore.getState().preferredCurrency).toBe("usd");
-    expect(useAppStore.getState().pfolioFile).toBe('{"id":1}');
-  });
-
   it("migrates version 0 payload without app-field changes", () => {
     const migrated = migrateAppStoreState(
       {
         allocationFlowStep: Step.IMPORT,
         currencies: ["usd"],
         preferredCurrency: "usd",
-        pfolioFile: "{\"id\":1}",
+        pfolioFile: '{"id":1}',
         __legacyPfolio: { quoteCcy: "usd" },
       },
       0
@@ -155,7 +86,7 @@ describe("appStore", () => {
       allocationFlowStep: Step.IMPORT,
       currencies: ["usd"],
       preferredCurrency: "usd",
-      pfolioFile: "{\"id\":1}",
+      pfolioFile: '{"id":1}',
     });
   });
 
@@ -165,7 +96,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.PORTFOLIO,
         currencies: ["eur"],
         preferredCurrency: "eur",
-        pfolioFile: "{\"id\":2}",
+        pfolioFile: '{"id":2}',
         __legacyPfolio: { quoteCcy: "eur" },
       },
       2
@@ -175,7 +106,7 @@ describe("appStore", () => {
       allocationFlowStep: Step.PORTFOLIO,
       currencies: ["eur"],
       preferredCurrency: "eur",
-      pfolioFile: "{\"id\":2}",
+      pfolioFile: '{"id":2}',
     });
   });
 
@@ -185,7 +116,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.END,
         currencies: ["chf"],
         preferredCurrency: "chf",
-        pfolioFile: "{\"id\":3}",
+        pfolioFile: '{"id":3}',
         __legacyPfolio: { quoteCcy: "chf" },
       },
       3
@@ -195,7 +126,7 @@ describe("appStore", () => {
       allocationFlowStep: Step.END,
       currencies: ["chf"],
       preferredCurrency: "chf",
-      pfolioFile: "{\"id\":3}",
+      pfolioFile: '{"id":3}',
     });
   });
 
@@ -205,7 +136,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.IMPORT,
         currencies: ["usd"],
         preferredCurrency: "eur",
-        pfolioFile: "{\"id\":4}",
+        pfolioFile: '{"id":4}',
       },
       3
     );
@@ -213,7 +144,7 @@ describe("appStore", () => {
     expect(migrated.allocationFlowStep).toBe(Step.PORTFOLIOS);
     expect(migrated.preferredCurrency).toBe("");
     expect(migrated.currencies).toStrictEqual(["usd"]);
-    expect(migrated.pfolioFile).toBe("{\"id\":4}");
+    expect(migrated.pfolioFile).toBe('{"id":4}');
   });
 
   it("keeps step and uses quoteCcy when legacy pfolio object exists even with empty assets", () => {
@@ -222,7 +153,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.IMPORT,
         currencies: ["usd"],
         preferredCurrency: "eur",
-        pfolioFile: "{\"id\":5}",
+        pfolioFile: '{"id":5}',
         __legacyPfolio: { assets: {}, quoteCcy: "usd" },
       },
       3
@@ -231,7 +162,7 @@ describe("appStore", () => {
     expect(migrated.allocationFlowStep).toBe(Step.IMPORT);
     expect(migrated.preferredCurrency).toBe("usd");
     expect(migrated.currencies).toStrictEqual(["usd"]);
-    expect(migrated.pfolioFile).toBe("{\"id\":5}");
+    expect(migrated.pfolioFile).toBe('{"id":5}');
   });
 
   it("sets empty preferred currency when legacy pfolio has no quoteCcy", () => {
@@ -240,7 +171,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.PORTFOLIO,
         currencies: ["usd", "eur"],
         preferredCurrency: "usd",
-        pfolioFile: "{\"id\":6}",
+        pfolioFile: '{"id":6}',
         __legacyPfolio: { assets: { VWCE: { symbol: "VWCE" } } },
       },
       3
@@ -256,7 +187,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.PORTFOLIOS,
         currencies: ["gbp"],
         preferredCurrency: "gbp",
-        pfolioFile: "{\"id\":6}",
+        pfolioFile: '{"id":6}',
       },
       5
     );
@@ -265,7 +196,7 @@ describe("appStore", () => {
       allocationFlowStep: Step.PORTFOLIOS,
       currencies: ["gbp"],
       preferredCurrency: "gbp",
-      pfolioFile: "{\"id\":6}",
+      pfolioFile: '{"id":6}',
     });
   });
 
@@ -294,7 +225,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.IMPORT,
         currencies: ["usd", "eur"],
         preferredCurrency: "",
-        pfolioFile: "{\"name\":\"imported\"}",
+        pfolioFile: '{"name":"imported"}',
       }),
       pfolio: JSON.stringify({
         assets: {},
@@ -318,7 +249,7 @@ describe("appStore", () => {
     expect(useAppStore.getState().allocationFlowStep).toBe(Step.IMPORT);
     expect(useAppStore.getState().currencies).toStrictEqual(["usd", "eur"]);
     expect(useAppStore.getState().preferredCurrency).toBe("usd");
-    expect(useAppStore.getState().pfolioFile).toBe("{\"name\":\"imported\"}");
+    expect(useAppStore.getState().pfolioFile).toBe('{"name":"imported"}');
   });
 
   it("rehydrates from legacy redux persist payload without pfolio object", async () => {
@@ -327,7 +258,7 @@ describe("appStore", () => {
         allocationFlowStep: Step.IMPORT,
         currencies: ["usd", "eur"],
         preferredCurrency: "chf",
-        pfolioFile: "{\"name\":\"imported\"}",
+        pfolioFile: '{"name":"imported"}',
       }),
       _persist: JSON.stringify({ version: 3, rehydrated: true }),
     };
@@ -347,10 +278,10 @@ describe("appStore", () => {
     expect(useAppStore.getState().allocationFlowStep).toBe(Step.PORTFOLIOS);
     expect(useAppStore.getState().currencies).toStrictEqual(["usd", "eur"]);
     expect(useAppStore.getState().preferredCurrency).toBe("");
-    expect(useAppStore.getState().pfolioFile).toBe("{\"name\":\"imported\"}");
+    expect(useAppStore.getState().pfolioFile).toBe('{"name":"imported"}');
   });
 
-  it("prefers redux bridge updates over persisted zustand values", async () => {
+  it("rehydrates persisted Zustand values", async () => {
     storage.setItem(
       APP_STORE_PERSIST_KEY,
       JSON.stringify({
@@ -358,7 +289,7 @@ describe("appStore", () => {
           allocationFlowStep: Step.END,
           currencies: ["cad"],
           preferredCurrency: "cad",
-          pfolioFile: "{\"persisted\":true}",
+          pfolioFile: '{"persisted":true}',
         },
         version: 5,
       })
@@ -366,18 +297,8 @@ describe("appStore", () => {
 
     await useAppStore.persist.rehydrate();
     expect(useAppStore.getState().preferredCurrency).toBe("cad");
-
-    const reduxStore = createReduxStoreMock({
-      allocationFlowStep: Step.IMPORT,
-      currencies: ["usd"],
-      preferredCurrency: "usd",
-      pfolioFile: "{\"redux\":true}",
-    });
-    bindAppStoreToRedux(reduxStore);
-
-    expect(useAppStore.getState().allocationFlowStep).toBe(Step.IMPORT);
-    expect(useAppStore.getState().currencies).toStrictEqual(["usd"]);
-    expect(useAppStore.getState().preferredCurrency).toBe("usd");
-    expect(useAppStore.getState().pfolioFile).toBe("{\"redux\":true}");
+    expect(useAppStore.getState().allocationFlowStep).toBe(Step.END);
+    expect(useAppStore.getState().currencies).toStrictEqual(["cad"]);
+    expect(useAppStore.getState().pfolioFile).toBe('{"persisted":true}');
   });
 });

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { replacer, roundAmount, timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import { toast } from "react-hot-toast";
@@ -135,7 +134,9 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
   const [solution, setSolution] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdated, setIsUpdated] = useState(false);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
 
   const { t } = useTranslation();
   const pfolio = useCurrentPortfolio();
@@ -228,12 +229,12 @@ export const EndStep = ({ useTaxEfficient, useAllBudget, useWholeShares }) => {
     }
 
     clearBudget();
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const onClickGoBack = () => {
     clearBudget();
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   return (

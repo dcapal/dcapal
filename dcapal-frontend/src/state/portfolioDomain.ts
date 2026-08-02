@@ -30,6 +30,7 @@ export type PortfolioAsset = {
   baseCcy: string;
   provider: string;
   qty: number;
+  averageBuyPrice: number | null;
   targetWeight: number;
   price: number;
   amount: number;
@@ -54,6 +55,17 @@ export type PortfolioStoreState = {
   selected: string | null;
   pfolios: Record<string, Portfolio>;
   deletedPortfolios: string[];
+};
+
+/** Converts a persisted or API numeric value into a finite number. */
+export const toFiniteNumber = (
+  value: number | string | null | undefined,
+  fallback = 0
+): number => {
+  const number = typeof value === "string" ? Number(value) : value;
+  return typeof number === "number" && Number.isFinite(number)
+    ? number
+    : fallback;
 };
 
 const getPortfolio = (
@@ -122,7 +134,9 @@ export const parseFeeType = (typeStr: string): number | null => {
   return null;
 };
 
-export const getDefaultFees = (type: number | null | undefined): PortfolioFees => {
+export const getDefaultFees = (
+  type: number | null | undefined
+): PortfolioFees => {
   if (!type) {
     return null;
   }
@@ -180,26 +194,34 @@ export const parseFees = (fees: unknown): PortfolioFees => {
 
   if (feeType === FeeType.FIXED) {
     if (parsedFees.maxFeeImpact != null) {
-      parsed.maxFeeImpact = parsedFees.maxFeeImpact;
+      parsed.maxFeeImpact = toFiniteNumber(parsedFees.maxFeeImpact);
     }
     if (parsedFees.feeStructure?.feeAmount != null) {
-      parsed.feeStructure.feeAmount = parsedFees.feeStructure.feeAmount;
+      parsed.feeStructure.feeAmount = toFiniteNumber(
+        parsedFees.feeStructure.feeAmount
+      );
     }
     return parsed;
   }
 
   if (feeType === FeeType.VARIABLE) {
     if (parsedFees.maxFeeImpact != null) {
-      parsed.maxFeeImpact = parsedFees.maxFeeImpact;
+      parsed.maxFeeImpact = toFiniteNumber(parsedFees.maxFeeImpact);
     }
     if (parsedFees.feeStructure?.feeRate != null) {
-      parsed.feeStructure.feeRate = parsedFees.feeStructure.feeRate;
+      parsed.feeStructure.feeRate = toFiniteNumber(
+        parsedFees.feeStructure.feeRate
+      );
     }
     if (parsedFees.feeStructure?.minFee != null) {
-      parsed.feeStructure.minFee = parsedFees.feeStructure.minFee;
+      parsed.feeStructure.minFee = toFiniteNumber(
+        parsedFees.feeStructure.minFee
+      );
     }
     if (parsedFees.feeStructure?.maxFee != null) {
-      parsed.feeStructure.maxFee = parsedFees.feeStructure.maxFee;
+      parsed.feeStructure.maxFee = toFiniteNumber(
+        parsedFees.feeStructure.maxFee
+      );
     }
     return parsed;
   }

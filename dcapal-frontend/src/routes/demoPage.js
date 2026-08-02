@@ -1,8 +1,7 @@
 import React, { useEffect } from "react";
-import { useDispatch } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 
 import {
   DEMO_PF_60_40,
@@ -38,7 +37,10 @@ const getPfolioFile = (path) => {
 
 export default function DemoPage() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const setPfolioFile = useAppStore((state) => state.setPfolioFile);
   const location = useLocation();
   const { t } = useTranslation();
 
@@ -46,15 +48,15 @@ export default function DemoPage() {
 
   useEffect(() => {
     if (pfolioFile && pfolioFile.length > 0) {
-      dispatch(setPfolioFile({ file: pfolioFile }));
-      dispatch(setAllocationFlowStep({ step: Step.IMPORT }));
+      setPfolioFile({ file: pfolioFile });
+      setAllocationFlowStep({ step: Step.IMPORT });
     } else {
-      dispatch(setPfolioFile({ file: "" }));
-      dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+      setPfolioFile({ file: "" });
+      setAllocationFlowStep({ step: Step.PORTFOLIOS });
     }
 
     navigate("/allocate");
-  }, [pfolioFile]);
+  }, [navigate, pfolioFile, setAllocationFlowStep, setPfolioFile]);
 
   return (
     <div className="px-6 py-10 flex flex-col grow justify-center items-center text-center gap-8">

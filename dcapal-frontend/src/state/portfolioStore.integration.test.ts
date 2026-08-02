@@ -1,4 +1,13 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { readFileSync } from "node:fs";
@@ -17,7 +26,15 @@ vi.mock("@app/config", () => ({
   },
 }));
 
-import { resetPortfolioStoreForTests, usePortfolioStore } from "./portfolioStore";
+import {
+  configureApiClientAuth,
+  configureApiClientBaseUrl,
+  resetApiClientConfiguration,
+} from "@dcapal/api-client";
+import {
+  resetPortfolioStoreForTests,
+  usePortfolioStore,
+} from "./portfolioStore";
 
 const server = setupServer();
 const syncFixture = JSON.parse(
@@ -34,13 +51,20 @@ describe("portfolioStore integration sync with MSW", () => {
     server.resetHandlers();
   });
 
-  afterAll(() => server.close());
+  afterAll(() => {
+    resetApiClientConfiguration();
+    server.close();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
     resetPortfolioStoreForTests();
     getSession.mockResolvedValue({
       data: { session: { access_token: "fixture-token" } },
+    });
+    configureApiClientBaseUrl("http://localhost/api");
+    configureApiClientAuth({
+      getAccessToken: async () => "fixture-token",
     });
   });
 
@@ -49,11 +73,14 @@ describe("portfolioStore integration sync with MSW", () => {
     let capturedBody: Record<string, unknown> | null = null;
 
     server.use(
-      http.post("http://localhost/api/v1/sync/portfolios", async ({ request }) => {
-        capturedAuthorization = request.headers.get("authorization") || "";
-        capturedBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json(syncFixture);
-      })
+      http.post(
+        "http://localhost/api/v1/sync/portfolios",
+        async ({ request }) => {
+          capturedAuthorization = request.headers.get("authorization") || "";
+          capturedBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(syncFixture);
+        }
+      )
     );
 
     usePortfolioStore.setState({

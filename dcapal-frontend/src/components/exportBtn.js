@@ -1,6 +1,5 @@
 import React from "react";
-import { Step } from "@app/appSlice";
-import { useAppStore } from "@/state/appStore";
+import { Step, useAppStore } from "@/state/appStore";
 import {
   aclassToString,
   feeTypeToString,

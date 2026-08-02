@@ -5,7 +5,8 @@ import {
   persist,
   type StateStorage,
 } from "zustand/middleware";
-import { syncPortfoliosAPI } from "@/api";
+import type { SyncPortfoliosResponse } from "@dcapal/api-client";
+import { syncPortfoliosAPI } from "@/api/portfolioSync";
 import { REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 import { roundAmount, roundPrice } from "@utils/index.js";
 import {
@@ -20,6 +21,7 @@ import {
   parseAClass,
   parseFeeType,
   parseFees,
+  toFiniteNumber,
   type Portfolio,
   type PortfolioAsset,
   type PortfolioFees,
@@ -44,10 +46,7 @@ type LegacySinglePortfolioState = Partial<Portfolio> & {
   quoteCcy?: string;
 };
 
-type SyncPortfoliosPayload = {
-  updatedPortfolios?: Array<Record<string, any>>;
-  deletedPortfolios?: string[];
-} | null;
+type SyncPortfoliosPayload = SyncPortfoliosResponse | null;
 
 export type PortfolioStoreActions = {
   addPortfolio: (payload: { pfolio: Portfolio }) => void;
@@ -66,6 +65,10 @@ export type PortfolioStoreActions = {
   removeAsset: (payload: { symbol: string }) => void;
   setQty: (payload: { symbol: string; qty: number }) => void;
   setPrice: (payload: { symbol: string; price: number }) => void;
+  setAverageBuyPrice: (payload: {
+    symbol: string;
+    averageBuyPrice: number | null;
+  }) => void;
   setTargetWeight: (payload: { symbol: string; weight: number }) => void;
   setRefreshTime: (payload: { time: number }) => void;
   setQuoteCurrency: (payload: { quoteCcy: string }) => void;
@@ -75,9 +78,15 @@ export type PortfolioStoreActions = {
   setFeeType: (payload: { type: number | null }) => void;
   setFeeTypeAsset: (payload: { symbol: string; type: number | null }) => void;
   setMaxFeeImpact: (payload: { value: number | null }) => void;
-  setMaxFeeImpactAsset: (payload: { symbol: string; value: number | null }) => void;
+  setMaxFeeImpactAsset: (payload: {
+    symbol: string;
+    value: number | null;
+  }) => void;
   setFixedFeeAmount: (payload: { value: number | null }) => void;
-  setFixedFeeAmountAsset: (payload: { symbol: string; value: number | null }) => void;
+  setFixedFeeAmountAsset: (payload: {
+    symbol: string;
+    value: number | null;
+  }) => void;
   setVariableFee: (payload: {
     feeRate?: number | null;
     minFee?: number | null;
@@ -170,7 +179,9 @@ const parseLegacyReduxPersistRoot = (
   const root = parsedRoot as Record<string, unknown>;
   return {
     pfolio: parseJSON(root.pfolio),
-    _persist: parseJSON(root._persist) as LegacyReduxPersistRootState["_persist"],
+    _persist: parseJSON(
+      root._persist
+    ) as LegacyReduxPersistRootState["_persist"],
   };
 };
 
@@ -183,31 +194,41 @@ const isPortfolioStoreState = (
 ): value is PortfolioStoreState => {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      "selected" in value &&
-      "pfolios" in value
+    typeof value === "object" &&
+    "selected" in value &&
+    "pfolios" in value
   );
 };
 
-const normalizeAsset = (asset: Partial<PortfolioAsset>, fallbackSymbol: string): PortfolioAsset => {
+const normalizeAsset = (
+  asset: Partial<PortfolioAsset>,
+  fallbackSymbol: string
+): PortfolioAsset => {
   return {
-    idx: typeof asset.idx === "number" ? asset.idx : 0,
+    idx: toFiniteNumber(asset.idx),
     symbol: typeof asset.symbol === "string" ? asset.symbol : fallbackSymbol,
     name: typeof asset.name === "string" ? asset.name : fallbackSymbol,
-    aclass: typeof asset.aclass === "number" ? asset.aclass : ACLASS.UNDEFINED,
+    aclass: toFiniteNumber(asset.aclass, ACLASS.UNDEFINED),
     baseCcy: typeof asset.baseCcy === "string" ? asset.baseCcy : "",
     provider: typeof asset.provider === "string" ? asset.provider : "",
-    qty: typeof asset.qty === "number" ? asset.qty : 0,
-    targetWeight: typeof asset.targetWeight === "number" ? asset.targetWeight : 0,
-    price: typeof asset.price === "number" ? asset.price : 0,
-    amount: typeof asset.amount === "number" ? asset.amount : 0,
-    weight: typeof asset.weight === "number" ? asset.weight : 0,
+    qty: toFiniteNumber(asset.qty),
+    averageBuyPrice:
+      asset.averageBuyPrice == null
+        ? null
+        : toFiniteNumber(asset.averageBuyPrice),
+    targetWeight: toFiniteNumber(asset.targetWeight),
+    price: toFiniteNumber(asset.price),
+    amount: toFiniteNumber(asset.amount),
+    weight: toFiniteNumber(asset.weight),
     fees:
       asset.fees === null || typeof asset.fees === "object" ? asset.fees : null,
   };
 };
 
-const normalizePortfolio = (input: Partial<Portfolio>, id: string): Portfolio => {
+const normalizePortfolio = (
+  input: Partial<Portfolio>,
+  id: string
+): Portfolio => {
   const assetsInput =
     input.assets && typeof input.assets === "object" ? input.assets : {};
   const assets = Object.entries(assetsInput).reduce(
@@ -223,9 +244,9 @@ const normalizePortfolio = (input: Partial<Portfolio>, id: string): Portfolio =>
     name: typeof input.name === "string" ? input.name : "",
     assets,
     quoteCcy: typeof input.quoteCcy === "string" ? input.quoteCcy : "eur",
-    nextIdx: typeof input.nextIdx === "number" ? input.nextIdx : 0,
-    totalAmount: typeof input.totalAmount === "number" ? input.totalAmount : 0,
-    budget: typeof input.budget === "number" ? input.budget : 0,
+    nextIdx: toFiniteNumber(input.nextIdx),
+    totalAmount: toFiniteNumber(input.totalAmount),
+    budget: toFiniteNumber(input.budget),
     fees:
       input.fees === null ||
       (typeof input.fees === "object" && input.fees !== undefined)
@@ -236,7 +257,9 @@ const normalizePortfolio = (input: Partial<Portfolio>, id: string): Portfolio =>
         ? input.lastPriceRefresh
         : Date.now(),
     lastUpdatedAt:
-      typeof input.lastUpdatedAt === "number" ? input.lastUpdatedAt : Date.now(),
+      typeof input.lastUpdatedAt === "number"
+        ? input.lastUpdatedAt
+        : Date.now(),
   };
 };
 
@@ -260,7 +283,9 @@ const normalizePortfolioStoreState = (state: unknown): PortfolioStoreState => {
       : null;
 
   const deletedPortfolios = Array.isArray(input.deletedPortfolios)
-    ? input.deletedPortfolios.filter((id): id is string => typeof id === "string")
+    ? input.deletedPortfolios.filter(
+        (id): id is string => typeof id === "string"
+      )
     : [];
 
   return {
@@ -278,7 +303,9 @@ const portfolioStoreMigrations: Record<number, (state: unknown) => unknown> = {
       return state;
     }
 
-    const anyAsset = Object.values(assets)[0] as Record<string, unknown> | undefined;
+    const anyAsset = Object.values(assets)[0] as
+      | Record<string, unknown>
+      | undefined;
     if (anyAsset && !("aclass" in anyAsset)) {
       return {};
     }
@@ -294,7 +321,10 @@ const portfolioStoreMigrations: Record<number, (state: unknown) => unknown> = {
     return {
       ...pfolio,
       fees: getDefaultFees(FeeType.ZERO_FEE),
-      assets: mapValues(pfolio.assets || {}, (asset) => ({ ...asset, fees: null })),
+      assets: mapValues(pfolio.assets || {}, (asset) => ({
+        ...asset,
+        fees: null,
+      })),
     };
   },
   3: (state) => {
@@ -314,11 +344,18 @@ const portfolioStoreMigrations: Record<number, (state: unknown) => unknown> = {
     }
 
     const pfolio = state as LegacySinglePortfolioState;
-    if (!pfolio || typeof pfolio !== "object" || Object.keys(pfolio).length === 0) {
+    if (
+      !pfolio ||
+      typeof pfolio !== "object" ||
+      Object.keys(pfolio).length === 0
+    ) {
       return initialPortfolioState();
     }
 
-    const id = typeof pfolio.id === "string" && pfolio.id ? pfolio.id : crypto.randomUUID();
+    const id =
+      typeof pfolio.id === "string" && pfolio.id
+        ? pfolio.id
+        : crypto.randomUUID();
     const name =
       typeof pfolio.name === "string" && pfolio.name
         ? pfolio.name
@@ -437,24 +474,37 @@ export const applySyncPortfoliosResult = (
       name: typeof pf.name === "string" ? pf.name : previous?.name || "",
       fees: parseFees(pf.fees),
       quoteCcy:
-        typeof pf.quoteCcy === "string" ? pf.quoteCcy : previous?.quoteCcy || "",
+        typeof pf.quoteCcy === "string"
+          ? pf.quoteCcy
+          : previous?.quoteCcy || "",
       assets: Array.isArray(pf.assets)
-        ? pf.assets.reduce((acc: Record<string, PortfolioAsset>, asset: any) => {
+        ? pf.assets.reduce((acc: Record<string, PortfolioAsset>, asset) => {
             const symbol = String(asset.symbol);
             acc[symbol] = {
-              ...asset,
+              idx: previous?.assets[symbol]?.idx ?? 0,
               symbol,
-              fees: parseFees(asset.fees),
+              name: typeof asset.name === "string" ? asset.name : symbol,
               aclass: parseAClass(asset.aclass),
-              weight: asset.targetWeight,
+              baseCcy: typeof asset.baseCcy === "string" ? asset.baseCcy : "",
+              provider:
+                typeof asset.provider === "string" ? asset.provider : "",
+              price: toFiniteNumber(asset.price),
+              qty: toFiniteNumber(asset.qty),
+              averageBuyPrice:
+                asset.averageBuyPrice == null
+                  ? null
+                  : toFiniteNumber(asset.averageBuyPrice),
+              targetWeight: toFiniteNumber(asset.targetWeight),
+              weight: toFiniteNumber(asset.targetWeight),
               amount: 0,
+              fees: parseFees(asset.fees),
             };
             return acc;
           }, {})
         : {},
-      nextIdx: pf.nextIdx || 0,
-      totalAmount: pf.totalAmount || 0,
-      budget: pf.budget || 0,
+      nextIdx: previous?.nextIdx ?? 0,
+      totalAmount: 0,
+      budget: previous?.budget ?? 0,
       lastPriceRefresh: previous?.lastPriceRefresh || Date.now(),
       lastUpdatedAt:
         typeof pf.lastUpdatedAt === "number"
@@ -547,13 +597,12 @@ export const usePortfolioStore = create<PortfolioStore>()(
           const symbol = payload.symbol;
           if (symbol && symbol in pfolio.assets) return state;
 
-          const legacyIdx = (state as unknown as { nextIdx?: number }).nextIdx;
           const nextPfolio: Portfolio = {
             ...pfolio,
             assets: {
               ...pfolio.assets,
               [payload.symbol]: {
-                idx: legacyIdx as number,
+                idx: pfolio.nextIdx,
                 symbol: payload.symbol,
                 name: payload.name,
                 aclass: payload.aclass,
@@ -561,6 +610,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
                 price: roundPrice(payload.price) || 0,
                 provider: payload.provider,
                 qty: 0,
+                averageBuyPrice: null,
                 amount: 0,
                 weight: 0,
                 targetWeight: 0,
@@ -612,7 +662,8 @@ export const usePortfolioStore = create<PortfolioStore>()(
           const pfolio = currentPortfolio(state);
           if (!pfolio) return state;
 
-          const asset = pfolio.assets[symbol]!;
+          const asset = pfolio.assets[symbol];
+          if (!asset) return state;
           const price = asset?.price || 0;
           const newAmount = roundAmount((qty || 0) * price);
           const nextTotalAmount = pfolio.totalAmount - asset.amount + newAmount;
@@ -638,6 +689,29 @@ export const usePortfolioStore = create<PortfolioStore>()(
           return {
             ...state,
             pfolios: { ...state.pfolios, [pfolio.id]: nextPfolio },
+          };
+        }),
+      setAverageBuyPrice: ({ symbol, averageBuyPrice }) =>
+        set((state) => {
+          const pfolio = currentPortfolio(state);
+          if (!pfolio || !symbol || !(symbol in pfolio.assets)) return state;
+
+          return {
+            ...state,
+            pfolios: {
+              ...state.pfolios,
+              [pfolio.id]: {
+                ...pfolio,
+                assets: {
+                  ...pfolio.assets,
+                  [symbol]: {
+                    ...pfolio.assets[symbol],
+                    averageBuyPrice,
+                  },
+                },
+                lastUpdatedAt: Date.now(),
+              },
+            },
           };
         }),
       setPrice: ({ symbol, price }) =>
@@ -977,7 +1051,9 @@ export const usePortfolioStore = create<PortfolioStore>()(
         set((state) => {
           const pfolio = currentPortfolio(state);
           if (!pfolio) return state;
-          if (!(pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.FIXED)) {
+          if (
+            !(pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.FIXED)
+          ) {
             return state;
           }
 
@@ -1037,7 +1113,9 @@ export const usePortfolioStore = create<PortfolioStore>()(
           const pfolio = currentPortfolio(state);
           if (!pfolio) return state;
           if (
-            !(pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.VARIABLE)
+            !(
+              pfolio.fees && pfolio.fees.feeStructure?.type === FeeType.VARIABLE
+            )
           ) {
             return state;
           }
@@ -1067,7 +1145,8 @@ export const usePortfolioStore = create<PortfolioStore>()(
           if (!symbol || !(symbol in pfolio.assets)) return state;
 
           const fees = pfolio.assets[symbol].fees;
-          if (!(fees && fees.feeStructure.type === FeeType.VARIABLE)) return state;
+          if (!(fees && fees.feeStructure.type === FeeType.VARIABLE))
+            return state;
 
           return {
             ...state,
@@ -1112,7 +1191,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
       syncPortfoliosNow: async () => {
         const { pfolios, deletedPortfolios } = get();
         const payload = await syncPortfoliosAPI(pfolios, deletedPortfolios);
-        set((state) => applySyncPortfoliosResult(state, payload as SyncPortfoliosPayload));
+        set((state) => applySyncPortfoliosResult(state, payload));
       },
     }),
     {

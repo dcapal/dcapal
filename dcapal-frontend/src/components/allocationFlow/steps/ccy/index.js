@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
-import { useAppStore } from "@/state/appStore";
+import { Step, useAppStore } from "@/state/appStore";
 import { useCurrentPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 import { CcyGroup } from "./ccyGroup";
 import { useTranslation } from "react-i18next";
@@ -31,7 +29,9 @@ export const CcyStep = ({ ...props }) => {
   const portfolioState = useCurrentPortfolio();
   const [selected, setSelected] = useState(portfolioState?.quoteCcy ?? "");
   const ccys = useAppStore((state) => state.currencies);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const setQuoteCurrency = usePortfolioStore((state) => state.setQuoteCurrency);
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -41,7 +41,7 @@ export const CcyStep = ({ ...props }) => {
 
   const onClickNext = () => {
     setQuoteCurrency({ quoteCcy: selected });
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+    setAllocationFlowStep({ step: Step.PORTFOLIO });
   };
 
   const sortedCcys = [...ccys].sort(sortCcy);

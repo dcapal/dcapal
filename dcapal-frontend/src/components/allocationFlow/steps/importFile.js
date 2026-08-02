@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { setAllocationFlowStep, setPfolioFile, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 import { getPriceForProvider } from "@/api/priceProviders";
-import { useAppStore } from "@/state/appStore";
 import { timeout } from "@utils/index.js";
 import { Spinner } from "@components/spinner/spinner";
 import {
@@ -109,7 +107,6 @@ export const ImportStep = () => {
   const [error, setError] = useState(false);
   const importStarted = useRef(false);
   const [pfolioId] = useState(crypto.randomUUID());
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const addAsset = usePortfolioStore((state) => state.addAsset);
@@ -120,8 +117,11 @@ export const ImportStep = () => {
   const setTargetWeight = usePortfolioStore((state) => state.setTargetWeight);
 
   const validCcys = useAppStore((state) => state.currencies);
-
   const pfolioFile = useAppStore((state) => state.pfolioFile);
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
+  const setPfolioFile = useAppStore((state) => state.setPfolioFile);
   const pfolio = useMemo(() => {
     const parsed = pfolioFile ? JSON.parse(pfolioFile) : {};
     if (Object.keys(parsed).length > 0) {
@@ -158,21 +158,21 @@ export const ImportStep = () => {
       ]);
 
       if (success) {
-        dispatch(setAllocationFlowStep({ step: Step.PORTFOLIO }));
+        setAllocationFlowStep({ step: Step.PORTFOLIO });
       } else {
         setError(true);
       }
 
-      dispatch(setPfolioFile({ file: "" }));
+      setPfolioFile({ file: "" });
       setIsLoading(false);
     };
 
     runImport();
-  }, [dispatch, pfolio, validCcys]);
+  }, [pfolio, pfolioId, setAllocationFlowStep, setPfolioFile, validCcys]);
 
   const onClickGoBack = () => {
-    dispatch(setPfolioFile({ file: "" }));
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    setPfolioFile({ file: "" });
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
     navigate("/");
   };
 

@@ -10,8 +10,7 @@ import LanguageSwitcher from "@components/languageSwitcher";
 
 import HAMBURGER_MENU from "@images/icons/hamburger-menu.svg";
 import CLOSE_MENU from "@images/icons/close-menu.svg";
-import { useDispatch } from "react-redux";
-import { setAllocationFlowStep, Step } from "@app/appSlice";
+import { Step, useAppStore } from "@/state/appStore";
 
 const CloseBtn = ({ onClick }) => {
   return (
@@ -28,11 +27,13 @@ const CloseBtn = ({ onClick }) => {
 };
 
 const MobileMenu = ({ visible, onClickTitle, toggleMenu }) => {
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const { t } = useTranslation();
 
   const onClickMyPortfolios = () => {
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
     toggleMenu();
   };
 
@@ -108,7 +109,9 @@ export const NavBar = () => {
   const [menuVisible, setMenuVisible] = useState(false);
 
   const { t } = useTranslation();
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = !useMediaQuery(MEDIA_MEDIUM);
@@ -123,7 +126,7 @@ export const NavBar = () => {
   };
 
   const onClickMyPortfolios = () => {
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
   };
 
   const isAllocate = location.pathname === "/allocate";

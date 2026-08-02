@@ -1,4 +1,3 @@
-import { Step } from "@app/appSlice";
 import { create } from "zustand";
 import {
   createJSONStorage,
@@ -6,27 +5,32 @@ import {
   type StateStorage,
 } from "zustand/middleware";
 
+export const Step = Object.freeze({
+  INIT: 0,
+  PORTFOLIOS: 10,
+  IMPORT: 20,
+  PORTFOLIO: 30,
+  INVEST: 40,
+  END: 50,
+} as const);
+
+export type AllocationFlowStep = (typeof Step)[keyof typeof Step];
+
 export type AppStoreState = {
-  allocationFlowStep: number;
+  allocationFlowStep: AllocationFlowStep;
   currencies: string[];
   preferredCurrency: string;
   pfolioFile: string;
 };
 
 export type AppStoreActions = {
-  setAllocationFlowStep: (payload: { step: number }) => void;
+  setAllocationFlowStep: (payload: { step: AllocationFlowStep }) => void;
   setCurrencies: (payload: { currencies: string[] }) => void;
   setPreferredCurrency: (payload: { ccy: string }) => void;
   setPfolioFile: (payload: { file: string }) => void;
-  hydrateFromRedux: (appState: Partial<AppStoreState> | undefined) => void;
 };
 
 export type AppStore = AppStoreState & AppStoreActions;
-
-type ReduxStore = {
-  getState: () => { app: AppStoreState };
-  subscribe: (listener: () => void) => () => void;
-};
 
 type SyncStorage = {
   getItem: (name: string) => string | null;
@@ -87,7 +91,9 @@ const normalizeAppState = (
 ): AppStoreState => {
   return {
     allocationFlowStep:
-      appState?.allocationFlowStep ?? initialAppState.allocationFlowStep,
+      typeof appState?.allocationFlowStep === "number"
+        ? (appState.allocationFlowStep as AllocationFlowStep)
+        : initialAppState.allocationFlowStep,
     currencies: Array.isArray(appState?.currencies)
       ? appState.currencies
       : initialAppState.currencies,
@@ -237,8 +243,6 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ ...state, preferredCurrency: ccy })),
       setPfolioFile: ({ file }) =>
         set((state) => ({ ...state, pfolioFile: file })),
-      hydrateFromRedux: (appState) =>
-        set((state) => ({ ...state, ...normalizeAppState(appState) })),
     }),
     {
       name: APP_STORE_PERSIST_KEY,
@@ -255,14 +259,6 @@ export const useAppStore = create<AppStore>()(
     }
   )
 );
-
-export const bindAppStoreToRedux = (store: ReduxStore): (() => void) => {
-  useAppStore.getState().hydrateFromRedux(store.getState().app);
-
-  return store.subscribe(() => {
-    useAppStore.getState().hydrateFromRedux(store.getState().app);
-  });
-};
 
 export const resetAppStoreForTests = () => {
   useAppStore.setState(initialAppState);

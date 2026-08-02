@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
-import { useAppStore } from "@/state/appStore";
+import { Step, useAppStore } from "@/state/appStore";
 import { useCurrentPortfolio, usePortfolioStore } from "@/state/portfolioStore";
 
 import toast from "react-hot-toast";
@@ -11,8 +10,6 @@ import { PDFDownloadLink } from "@react-pdf/renderer";
 import { SearchBar } from "./searchBar";
 import { AssetCard } from "./assetCard";
 import { PortfolioSummaryDocument } from "./documentSummary";
-
-import { setAllocationFlowStep, Step } from "@app/appSlice";
 
 import { MEDIA_SMALL, REFRESH_PRICE_INTERVAL_SEC } from "@app/config";
 
@@ -100,12 +97,17 @@ export const PortfolioStep = () => {
   const lastRefreshTime = pfolio?.lastPriceRefresh || 0;
 
   const isMobile = !useMediaQuery(MEDIA_SMALL);
-  const dispatch = useDispatch();
+  const setAllocationFlowStep = useAppStore(
+    (state) => state.setAllocationFlowStep
+  );
   const addAsset = usePortfolioStore((state) => state.addAsset);
   const selectPortfolio = usePortfolioStore((state) => state.selectPortfolio);
   const setPrice = usePortfolioStore((state) => state.setPrice);
   const setQty = usePortfolioStore((state) => state.setQty);
   const setRefreshTime = usePortfolioStore((state) => state.setRefreshTime);
+  const setAverageBuyPrice = usePortfolioStore(
+    (state) => state.setAverageBuyPrice
+  );
   const setTargetWeight = usePortfolioStore((state) => state.setTargetWeight);
 
   useEffect(() => {
@@ -178,11 +180,11 @@ export const PortfolioStep = () => {
 
   const onClickGoBack = () => {
     selectPortfolio({ id: null });
-    dispatch(setAllocationFlowStep({ step: Step.PORTFOLIOS }));
+    setAllocationFlowStep({ step: Step.PORTFOLIOS });
   };
 
   const onClickAddLiquidity = () => {
-    dispatch(setAllocationFlowStep({ step: Step.INVEST }));
+    setAllocationFlowStep({ step: Step.INVEST });
   };
 
   return (
@@ -247,12 +249,10 @@ export const PortfolioStep = () => {
           };
 
           const setAssetAverageBuyPrice = (abp) => {
-            dispatch(
-              setAverageBuyPrice({
-                symbol: a.symbol,
-                averageBuyPrice: abp || null,
-              })
-            );
+            setAverageBuyPrice({
+              symbol: a.symbol,
+              averageBuyPrice: abp || null,
+            });
           };
 
           return (
