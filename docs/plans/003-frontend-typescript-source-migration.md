@@ -15,7 +15,7 @@ The user-visible proof is unchanged behavior: the development build still starts
 - [x] (2026-08-02) Renamed the selected files, using `.tsx` for the two converted JSX modules, and preserved extensionless imports.
 - [x] (2026-08-02) Added TypeScript types for the generated API boundaries, Redux state, MSW fixtures, and Playwright helpers; added React declarations and included the test tree in frontend typecheck.
 - [x] (2026-08-02) Validated formatting, typecheck, unit tests, build, coverage browser tests, compatibility browser tests, and changed-line coverage.
-- [ ] Commit, push, and verify the GitHub pipeline.
+- [x] Commit, push, and verify the GitHub pipeline.
 
 ## Surprises & Discoveries
 
@@ -55,7 +55,7 @@ The user-visible proof is unchanged behavior: the development build still starts
 
 ## Outcomes & Retrospective
 
-The selected new and heavily changed frontend modules are now TypeScript/TSX. Tooling remains JavaScript/ESM by decision: `scripts/coverage-report.mjs`, `playwright.config.js`, and Webpack configuration files were not selected by the 80% rule. Frontend unit tests, the development build, frontend and API-client typechecks, API-client tests, both 76-test browser lanes, and changed-line coverage pass. The coverage report records 320/320 changed executable lines covered and does not enforce a global percentage threshold.
+The selected new and heavily changed frontend modules are now TypeScript/TSX. Tooling remains JavaScript/ESM by decision: `scripts/coverage-report.mjs`, `playwright.config.js`, and Webpack configuration files were not selected by the 80% rule. Frontend unit tests, the development build, frontend and API-client typechecks, API-client tests, both 76-test browser lanes, and changed-line coverage pass. The coverage report records 320/320 changed executable lines covered and does not enforce a global percentage threshold. The durable language policy is recorded in [ADR 005](../adr/005-frontend-source-uses-typescript.md).
 
 ## Context and Orientation
 
@@ -139,3 +139,4 @@ The only new dependencies are development-time React declaration packages (`@typ
 
 Revision note (2026-08-02): Created after auditing the full branch diff in response to the request to convert all new frontend source and any existing JavaScript changed by more than 80%.
 Revision note (2026-08-02): Updated after implementation and validation; recorded the TSX Tailwind scan fix, fresh-server browser validation, final coverage result, and converted `.tsx` hook path.
+Revision note (2026-08-02): Recorded the durable TypeScript source policy in ADR 005 and completed the final commit, push, and pipeline verification item.
