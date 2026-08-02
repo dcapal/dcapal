@@ -6,20 +6,29 @@ use rust_decimal::prelude::*;
 
 use crate::{AMOUNT_DECIMALS, PERCENTAGE_DECIMALS, utils::parse_amount};
 
+/// Inputs that define a portfolio allocation problem.
 #[derive(Debug, Clone)]
 pub struct ProblemOptions {
+    /// Amount available for the allocation.
     pub budget: Decimal,
+    /// Assets and their target allocation constraints.
     pub assets: HashMap<String, ProblemAsset>,
+    /// Whether the solution must preserve the current holdings.
     pub is_buy_only: bool,
 }
 
+/// Allocation constraints for one asset.
 #[derive(Debug, Clone)]
 pub struct ProblemAsset {
+    /// The asset symbol.
     pub symbol: String,
+    /// The desired fraction of the budget.
     pub target_weight: Decimal,
+    /// The amount already held.
     pub current_amount: Decimal,
 }
 
+/// A linear-programming problem built from portfolio allocation options.
 pub struct Problem {
     pub(crate) options: ProblemOptions,
     pub(crate) problem: minilp::Problem,
@@ -27,6 +36,7 @@ pub struct Problem {
 }
 
 impl Problem {
+    /// Builds the allocation problem represented by the supplied options.
     pub fn new(options: ProblemOptions) -> Self {
         // Problem:
         //    minimize sum_i(s_i)
@@ -98,6 +108,7 @@ impl Problem {
     }
 }
 
+/// Refines a solver result so rounded allocations use the available budget.
 pub fn refine_solution(problem: &Problem, vars: &HashMap<String, f64>) -> HashMap<String, f64> {
     let options = &problem.options;
 

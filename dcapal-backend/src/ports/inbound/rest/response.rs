@@ -14,39 +14,60 @@ use crate::{
 
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// The result of synchronizing the client's portfolio set.
 pub struct SyncPortfoliosResponse {
+    /// Portfolios whose server state should be applied by the client.
     pub updated_portfolios: Vec<PortfolioResponse>,
+    /// Portfolio identifiers that the client should remove.
     pub deleted_portfolios: Vec<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// A portfolio returned by the synchronization endpoint.
 pub struct PortfolioResponse {
+    /// The portfolio identifier.
     pub id: Uuid,
+    /// The portfolio display name.
     pub name: String,
+    /// The portfolio quote currency.
     pub quote_ccy: String,
+    /// The portfolio-level transaction fee settings.
     pub fees: Option<TransactionFeesResponse>,
+    /// The assets held by the portfolio.
     pub assets: Vec<PortfolioAssetResponse>,
+    /// The timestamp used to compare this state with a client copy.
     pub last_updated_at: DateTime,
 }
 
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// An asset held by a portfolio.
 pub struct PortfolioAssetResponse {
+    /// The provider symbol for the asset.
     pub symbol: String,
+    /// The asset display name.
     pub name: String,
+    /// The asset class.
     pub aclass: String,
+    /// The asset currency.
     pub base_ccy: String,
+    /// The data provider for the asset.
     pub provider: String,
     #[serde(with = "rust_decimal::serde::float")]
+    /// The quantity held.
     pub qty: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
+    /// The target portfolio weight.
     pub target_weight: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
+    /// The latest known price.
     pub price: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
+    /// The average price paid for the holding.
     pub average_buy_price: Decimal,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The asset-level transaction fee settings.
     pub fees: Option<TransactionFeesResponse>,
 }
 
@@ -166,13 +187,16 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
 
 #[derive(Debug, Serialize, ToSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
+/// Transaction fee settings returned by the API.
 pub struct TransactionFeesResponse {
     #[serde(
         skip_serializing_if = "Option::is_none",
         default,
         with = "rust_decimal::serde::float_option"
     )]
+    /// The maximum allowed fee impact, when configured.
     pub max_fee_impact: Option<Decimal>,
+    /// The fee calculation model.
     pub fee_structure: FeeStructure,
 }
 

@@ -21,6 +21,7 @@ async fn main() -> Result<()> {
 fn database_url() -> Result<String> {
     let args: Vec<String> = env::args().skip(1).collect();
 
+    // Keep the explicit URL form for operators who used the previous migration command.
     match args.as_slice() {
         [] => env::var("DATABASE_URL").context("DATABASE_URL is not set"),
         [command, flag, url] if command == "up" && flag == "-u" => Ok(url.clone()),

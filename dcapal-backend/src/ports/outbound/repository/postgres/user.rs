@@ -8,12 +8,14 @@ use crate::{
     ports::outbound::repository::{postgres::types::UserRow, user::UserRepository},
 };
 
+/// PostgreSQL implementation of user persistence backed by a SQLx pool.
 #[derive(Clone)]
 pub struct SqlxUserRepository {
     pool: PgPool,
 }
 
 impl SqlxUserRepository {
+    /// Creates a user repository backed by the provided PostgreSQL pool.
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

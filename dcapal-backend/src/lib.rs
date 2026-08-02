@@ -52,14 +52,19 @@ pub mod config;
 pub mod error;
 pub mod ports;
 
+/// The timestamp type shared by API and persistence models.
 pub type DateTime = chrono::DateTime<Utc>;
 
+/// Redis connection settings used by backend integrations.
 pub struct RedisConfig {
+    /// Redis host name.
     pub hostname: String,
+    /// Redis port.
     pub port: u32,
 }
 
 #[allow(dead_code)]
+/// Shared application state made available to HTTP handlers and workers.
 pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
@@ -71,6 +76,7 @@ pub struct AppContextInner {
     providers: Arc<PriceProviders>,
 }
 
+/// Shared application context passed through the backend.
 pub type AppContext = Arc<AppContextInner>;
 
 #[derive(Clone)]
@@ -90,6 +96,7 @@ struct Repository {
     pub user: Arc<dyn UserRepository>,
 }
 
+/// The HTTP server and background workers that make up the backend process.
 pub struct DcaServer {
     addr: SocketAddr,
     app: IntoMakeServiceWithConnectInfo<Router<()>, SocketAddr>,
@@ -99,6 +106,7 @@ pub struct DcaServer {
 }
 
 impl DcaServer {
+    /// Builds a server and initializes its external service clients and repositories.
     pub async fn try_new(config: Config) -> Result<Self> {
         let config = Arc::new(config);
 
@@ -214,6 +222,7 @@ impl DcaServer {
         })
     }
 
+    /// Starts the HTTP server and its background workers until shutdown.
     pub async fn start(&mut self, _signal_handler: BoxFuture<'_, ()>) -> Result<()> {
         info!("Initializing metrics");
         self.init_metrics().await;
@@ -252,6 +261,7 @@ impl DcaServer {
         Ok(())
     }
 
+    /// Registers backend metrics and refreshes counters stored in Redis.
     pub async fn init_metrics(&self) {
         describe_counter!(
             infra::stats::VISITORS_TOTAL,

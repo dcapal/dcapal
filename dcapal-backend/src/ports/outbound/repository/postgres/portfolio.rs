@@ -19,6 +19,7 @@ use crate::{
     },
 };
 
+/// PostgreSQL persistence for portfolios and their assets.
 #[derive(Clone)]
 pub struct SqlxPortfolioRepository {
     pool: sqlx::PgPool,
@@ -35,6 +36,7 @@ struct FeeFields {
 }
 
 impl SqlxPortfolioRepository {
+    /// Creates a portfolio repository backed by the provided PostgreSQL pool.
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self { pool }
     }
@@ -44,6 +46,7 @@ impl SqlxPortfolioRepository {
         portfolio_id: Uuid,
         assets: Vec<PortfolioAssetRequest>,
     ) -> Result<Vec<PortfolioAssetRow>> {
+        // Lock the current asset set so concurrent syncs cannot both reconcile it from stale data.
         let existing_assets = query_as::<_, PortfolioAssetRow>(
             "SELECT id, symbol, portfolio_id, name, asset_class, currency, provider,
                     quantity, target_weight, price, max_fee_impact, fee_type, fee_amount,
@@ -236,6 +239,7 @@ impl PortfolioRepository for SqlxPortfolioRepository {
     }
 
     async fn soft_delete(&self, user_id: Uuid, portfolio_id: Uuid) -> Result<()> {
+        // Keep the ownership check in the write itself so this invariant survives other callers.
         query("UPDATE portfolios SET deleted = TRUE WHERE id = $1 AND user_id = $2")
             .bind(portfolio_id)
             .bind(user_id)
@@ -324,6 +328,7 @@ impl PortfolioRepository for SqlxPortfolioRepository {
             Self::upsert_assets_transaction(&mut tx, portfolio_req.id, portfolio_req.assets)
                 .await?;
 
+        // A sync must expose the portfolio and its asset set as one consistent change.
         tx.commit().await?;
         Ok((portfolio, assets))
     }

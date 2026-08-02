@@ -3,6 +3,7 @@ use sqlx::PgPool;
 
 #[sqlx::test(migrations = false, fixtures("legacy_schema"))]
 async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx::Result<()> {
+    // The fixture represents a production database that was already migrated by SeaORM.
     MIGRATOR.run(&pool).await?;
 
     let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")

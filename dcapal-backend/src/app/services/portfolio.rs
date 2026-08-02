@@ -13,17 +13,20 @@ use crate::{
     },
 };
 
+/// Coordinates bidirectional portfolio synchronization between clients and storage.
 pub struct PortfolioService {
     portfolio_repository: Arc<dyn PortfolioRepository>,
 }
 
 impl PortfolioService {
+    /// Creates a portfolio service using the supplied persistence port.
     pub fn new(portfolio_repository: Arc<dyn PortfolioRepository>) -> Self {
         Self {
             portfolio_repository,
         }
     }
 
+    /// Synchronizes a user's local portfolios with the server state.
     pub async fn sync_portfolios(
         &self,
         user_id: Uuid,

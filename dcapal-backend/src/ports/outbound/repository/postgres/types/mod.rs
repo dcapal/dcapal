@@ -1,3 +1,5 @@
+//! PostgreSQL row types returned by SQLx queries.
+
 mod portfolio;
 mod portfolio_asset;
 mod user;
