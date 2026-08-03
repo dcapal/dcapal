@@ -219,4 +219,3 @@ This ticket resolves feasibility and the repository gaps. The following choices 
 - whether revised ECB/Fed observations replace prior values or are versioned;
 - the exact REST route and numeric wire representation;
 - whether production PostgreSQL is pinned to a Timescale-supported version or uses native partitioning.
-
