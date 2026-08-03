@@ -3,7 +3,7 @@ packages:
   - packages/api-client
 
 catalog:
-  "@faker-js/faker": ^10.0.0
+  "@faker-js/faker": ^10.5.0
   "@babel/core": ^8.0.1
   "@babel/parser": ^7.29.8
   "@babel/preset-env": ^8.0.2
@@ -23,7 +23,7 @@ catalog:
   "@supabase/auth-ui-shared": ^0.1.8
   "@supabase/supabase-js": ^2.111.0
   "@tailwindcss/postcss": ^4.3.3
-  "@tanstack/react-query": ^5.90.21
+  "@tanstack/react-query": ^5.101.4
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4
   "@types/node": ^26.1.2
@@ -49,7 +49,7 @@ catalog:
   "lucide-react": ^1.28.0
   "mini-css-extract-plugin": ^2.10.2
   "msw": ^2.15.0
-  "orval": ^8.5.1
+  "orval": ^8.23.0
   "postcss": ^8.5.25
   "postcss-loader": ^8.2.1
   "postcss-preset-env": ^11.3.2
@@ -79,4 +79,4 @@ catalog:
   "webpack-cli": ^7.2.2
   "webpack-dev-server": ^6.0.0
   "webpack-merge": ^6.0.1
-  "zustand": ^5.0.11
+  "zustand": ^5.0.14
