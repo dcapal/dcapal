@@ -36,6 +36,10 @@ _Avoid_: Risk-free asset, when describing actual investment risk
 An asset class that is not classified as defensive for strategic guidance, including equities, crypto, commodities, and other user-defined classes.
 _Avoid_: Growth asset, when referring to the strategic risk grouping
 
+**Guidance bucket**:
+A planning group used by The Bull v1 to express its two outputs: the risk-on bucket contains Equities, Crypto, Commodities, and Other; the defensive bucket contains Bonds and Cash. Guidance sets the two bucket totals without adding a hierarchy below Asset Class.
+_Avoid_: Asset Class, tactical sleeve, risk-free bucket
+
 **Symbol**:
 The provider-recognised identifier that distinguishes an asset.
 _Avoid_: Name, ticker, when the identifier may refer to crypto or currency
@@ -93,12 +97,28 @@ A separate planning definition of Asset-class target weights that can be compare
 _Avoid_: Portfolio, when referring to the asset-class plan
 
 **Strategic allocation guidance**:
-A separate area where an investor can explore Allocation Frameworks and create or update the Strategic Allocation for a Portfolio. It works in both Simple and Strategic allocation modes by aggregating current asset weights into Asset Class weights; applying guidance is an explicit user action.
+A separate area where an investor can explore Allocation Frameworks and create or update the Strategic Allocation for a Portfolio. It works in both Simple and Strategic allocation modes by aggregating current asset weights into Asset Class weights; in Simple mode it is comparison-only until the investor explicitly switches to Strategic mode. Preview is read-only and applying guidance is an explicit user action.
 _Avoid_: Portfolio editor, financial advice
+
+**Guidance age**:
+The investor's completed age in whole years, accepted from 0 through 120 inclusive, used as an input to Strategic allocation guidance. It is not a property of the Portfolio or Strategic Allocation.
+_Avoid_: Date of birth, fractional age, automatic age calculation
+
+**Guidance rate type**:
+The official live rate selected for an Allocation Framework calculation. In the MVP, the choices are Fed EFFR and ECB €STR; the application uses the latest available observation from the selected source and does not silently switch sources. Live and manual rate values are signed percentage points, with source precision retained for calculation.
+_Avoid_: Policy rate, bond yield, fallback rate
+
+**Manual guidance rate**:
+A temporary signed rate value, entered in percentage points with up to three decimal places, for one guidance preview or application when the selected live source cannot provide a usable observation. It must be finite and is not saved as Portfolio or Strategic Allocation data; an applied guidance record still identifies the selected official rate type and age, but not the manual value.
+_Avoid_: Stored rate, fallback source, policy rate
 
 **Allocation framework**:
 A named formula, rule, or literature-based approach that suggests strategic asset-class weights, such as The Bull rule. It is educational reference material; the user decides whether to apply its output.
 _Avoid_: Financial advice, automatic recommendation
+
+**Framework version**:
+An immutable DcaPal-owned identifier for the exact formula and rate policy used by an Allocation Framework. The MVP uses `the-bull-v1`; any change to its meaning requires a new version.
+_Avoid_: Source article version, last-updated date, live rate version
 
 **Drift band**:
 An acceptable range around a target weight used to decide whether to surface drift or recommend rebalancing. Drift bands are expressed in percentage points and may be configured separately for Asset Classes and Portfolio Assets.
