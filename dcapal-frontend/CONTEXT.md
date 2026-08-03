@@ -1,12 +1,16 @@
 # DcaPal Frontend
 
-This context helps a self-directed investor describe a portfolio, record current holdings, and decide how to use new savings to move towards a target allocation. It presents market data and produces allocation recommendations; it does not execute trades.
+This context helps a self-directed investor define portfolios, review their value over time, and decide how to use new savings or rebalance towards target weights. It presents market data and allocation suggestions; it does not execute trades.
 
 ## Portfolio language
 
 **Portfolio**:
-A named collection of portfolio assets, a quote currency, target weights, and fee policies. It combines what the investor currently owns with a strategy for future contributions.
-_Avoid_: Account, order
+A named collection of portfolio assets, a quote currency, target weights, and fee policies. It may include current holdings, but strategic allocation guidance and other planning decisions are separate concepts rather than fields inside the Portfolio.
+_Avoid_: Account, order, strategic allocation, when referring to the asset collection
+
+**Portfolio clone**:
+A new independent Portfolio copied from an existing Portfolio for experimentation. Changes to the clone do not change the original Portfolio; historical performance is calculated separately from asset time series for whichever Portfolio is selected.
+_Avoid_: Portfolio version, scenario, when referring to an experimental copy
 
 **Asset**:
 A tradable instrument or currency that can be added to a portfolio.
@@ -21,8 +25,16 @@ The part of a portfolio asset that the investor already owns, described by its q
 _Avoid_: Target allocation
 
 **Asset class**:
-A broad kind of asset: equity, crypto, or currency. It supplies the default rule for whether an allocation uses whole or fractional units.
-_Avoid_: Asset type, when referring to the equity/crypto/currency classification
+A broad grouping assigned to a portfolio asset, such as equities, bonds, crypto, commodities, or currency. It is used to group and summarize portfolio assets and may supply default rules for allocation constraints.
+_Avoid_: Asset type, tactical sleeve, when referring to the grouping
+
+**Defensive asset**:
+An asset class DcaPal treats as the lower-risk bucket for strategic guidance: bonds and cash. This is a planning classification, not a claim that these assets have zero investment risk.
+_Avoid_: Risk-free asset, when describing actual investment risk
+
+**Risk-on asset**:
+An asset class that is not classified as defensive for strategic guidance, including equities, crypto, commodities, and other user-defined classes.
+_Avoid_: Growth asset, when referring to the strategic risk grouping
 
 **Symbol**:
 The provider-recognised identifier that distinguishes an asset.
@@ -53,8 +65,48 @@ The percentage of the current portfolio value represented by a portfolio asset's
 _Avoid_: Target weight
 
 **Target weight**:
-The desired percentage of portfolio value for a portfolio asset. When an allocation is calculated, the target applies to the portfolio after the investment budget is added; a complete target allocation totals 100%.
-_Avoid_: Current weight, allocation amount
+The desired percentage used to define an allocation. DcaPal qualifies it as an Asset-class target weight, Absolute target weight, or Relative target weight when the level is important.
+_Avoid_: Current weight, allocation amount, when referring to a target
+
+**Asset-class target weight**:
+The desired percentage of the whole Portfolio assigned to an Asset Class in Strategic allocation mode. Asset-class target weights across the active Strategic Allocation total 100%.
+_Avoid_: Relative target weight, asset weight
+
+**Absolute target weight**:
+The desired percentage of the whole Portfolio assigned to a Portfolio Asset in Simple allocation mode. In Strategic allocation mode, it is derived from the Asset-class target weight multiplied by the asset's Relative target weight within that class.
+_Avoid_: Relative target weight, current weight
+
+**Relative target weight**:
+The desired percentage of an Asset Class assigned to a Portfolio Asset in Strategic allocation mode. Relative target weights for the assets in one class total 100%.
+_Avoid_: Absolute target weight, current weight
+
+**Simple allocation mode**:
+The mode in which an investor defines Absolute target weights directly for each Portfolio Asset. Asset-class totals are derived from those asset weights.
+_Avoid_: Strategic allocation mode, flat mode
+
+**Strategic allocation mode**:
+The advanced mode in which an investor defines Asset-class target weights and Relative target weights within each class. DcaPal derives each asset's Absolute target weight from those two levels.
+_Avoid_: Tactical sleeve mode, nested allocation
+
+**Strategic allocation**:
+A separate planning definition of Asset-class target weights that can be compared with any Portfolio. Each Portfolio has at most one active Strategic Allocation; users explore alternatives by cloning the Portfolio rather than attaching multiple Strategic Allocations.
+_Avoid_: Portfolio, when referring to the asset-class plan
+
+**Strategic allocation guidance**:
+A separate area where an investor can explore Allocation Frameworks and create or update the Strategic Allocation for a Portfolio. It works in both Simple and Strategic allocation modes by aggregating current asset weights into Asset Class weights; applying guidance is an explicit user action.
+_Avoid_: Portfolio editor, financial advice
+
+**Allocation framework**:
+A named formula, rule, or literature-based approach that suggests strategic asset-class weights, such as The Bull rule. It is educational reference material; the user decides whether to apply its output.
+_Avoid_: Financial advice, automatic recommendation
+
+**Drift band**:
+An acceptable range around a target weight used to decide whether to surface drift or recommend rebalancing. Drift bands are expressed in percentage points and may be configured separately for Asset Classes and Portfolio Assets.
+_Avoid_: Confidence band, when referring to a rebalancing threshold
+
+**Model performance history**:
+A normalized time series calculated from target weights and historical asset prices, rebased to a common starting value. It shows how the model Portfolio moved over time and is not a money-weighted return.
+_Avoid_: Transaction history, money-weighted return
 
 **Average buy price**:
 The average cost paid for one unit of a held asset. If it is not available, the current market price is used when showing portfolio gain.
