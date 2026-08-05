@@ -121,7 +121,7 @@ An immutable DcaPal-owned identifier for the exact formula and rate policy used 
 _Avoid_: Source article version, last-updated date, live rate version
 
 **Drift band**:
-An acceptable range around a target weight used to decide whether to surface drift or recommend rebalancing. Drift bands are expressed in percentage points and may be configured separately for Asset Classes and Portfolio Assets.
+An optional Portfolio-wide range around each target weight used to decide whether to surface drift or recommend rebalancing. It is expressed in percentage points; a missing value disables drift diagnostics. Asset- and Asset Class-specific overrides are not part of this MVP.
 _Avoid_: Confidence band, when referring to a rebalancing threshold
 
 **Model performance history**:
@@ -143,11 +143,11 @@ New money or liquidity available for the current allocation. It is separate from
 _Avoid_: Portfolio value, balance
 
 **Allocation**:
-A recommendation for distributing the investment budget among portfolio assets to move projected weights towards target weights. It may include unallocated cash and is not an executed trade.
+A buy-only recommendation for distributing the investment budget among Portfolio Assets to move projected weights towards target weights. It may include unallocated cash and is not an executed trade.
 _Avoid_: Order, transaction, full rebalancing
 
 **Rebalancing**:
-Changing existing holdings, including possible sales, to restore target weights. A buy-only allocation can improve balance without being a full rebalancing.
+Changing existing holdings to restore target weights. It may sell eligible overweight Portfolio Assets and use their proceeds, together with the investment budget, to buy underweight assets. A buy-only allocation can improve balance without being a full rebalancing.
 _Avoid_: Allocation, when sales are part of the intended action
 
 **Buy-only mode**:
@@ -167,6 +167,14 @@ The part of the investment budget that an allocation recommendation does not ass
 _Avoid_: Unused portfolio value, cash asset, unless the quote currency is actually included as a portfolio asset
 
 ## Fee and market-data language
+
+**Effective price**:
+The price currently used to value a Portfolio asset. Its provenance is explicit: manual price, current provider price, or last-known provider price.
+_Avoid_: Current price, when the source or freshness matters
+
+**Historical price series**:
+An ordered set of daily provider price observations for an Asset, used to calculate Model performance history. It begins at the first real observation available and is not a transaction history.
+_Avoid_: Price chart, transaction history, when referring to the source data
 
 **Transaction fee policy**:
 A rule used to estimate the cost of buying a portfolio asset during an allocation. It can be zero, fixed, or variable, and may include a maximum fee impact.
