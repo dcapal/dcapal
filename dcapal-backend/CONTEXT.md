@@ -24,6 +24,10 @@ _Avoid_: Conversion rate, when the price belongs to a specific market
 The price of one known asset in another known asset, obtained from a direct market or from intermediary markets. When the two assets are the same, the conversion rate is one.
 _Avoid_: Market price, when the value is not tied to one specific market; trade price
 
+**Price series**:
+An ordered set of daily provider observations for a provider-bound market, with a source timestamp and value for each point.
+_Avoid_: Historical chart, when referring to stored market data
+
 **Market data provider**:
 An external service that discovers market assets and markets or supplies market prices to DcaPal Backend.
 _Avoid_: Portfolio asset provider; broker
