@@ -1,3 +1,13 @@
+## Repository structure
+
+- `dcapal-backend/` — Rust backend, migrations, provider adapters, and backend tests.
+- `dcapal-frontend/` — frontend application, routes, UI, browser journeys, and frontend tests.
+- `dcapal-optimizer-wasm/` — Rust/WASM allocation and rebalancing calculations.
+- `packages/api-client/` — generated OpenAPI client models, query operations, and MSW handlers.
+- `docs/` — shared ADRs, research, plans, and agent guidance.
+- `CONTEXT-MAP.md` and each app's `CONTEXT.md` — context boundaries, glossary, and domain relationships.
+
+
 ## Agent skills
 
 ### Issue tracker
