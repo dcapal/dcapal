@@ -104,7 +104,7 @@ jobs:
           strip_components: 2
 
       - name: Download IP2Location database
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           packageManager: "npm"
           apiToken: ${{ secrets.CF_R2_API_TOKEN }}
