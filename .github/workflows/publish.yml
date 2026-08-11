@@ -13,6 +13,12 @@ on:
 env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
+  SCCACHE_GHA_VERSION: dcapal-v1
+  SCCACHE_GHA_RW_MODE: READ_WRITE
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   extract-tag-version:
@@ -44,19 +50,31 @@ jobs:
         id: setup-buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Export GitHub Actions cache environment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Locate sccache binary
+        id: sccache-path
+        run: echo "path=${SCCACHE_PATH}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/cache@v6
         id: rust-docker-cache
         with:
           path: ${{ runner.temp }}/docker-rust-cache
-          key: ubuntu-docker-rust-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'dcapal-backend/docker/Dockerfile') }}
+          key: ubuntu-docker-sccache-rust-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'dcapal-backend/docker/Dockerfile.ci') }}
           restore-keys: |
-            ubuntu-docker-rust-
+            ubuntu-docker-sccache-rust-
 
       - uses: reproducible-containers/buildkit-cache-dance@v3
         with:
           builder: ${{ steps.setup-buildx.outputs.name }}
           cache-dir: ${{ runner.temp }}/docker-rust-cache
-          dockerfile: dcapal-backend/docker/Dockerfile
+          dockerfile: dcapal-backend/docker/Dockerfile.ci
           skip-extraction: ${{ steps.rust-docker-cache.outputs.cache-hit }}
 
       - name: Login to Docker Hub
@@ -68,12 +86,21 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./dcapal-backend/docker/Dockerfile
+          file: ./dcapal-backend/docker/Dockerfile.ci
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Publish owns its scope and reads the smoke scope for shared layers.
+          build-args: |
+            SCCACHE_GHA_VERSION=${{ env.SCCACHE_GHA_VERSION }}
+            SCCACHE_GHA_RW_MODE=${{ env.SCCACHE_GHA_RW_MODE }}
+          secret-envs: |
+            actions_runtime_token=ACTIONS_RUNTIME_TOKEN
+            actions_results_url=ACTIONS_RESULTS_URL
+          secret-files: |
+            sccache=${{ steps.sccache-path.outputs.path }}
+          progress: plain
+          # Publish owns its sccache scope and reads smoke's shared layers.
           cache-from: |
-            type=gha,scope=dcapal-backend-smoke
-            type=gha,scope=dcapal-backend-publish
-          cache-to: type=gha,scope=dcapal-backend-publish,mode=max,ignore-error=true
+            type=gha,scope=dcapal-backend-sccache-smoke
+            type=gha,scope=dcapal-backend-sccache-publish
+          cache-to: type=gha,scope=dcapal-backend-sccache-publish,mode=max,ignore-error=true

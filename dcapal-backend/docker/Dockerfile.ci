@@ -1,0 +1,81 @@
+# syntax=docker/dockerfile:1.7
+
+# This Dockerfile is for GitHub Actions only. Local and reproducible builds use
+# Dockerfile, which intentionally retains its local BuildKit target cache.
+FROM rust:bookworm AS chef
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    cargo install cargo-chef
+WORKDIR /var/dcapal
+
+FROM chef AS planner
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
+COPY ./dcapal-backend ./dcapal-backend
+COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+ARG SCCACHE_GHA_VERSION=dcapal-v1
+ARG SCCACHE_GHA_RW_MODE=READ_WRITE
+
+ENV SCCACHE_GHA_ENABLED=true \
+    SCCACHE_GHA_VERSION=${SCCACHE_GHA_VERSION} \
+    SCCACHE_GHA_RW_MODE=${SCCACHE_GHA_RW_MODE} \
+    RUSTC_WRAPPER=/usr/local/bin/sccache
+
+# The workflow supplies a prebuilt runner-compatible sccache binary. It is
+# copied into this intermediate stage and never enters the runtime image.
+RUN --mount=type=secret,id=sccache,target=/tmp/sccache \
+    install -m 0755 /tmp/sccache /usr/local/bin/sccache
+
+# Build dependencies
+COPY --from=planner /var/dcapal/recipe.json recipe.json
+# Install rquest dependencies
+RUN apt-get update
+RUN apt-get install build-essential cmake perl pkg-config libclang-dev musl-tools git -y
+
+# sccache stores compiler outputs remotely, so avoid copying the large target/
+# directory between GitHub-hosted runners. Cargo's downloaded source remains a
+# small, useful cache mount.
+RUN --mount=type=secret,id=actions_runtime_token \
+    --mount=type=secret,id=actions_results_url \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    export ACTIONS_RUNTIME_TOKEN="$(cat /run/secrets/actions_runtime_token)" && \
+    export ACTIONS_RESULTS_URL="$(cat /run/secrets/actions_results_url)" && \
+    cargo chef cook --profile release-with-debug --recipe-path recipe.json \
+    && sccache --show-stats
+
+# Build application
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
+COPY ./dcapal-backend ./dcapal-backend
+COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
+RUN --mount=type=secret,id=actions_runtime_token \
+    --mount=type=secret,id=actions_results_url \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    export ACTIONS_RUNTIME_TOKEN="$(cat /run/secrets/actions_runtime_token)" && \
+    export ACTIONS_RESULTS_URL="$(cat /run/secrets/actions_results_url)" && \
+    cargo build --profile release-with-debug --bin dcapal-backend --bin migration \
+    && mkdir -p /var/dcapal/output \
+    && cp /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/output/dcapal-backend \
+    && cp /var/dcapal/target/release-with-debug/migration /var/dcapal/output/migration \
+    && sccache --show-stats
+
+FROM debian:bookworm-slim AS runtime
+# Install runtime dependencies
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get install -y ca-certificates curl libssl3 jq postgresql-client
+# Prepare binary and migrations
+WORKDIR /var/dcapal/dcapal-backend
+RUN mkdir bin
+RUN mkdir data
+COPY --from=builder /var/dcapal/output/dcapal-backend /var/dcapal/dcapal-backend/bin
+COPY --from=builder /var/dcapal/output/migration /var/dcapal/dcapal-backend/bin
+# Create start script
+COPY ./dcapal-backend/scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
+ENTRYPOINT ["./start.sh"]
