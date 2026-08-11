@@ -446,7 +446,6 @@ jobs:
           secret-envs: |
             actions_runtime_token=ACTIONS_RUNTIME_TOKEN
             actions_results_url=ACTIONS_RESULTS_URL
-          progress: plain
           # Smoke owns its sccache scope and reads publish's shared layers.
           cache-from: |
             type=gha,scope=dcapal-backend-sccache-smoke
