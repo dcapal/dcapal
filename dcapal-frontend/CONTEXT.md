@@ -176,6 +176,14 @@ _Avoid_: Current price, when the source or freshness matters
 An ordered set of daily provider price observations for an Asset, used to calculate Model performance history. It begins at the first real observation available and is not a transaction history.
 _Avoid_: Price chart, transaction history, when referring to the source data
 
+**Historical depth**:
+A named time range used to choose how much of a Historical price series to show, such as 1M, 3M, 1Y, 3Y, 5Y, or Max. It selects a view of a series; it does not identify a different series.
+_Avoid_: Sampling frequency, when referring to the displayed range
+
+**Series coverage**:
+The actual date range of observations available for a Historical price series. It may be shorter than the requested Historical depth when the provider has less history.
+_Avoid_: Historical depth, when referring to the data that exists rather than the range requested
+
 **Transaction fee policy**:
 A rule used to estimate the cost of buying a portfolio asset during an allocation. It can be zero, fixed, or variable, and may include a maximum fee impact.
 _Avoid_: Fee, when the policy and its constraints are meant
