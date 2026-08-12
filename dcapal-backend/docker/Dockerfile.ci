@@ -53,6 +53,7 @@ RUN --mount=type=secret,id=actions_runtime_token \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     export ACTIONS_RUNTIME_TOKEN="$(cat /run/secrets/actions_runtime_token)" && \
     export ACTIONS_RESULTS_URL="$(cat /run/secrets/actions_results_url)" && \
+    export SCCACHE_LOG=debug SCCACHE_NO_DAEMON=1 && \
     cargo chef cook --profile release-with-debug --recipe-path recipe.json \
     && sccache --show-stats
 
@@ -67,6 +68,7 @@ RUN --mount=type=secret,id=actions_runtime_token \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     export ACTIONS_RUNTIME_TOKEN="$(cat /run/secrets/actions_runtime_token)" && \
     export ACTIONS_RESULTS_URL="$(cat /run/secrets/actions_results_url)" && \
+    export SCCACHE_LOG=debug SCCACHE_NO_DAEMON=1 && \
     cargo build --profile release-with-debug --bin dcapal-backend --bin migration \
     && mkdir -p /var/dcapal/output \
     && cp /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/output/dcapal-backend \
