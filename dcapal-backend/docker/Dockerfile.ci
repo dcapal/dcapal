@@ -19,11 +19,10 @@ FROM chef AS builder
 ARG SCCACHE_VERSION=0.17.0
 ARG SCCACHE_SHA256=67c4a96dd237c1f518f6b36083f270f9976d516f1e57fce891755ea782e50006
 ARG SCCACHE_GHA_VERSION=dcapal-v1
-ARG SCCACHE_GHA_RW_MODE=READ_WRITE
 
 ENV SCCACHE_GHA_ENABLED=true \
+    SCCACHE_BASEDIRS=/var/dcapal \
     SCCACHE_GHA_VERSION=${SCCACHE_GHA_VERSION} \
-    SCCACHE_GHA_RW_MODE=${SCCACHE_GHA_RW_MODE} \
     RUSTC_WRAPPER=/usr/local/bin/sccache
 
 # Build dependencies
@@ -34,7 +33,7 @@ RUN apt-get install build-essential cmake curl perl pkg-config libclang-dev musl
 
 # Download a pinned static binary instead of passing it as a BuildKit secret;
 # BuildKit limits secret files to 500 KiB, while sccache is larger than that.
-RUN curl --fail --silent --show-error --location \
+RUN curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
       "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
       --output /tmp/sccache.tar.gz \
     && echo "${SCCACHE_SHA256}  /tmp/sccache.tar.gz" | sha256sum --check \

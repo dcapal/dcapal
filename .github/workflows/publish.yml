@@ -23,7 +23,6 @@ env:
   CARGO_TERM_COLOR: always
   DOCKER_REPO: leonardoarcari/dcapal
   SCCACHE_GHA_VERSION: dcapal-v1
-  SCCACHE_GHA_RW_MODE: READ_WRITE
 
 permissions:
   contents: read
@@ -118,7 +117,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             SCCACHE_GHA_VERSION=${{ env.SCCACHE_GHA_VERSION }}
-            SCCACHE_GHA_RW_MODE=${{ env.SCCACHE_GHA_RW_MODE }}
           secret-envs: |
             actions_runtime_token=ACTIONS_RUNTIME_TOKEN
             actions_results_url=ACTIONS_RESULTS_URL
