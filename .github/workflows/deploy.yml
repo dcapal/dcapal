@@ -1,6 +1,25 @@
 name: Deploy
 
-on: workflow_dispatch
+on:
+  workflow_call:
+    inputs:
+      deploy_environment:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: Deployment target
+        required: true
+        type: choice
+        options: [development, production]
+      image_tag:
+        description: Published Docker image tag
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -8,8 +27,26 @@ env:
   IP2LOCATION_FILENAME: IP2LOCATION-LITE-DB5.IPV6.BIN
 
 jobs:
+  validate-inputs:
+    runs-on: ubuntu-slim
+    env:
+      DEPLOY_ENVIRONMENT: ${{ inputs.deploy_environment }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+    steps:
+      - run: |
+          set -euo pipefail
+          case "${DEPLOY_ENVIRONMENT}" in
+            development|production) ;;
+            *) echo "Unsupported deployment environment: ${DEPLOY_ENVIRONMENT}" >&2; exit 1 ;;
+          esac
+          [[ "${IMAGE_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || {
+            echo "Image tag is not a valid Docker tag" >&2
+            exit 1
+          }
+
   optimizer-build:
     runs-on: ubuntu-latest
+    needs: validate-inputs
     steps:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -59,8 +96,8 @@ jobs:
 
       - name: Configure .env.production
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ inputs.deploy_environment == 'production' && secrets.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL_DEV }}
+          VITE_SUPABASE_ANON_KEY: ${{ inputs.deploy_environment == 'production' && secrets.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY_DEV }}
         run: |
           cat > dcapal-frontend/.env.production << EOF
           REACT_APP_ENABLE_COOKIE_BUTTON=0
@@ -100,7 +137,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-frontend/dist
-          target: ${{ secrets.WEB_DIR }}
+          target: ${{ inputs.deploy_environment == 'production' && secrets.WEB_DIR || secrets.WEB_DIR_DEV }}
           strip_components: 2
 
       - name: Download IP2Location database
@@ -120,13 +157,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-backend/data/dcapal
-          target: ${{ secrets.DCAPAL_DIR }}
+          target: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_DIR || secrets.DCAPAL_DIR_DEV }}
           strip_components: 1
 
       - name: Unpack IP2Location database
         uses: appleboy/ssh-action@master
         env:
-          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR }}
+          DCAPAL_DIR: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_DIR || secrets.DCAPAL_DIR_DEV }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
@@ -144,23 +181,23 @@ jobs:
 
       - name: Configure docker-compose.yml
         env:
-          REDIS_PORT: ${{ secrets.REDIS_PORT }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          REDIS_PORT: ${{ inputs.deploy_environment == 'production' && secrets.REDIS_PORT || secrets.REDIS_PORT_DEV }}
+          POSTGRES_PORT: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_PORT || secrets.POSTGRES_PORT_DEV }}
           POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          POSTGRES_PASSWORD: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_DATABASE || secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/docker-compose.yml << EOF
           version: "3.9"
           services:
             redis:
               image: redis/redis-stack-server
-              container_name: redis
+              container_name: ${{ inputs.deploy_environment == 'production' && 'redis' || 'redis-dev' }}
               restart: always
               ports:
                 - ${REDIS_PORT}:6379
               networks:
-                - dcapalnetwork
+                - ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}
               volumes:
                 - ./config/redis/redis-stack.conf:/redis-stack.conf
                 - ./config/redis/users.acl:/etc/redis/users.acl
@@ -173,7 +210,7 @@ jobs:
 
             db:
               image: timescale/timescaledb-ha:pg17
-              container_name: db
+              container_name: ${{ inputs.deploy_environment == 'production' && 'db' || 'db-dev' }}
               restart: always
               # set shared memory limit when using docker-compose
               shm_size: 128mb
@@ -183,7 +220,7 @@ jobs:
               - ./data/db/:/home/postgres/pgdata/data
               - ./config/db/init/:/docker-entrypoint-initdb.d
               networks:
-                - dcapalnetwork
+                - ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}
               environment:
                 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
               healthcheck:
@@ -193,26 +230,26 @@ jobs:
                 retries: 5
 
           networks:
-            dcapalnetwork:
+            ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}:
           EOF
 
       - name: Configure docker-compose.prod.yml
         env:
-          DCAPAL_API_PORT: ${{ secrets.DCAPAL_API_PORT }}
-          DCAPAL_METRICS_PORT: ${{ secrets.DCAPAL_METRICS_PORT }}
+          DCAPAL_API_PORT: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_API_PORT || secrets.DCAPAL_API_PORT_DEV }}
+          DCAPAL_METRICS_PORT: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_METRICS_PORT || secrets.DCAPAL_METRICS_PORT_DEV }}
         run: |
           cat > dcapal-backend/docker/docker-compose.prod.yml << EOF
           version: "3.9"
           services:
             dcapal:
-              image: leonardoarcari/dcapal:master
+              image: ${{ env.DOCKER_REPO }}:${{ inputs.image_tag }}
               env_file: dcapal.env
               restart: always
               ports:
                 - ${DCAPAL_API_PORT}:8080
                 - ${DCAPAL_METRICS_PORT}:9000
               networks:
-                - dcapalnetwork
+                - ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}
               volumes:
                 - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
                 - ./data/dcapal:/var/dcapal/dcapal-backend/data
@@ -256,12 +293,12 @@ jobs:
           DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
           DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
           DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_SECRET: ${{ inputs.deploy_environment == 'production' && secrets.JWT_SECRET || secrets.JWT_SECRET_DEV }}
           REDIS_USER: ${{ secrets.REDIS_USER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           POSTGRES_USER: ${{ secrets.PG_DCAPAL_USER }}
           POSTGRES_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
-          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          POSTGRES_DATABASE: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_DATABASE || secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/dcapal.yml << EOF
           app:
@@ -304,10 +341,10 @@ jobs:
 
       - name: Configure dotenv
         env:
-          POSTGRES_HOST: ${{ secrets.POSTGRES_HOSTNAME }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          POSTGRES_HOST: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_HOSTNAME || secrets.POSTGRES_HOSTNAME_DEV }}
+          POSTGRES_USER: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_USER || secrets.POSTGRES_USER_DEV }}
+          POSTGRES_PASSWORD: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD_DEV }}
+          POSTGRES_DATABASE: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_DATABASE || secrets.POSTGRES_DATABASE_DEV }}
         run: |
           cat > dcapal-backend/dcapal.env << EOF
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -325,13 +362,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           source: dcapal-backend/config,dcapal-backend/docker/docker-compose.prod.yml,dcapal-backend/docker-compose.yml,dcapal-backend/dcapal.yml,dcapal-backend/dcapal.env
-          target: ${{ secrets.DCAPAL_DIR }}
+          target: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_DIR || secrets.DCAPAL_DIR_DEV }}
           strip_components: 1
 
       - name: Deploy dcapal-backend
         uses: appleboy/ssh-action@master
         env:
-          DCAPAL_DIR: ${{ secrets.DCAPAL_DIR }}
+          DCAPAL_DIR: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_DIR || secrets.DCAPAL_DIR_DEV }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
