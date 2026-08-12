@@ -2,13 +2,22 @@ name: Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: Deploy the published image
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - development
+          - production
   push:
     branches:
       - master
       - dev
     tags:
-      - v[0-9]+.[0-9]+.[0-9]+
-      - v[0-9]+.[0-9]+.[0-9]+-*
+      - '*'
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,22 +30,42 @@ permissions:
   actions: write
 
 jobs:
-  extract-tag-version:
-    name: resolve:release:version
+  resolve-image:
+    name: resolve:image
     runs-on: ubuntu-slim
+    outputs:
+      image_ref: ${{ steps.vars.outputs.image_ref }}
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+      ref_tag: ${{ steps.vars.outputs.ref_tag }}
     steps:
-      - uses: actions/checkout@v7
-      - name: Extract tag version
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-      - name: Echo tag version
+      - id: vars
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
-          echo $RELEASE_VERSION
-          echo ${{ env.RELEASE_VERSION }}
+          set -euo pipefail
+
+          case "${REF}" in
+            refs/heads/master|refs/heads/dev|refs/tags/*)
+              ref_tag="${REF_NAME}"
+              ;;
+            *)
+              echo "Publish supports master, dev, and Git tag refs; got ${REF}" >&2
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "ref_tag=${ref_tag}"
+            echo "image_tag=${SHA}"
+            echo "image_ref=${DOCKER_REPO}:${SHA}"
+          } >> "${GITHUB_OUTPUT}"
 
   build-publish-docker-image:
     name: build:backend:image
     runs-on: ubuntu-latest
-    needs: [extract-tag-version]
+    needs: [resolve-image]
     steps:
       - uses: actions/checkout@v7
       - name: Docker meta
@@ -46,6 +75,9 @@ jobs:
           # list of Docker images to use as base name for tags
           images: |
             ${{ env.DOCKER_REPO }}
+          tags: |
+            type=raw,value=${{ needs.resolve-image.outputs.ref_tag }}
+            type=raw,value=${{ needs.resolve-image.outputs.image_tag }}
       - name: Set up Docker Buildx
         id: setup-buildx
         uses: docker/setup-buildx-action@v4
@@ -95,3 +127,13 @@ jobs:
             type=gha,scope=dcapal-backend-sccache-smoke
             type=gha,scope=dcapal-backend-sccache-publish
           cache-to: type=gha,scope=dcapal-backend-sccache-publish,mode=max,ignore-error=true
+
+  deploy:
+    name: deploy:${{ inputs.deploy_environment }}
+    needs: [resolve-image, build-publish-docker-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_environment != 'none' }}
+    uses: ./.github/workflows/deploy.yml
+    with:
+      deploy_environment: ${{ inputs.deploy_environment }}
+      image_tag: ${{ needs.resolve-image.outputs.image_tag }}
+    secrets: inherit
