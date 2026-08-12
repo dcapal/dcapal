@@ -12,8 +12,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  SCCACHE_BASEDIRS: ${{ github.workspace }}
   SCCACHE_GHA_VERSION: dcapal-v1
-  SCCACHE_GHA_RW_MODE: ${{ github.event_name == 'pull_request' && 'READ_ONLY' || 'READ_WRITE' }}
 
 permissions:
   contents: read
@@ -442,7 +442,6 @@ jobs:
           tags: dcapal-backend:smoke
           build-args: |
             SCCACHE_GHA_VERSION=${{ env.SCCACHE_GHA_VERSION }}
-            SCCACHE_GHA_RW_MODE=${{ env.SCCACHE_GHA_RW_MODE }}
           secret-envs: |
             actions_runtime_token=ACTIONS_RUNTIME_TOKEN
             actions_results_url=ACTIONS_RESULTS_URL
