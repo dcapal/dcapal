@@ -15,7 +15,7 @@ use glob::glob;
 use log::info;
 use scenario::{Expect, ExpectedSolution, Scenario};
 
-const SCENARIOS_PATH: &str = "./tests/scenarios";
+const SCENARIOS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/scenarios");
 
 #[test_log::test]
 fn test_runner() -> anyhow::Result<()> {

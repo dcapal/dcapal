@@ -1,9 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-  "dcapal-backend",
-  "dcapal-optimizer-wasm",
-  "dcapal-backend/migration",
+  "dcapal-backend/crates/backend",
+  "dcapal-backend/crates/migration",
+  "dcapal-backend/crates/openapi-generator",
+  "dcapal-optimizer-wasm/crates/optimizer",
 ]
 
 [workspace.package]

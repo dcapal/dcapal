@@ -55,7 +55,7 @@ fn portfolio_request(assets: Vec<PortfolioAssetRequest>) -> PortfolioRequest {
     }
 }
 
-#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn reads_portfolios_with_their_assets(pool: PgPool) -> dcapal_backend::error::Result<()> {
     let repository = SqlxPortfolioRepository::new(pool);
     let portfolios = repository.get_user_portfolios_with_assets(USER_ID).await?;
@@ -68,7 +68,7 @@ async fn reads_portfolios_with_their_assets(pool: PgPool) -> dcapal_backend::err
     Ok(())
 }
 
-#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn upsert_updates_assets_and_removes_missing_assets(
     pool: PgPool,
 ) -> dcapal_backend::error::Result<()> {
@@ -93,7 +93,7 @@ async fn upsert_updates_assets_and_removes_missing_assets(
     Ok(())
 }
 
-#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn ownership_is_required_for_upsert_and_delete(
     pool: PgPool,
 ) -> dcapal_backend::error::Result<()> {
@@ -114,7 +114,7 @@ async fn ownership_is_required_for_upsert_and_delete(
     Ok(())
 }
 
-#[sqlx::test(migrations = "./migrations", fixtures("users", "portfolio"))]
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn soft_delete_updates_an_owned_portfolio(pool: PgPool) -> dcapal_backend::error::Result<()> {
     let repository = SqlxPortfolioRepository::new(pool.clone());
     repository.soft_delete(USER_ID, PORTFOLIO_ID).await?;

@@ -37,7 +37,7 @@ pub mod request;
 pub mod response;
 
 static PORTFOLIO_SCHEMA_STR: &str =
-    include_str!("../../../../docs/schema/portfolio/v1/schema.json");
+    include_str!("../../../../../../docs/schema/portfolio/v1/schema.json");
 
 lazy_static! {
     static ref ASSETS_CACHE_CONTROL: CacheControl = CacheControl::new()

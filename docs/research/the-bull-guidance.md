@@ -44,7 +44,7 @@ Fetch the latest available selected rate at apply time, use it only for the calc
 
 The repository treats The Bull as the first [Allocation framework](../dcapal-frontend/docs/design/portfolio-management-epic.md), and describes framework guidance as educational material that the investor applies explicitly. It also keeps Strategic allocation and framework suggestions separate from the lean Portfolio ([ADR 001](../dcapal-frontend/docs/adr/001-keep-strategic-allocation-separate-from-portfolio.md)); both Simple and Strategic modes can compare guidance with current Asset Class weights ([ADR 004](../dcapal-frontend/docs/adr/004-support-simple-and-strategic-targeting-modes.md)).
 
-The source review found no The Bull, Fed, or ECB guidance implementation in [`dcapal-frontend/src`](../dcapal-frontend/src), [`dcapal-backend/src`](../dcapal-backend/src), or [`packages/api-client/src`](../packages/api-client/src). The existing repository contract is therefore the design documentation, not an existing code contract.
+The source review found no The Bull, Fed, or ECB guidance implementation in [`dcapal-frontend/src`](../dcapal-frontend/src), [`dcapal-backend/crates/backend/src`](../dcapal-backend/crates/backend/src), or [`packages/api-client/src`](../packages/api-client/src). The existing repository contract is therefore the design documentation, not an existing code contract.
 
 ## The Bull framework
 
