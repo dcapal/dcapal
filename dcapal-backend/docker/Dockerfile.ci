@@ -21,6 +21,7 @@ ARG SCCACHE_SHA256=67c4a96dd237c1f518f6b36083f270f9976d516f1e57fce891755ea782e50
 ARG SCCACHE_GHA_VERSION=dcapal-v1
 
 ENV SCCACHE_GHA_ENABLED=true \
+    ACTIONS_CACHE_SERVICE_V2=true \
     SCCACHE_BASEDIRS=/var/dcapal \
     SCCACHE_GHA_VERSION=${SCCACHE_GHA_VERSION} \
     RUSTC_WRAPPER=/usr/local/bin/sccache
@@ -53,7 +54,6 @@ RUN --mount=type=secret,id=actions_runtime_token \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     export ACTIONS_RUNTIME_TOKEN="$(cat /run/secrets/actions_runtime_token)" && \
     export ACTIONS_RESULTS_URL="$(cat /run/secrets/actions_results_url)" && \
-    export SCCACHE_LOG=debug SCCACHE_NO_DAEMON=1 && \
     cargo chef cook --profile release-with-debug --recipe-path recipe.json \
     && sccache --show-stats
 
@@ -68,7 +68,6 @@ RUN --mount=type=secret,id=actions_runtime_token \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     export ACTIONS_RUNTIME_TOKEN="$(cat /run/secrets/actions_runtime_token)" && \
     export ACTIONS_RESULTS_URL="$(cat /run/secrets/actions_results_url)" && \
-    export SCCACHE_LOG=debug SCCACHE_NO_DAEMON=1 && \
     cargo build --profile release-with-debug --bin dcapal-backend --bin migration \
     && mkdir -p /var/dcapal/output \
     && cp /var/dcapal/target/release-with-debug/dcapal-backend /var/dcapal/output/dcapal-backend \
