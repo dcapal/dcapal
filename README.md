@@ -75,7 +75,7 @@ cp config/dcapal/dcapal.yml dcapal.yml
 Compile and start backend service
 
 ```bash
-cargo run --manifest-path crates/backend/Cargo.toml --release
+cargo run --bin dcapal-backend --release
 ```
 
 **Run DcaPal frontend**
