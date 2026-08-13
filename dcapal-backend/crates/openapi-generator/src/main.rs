@@ -17,5 +17,5 @@ fn main() -> Result<()> {
 }
 
 fn default_output_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs/openapi.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/openapi.json")
 }

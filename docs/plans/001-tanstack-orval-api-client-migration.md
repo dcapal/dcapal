@@ -33,7 +33,7 @@ A contributor will be able to regenerate the client from the backend contract, s
 - Observation: The frontend currently combines Axios services, a direct `fetch` sync call, effects, timers, and request-id/cancel-token logic.
   Evidence: `dcapal-frontend/src/api/services`, `useFetchImportedPortfolio.js`, `useSyncPortfolios.js`, and the portfolio search/price components.
 - Observation: Rust `Decimal` fields are currently described as strings by parts of OpenAPI but several response serializers force JSON floating-point numbers; the price timestamp is serialized as epoch seconds while its generated schema says date-time.
-  Evidence: the `rust_decimal::serde::float*` attributes in `dcapal-backend/src/ports/inbound/rest`, `#[serde(with = "chrono::serde::ts_seconds")]` on `Price.ts`, and the generated `Price` schema.
+  Evidence: the `rust_decimal::serde::float*` attributes in `dcapal-backend/crates/backend/src/ports/inbound/rest`, `#[serde(with = "chrono::serde::ts_seconds")]` on `Price.ts`, and the generated `Price` schema.
 - Observation: `MIGRATION.md` and `agent_docs/migration_inventory_report.md` are untracked stale work describing a different stack.
   Evidence: the files mention Zodios, Zustand, and Next.js. They are intentionally left untouched.
 - Observation: Orval 8.23 expects MSW generation through `mock.generators`, and the imported portfolio schema's local `$defs` cannot remain rooted at the OpenAPI document.
@@ -99,7 +99,7 @@ Finally update the root and package scripts so one explicit command regenerates 
 
 Run all commands from the repository root unless a step says otherwise.
 
-1. Inspect and update the Rust REST serializers and OpenAPI annotations in `dcapal-backend/src/ports/inbound/rest/mod.rs`, `request.rs`, `response.rs`, and any related schema tests. Run the backend formatter and tests. Use the repository's existing OpenAPI export command and confirm only the intended generated contract changes appear.
+1. Inspect and update the Rust REST serializers and OpenAPI annotations in `dcapal-backend/crates/backend/src/ports/inbound/rest/mod.rs`, `request.rs`, `response.rs`, and any related schema tests. Run the backend formatter and tests. Use the repository's existing OpenAPI export command and confirm only the intended generated contract changes appear.
 
 2. Create the `packages/api-client` package and add its workspace entry. Add the package-local `generate` script and a root script that exports the backend OpenAPI document before running Orval. Install or add the pinned workspace versions of `@tanstack/react-query`, `orval`, and any MSW mock-generation development dependencies through the pnpm catalog; update the single root lockfile.
 

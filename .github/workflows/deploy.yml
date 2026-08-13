@@ -64,8 +64,8 @@ jobs:
           rustc --version
 
       - name: Build
-        run: |
-          wasm-pack build --release dcapal-optimizer-wasm
+        working-directory: dcapal-optimizer-wasm/crates/optimizer
+        run: wasm-pack build --release --out-dir ../../pkg
 
       - name: Archive dcapal-optimizer-wasm pkg
         uses: actions/upload-artifact@v7

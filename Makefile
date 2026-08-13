@@ -1,6 +1,6 @@
 COMPOSE_BASE_ARGS := -f docker-compose.yml -f docker/docker-compose.dev.yml
 DCAPAL_BACKEND_DIR := ./dcapal-backend
-DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm
+DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm/crates/optimizer
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
 SUPABASE_WORKDIR := ./config
 SUPABASE_DATABASE_URL ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
@@ -33,15 +33,15 @@ lint: lint-rust lint-js  ## Run linters on the codebase
 
 ## Build backend
 build-backend: ## Build backend
-	cd $(DCAPAL_BACKEND_DIR) && cargo build
+	cd $(DCAPAL_BACKEND_DIR) && cargo build --manifest-path crates/backend/Cargo.toml
 
 ## Export backend OpenAPI spec
 export-openapi: ## Export backend OpenAPI spec
-	cargo run -p dcapal-backend --bin generate_openapi -- dcapal-backend/docs/openapi.json
+	cargo run -p openapi-generator --bin openapi-generator -- dcapal-backend/docs/openapi.json
 
 ## Build optimizer-wasm
 build-optimizer: ## Build optimizer-wasm
-	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev
+	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev --out-dir ../../pkg
 
 ## Build frontend
 build-frontend: ## Build frontend
@@ -63,11 +63,11 @@ test-frontend: test-frontend-unit test-frontend-e2e ## Run all frontend tests
 
 ## Run backend (dev)
 run-backend-dev: ## Run backend (dev)
-	cd $(DCAPAL_BACKEND_DIR) && cargo run
+	cd $(DCAPAL_BACKEND_DIR) && cargo run --manifest-path crates/backend/Cargo.toml
 
 ## Run frontend (dev)
 run-frontend-dev: ## Run frontend (dev)
-	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev
+	cd $(DCAPAL_OPTIMIZER_DIR) && wasm-pack build --dev --out-dir ../../pkg
 	pnpm frontend:dev
 
 ## Start Supabase with config

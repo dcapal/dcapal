@@ -49,9 +49,5 @@ utoipa-axum = { workspace = true }
 uuid = { workspace = true }
 rquest = { workspace = true }
 
-[[bin]]
-name = "generate_openapi"
-path = "tools/generate_openapi.rs"
-
 [dev-dependencies]
-migration = { path = "migration" }
+migration = { path = "../migration" }

@@ -19,7 +19,7 @@ VITE_SUPABASE_ANON_KEY=<anon_key>
 From the repository root, build the local optimizer package, install the workspace dependencies, and run the frontend server:
 
 ```shell
-wasm-pack build --dev dcapal-optimizer-wasm
+(cd dcapal-optimizer-wasm/crates/optimizer && wasm-pack build --dev --out-dir ../../pkg)
 pnpm install --frozen-lockfile
 pnpm frontend:dev
 ```

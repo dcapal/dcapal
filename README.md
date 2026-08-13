@@ -75,7 +75,7 @@ cp config/dcapal/dcapal.yml dcapal.yml
 Compile and start backend service
 
 ```bash
-cargo run --release
+cargo run --manifest-path crates/backend/Cargo.toml --release
 ```
 
 **Run DcaPal frontend**
@@ -83,15 +83,15 @@ cargo run --release
 Build DcaPal Optimizer
 
 ```bash
-cd dcapal-optimizer-wasm
+cd dcapal-optimizer-wasm/crates/optimizer
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-wasm-pack build --release
+wasm-pack build --release --out-dir ../../pkg
 ```
 
 Install JavaScript dependencies from the repository root. The optimizer build must happen first because the frontend uses its generated package as a local dependency.
 
 ```bash
-cd ..
+cd ../../..
 pnpm install --frozen-lockfile
 ```
 

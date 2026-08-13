@@ -33,7 +33,6 @@ jobs:
           components: rustfmt
 
       - name: Check backend formatting
-        working-directory: dcapal-backend
         run: cargo fmt --all -- --check
 
   backend-lint:
@@ -61,8 +60,7 @@ jobs:
           cargo clippy --version
 
       - name: Lint backend
-        working-directory: dcapal-backend
-        run: cargo clippy -- -D warnings
+        run: cargo clippy -p dcapal-backend -p migration -p openapi-generator -- -D warnings
       - name: Show sccache stats
         if: always()
         run: ${SCCACHE_PATH} --show-stats
@@ -167,7 +165,7 @@ jobs:
           cargo clippy --version
 
       - name: Lint optimizer
-        working-directory: dcapal-optimizer-wasm
+        working-directory: dcapal-optimizer-wasm/crates/optimizer
         run: |
           cargo fmt -- --check
           cargo clippy -- -D warnings
@@ -201,14 +199,14 @@ jobs:
           rustc --version
 
       - name: Test optimizer
-        working-directory: dcapal-optimizer-wasm
+        working-directory: dcapal-optimizer-wasm/crates/optimizer
         run: |
           RUST_LOG=info cargo test -- --nocapture
           wasm-pack test --headless --chrome
 
       - name: Build optimizer package
-        working-directory: dcapal-optimizer-wasm
-        run: wasm-pack build
+        working-directory: dcapal-optimizer-wasm/crates/optimizer
+        run: wasm-pack build --out-dir ../../pkg
 
       - name: Show sccache stats
         if: always()

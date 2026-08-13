@@ -21,7 +21,7 @@ fn claims(user_id: Uuid, email: &str, full_name: Option<&str>) -> Claims {
     }
 }
 
-#[sqlx::test(migrations = "./migrations", fixtures("users"))]
+#[sqlx::test(migrations = "../../migrations", fixtures("users"))]
 async fn updates_an_existing_user(pool: PgPool) -> dcapal_backend::error::Result<()> {
     let repository = SqlxUserRepository::new(pool.clone());
     let user = repository
@@ -45,7 +45,7 @@ async fn updates_an_existing_user(pool: PgPool) -> dcapal_backend::error::Result
     Ok(())
 }
 
-#[sqlx::test(migrations = "./migrations", fixtures("users"))]
+#[sqlx::test(migrations = "../../migrations", fixtures("users"))]
 async fn inserts_a_missing_user(pool: PgPool) -> dcapal_backend::error::Result<()> {
     let repository = SqlxUserRepository::new(pool.clone());
     let user = repository
