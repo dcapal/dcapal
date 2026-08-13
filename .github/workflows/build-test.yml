@@ -12,6 +12,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  ACTIONS_CACHE_SERVICE_V2: "true"
   SCCACHE_BASEDIRS: ${{ github.workspace }}
   SCCACHE_GHA_VERSION: dcapal-v1
 
