@@ -443,6 +443,7 @@ jobs:
           tags: dcapal-backend:smoke
           build-args: |
             SCCACHE_GHA_VERSION=${{ env.SCCACHE_GHA_VERSION }}
+            SCCACHE_PROBE=${{ github.run_id }}
           secret-envs: |
             actions_runtime_token=ACTIONS_RUNTIME_TOKEN
             actions_results_url=ACTIONS_RESULTS_URL
