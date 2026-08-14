@@ -54,6 +54,26 @@ run_migrations() {
   DATABASE_URL="$database_url" cargo run --quiet -p migration
 }
 
+restore_dump() {
+  local name="$1"
+  local dump_path="$2"
+  local restore_list="$TEMP_DIR/${name}-restore.list"
+
+  # The PostgreSQL 18 image already provisions TimescaleDB. Exclude only its
+  # extension metadata from the PostgreSQL 17 archive before restoring it.
+  docker exec -i "$name" pg_restore --list < "$dump_path" |
+    sed -e '/EXTENSION - timescaledb$/d' \
+        -e '/COMMENT - EXTENSION timescaledb$/d' \
+    > "$restore_list"
+  docker exec -i "$name" sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
+  docker exec "$name" pg_restore \
+    --use-list=/tmp/dcapal-restore.list \
+    -U postgres \
+    -d postgres \
+    --no-owner \
+    --exit-on-error
+}
+
 start_database "$SOURCE_NAME" "$SOURCE_IMAGE"
 wait_for_database "$SOURCE_NAME"
 SOURCE_PORT="$(mapped_port "$SOURCE_NAME")"
@@ -113,11 +133,7 @@ wait_for_database "$TARGET_NAME"
 TARGET_PORT="$(mapped_port "$TARGET_NAME")"
 TARGET_URL="postgresql://postgres:${PASSWORD}@127.0.0.1:${TARGET_PORT}/postgres"
 
-docker exec -i "$TARGET_NAME" pg_restore \
-  -U postgres \
-  -d postgres \
-  --no-owner \
-  --exit-on-error < "$TEMP_DIR/dcapal.dump"
+restore_dump "$TARGET_NAME" "$TEMP_DIR/dcapal.dump"
 
 run_migrations "$TARGET_URL"
 

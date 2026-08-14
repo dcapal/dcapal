@@ -83,7 +83,7 @@ supabase-down:  ## Stop Supabase
 
 ## Start the TimescaleDB database used by backend development and tests
 backend-db-up:  ## Start the backend database
-	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_BASE_ARGS) up -d --wait --wait-timeout 120 db
+	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_BASE_ARGS) up -d --wait --wait-timeout 180 db
 
 ## Stop the TimescaleDB database used by backend development and tests
 backend-db-down:  ## Stop the backend database

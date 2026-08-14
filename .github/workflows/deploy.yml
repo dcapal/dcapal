@@ -226,8 +226,9 @@ jobs:
               healthcheck:
                 test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DATABASE}" ]
                 interval: 10s
-                timeout: 5s
-                retries: 5
+                timeout: 10s
+                retries: 10
+                start_period: 60s
 
           networks:
             ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}:

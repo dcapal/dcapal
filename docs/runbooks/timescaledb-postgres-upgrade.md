@@ -77,6 +77,26 @@ database/Redis Compose file and with the full stack written by
       fi
     }
 
+    restore_dump() {
+      local dump_path="$1"
+      local restore_list="$BACKUP_DIR/restore.list"
+
+      # The PostgreSQL 18 image already provisions TimescaleDB. Restore the
+      # application archive without replaying only that extension metadata.
+      compose exec -T db pg_restore --list < "$dump_path" |
+        sed -e '/EXTENSION - timescaledb$/d' \
+            -e '/COMMENT - EXTENSION timescaledb$/d' \
+        > "$restore_list"
+      chmod 600 "$restore_list"
+      compose exec -T db sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
+      compose exec -T db pg_restore \
+        --use-list=/tmp/dcapal-restore.list \
+        -U postgres \
+        -d postgres \
+        --no-owner \
+        --exit-on-error
+    }
+
     compose config >/dev/null
     compose config --services
     compose ps
@@ -224,14 +244,11 @@ same deployment secret; do not continue with a missing application role.
 
 ### 4. Restore data and run DcaPal migrations
 
-Restore the PostgreSQL 17 custom dump into the empty PostgreSQL 18 database:
+Restore the PostgreSQL 17 custom dump into the empty PostgreSQL 18 database.
+The restore list omits only the TimescaleDB extension and its comment because
+the PostgreSQL 18 TimescaleDB image has already created that extension:
 
-    compose exec -T db pg_restore \
-      -U postgres \
-      -d postgres \
-      --no-owner \
-      --exit-on-error \
-      < "$BACKUP_DIR/dcapal-pg17.dump"
+    restore_dump "$BACKUP_DIR/dcapal-pg17.dump"
 
 Run the migration binary packaged in the DcaPal backend image. The command
 uses the Compose-internal db:5432 address and the credentials already loaded
@@ -339,9 +356,7 @@ does not preserve writes made after the cutover.
     chmod 700 "$DCAPAL_DIR/data/db"
     compose pull db
     compose up -d --no-deps --wait --wait-timeout 180 db
-    compose exec -T db pg_restore \
-      -U postgres -d postgres --no-owner --exit-on-error \
-      < "$BACKUP_DIR/dcapal-pg17.dump"
+    restore_dump "$BACKUP_DIR/dcapal-pg17.dump"
 
 Run the packaged migration command from the backend service, then start and
 verify the full stack. Treat any post-cutover writes that are not present in
