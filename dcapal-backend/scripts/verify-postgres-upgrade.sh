@@ -66,7 +66,7 @@ restore_dump() {
         -e '/COMMENT - EXTENSION timescaledb$/d' \
     > "$restore_list"
   docker exec -i "$name" sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
-  docker exec "$name" pg_restore \
+  docker exec -i "$name" pg_restore \
     --use-list=/tmp/dcapal-restore.list \
     -U postgres \
     -d postgres \
