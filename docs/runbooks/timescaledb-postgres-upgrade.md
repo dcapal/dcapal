@@ -81,10 +81,12 @@ database/Redis Compose file and with the full stack written by
       local dump_path="$1"
       local restore_list="$BACKUP_DIR/restore.list"
 
-      # TimescaleDB extensions are owned by the target image. Restore the
-      # application archive without replaying their extension metadata.
+      # TimescaleDB extensions and their internal catalog data are owned by the
+      # target image. Restore the application archive without replaying them.
       compose exec -T db pg_restore --list < "$dump_path" |
-        sed -E '/EXTENSION .*timescaledb(_toolkit)?/d' \
+        sed -E \
+          -e '/EXTENSION .*timescaledb(_toolkit)?/d' \
+          -e '/TABLE DATA .*_timescaledb_(catalog|config)/d' \
         > "$restore_list"
       chmod 600 "$restore_list"
       compose exec -T db sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
@@ -150,6 +152,8 @@ including role passwords:
       -d postgres \
       --format=custom \
       --no-owner \
+      --exclude-table-data='_timescaledb_catalog.*' \
+      --exclude-table-data='_timescaledb_config.*' \
       > "$BACKUP_DIR/dcapal-pg17.dump"
 
     compose exec -T db pg_dumpall \
@@ -245,9 +249,12 @@ same deployment secret; do not continue with a missing application role.
 ### 4. Restore data and run DcaPal migrations
 
 Restore the PostgreSQL 17 custom dump into the empty PostgreSQL 18 database.
-The restore list omits only the TimescaleDB and TimescaleDB Toolkit extension
-metadata because extension availability is owned by the PostgreSQL 18
-TimescaleDB image:
+The dump excludes TimescaleDB and TimescaleDB Toolkit internal catalog data,
+and the restore list also removes those extension metadata and data entries.
+The target image owns this state, and the PostgreSQL 17 and 18 catalog schemas
+are not interchangeable. DcaPal does not currently own TimescaleDB
+hypertables, so this preserves all DcaPal application tables while the target
+image provisions its own extension catalog:
 
     restore_dump "$BACKUP_DIR/dcapal-pg17.dump"
 

@@ -65,10 +65,14 @@ restore_dump() {
   local dump_path="$2"
   local restore_list="$TEMP_DIR/${name}-restore.list"
 
-  # TimescaleDB extensions are owned by the target image. Exclude only their
-  # extension metadata from the PostgreSQL 17 archive before restoring it.
+  # TimescaleDB extensions and their internal catalog data are owned by the
+  # target image. Exclude their archive entries before restoring it. The dump
+  # also excludes this data at creation time; this list keeps the restore safe
+  # for an archive created before that flag was added.
   docker exec -i "$name" pg_restore --list < "$dump_path" |
-    sed -E '/EXTENSION .*timescaledb(_toolkit)?/d' \
+    sed -E \
+      -e '/EXTENSION .*timescaledb(_toolkit)?/d' \
+      -e '/TABLE DATA .*_timescaledb_(catalog|config)/d' \
     > "$restore_list"
   docker exec -i "$name" sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
   docker exec -i "$name" pg_restore \
@@ -132,7 +136,10 @@ docker exec "$SOURCE_NAME" pg_dump \
   -U postgres \
   -d postgres \
   --format=custom \
-  --no-owner > "$TEMP_DIR/dcapal.dump"
+  --no-owner \
+  --exclude-table-data='_timescaledb_catalog.*' \
+  --exclude-table-data='_timescaledb_config.*' \
+  > "$TEMP_DIR/dcapal.dump"
 
 start_database "$TARGET_NAME" "$TARGET_IMAGE"
 wait_for_database "$TARGET_NAME"
