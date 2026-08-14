@@ -65,11 +65,13 @@ restore_dump() {
   local dump_path="$2"
   local restore_list="$TEMP_DIR/${name}-restore.list"
 
-  # The PostgreSQL 18 image already provisions TimescaleDB. Exclude only its
+  # TimescaleDB extensions are owned by the target image. Exclude only their
   # extension metadata from the PostgreSQL 17 archive before restoring it.
   docker exec -i "$name" pg_restore --list < "$dump_path" |
     sed -e '/EXTENSION - timescaledb$/d' \
         -e '/COMMENT - EXTENSION timescaledb$/d' \
+        -e '/EXTENSION - timescaledb_toolkit$/d' \
+        -e '/COMMENT - EXTENSION timescaledb_toolkit$/d' \
     > "$restore_list"
   docker exec -i "$name" sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
   docker exec -i "$name" pg_restore \

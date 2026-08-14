@@ -81,11 +81,13 @@ database/Redis Compose file and with the full stack written by
       local dump_path="$1"
       local restore_list="$BACKUP_DIR/restore.list"
 
-      # The PostgreSQL 18 image already provisions TimescaleDB. Restore the
-      # application archive without replaying only that extension metadata.
+      # TimescaleDB extensions are owned by the target image. Restore the
+      # application archive without replaying their extension metadata.
       compose exec -T db pg_restore --list < "$dump_path" |
         sed -e '/EXTENSION - timescaledb$/d' \
             -e '/COMMENT - EXTENSION timescaledb$/d' \
+            -e '/EXTENSION - timescaledb_toolkit$/d' \
+            -e '/COMMENT - EXTENSION timescaledb_toolkit$/d' \
         > "$restore_list"
       chmod 600 "$restore_list"
       compose exec -T db sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
@@ -246,8 +248,9 @@ same deployment secret; do not continue with a missing application role.
 ### 4. Restore data and run DcaPal migrations
 
 Restore the PostgreSQL 17 custom dump into the empty PostgreSQL 18 database.
-The restore list omits only the TimescaleDB extension and its comment because
-the PostgreSQL 18 TimescaleDB image has already created that extension:
+The restore list omits only the TimescaleDB and TimescaleDB Toolkit extension
+metadata because extension availability is owned by the PostgreSQL 18
+TimescaleDB image:
 
     restore_dump "$BACKUP_DIR/dcapal-pg17.dump"
 
