@@ -32,8 +32,14 @@ wait_for_database() {
   local name="$1"
 
   for _ in $(seq 1 90); do
-    if docker exec "$name" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
-      return 0
+    if docker logs "$name" 2>&1 |
+      grep -F 'PostgreSQL init process complete; ready for start up.' >/dev/null \
+      && docker exec "$name" psql \
+        -v ON_ERROR_STOP=1 \
+        -U postgres \
+        -d postgres \
+        -c 'SELECT 1' >/dev/null 2>&1; then
+        return 0
     fi
     sleep 1
   done
