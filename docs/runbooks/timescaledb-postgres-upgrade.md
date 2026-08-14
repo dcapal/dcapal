@@ -84,10 +84,7 @@ database/Redis Compose file and with the full stack written by
       # TimescaleDB extensions are owned by the target image. Restore the
       # application archive without replaying their extension metadata.
       compose exec -T db pg_restore --list < "$dump_path" |
-        sed -e '/EXTENSION - timescaledb$/d' \
-            -e '/COMMENT - EXTENSION timescaledb$/d' \
-            -e '/EXTENSION - timescaledb_toolkit$/d' \
-            -e '/COMMENT - EXTENSION timescaledb_toolkit$/d' \
+        sed -E '/EXTENSION .*timescaledb(_toolkit)?/d' \
         > "$restore_list"
       chmod 600 "$restore_list"
       compose exec -T db sh -c 'cat > /tmp/dcapal-restore.list' < "$restore_list"
