@@ -71,7 +71,8 @@ restore_dump() {
     -U postgres \
     -d postgres \
     --no-owner \
-    --exit-on-error
+    --exit-on-error \
+    < "$dump_path"
 }
 
 start_database "$SOURCE_NAME" "$SOURCE_IMAGE"

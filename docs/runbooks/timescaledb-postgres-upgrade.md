@@ -94,7 +94,8 @@ database/Redis Compose file and with the full stack written by
         -U postgres \
         -d postgres \
         --no-owner \
-        --exit-on-error
+        --exit-on-error \
+        < "$dump_path"
     }
 
     compose config >/dev/null

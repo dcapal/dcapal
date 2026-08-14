@@ -83,7 +83,15 @@ supabase-down:  ## Stop Supabase
 
 ## Start the TimescaleDB database used by backend development and tests
 backend-db-up:  ## Start the backend database
-	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_BASE_ARGS) up -d --wait --wait-timeout 180 db
+	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_BASE_ARGS) up -d db
+	cd $(DCAPAL_BACKEND_DIR) && for attempt in $$(seq 1 180); do \
+		if docker compose $(COMPOSE_BASE_ARGS) exec -T db psql -U postgres -d postgres -c 'SELECT 1' >/dev/null 2>&1; then \
+			exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	docker compose $(COMPOSE_BASE_ARGS) logs db; \
+	exit 1
 
 ## Stop the TimescaleDB database used by backend development and tests
 backend-db-down:  ## Stop the backend database
