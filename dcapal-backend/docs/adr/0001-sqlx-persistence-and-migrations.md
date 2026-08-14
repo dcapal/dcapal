@@ -28,7 +28,7 @@ fixtures for repository integration tests.
 
 The backend no longer depends on SeaORM or its migration CLI. Deployments keep
 their current startup order and command form, while local tests require a
-running Supabase PostgreSQL instance. SQLx migrations have a separate history,
-so old SeaORM migration metadata remains visible for compatibility. Portfolio
-asset uniqueness is intentionally not added here; it is tracked separately in
-[issue #714](https://github.com/dcapal/dcapal/issues/714).
+running application PostgreSQL instance. SQLx migrations have a separate
+history, so old SeaORM migration metadata remains visible for compatibility.
+Portfolio asset uniqueness is intentionally not added here; it is tracked
+separately in [issue #714](https://github.com/dcapal/dcapal/issues/714).

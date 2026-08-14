@@ -1,12 +1,15 @@
+SHELL := /bin/bash
+
 COMPOSE_BASE_ARGS := -f docker-compose.yml -f docker/docker-compose.dev.yml
 DCAPAL_BACKEND_DIR := ./dcapal-backend
 DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm/crates/optimizer
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
 SUPABASE_WORKDIR := ./config
-SUPABASE_DATABASE_URL ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
-DATABASE_URL ?= $(SUPABASE_DATABASE_URL)
+POSTGRES_PASSWORD ?= postgres
+TIMESCALE_DATABASE_URL ?= postgresql://postgres:$(POSTGRES_PASSWORD)@127.0.0.1:5433/postgres
+DATABASE_URL ?= $(TIMESCALE_DATABASE_URL)
 
-.PHONY: help supabase-up supabase-down backend-db-up backend-db-down backend-db-check backend-migrate test-backend docker-dev-up docker-dev-down dev-up dev-down export-openapi
+.PHONY: help supabase-up supabase-down render-local-config local-up local-down backend-db-up backend-db-down backend-db-check backend-migrate test-backend docker-dev-up docker-dev-down dev-up dev-down export-openapi
 
 ## Show this help message
 help:
@@ -78,11 +81,14 @@ supabase-up:  ## Start Supabase with config
 supabase-down:  ## Stop Supabase
 	cd $(DCAPAL_BACKEND_DIR) && npx supabase stop --workdir $(SUPABASE_WORKDIR)
 
-## Start the Supabase database used by backend development and tests
-backend-db-up: supabase-up  ## Start the backend database
+## Start the TimescaleDB database used by backend development and tests
+backend-db-up:  ## Start the backend database
+	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_BASE_ARGS) up -d --wait --wait-timeout 120 db
 
-## Stop the Supabase database used by backend development and tests
-backend-db-down: supabase-down  ## Stop the backend database
+## Stop the TimescaleDB database used by backend development and tests
+backend-db-down:  ## Stop the backend database
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) stop db
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) rm --force db
 
 ## Check that the backend database is already running
 backend-db-check:  ## Check backend database connectivity
@@ -123,7 +129,15 @@ dev-up: supabase-up docker-dev-up  ## Start full dev environment (Supabase + Doc
 dev-down: docker-dev-down supabase-down  ## Stop full dev environment
 ## Start full dev+local environment (Supabase + Docker)
 
-local-up: supabase-up docker-local-up  ## Start full dev environment (Supabase + Docker)
+render-local-config: supabase-up  ## Render the local backend config from Supabase's signing keys
+	cd $(DCAPAL_BACKEND_DIR) && \
+		eval "$$(npx supabase status --workdir ./config -o env)" && \
+		DCAPAL_JWT_SECRET="$$JWT_SECRET" \
+		DCAPAL_JWT_JWKS="$$(curl --fail --silent --show-error "$$API_URL/auth/v1/.well-known/jwks.json")" \
+		python3 scripts/render-dcapal-config.py --output dcapal.yml
+
+local-up: render-local-config  ## Start full dev environment (Supabase + Docker)
+	$(MAKE) docker-local-up
 
 ## Stop full dev+local environment
 local-down: docker-local-down supabase-down  ## Stop full dev environment

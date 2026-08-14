@@ -2,6 +2,15 @@
 
 Research date: 2026-08-05
 
+Implementation update (2026-08-13): issue #794 adopts the TimescaleDB
+PostgreSQL 18 application-database contract and keeps Supabase as a separate
+authentication stack. The durable decision and upgrade procedure are recorded
+in [backend ADR 0002](../../dcapal-backend/docs/adr/0002-timescaledb-application-database.md)
+and the [upgrade runbook](../runbooks/timescaledb-postgres-upgrade.md).
+
+The numbered findings below describe the pre-implementation baseline where
+they refer to the former PostgreSQL 17 image or Supabase-backed test setup.
+
 ## Context
 
 - Ticket: [Research: Verify TimescaleDB local and CI parity](https://github.com/dcapal/dcapal/issues/757)
@@ -11,7 +20,11 @@ This is a research finding, not a product-code change. It uses the current
 repository source and first-party TimescaleDB, SQLx, and Supabase documentation.
 Redis is explicitly outside this epic.
 
-## Executive findings
+## Historical findings (pre-issue #794 baseline)
+
+The findings below preserve the research evidence that led to issue #794.
+They describe the repository before the implementation and are not current
+acceptance criteria where the implementation update above says otherwise.
 
 1. **The repository already has a suitable local TimescaleDB service.** The base
    Compose file uses `timescale/timescaledb-ha:pg17`, exposes PostgreSQL only to
@@ -75,7 +88,8 @@ Redis is explicitly outside this epic.
    and [migration ADR](https://github.com/dcapal/dcapal/blob/f652260de11204971f95b6235ffc40cf812911a1/dcapal-backend/docs/adr/0001-sqlx-persistence-and-migrations.md#decision)
 
 7. **Ordinary CI should use the Timescale Compose database for backend tests.**
-   The current `backend-test` job installs the Supabase CLI, starts Supabase,
+   The pre-issue backend test job (now `build-test-backend`) installed the
+   Supabase CLI, started Supabase,
    and runs `make test-backend`; the Makefile defaults `DATABASE_URL` to
    Supabase's `127.0.0.1:54322` endpoint. This makes ordinary SQLx tests depend
    on the wrong database implementation for a Timescale contract. The ordinary
@@ -88,8 +102,9 @@ Redis is explicitly outside this epic.
    and [SQLx test attribute documentation](https://docs.rs/sqlx/latest/sqlx/attr.test.html)
 
 8. **Supabase should be isolated to a smoke-test boundary.** The existing
-   `backend-smoke-test` already starts Supabase separately, configures the
-   application to use the Compose `db` service, and starts the Timescale/Redis
+   The pre-issue smoke job (now `test-e2e-smoke`) already started Supabase
+   separately, configured the application to use the Compose `db` service, and
+   started the Timescale/Redis
    application stack with `docker compose ... up --wait`. That job is the right
    place to retain Supabase checks that exercise Supabase-specific auth or local
    service wiring. It should not be the database oracle for ordinary repository
@@ -110,14 +125,18 @@ Redis is explicitly outside this epic.
    [backend runtime wiring](https://github.com/dcapal/dcapal/blob/f652260de11204971f95b6235ffc40cf812911a1/dcapal-backend/src/lib.rs#L125-L145),
    and [current PostgreSQL-only integration tests](https://github.com/dcapal/dcapal/blob/f652260de11204971f95b6235ffc40cf812911a1/dcapal-backend/tests/portfolio_repository.rs#L58-L129)
 
-## Recommended boundary for the implementation ticket
+## Future Timescale work outside issue #794
 
-The next implementation should make the database contract explicit in one
-forward SQLx migration:
+Issue #794 deliberately does not add a Timescale-specific migration, create
+hypertables, or change the application schema. Timescale provisioning owns
+extension availability. The following ideas remain separate future work and
+must not be read as requirements for the current database upgrade.
 
-- Use `CREATE EXTENSION IF NOT EXISTS timescaledb` only if production ownership
-  and permissions allow it; otherwise fail clearly during deployment rather than
-  silently falling back to plain PostgreSQL.
+If a future schema introduces time-series observations, its design should:
+
+- Keep extension provisioning outside application migrations, and verify the
+  operational prerequisite in the deployment process rather than adding
+  `CREATE EXTENSION` to issue #794.
 - Create the observation table with a non-null `timestamptz` partition column and
   an application-level series key. Choose the unique key with the time column
   included, for example `(series_id, observed_at)`.
@@ -130,15 +149,16 @@ forward SQLx migration:
 - Keep repository tests on `#[sqlx::test(migrations = "./migrations", fixtures(...))]`.
   SQLx applies migrations and fixtures in isolated test databases; fixture order
   must continue to satisfy foreign keys. [SQLx test and fixture guidance](https://docs.rs/sqlx/latest/sqlx/attr.test.html)
-- Change ordinary backend CI to start the Timescale Compose `db` service and
-  point SQLx at it. Keep Supabase startup and any Supabase-specific checks in an
-  explicitly named smoke job. Keep Redis out of the migration and ordinary SQLx
-  test setup.
+- Preserve the issue #794 boundary in any future schema work: ordinary backend
+  CI uses the Timescale Compose `db` service, while Supabase remains an
+  explicitly named authentication-smoke dependency.
 
-## Operational acceptance criteria
+## Future-work validation ideas
 
-The implementation is ready when a clean checkout can demonstrate all of the
-following:
+These checks apply only if the separate hypertable/schema work is taken up:
+
+A future implementation is ready when a clean checkout can demonstrate all of
+the following:
 
 1. The Compose database reports healthy only after PostgreSQL accepts both
    readiness and a real query, and `SELECT extname, extversion FROM pg_extension`
@@ -153,9 +173,7 @@ following:
    existing Compose application stack, while failure logs identify which service
    failed.
 
-The production decision that remains open is not whether SQLx can talk to
-TimescaleDB; it can. The decision is whether the production PostgreSQL service
-will be explicitly pinned and operated as a TimescaleDB-capable target. If that
-cannot be guaranteed, use ordinary PostgreSQL partitioning for the first
-production schema and treat TimescaleDB as an optional local/CI profile rather
-than claiming production/local parity.
+For issue #794, the production image contract and PostgreSQL upgrade procedure
+are recorded in ADR 0002 and the upgrade runbook. Any future decision about
+Timescale-specific schema objects should be made separately from that accepted
+application-database boundary.

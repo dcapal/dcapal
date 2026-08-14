@@ -52,7 +52,6 @@ log = "0.4.33"
 metrics = "0.24.6"
 metrics-exporter-prometheus = "0.18.3"
 minilp = "0.2.2"
-once_cell = "1.21.4"
 parking_lot = "0.12.5"
 rand = "0.10.2"
 redis = { version = "1.5.0", features = ["tokio-comp"] }

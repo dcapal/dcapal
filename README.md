@@ -38,45 +38,19 @@ You can start using [DcaPal](https://dcapal.com) right away. It's free. No regis
 DcaPal does not store any user data. But if you are still concerned for your privacy, you can build and run it on your
 machine.
 
-**Start Docker environment**
+**Start the local application environment**
 
-- Setup the `.env` file
-
-```bash
-cp dcapal-backend/.env.example dcapal-backend/.env
-```
-
-- Setup a password for the db and the JWT secret (you can use `openssl rand -base64 32` to generate a random string) in
-  the new `.env` file
-
-```dotenv
-POSTGRES_PASSWORD=<replace-with-your-pwd>
-JWT_SECRET=<generated_secret>
-```
-
-- Start the Docker environment
+`make local-up` starts the local Supabase Auth stack, renders the ignored
+backend configuration with its JWT signing keys, and starts the TimescaleDB,
+Redis, and DcaPal containers. Supabase's PostgreSQL instance is not used for
+DcaPal migrations or application data.
 
 ```bash
-make dev-up
+make local-up
 ```
 
 (Note: if you're using a Mac with an ARM processor, you should replace (in the docker-compose dev file) Cadvisor's image
 version with gcr.io/cadvisor/cadvisor:v0.47.1 and set platform: linux/aarch64)
-
-**Run DcaPal backend**
-
-Prepare `dcapal.yml` config file
-
-```bash
-cd dcapal-backend
-cp config/dcapal/dcapal.yml dcapal.yml
-```
-
-Compile and start backend service
-
-```bash
-cargo run --bin dcapal-backend --release
-```
 
 **Run DcaPal frontend**
 

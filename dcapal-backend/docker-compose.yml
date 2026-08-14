@@ -18,7 +18,7 @@ services:
       retries: 3
 
   db:
-    image: timescale/timescaledb-ha:pg17
+    image: timescale/timescaledb-ha:pg18.4-ts2.28.3-all-oss
     container_name: db
     restart: always
     expose:

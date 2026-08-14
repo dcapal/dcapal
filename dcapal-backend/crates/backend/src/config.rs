@@ -1,3 +1,4 @@
+use jsonwebtoken::jwk::JwkSet;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -41,6 +42,12 @@ pub struct Providers {
 #[serde(rename_all = "camelCase")]
 pub struct Auth {
     pub jwt_secret: String,
+    #[serde(default = "default_jwt_jwks")]
+    pub jwt_jwks: JwkSet,
+}
+
+fn default_jwt_jwks() -> JwkSet {
+    JwkSet { keys: Vec::new() }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
