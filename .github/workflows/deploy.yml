@@ -212,6 +212,9 @@ jobs:
               image: timescale/timescaledb-ha:pg18.4-ts2.28.3-all-oss
               container_name: ${{ inputs.deploy_environment == 'production' && 'db' || 'db-dev' }}
               restart: always
+              # Let the image entrypoint repair bind-mount ownership before it
+              # drops to the postgres user.
+              user: "0:0"
               # set shared memory limit when using docker-compose
               shm_size: 128mb
               ports:
