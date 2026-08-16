@@ -12,6 +12,13 @@ const isPath = (url: string, pathname: string): boolean => {
   return new URL(url).pathname === pathname;
 };
 
+/*
+ * GIVEN the global setup has prepared a real Supabase session and the browser
+ * has a seeded portfolio
+ * WHEN /allocate opens
+ * THEN Supabase returns the seeded user, the frontend sends an authenticated
+ * POST /api/v1/sync/portfolios request, and the expected portfolio is included
+ */
 test("syncs a Supabase session through the frontend", async ({ page }) => {
   await seedPersistedState(page, {
     portfolios: { [smokePortfolio.id]: smokePortfolio },

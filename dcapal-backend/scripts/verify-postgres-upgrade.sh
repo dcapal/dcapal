@@ -9,6 +9,7 @@ PASSWORD="${PG_UPGRADE_PASSWORD:-pg-upgrade-test}"
 SOURCE_IMAGE="${PG17_IMAGE:-timescale/timescaledb-ha:pg17}"
 TARGET_IMAGE="${PG18_IMAGE:-timescale/timescaledb-ha:pg18.4-ts2.28.3-all-oss}"
 
+# Removes the disposable source and target databases and their temporary files.
 cleanup() {
   docker rm -f "$SOURCE_NAME" "$TARGET_NAME" >/dev/null 2>&1 || true
   rm -rf "$TEMP_DIR"
@@ -16,6 +17,7 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Starts a disposable PostgreSQL database from the requested Timescale image.
 start_database() {
   local name="$1"
   local image="$2"
@@ -28,6 +30,7 @@ start_database() {
     "$image" >/dev/null
 }
 
+# Waits until the database has completed initialization and accepts queries.
 wait_for_database() {
   local name="$1"
 
@@ -49,10 +52,12 @@ wait_for_database() {
   exit 1
 }
 
+# Returns the host port Docker mapped to the container's PostgreSQL port.
 mapped_port() {
   docker port "$1" 5432/tcp | head -n 1 | awk -F: '{print $NF}'
 }
 
+# Runs the packaged DcaPal migrations against a supplied database URL.
 run_migrations() {
   local database_url="$1"
 
@@ -60,6 +65,7 @@ run_migrations() {
   DATABASE_URL="$database_url" cargo run --quiet -p migration
 }
 
+# Restores a custom-format dump while leaving Timescale-owned catalog data intact.
 restore_dump() {
   local name="$1"
   local dump_path="$2"

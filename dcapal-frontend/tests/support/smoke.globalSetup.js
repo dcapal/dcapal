@@ -19,6 +19,11 @@ const userMetadata = (email) => ({
   name: DEFAULT_USER_NAME,
 });
 
+/**
+ * Sends an HTTP request and parses its JSON response.
+ *
+ * Throws an error with the response details when the request is unsuccessful.
+ */
 const requestJson = async (url, options) => {
   const response = await fetch(url, options);
   const responseText = await response.text();
@@ -43,7 +48,12 @@ const requestJson = async (url, options) => {
   return responseBody;
 };
 
-/** Creates a repeatable local Supabase user and browser session for full-stack smoke. */
+/**
+ * Prepares the browser state for the full-stack smoke journey.
+ *
+ * The setup resets or creates the fixed test user, obtains a password session
+ * from Supabase Auth, and writes that session to the browser storage state.
+ */
 module.exports = async (config) => {
   const supabaseUrl = requiredEnvironment(
     "SUPABASE_URL",
@@ -98,18 +108,16 @@ module.exports = async (config) => {
     });
   }
 
-  const session = await requestJson(
-    `${authApiUrl}/token?grant_type=password`,
-    {
-      method: "POST",
-      headers: {
-        apikey: anonKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    }
-  );
-  if (!session?.access_token) throw new Error("Supabase returned no access token.");
+  const session = await requestJson(`${authApiUrl}/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!session?.access_token)
+    throw new Error("Supabase returned no access token.");
 
   const supabaseHost = new URL(supabaseUrl).hostname.split(".")[0];
   const storageKey = `sb-${supabaseHost}-auth-token`;

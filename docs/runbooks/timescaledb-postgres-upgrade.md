@@ -323,7 +323,7 @@ configuration, then runs:
     docker compose -f docker-compose.yml \
       -f ./docker/docker-compose.prod.yml down
     docker compose -f docker-compose.yml \
-      -f ./docker/docker-compose.prod.yml up -d
+      -f ./docker/docker-compose.prod.yml up -d --wait --wait-timeout 180
 
 After this runbook completes, that sequence is safe because data/db is a
 PostgreSQL 18 data directory. The next deployment does not need to restore the

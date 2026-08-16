@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
-COMPOSE_BASE_ARGS := -f docker-compose.yml -f docker/docker-compose.dev.yml
+COMPOSE_DEV_ARGS := -f docker-compose.yml -f docker/docker-compose.dev.yml
+COMPOSE_TEST_ARGS := -f docker-compose.yml -f docker/docker-compose.test.yml
 DCAPAL_BACKEND_DIR := ./dcapal-backend
 DCAPAL_OPTIMIZER_DIR := ./dcapal-optimizer-wasm/crates/optimizer
 DCAPAL_FRONTEND_DIR := ./dcapal-frontend
@@ -83,20 +84,12 @@ supabase-down:  ## Stop Supabase
 
 ## Start the TimescaleDB database used by backend development and tests
 backend-db-up:  ## Start the backend database
-	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_BASE_ARGS) up -d db
-	cd $(DCAPAL_BACKEND_DIR) && for attempt in $$(seq 1 180); do \
-		if docker compose $(COMPOSE_BASE_ARGS) exec -T db psql -U postgres -d postgres -c 'SELECT 1' >/dev/null 2>&1; then \
-			exit 0; \
-		fi; \
-		sleep 1; \
-	done; \
-	docker compose $(COMPOSE_BASE_ARGS) logs db; \
-	exit 1
+	cd $(DCAPAL_BACKEND_DIR) && env POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" docker compose $(COMPOSE_TEST_ARGS) up -d --wait --wait-timeout 180 db
 
 ## Stop the TimescaleDB database used by backend development and tests
 backend-db-down:  ## Stop the backend database
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) stop db
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) rm --force db
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_TEST_ARGS) stop db
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_TEST_ARGS) rm --force db
 
 ## Check that the backend database is already running
 backend-db-check:  ## Check backend database connectivity
@@ -112,23 +105,23 @@ test-backend: backend-db-check  ## Run backend tests (requires backend-db-up)
 
 ## Start development Docker containers
 docker-dev-up:  ## Start development Docker containers
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) up -d
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_DEV_ARGS) up -d
 
 ## Stop development Docker containers
 docker-dev-down:  ## Stop development Docker containers
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) down
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_DEV_ARGS) down
 
 ## Start development Docker containers with Dcapal image
 docker-local-build:  ## Start development Docker containers
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) -f docker/docker-compose.local.yml build
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_DEV_ARGS) -f docker/docker-compose.local.yml build
 
 ## Start development Docker containers with Dcapal image
 docker-local-up:  ## Start development Docker containers
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) -f docker/docker-compose.local.yml up -d
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_DEV_ARGS) -f docker/docker-compose.local.yml up -d
 
 ## Start development Docker containers with Dcapal image
 docker-local-down:  ## Stop development Docker containers
-	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_BASE_ARGS) -f docker/docker-compose.local.yml down
+	cd $(DCAPAL_BACKEND_DIR) && docker compose $(COMPOSE_DEV_ARGS) -f docker/docker-compose.local.yml down
 
 ## Start full dev environment (Supabase + Docker)
 dev-up: supabase-up docker-dev-up  ## Start full dev environment (Supabase + Docker)

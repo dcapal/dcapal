@@ -10,6 +10,7 @@ SMOKE_PORTFOLIO_NAME="${SMOKE_PORTFOLIO_NAME:-Smoke portfolio}"
 
 cd "$BACKEND_DIR"
 
+# Runs queries against the TimescaleDB service used by the smoke test.
 compose() {
   local compose_files=(
     -f docker-compose.yml
@@ -18,6 +19,7 @@ compose() {
   docker compose "${compose_files[@]}" "$@"
 }
 
+# Returns a compact query result for the seeded smoke records.
 query() {
   compose exec -T db psql \
     -U postgres \
@@ -31,6 +33,7 @@ $1
 SQL
 }
 
+# Fails the smoke test when a database value differs from its expected value.
 assert_value() {
   local description="$1"
   local expected="$2"

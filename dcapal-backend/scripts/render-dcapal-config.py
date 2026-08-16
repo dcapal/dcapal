@@ -16,10 +16,12 @@ DEFAULT_OUTPUT = BACKEND_DIR / "dcapal.yml"
 
 
 def json_value(value: Any) -> str:
+    """Encode a configuration value as JSON for insertion into YAML."""
     return json.dumps(value, ensure_ascii=False)
 
 
 def required_environment(name: str) -> str:
+    """Return a required environment value or stop with a clear error."""
     value = os.environ.get(name)
     if not value:
         raise SystemExit(f"{name} must be set before rendering dcapal.yml")
@@ -27,6 +29,7 @@ def required_environment(name: str) -> str:
 
 
 def integer_environment(name: str, default: int) -> int:
+    """Read an integer environment value, using the supplied default when absent."""
     value = os.environ.get(name)
     if value is None:
         return default
@@ -37,6 +40,7 @@ def integer_environment(name: str, default: int) -> int:
 
 
 def boolean_environment(name: str, default: bool) -> bool:
+    """Read a boolean environment value using common shell spellings."""
     value = os.environ.get(name)
     if value is None:
         return default
@@ -49,6 +53,7 @@ def boolean_environment(name: str, default: bool) -> bool:
 
 
 def jwks_environment() -> dict[str, list[dict[str, Any]]]:
+    """Return the configured JWKS as an object containing a list of keys."""
     raw_value = os.environ.get("DCAPAL_JWT_JWKS", '{"keys": []}')
     try:
         value = json.loads(raw_value)
@@ -65,6 +70,7 @@ def jwks_environment() -> dict[str, list[dict[str, Any]]]:
 
 
 def render(template: str) -> str:
+    """Replace runtime configuration placeholders and reject unknown ones."""
     ip2location_path = os.environ.get("DCAPAL_IP2LOCATION_PATH")
     services = None
     if ip2location_path:
@@ -141,6 +147,7 @@ def render(template: str) -> str:
 
 
 def main() -> None:
+    """Render the selected configuration template to the requested output."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)

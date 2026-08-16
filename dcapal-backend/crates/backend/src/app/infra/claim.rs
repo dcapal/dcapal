@@ -46,6 +46,12 @@ pub struct UserMetadataClaim {
 }
 
 impl Claims {
+    /// Decodes a Supabase JWT using the configured authentication keys.
+    ///
+    /// HS256 tokens use the shared JWT secret. ES256 tokens require a key ID
+    /// that matches a compatible JWK in the configured public key set.
+    /// Unsupported algorithms, missing keys, mismatched key IDs, and malformed
+    /// keys are rejected.
     pub fn decode(
         token: &str,
         jwt_secret: &str,
@@ -92,6 +98,9 @@ impl FromRequestParts<AppContext> for Claims {
 
 #[cfg(test)]
 mod tests {
+    //! These tests cover shared-secret HS256 tokens, matching ES256 JWKs, and
+    //! rejection of missing, mismatched, malformed, or unsupported keys.
+
     use jsonwebtoken::{
         EncodingKey, Header, encode,
         jwk::{Jwk, JwkSet, PublicKeyUse},

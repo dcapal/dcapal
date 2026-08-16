@@ -6,9 +6,6 @@ services:
       - 8001:8001
 
   db:
-    # The image entrypoint uses root to repair bind-mount ownership, then
-    # drops to the postgres user before starting the server.
-    user: "0:0"
     ports:
       - "5433:5432"
     volumes:
