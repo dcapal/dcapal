@@ -209,7 +209,7 @@ jobs:
                 retries: 3
 
             db:
-              image: timescale/timescaledb-ha:pg17
+              image: timescale/timescaledb-ha:pg18.4-ts2.28.3-all-oss
               container_name: ${{ inputs.deploy_environment == 'production' && 'db' || 'db-dev' }}
               restart: always
               # set shared memory limit when using docker-compose
@@ -224,10 +224,11 @@ jobs:
               environment:
                 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
               healthcheck:
-                test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DATABASE}" ]
+                test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1" ]
                 interval: 10s
-                timeout: 5s
-                retries: 5
+                timeout: 10s
+                retries: 10
+                start_period: 60s
 
           networks:
             ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}:
@@ -300,44 +301,25 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.PG_DCAPAL_PASSWORD }}
           POSTGRES_DATABASE: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_DATABASE || secrets.POSTGRES_DATABASE_DEV }}
         run: |
-          cat > dcapal-backend/dcapal.yml << EOF
-          app:
-            providers:
-              priceProvider: kraken
-              cwApiKey: ${DCAPAL_CW_API_KEY}
-              ipApiKey: ${DCAPAL_IP_API_KEY}
-              cmcApiKey: ${DCAPAL_CMC_API_KEY}
-            auth:
-              jwtSecret: ${JWT_SECRET}
-
-            services:
-              ip:
-                dbPath: data/${IP2LOCATION_FILENAME}
-
-            log:
-              level: dcapal_backend=info,tower_http=debug
-              file: data/dcapal.log
-              enableStdout: false
-
-          server:
-            web:
-              hostname: 0.0.0.0
-              port: 8080
-            metrics:
-              hostname: 0.0.0.0
-              port: 9000
-            redis:
-              hostname: redis
-              port: 6379
-              user: ${REDIS_USER}
-              password: ${REDIS_PASSWORD}
-            postgres:
-              hostname: db
-              port: 5432
-              user: ${POSTGRES_USER}
-              password: ${POSTGRES_PASSWORD}
-              database: ${POSTGRES_DATABASE}
-          EOF
+          export DCAPAL_JWT_SECRET="${JWT_SECRET}"
+          export DCAPAL_CW_API_KEY="${DCAPAL_CW_API_KEY}"
+          export DCAPAL_IP_API_KEY="${DCAPAL_IP_API_KEY}"
+          export DCAPAL_CMC_API_KEY="${DCAPAL_CMC_API_KEY}"
+          export DCAPAL_IP2LOCATION_PATH="data/${IP2LOCATION_FILENAME}"
+          export DCAPAL_WEB_HOSTNAME=0.0.0.0
+          export DCAPAL_METRICS_HOSTNAME=0.0.0.0
+          export DCAPAL_REDIS_HOSTNAME=redis
+          export DCAPAL_REDIS_USER="${REDIS_USER}"
+          export DCAPAL_REDIS_PASSWORD="${REDIS_PASSWORD}"
+          export DCAPAL_POSTGRES_HOSTNAME=db
+          export DCAPAL_POSTGRES_PORT=5432
+          export DCAPAL_POSTGRES_USER="${POSTGRES_USER}"
+          export DCAPAL_POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
+          export DCAPAL_POSTGRES_DATABASE="${POSTGRES_DATABASE}"
+          export DCAPAL_LOG_FILE=data/dcapal.log
+          export DCAPAL_LOG_ENABLE_STDOUT=false
+          python3 dcapal-backend/scripts/render-dcapal-config.py \
+            --output dcapal-backend/dcapal.yml
 
       - name: Configure dotenv
         env:
@@ -383,4 +365,4 @@ jobs:
             touch ./data/dcapal/dcapal.log
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml down
-            docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml up -d
+            docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml up -d --wait --wait-timeout 180

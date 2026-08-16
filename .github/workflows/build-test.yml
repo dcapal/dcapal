@@ -65,32 +65,15 @@ jobs:
         if: always()
         run: ${SCCACHE_PATH} --show-stats
 
-  backend-test:
-    name: test:backend
+  build-test-backend:
+    name: build:test:backend
     runs-on: ubuntu-latest
     env:
-      SUPABASE_VERSION: 2.110.0
+      POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: Cache Supabase CLI npm packages
-        uses: actions/cache@v6
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-supabase-cli-${{ env.SUPABASE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-supabase-cli-
-
-      - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v3
-        with:
-          version: ${{ env.SUPABASE_VERSION }}
-
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           cache: true
@@ -113,6 +96,23 @@ jobs:
       - name: Stop backend database
         if: always()
         run: make backend-db-down
+
+  backend-postgres-upgrade-test:
+    name: test:backend:postgres-upgrade
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          cache-shared-key: rust-sccache
+          cache-on-failure: false
+          cache-targets: false
+          rustflags: ""
+
+      - name: Verify PostgreSQL 17 to 18 upgrade
+        run: ./dcapal-backend/scripts/verify-postgres-upgrade.sh
 
   backend-openapi-check:
     name: check:openapi:backend
@@ -375,10 +375,11 @@ jobs:
           path: coverage/frontend/
           retention-days: 30
 
-  backend-smoke-test:
-    name: test:smoke:backend
+  test-e2e-smoke:
+    name: test:e2e:smoke
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    needs: optimizer-build-test
     env:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -386,11 +387,40 @@ jobs:
       POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
       POSTGRES_DB: postgres
       SUPABASE_VERSION: 2.110.0
+      SMOKE_USER_EMAIL: smoke@example.com
+      SMOKE_USER_PASSWORD: smoke-password-123456
+      SMOKE_PORTFOLIO_ID: 11111111-1111-4111-8111-111111111111
+      SMOKE_PORTFOLIO_NAME: Smoke portfolio
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # The generated package is a local dependency and must exist before pnpm install.
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v8
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The full-stack smoke uses one Chromium project; the deterministic frontend job owns the browser matrix.
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-v1-
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @dcapal/frontend exec playwright install --with-deps chromium
 
       # Supabase setup-cli installs the pinned package through npm.
       - name: Cache Supabase CLI npm packages
@@ -460,42 +490,6 @@ jobs:
           POSTGRES_PORT=${POSTGRES_PORT}
           EOF
 
-      - name: Configure dcapal.yml
-        run: |
-          cat > dcapal-backend/dcapal.yml << EOF
-          app:
-            providers:
-              priceProvider: kraken
-              cwApiKey: CW_API_KEY
-              ipApiKey: IP_API_KEY
-            auth:
-              jwtSecret: super-secret-jwt-token-with-at-least-32-characters-long
-
-            log:
-              level: dcapal_backend=info,tower_http=debug
-              file: data/dcapal/dcapal.log
-              enableStdout: true
-
-          server:
-            web:
-              hostname: 0.0.0.0
-              port: 8080
-            metrics:
-              hostname: 0.0.0.0
-              port: 9000
-            redis:
-              hostname: redis
-              port: 6379
-              user: dcapal
-              password: dcapal
-            postgres:
-              hostname: ${POSTGRES_HOST}
-              port: ${POSTGRES_PORT}
-              user: ${POSTGRES_USER}
-              password: ${POSTGRES_PASSWORD}
-              database: ${POSTGRES_DB}
-          EOF
-
       - name: Configure docker compose override
         run: |
           cat > dcapal-backend/docker-compose.override.yml << EOF
@@ -508,6 +502,46 @@ jobs:
       - name: Start Supabase
         run: cd dcapal-backend && supabase start --workdir ./config
 
+      - name: Capture Supabase local environment
+        run: |
+          cd dcapal-backend
+          supabase status --workdir ./config -o env > supabase.env
+          set -a
+          source supabase.env
+          set +a
+          : "${API_URL:?Supabase did not report API_URL}"
+          : "${ANON_KEY:?Supabase did not report ANON_KEY}"
+          : "${SERVICE_ROLE_KEY:?Supabase did not report SERVICE_ROLE_KEY}"
+          : "${JWT_SECRET:?Supabase did not report JWT_SECRET}"
+          JWKS="$(curl --fail --silent --show-error "${API_URL}/auth/v1/.well-known/jwks.json" | jq -c '.')"
+          : "${JWKS:?Supabase did not report signing keys}"
+          {
+            echo "SUPABASE_URL=${API_URL}"
+            echo "SUPABASE_ANON_KEY=${ANON_KEY}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}"
+            echo "SUPABASE_AUTH_JWT_SECRET=${JWT_SECRET}"
+            echo "SUPABASE_AUTH_JWKS=${JWKS}"
+            echo "VITE_SUPABASE_URL=${API_URL}"
+            echo "VITE_SUPABASE_ANON_KEY=${ANON_KEY}"
+          } >> "$GITHUB_ENV"
+
+      - name: Configure dcapal.yml
+        run: |
+          export DCAPAL_JWT_SECRET="${SUPABASE_AUTH_JWT_SECRET}"
+          export DCAPAL_JWT_JWKS="${SUPABASE_AUTH_JWKS}"
+          export DCAPAL_WEB_HOSTNAME=0.0.0.0
+          export DCAPAL_METRICS_HOSTNAME=0.0.0.0
+          export DCAPAL_REDIS_HOSTNAME=redis
+          export DCAPAL_POSTGRES_HOSTNAME="${POSTGRES_HOST}"
+          export DCAPAL_POSTGRES_PORT="${POSTGRES_PORT}"
+          export DCAPAL_POSTGRES_USER="${POSTGRES_USER}"
+          export DCAPAL_POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
+          export DCAPAL_POSTGRES_DATABASE="${POSTGRES_DB}"
+          export DCAPAL_LOG_FILE=data/dcapal/dcapal.log
+          export DCAPAL_LOG_ENABLE_STDOUT=true
+          python3 dcapal-backend/scripts/render-dcapal-config.py \
+            --output dcapal-backend/dcapal.yml
+
       - name: Run backend stack and wait for health
         run: |
           cd dcapal-backend
@@ -515,6 +549,19 @@ jobs:
                          -f ./docker/docker-compose.local.yml \
                          -f docker-compose.override.yml \
                          up --no-build --wait --wait-timeout 120
+
+      - name: Run full-stack frontend smoke
+        run: pnpm frontend:test:e2e:smoke
+
+      - name: Assert Timescale smoke data
+        run: dcapal-backend/scripts/assert-smoke-data.sh
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-report-smoke
+          path: dcapal-frontend/playwright-report/
+          retention-days: 30
 
       - name: Print backend logs on failure
         if: ${{ failure() && hashFiles('dcapal-backend/docker-compose.override.yml') != '' }}

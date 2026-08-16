@@ -1,36 +1,35 @@
 app:
   providers:
-    priceProvider: kraken
-    cwApiKey: CW_API_KEY
-    ipApiKey: IP_API_KEY
-    # cmcApiKey: CMC_API_KEY
+    priceProvider: @@DCAPAL_PRICE_PROVIDER@@
+    cwApiKey: @@DCAPAL_CW_API_KEY@@
+    ipApiKey: @@DCAPAL_IP_API_KEY@@
+    cmcApiKey: @@DCAPAL_CMC_API_KEY@@
   auth:
-    jwtSecret: SUPABASE_JWT_SECRET
+    jwtSecret: @@DCAPAL_JWT_SECRET@@
+    jwtJwks: @@DCAPAL_JWT_JWKS@@
 
-  # services:
-  #   ip:
-  #     dbPath: PATH_TO_IP2LOCATION_BIN
+  services: @@DCAPAL_SERVICES@@
 
   log:
-    level: dcapal_backend=info,tower_http=debug
-    file: dcapal.log
-    enableStdout: true
+    level: @@DCAPAL_LOG_LEVEL@@
+    file: @@DCAPAL_LOG_FILE@@
+    enableStdout: @@DCAPAL_LOG_ENABLE_STDOUT@@
 
 server:
   web:
-    hostname: 127.0.0.1
-    port: 8080
+    hostname: @@DCAPAL_WEB_HOSTNAME@@
+    port: @@DCAPAL_WEB_PORT@@
   metrics:
-    hostname: 127.0.0.1
-    port: 9000
+    hostname: @@DCAPAL_METRICS_HOSTNAME@@
+    port: @@DCAPAL_METRICS_PORT@@
   redis:
-    hostname: 127.0.0.1
-    port: 6379
-    user: dcapal
-    password: dcapal
+    hostname: @@DCAPAL_REDIS_HOSTNAME@@
+    port: @@DCAPAL_REDIS_PORT@@
+    user: @@DCAPAL_REDIS_USER@@
+    password: @@DCAPAL_REDIS_PASSWORD@@
   postgres:
-    hostname: 127.0.0.1
-    port: 54322
-    user: postgres
-    password: postgres
-    database: postgres
+    hostname: @@DCAPAL_POSTGRES_HOSTNAME@@
+    port: @@DCAPAL_POSTGRES_PORT@@
+    user: @@DCAPAL_POSTGRES_USER@@
+    password: @@DCAPAL_POSTGRES_PASSWORD@@
+    database: @@DCAPAL_POSTGRES_DATABASE@@

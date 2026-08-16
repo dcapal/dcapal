@@ -883,7 +883,6 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "migration",
- "once_cell",
  "parking_lot",
  "redis",
  "reqwest",

@@ -1,3 +1,4 @@
+use jsonwebtoken::jwk::JwkSet;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -41,6 +42,17 @@ pub struct Providers {
 #[serde(rename_all = "camelCase")]
 pub struct Auth {
     pub jwt_secret: String,
+    /// Optional Supabase public keys used to validate ES256 access tokens.
+    ///
+    /// HS256 validation continues to use `jwt_secret`. An empty key set keeps
+    /// configurations that only use the shared-secret validation path valid.
+    #[serde(default = "default_jwt_jwks")]
+    pub jwt_jwks: JwkSet,
+}
+
+/// Supplies an empty public-key set when older configuration omits JWKS.
+fn default_jwt_jwks() -> JwkSet {
+    JwkSet { keys: Vec::new() }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

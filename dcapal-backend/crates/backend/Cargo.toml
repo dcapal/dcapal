@@ -26,7 +26,6 @@ jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
-once_cell = { workspace = true }
 parking_lot = { workspace = true }
 redis = { workspace = true }
 reqwest = { workspace = true }

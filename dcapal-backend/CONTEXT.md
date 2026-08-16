@@ -2,6 +2,19 @@
 
 DcaPal Backend provides market data, temporary portfolio transfer, and remote storage for authenticated users' saved portfolios. It does not execute trades or calculate allocation recommendations.
 
+## Remote storage language
+
+**Application data store**:
+The durable PostgreSQL-backed store for DcaPal users, saved portfolios, and
+portfolio assets. It is separate from the service that authenticates users.
+_Avoid_: Authentication database; Supabase database
+
+**Authentication service**:
+The separate Supabase service that issues and validates user sessions. Its
+internal data store holds authentication-service data, not DcaPal saved
+portfolios, and does not receive DcaPal schema migrations.
+_Avoid_: Application data store; application database
+
 ## Market data language
 
 **Market asset**:

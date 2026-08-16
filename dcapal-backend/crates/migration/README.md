@@ -4,7 +4,7 @@ The migration crate embeds the SQL files in `dcapal-backend/migrations` and
 runs them against the URL in `DATABASE_URL`:
 
 ```sh
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5433/postgres \
   cargo run -p migration
 ```
 
