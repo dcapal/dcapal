@@ -26,7 +26,9 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: "REACT_APP_E2E_MSW=0 pnpm run dev:ci",
+    // Full-stack smoke must exercise the same production bundle that deploys
+    // instead of the development server used by the frontend test matrix.
+    command: "pnpm run build && node scripts/serve-dist.mjs",
     url: "http://127.0.0.1:3000",
     timeout: 120000,
     reuseExistingServer: false,
