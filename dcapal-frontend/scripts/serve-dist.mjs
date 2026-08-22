@@ -1,6 +1,6 @@
 import { createReadStream } from "node:fs";
 import { promises as fs } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, request as createRequest } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,6 +22,34 @@ const contentTypes = {
   ".wasm": "application/wasm",
 };
 
+/** Forwards API calls to the local backend used by the full-stack smoke job. */
+const proxyApiRequest = (request, response, requestUrl) => {
+  const backendPath = `${requestUrl.pathname.replace(/^\/api/, "")}${requestUrl.search}`;
+  const backendRequest = createRequest(
+    {
+      hostname: "127.0.0.1",
+      port: 8080,
+      path: backendPath,
+      method: request.method,
+      headers: { ...request.headers, host: "127.0.0.1:8080" },
+    },
+    (backendResponse) => {
+      response.writeHead(
+        backendResponse.statusCode || 502,
+        backendResponse.headers
+      );
+      backendResponse.pipe(response);
+    }
+  );
+
+  backendRequest.on("error", (error) => {
+    console.error(`Backend proxy failed: ${error.message}`);
+    if (!response.headersSent) response.writeHead(502);
+    response.end();
+  });
+  request.pipe(backendRequest);
+};
+
 const isWithinDist = (candidate) => {
   const relativePath = path.relative(distRoot, candidate);
   return (
@@ -33,14 +61,19 @@ const isWithinDist = (candidate) => {
 
 /** Serves the production assets and falls back to the SPA entrypoint for routes. */
 const server = createServer(async (request, response) => {
+  const requestUrl = new URL(request.url || "/", `http://127.0.0.1:${port}`);
+  const requestedPath = decodeURIComponent(requestUrl.pathname);
+  if (requestedPath === "/api" || requestedPath.startsWith("/api/")) {
+    proxyApiRequest(request, response, requestUrl);
+    return;
+  }
+
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { Allow: "GET, HEAD" });
     response.end();
     return;
   }
 
-  const requestUrl = new URL(request.url || "/", `http://127.0.0.1:${port}`);
-  const requestedPath = decodeURIComponent(requestUrl.pathname);
   const candidate = path.resolve(distRoot, `.${requestedPath}`);
   const candidateIsSafe = isWithinDist(candidate);
   let filePath = candidateIsSafe
