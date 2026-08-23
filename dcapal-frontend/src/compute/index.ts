@@ -39,11 +39,21 @@ const createWorkerState = <
 
 const analyzerState = createWorkerState<AnalyzerWorkerRpc>();
 const solverState = createWorkerState<SolverWorkerRpc>();
-const analyzerWorkerUrl = new URL(
-  "./workers/analyzer.worker.js",
-  import.meta.url
-);
-const solverWorkerUrl = new URL("./workers/solver.worker.js", import.meta.url);
+
+const createAnalyzerWorker = (): unknown =>
+  new Worker(
+    new URL(
+      "./workers/analyzer.worker.js",
+      import.meta.url
+    ) as unknown as string,
+    { name: "wasm-analyzer-worker" }
+  );
+
+const createSolverWorker = (): unknown =>
+  new Worker(
+    new URL("./workers/solver.worker.js", import.meta.url) as unknown as string,
+    { name: "wasm-solver-worker" }
+  );
 
 const enqueueSerialized = async <TWorker extends WorkerRpc, TResult>(
   state: WorkerState<TWorker>,
@@ -56,17 +66,13 @@ const enqueueSerialized = async <TWorker extends WorkerRpc, TResult>(
 
 const getWorker = async <TWorker extends WorkerRpc>(
   state: WorkerState<TWorker>,
-  workerUrl: URL,
-  workerName: string
+  createWorker: () => unknown
 ): Promise<TWorker> => {
   if (state.instancePromise) return state.instancePromise;
 
-  // TODO(migrate): threads' constructor types only accept string paths, but webpack worker loading uses URL.
   state.instancePromise = (
     spawn(
-      new Worker(workerUrl as unknown as string, {
-        name: workerName,
-      })
+      createWorker() as Parameters<typeof spawn>[0]
     ) as unknown as Promise<TWorker>
   ).catch((error: unknown) => {
     state.instancePromise = null;
@@ -94,12 +100,11 @@ const terminateWorkerPromise = async <TWorker extends WorkerRpc>(
 
 const runWithWorker = async <TWorker extends WorkerRpc, TResult>(
   state: WorkerState<TWorker>,
-  workerUrl: URL,
-  workerName: string,
+  createWorker: () => unknown,
   operation: (worker: TWorker) => Promise<TResult>
 ): Promise<TResult> => {
   return enqueueSerialized(state, async () => {
-    const workerPromise = getWorker(state, workerUrl, workerName);
+    const workerPromise = getWorker(state, createWorker);
 
     try {
       const worker = await workerPromise;
@@ -120,12 +125,14 @@ export const analyze = async (
   try {
     return await runWithWorker(
       analyzerState,
-      analyzerWorkerUrl,
-      "wasm-analyzer-worker",
+      createAnalyzerWorker,
       async (worker) => worker.analyzeAndSolve(assets)
     );
   } catch (error) {
-    console.error("Unexpected exception in dcapal-optimizer:", error);
+    console.error(
+      "Unexpected exception in dcapal-optimizer analyzer worker:",
+      error
+    );
     return null;
   }
 };
@@ -152,8 +159,7 @@ export const solve = async (
   try {
     return await runWithWorker(
       solverState,
-      solverWorkerUrl,
-      "wasm-solver-worker",
+      createSolverWorker,
       async (worker) =>
         worker.makeAndSolve(
           budget,
@@ -165,7 +171,10 @@ export const solve = async (
         )
     );
   } catch (error) {
-    console.error("Unexpected exception in dcapal-optimizer:", error);
+    console.error(
+      "Unexpected exception in dcapal-optimizer solver worker:",
+      error
+    );
     return null;
   }
 };

@@ -123,6 +123,10 @@ describe("compute boundary", () => {
 
     expect(firstResult).toBeNull();
     expect(secondResult).toBe(42);
+    expect(console.error).toHaveBeenCalledWith(
+      "Unexpected exception in dcapal-optimizer analyzer worker:",
+      expect.any(Error)
+    );
     expect(spawnMock).toHaveBeenCalledTimes(2);
     expect(terminateMock).toHaveBeenCalledTimes(1);
     expect(terminateMock).toHaveBeenCalledWith(failingRpc);
