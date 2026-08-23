@@ -115,9 +115,9 @@ INSERT INTO portfolio_asset (
     symbol,
     portfolio_id,
     name,
-    asset_class,
+    legacy_asset_class,
     currency,
-    provider,
+    legacy_provider,
     quantity,
     target_weight,
     price,
@@ -212,9 +212,9 @@ BEGIN
           AND p.id = '33333333-3333-4333-8333-333333333333'
           AND a.symbol = 'vwce.mi'
           AND a.name = 'Upgrade asset'
-          AND a.asset_class = 'EQUITY'
+          AND a.legacy_asset_class = 'EQUITY'
           AND a.currency = 'usd'
-          AND a.provider = 'YF'
+          AND a.legacy_provider = 'YF'
           AND a.quantity = 1
           AND a.target_weight = 100
           AND a.price = 100
@@ -223,7 +223,7 @@ BEGIN
         RAISE EXCEPTION 'restored portfolio asset is missing or changed';
     END IF;
 
-    IF (SELECT COUNT(*) FROM _sqlx_migrations) < 4
+    IF (SELECT COUNT(*) FROM _sqlx_migrations) < 5
        OR EXISTS (SELECT 1 FROM _sqlx_migrations WHERE success = FALSE) THEN
         RAISE EXCEPTION 'migration history is incomplete or contains a failed migration';
     END IF;
