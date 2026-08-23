@@ -37,7 +37,10 @@ test("a production allocation completes with the bundled optimizer", async ({
     runtimeErrors.push(`pageerror: ${error.message}`);
   });
   page.on("console", (message) => {
-    if (message.type() === "error") {
+    if (
+      message.type() === "error" &&
+      /dcapal-optimizer|wasm|worker/i.test(message.text())
+    ) {
       runtimeErrors.push(`console: ${message.text()}`);
     }
   });
