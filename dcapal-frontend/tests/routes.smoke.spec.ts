@@ -59,11 +59,27 @@ test("the login route renders authentication controls", async ({ page }) => {
   /*
    * GIVEN an investor is not signed in
    * WHEN the login route opens
-   * THEN the authentication screen is visible
+   * THEN the authentication screen shows visible, usable OAuth buttons
    */
   await page.goto("/login");
 
-  await expect(page.getByTestId("route-login")).toBeVisible();
+  const loginRoute = page.getByTestId("route-login");
+  await expect(loginRoute).toBeVisible();
+
+  const oauthButtons = loginRoute.getByRole("button");
+  await expect(oauthButtons).toHaveCount(2);
+  for (const provider of ["Google", "GitHub"]) {
+    const button = oauthButtons.filter({ hasText: provider });
+    await expect(button).toBeVisible();
+    await expect(button).toHaveCSS("border-width", "1px");
+    await expect(button).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(button).toHaveCSS("padding", "10px 15px");
+    await expect
+      .poll(() =>
+        button.evaluate((element) => element.getBoundingClientRect().height)
+      )
+      .toBeGreaterThan(0);
+  }
 });
 
 test("an unknown route renders the not-found page", async ({ page }) => {

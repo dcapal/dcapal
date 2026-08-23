@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
 import { useMediaQuery } from "@react-hook/media-query";
 import { Step, useAppStore } from "@/state/appStore";
@@ -87,6 +87,7 @@ const computePortfolioGain = (assets) => {
 /** Renders the selected portfolio editor and coordinates price refreshes. */
 export const PortfolioStep = () => {
   const [searchText, setSearchText] = useState("");
+  const refreshInFlight = useRef(false);
 
   const { t, i18n } = useTranslation();
   const pfolio = useCurrentPortfolio();
@@ -114,32 +115,36 @@ export const PortfolioStep = () => {
     let timeout = null;
 
     const refreshPrices = async () => {
+      const refreshOnce = async () => {
+        if (refreshInFlight.current) return;
+
+        refreshInFlight.current = true;
+        try {
+          await refreshAssetPrices(
+            assetStore,
+            quoteCcy,
+            validCcys,
+            setPrice,
+            setRefreshTime,
+            t
+          );
+        } finally {
+          refreshInFlight.current = false;
+        }
+      };
+
       const now = new Date();
       const nextRefresh = new Date(
         lastRefreshTime + REFRESH_PRICE_INTERVAL_SEC * 1000
       );
 
       if (now > nextRefresh) {
-        await refreshAssetPrices(
-          assetStore,
-          quoteCcy,
-          validCcys,
-          setPrice,
-          setRefreshTime,
-          t
-        );
+        await refreshOnce();
         return;
       }
 
       timeout = setTimeout(async () => {
-        await refreshAssetPrices(
-          assetStore,
-          quoteCcy,
-          validCcys,
-          setPrice,
-          setRefreshTime,
-          t
-        );
+        await refreshOnce();
       }, nextRefresh - now);
     };
 
