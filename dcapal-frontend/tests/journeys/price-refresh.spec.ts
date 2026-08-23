@@ -7,7 +7,7 @@ test("an investor sees a styled success toast after stale prices refresh", async
   /*
    * GIVEN an investor has a portfolio whose prices were refreshed more than five minutes ago
    * WHEN the portfolio editor opens and refreshes its prices
-   * THEN the translated success toast is visible with a readable, elevated presentation
+   * THEN one translated success toast is visible with a readable, elevated presentation
    */
   const stalePortfolio = makePortfolio({
     lastPriceRefresh: Date.now() - 6 * 60 * 1000,
@@ -23,6 +23,7 @@ test("an investor sees a styled success toast after stale prices refresh", async
   const toast = page
     .getByRole("status")
     .filter({ hasText: "Refreshed prices!" });
+  await expect(toast).toHaveCount(1);
   await expect(toast).toBeVisible();
   const toastBar = toast.locator("..");
   await expect(toastBar).toHaveCSS("background-color", "rgb(255, 255, 255)");
