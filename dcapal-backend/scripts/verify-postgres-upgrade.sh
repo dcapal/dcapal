@@ -115,22 +115,22 @@ INSERT INTO portfolio_asset (
     symbol,
     portfolio_id,
     name,
-    legacy_asset_class,
+    asset_class,
     currency,
-    legacy_provider,
+    provider,
     quantity,
     target_weight,
-    price,
+    manual_price,
     average_buy_price
 )
 VALUES (
     '44444444-4444-4444-8444-444444444444',
-    'vwce.mi',
+    'VWCE.MI',
     '33333333-3333-4333-8333-333333333333',
     'Upgrade asset',
-    'EQUITY',
+    1,
     'usd',
-    'YF',
+    2,
     1,
     100,
     100,
@@ -210,20 +210,20 @@ BEGIN
         JOIN portfolios AS p ON p.id = a.portfolio_id
         WHERE a.id = '44444444-4444-4444-8444-444444444444'
           AND p.id = '33333333-3333-4333-8333-333333333333'
-          AND a.symbol = 'vwce.mi'
+          AND a.symbol = 'VWCE.MI'
           AND a.name = 'Upgrade asset'
-          AND a.legacy_asset_class = 'EQUITY'
+          AND a.asset_class = 1
           AND a.currency = 'usd'
-          AND a.legacy_provider = 'YF'
+          AND a.provider = 2
           AND a.quantity = 1
           AND a.target_weight = 100
-          AND a.price = 100
+          AND a.manual_price = 100
           AND a.average_buy_price = 100
     ) <> 1 THEN
         RAISE EXCEPTION 'restored portfolio asset is missing or changed';
     END IF;
 
-    IF (SELECT COUNT(*) FROM _sqlx_migrations) < 5
+    IF (SELECT COUNT(*) FROM _sqlx_migrations) < 6
        OR EXISTS (SELECT 1 FROM _sqlx_migrations WHERE success = FALSE) THEN
         RAISE EXCEPTION 'migration history is incomplete or contains a failed migration';
     END IF;

@@ -21,9 +21,9 @@ fn asset(symbol: &str) -> PortfolioAssetRequest {
     PortfolioAssetRequest {
         symbol: symbol.to_string(),
         name: format!("{symbol} asset"),
-        aclass: "Stock".to_string(),
+        aclass: "EQUITY".to_string(),
         base_ccy: "EUR".to_string(),
-        provider: "IBKR".to_string(),
+        provider: "YF".to_string(),
         qty: dec!(2),
         target_weight: dec!(1),
         price: dec!(120),
@@ -82,6 +82,36 @@ async fn upsert_updates_assets_and_removes_missing_assets(
     assert_eq!(assets.len(), 1);
     assert_eq!(assets[0].symbol, "VWCE");
     assert_eq!(assets[0].quantity, dec!(2));
+
+    let asset_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM portfolio_asset WHERE portfolio_id = $1")
+            .bind(PORTFOLIO_ID)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(asset_count, 1);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn upsert_normalizes_symbols_before_matching_and_writing(
+    pool: PgPool,
+) -> dcapal_backend::error::Result<()> {
+    // GIVEN a stored Portfolio Asset, WHEN clients submit lower and mixed-case symbols,
+    // THEN synchronization retains one row and stores the canonical upper-case symbol.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let (_, inserted_assets) = repository
+        .upsert(USER_ID, portfolio_request(vec![asset("vwce")]))
+        .await?;
+    let inserted_id = inserted_assets[0].id;
+
+    let (_, updated_assets) = repository
+        .upsert(USER_ID, portfolio_request(vec![asset("VwCe")]))
+        .await?;
+
+    assert_eq!(updated_assets.len(), 1);
+    assert_eq!(updated_assets[0].id, inserted_id);
+    assert_eq!(updated_assets[0].symbol, "VWCE");
 
     let asset_count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM portfolio_asset WHERE portfolio_id = $1")

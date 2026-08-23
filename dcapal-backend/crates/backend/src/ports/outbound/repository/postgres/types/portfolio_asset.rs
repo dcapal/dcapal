@@ -13,6 +13,27 @@ pub enum Provider {
     Kraken = 1,
 }
 
+impl Provider {
+    /// Converts a legacy synchronization provider into canonical storage.
+    pub fn from_legacy(value: &str) -> Option<Self> {
+        if value.eq_ignore_ascii_case("dcapal") || value.eq_ignore_ascii_case("kraken") {
+            Some(Self::Kraken)
+        } else if value.eq_ignore_ascii_case("yf") || value.eq_ignore_ascii_case("yahoo") {
+            Some(Self::YF)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the v1 synchronization provider name for this canonical provider.
+    pub const fn as_legacy_name(self) -> &'static str {
+        match self {
+            Self::Kraken => "Kraken",
+            Self::YF => "YF",
+        }
+    }
+}
+
 /// The Asset Class codes used by canonical Portfolio Asset storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i16)]
@@ -29,6 +50,37 @@ pub enum AssetClass {
     Crypto = 4,
     /// A commodity asset.
     Commodity = 5,
+}
+
+impl AssetClass {
+    /// Converts a legacy synchronization Asset Class into canonical storage.
+    pub fn from_legacy(value: &str) -> Self {
+        if value.eq_ignore_ascii_case("equity") {
+            Self::Equity
+        } else if value.eq_ignore_ascii_case("bond") {
+            Self::Bond
+        } else if value.eq_ignore_ascii_case("currency") || value.eq_ignore_ascii_case("cash") {
+            Self::Cash
+        } else if value.eq_ignore_ascii_case("crypto") {
+            Self::Crypto
+        } else if value.eq_ignore_ascii_case("commodity") {
+            Self::Commodity
+        } else {
+            Self::Other
+        }
+    }
+
+    /// Returns the v1 synchronization Asset Class name for this canonical class.
+    pub const fn as_legacy_name(self) -> &'static str {
+        match self {
+            Self::Other => "OTHER",
+            Self::Equity => "EQUITY",
+            Self::Bond => "BOND",
+            Self::Cash => "CASH",
+            Self::Crypto => "CRYPTO",
+            Self::Commodity => "COMMODITY",
+        }
+    }
 }
 
 /// A row from the `portfolio_asset` table.
@@ -108,5 +160,16 @@ mod tests {
         }
 
         assert!(AssetClass::try_from(6).is_err());
+    }
+
+    #[test]
+    fn legacy_values_map_to_canonical_codes() {
+        // GIVEN legacy provider and Asset Class names, WHEN storage values are derived,
+        // THEN known aliases use canonical codes and unsupported names use the stated policy.
+        assert_eq!(Provider::from_legacy("DCAPal"), Some(Provider::Kraken));
+        assert_eq!(Provider::from_legacy("Yahoo"), Some(Provider::YF));
+        assert_eq!(Provider::from_legacy("IBKR"), None);
+        assert_eq!(AssetClass::from_legacy("CURRENCY"), AssetClass::Cash);
+        assert_eq!(AssetClass::from_legacy("unclassified"), AssetClass::Other);
     }
 }

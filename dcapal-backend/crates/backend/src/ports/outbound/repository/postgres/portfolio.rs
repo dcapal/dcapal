@@ -14,7 +14,7 @@ use crate::{
         },
         outbound::repository::{
             portfolio::PortfolioRepository,
-            postgres::types::{PortfolioAssetRow, PortfolioRow},
+            postgres::types::{AssetClass, PortfolioAssetRow, PortfolioRow, Provider},
         },
     },
 };
@@ -46,11 +46,26 @@ impl SqlxPortfolioRepository {
         portfolio_id: Uuid,
         assets: Vec<PortfolioAssetRequest>,
     ) -> Result<Vec<PortfolioAssetRow>> {
+        // Keep persisted identity case-insensitive by normalizing every client symbol first.
+        let assets: Vec<PortfolioAssetRequest> = assets
+            .into_iter()
+            .map(|mut asset| {
+                asset.symbol = asset.symbol.to_uppercase();
+                asset
+            })
+            .collect();
+
         // Lock the current asset set so concurrent syncs cannot both reconcile it from stale data.
         let existing_assets = query_as::<_, PortfolioAssetRow>(
-            "SELECT id, symbol, portfolio_id, name, legacy_asset_class AS asset_class,
-                    currency, legacy_provider AS provider,
-                    quantity, target_weight, price, max_fee_impact, fee_type, fee_amount,
+            "SELECT id, symbol, portfolio_id, name,
+                    CASE asset_class
+                        WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
+                        WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
+                        ELSE 'OTHER'
+                    END AS asset_class,
+                    currency,
+                    CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+                    quantity, target_weight, manual_price AS price, max_fee_impact, fee_type, fee_amount,
                     fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at
              FROM portfolio_asset
              WHERE portfolio_id = $1
@@ -68,28 +83,39 @@ impl SqlxPortfolioRepository {
                 .iter()
                 .find(|row| row.symbol == asset.symbol);
             let fee_fields = Self::extract_fee_fields(asset.fees.clone());
+            let provider = Provider::from_legacy(&asset.provider).ok_or_else(|| {
+                DcaError::BadRequest(format!(
+                    "Unsupported Portfolio Asset provider: {}",
+                    asset.provider
+                ))
+            })?;
+            let asset_class = AssetClass::from_legacy(&asset.aclass);
 
             let updated = if let Some(existing_asset) = existing_asset {
                 query_as::<_, PortfolioAssetRow>(
                     "UPDATE portfolio_asset
-                    SET symbol = $2, name = $3, legacy_asset_class = $4, currency = $5,
-                         legacy_provider = $6, quantity = $7, target_weight = $8, price = $9,
+                    SET symbol = $2, name = $3, asset_class = $4, currency = $5,
+                         provider = $6, quantity = $7, target_weight = $8, manual_price = $9,
                          average_buy_price = $10, max_fee_impact = $11, fee_type = $12,
                          fee_amount = $13, fee_rate = $14, min_fee = $15, max_fee = $16
                      WHERE id = $1
                      RETURNING id, symbol, portfolio_id, name,
-                               legacy_asset_class AS asset_class, currency,
-                               legacy_provider AS provider,
-                               quantity, target_weight, price, max_fee_impact, fee_type,
+                               CASE asset_class
+                                   WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
+                                   WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
+                                   ELSE 'OTHER'
+                               END AS asset_class,
+                               currency, CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+                               quantity, target_weight, manual_price AS price, max_fee_impact, fee_type,
                                fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
                                created_at, updated_at",
                 )
                 .bind(existing_asset.id)
                 .bind(&asset.symbol)
                 .bind(&asset.name)
-                .bind(&asset.aclass)
+                .bind(i16::from(asset_class))
                 .bind(&asset.base_ccy)
-                .bind(&asset.provider)
+                .bind(i16::from(provider))
                 .bind(asset.qty)
                 .bind(asset.target_weight)
                 .bind(asset.price)
@@ -105,16 +131,19 @@ impl SqlxPortfolioRepository {
             } else {
                 query_as::<_, PortfolioAssetRow>(
                     "INSERT INTO portfolio_asset
-                         (id, symbol, portfolio_id, name, legacy_asset_class, currency,
-                          legacy_provider,
-                          quantity, target_weight, price, average_buy_price, max_fee_impact,
+                         (id, symbol, portfolio_id, name, asset_class, currency, provider,
+                          quantity, target_weight, manual_price, average_buy_price, max_fee_impact,
                           fee_type, fee_amount, fee_rate, min_fee, max_fee)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
                              $15, $16, $17)
                      RETURNING id, symbol, portfolio_id, name,
-                               legacy_asset_class AS asset_class, currency,
-                               legacy_provider AS provider,
-                               quantity, target_weight, price, max_fee_impact, fee_type,
+                               CASE asset_class
+                                   WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
+                                   WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
+                                   ELSE 'OTHER'
+                               END AS asset_class,
+                               currency, CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+                               quantity, target_weight, manual_price AS price, max_fee_impact, fee_type,
                                fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
                                created_at, updated_at",
                 )
@@ -122,9 +151,9 @@ impl SqlxPortfolioRepository {
                 .bind(&asset.symbol)
                 .bind(portfolio_id)
                 .bind(&asset.name)
-                .bind(&asset.aclass)
+                .bind(i16::from(asset_class))
                 .bind(&asset.base_ccy)
-                .bind(&asset.provider)
+                .bind(i16::from(provider))
                 .bind(asset.qty)
                 .bind(asset.target_weight)
                 .bind(asset.price)
@@ -214,9 +243,14 @@ impl PortfolioRepository for SqlxPortfolioRepository {
 
         let portfolio_ids: Vec<Uuid> = portfolios.iter().map(|portfolio| portfolio.id).collect();
         let assets = query_as::<_, PortfolioAssetRow>(
-            "SELECT id, symbol, portfolio_id, name, legacy_asset_class AS asset_class,
-                    currency, legacy_provider AS provider,
-                    quantity, target_weight, price, max_fee_impact, fee_type, fee_amount,
+            "SELECT id, symbol, portfolio_id, name,
+                    CASE asset_class
+                        WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
+                        WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
+                        ELSE 'OTHER'
+                    END AS asset_class,
+                    currency, CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+                    quantity, target_weight, manual_price AS price, max_fee_impact, fee_type, fee_amount,
                     fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at
              FROM portfolio_asset
              WHERE portfolio_id = ANY($1)
