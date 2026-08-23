@@ -107,7 +107,7 @@ module.exports = (_env, argv) => {
         new TerserPlugin(),
         new CssMinimizerPlugin({
           minimizerOptions: {
-            preset: "advanced",
+            preset: "default",
           },
         }),
       ],
