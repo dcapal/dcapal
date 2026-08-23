@@ -115,6 +115,10 @@ jobs:
           path: dcapal-frontend/dist
 
   deploy:
+    concurrency:
+      group: dcapal-deployment
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-slim
     needs: frontend-build
     steps:

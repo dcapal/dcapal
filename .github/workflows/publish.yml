@@ -18,6 +18,19 @@ on:
       - dev
     tags:
       - '*'
+    # Run publishing for changes in application trees and workspace packages.
+    paths:
+      - '.nvmrc'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'rust-toolchain.toml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'dcapal-backend/**'
+      - 'dcapal-optimizer-wasm/**'
+      - 'dcapal-frontend/**'
+      - 'packages/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -28,6 +41,11 @@ env:
 permissions:
   contents: read
   actions: write
+
+concurrency:
+  group: dcapal-publish
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   resolve-image:
