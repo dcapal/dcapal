@@ -21,8 +21,8 @@ VALUES (
 );
 
 INSERT INTO portfolio_asset (
-    id, symbol, portfolio_id, name, legacy_asset_class, currency, legacy_provider,
-    quantity, target_weight, price, max_fee_impact, fee_type, fee_amount,
+    id, symbol, portfolio_id, name, asset_class, currency, provider,
+    quantity, target_weight, manual_price, max_fee_impact, fee_type, fee_amount,
     fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at
 )
 VALUES
@@ -31,9 +31,9 @@ VALUES
         'VWCE',
         '10000000-0000-0000-0000-000000000001',
         'Vanguard FTSE All-World',
-        'Stock',
+        1,
         'EUR',
-        'IBKR',
+        2,
         10,
         1,
         100,
@@ -52,9 +52,9 @@ VALUES
         'CASH',
         '10000000-0000-0000-0000-000000000001',
         'Cash',
-        'Cash',
+        3,
         'EUR',
-        'IBKR',
+        2,
         100,
         0,
         1,

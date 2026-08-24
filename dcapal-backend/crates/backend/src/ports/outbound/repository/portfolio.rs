@@ -1,13 +1,24 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::{
-    error::Result,
-    ports::{
-        inbound::rest::request::PortfolioRequest,
-        outbound::repository::postgres::types::{PortfolioAssetRow, PortfolioRow},
-    },
+use crate::ports::{
+    inbound::rest::request::PortfolioRequest,
+    outbound::repository::postgres::types::{PortfolioAssetRow, PortfolioRow},
 };
+
+/// Errors raised while persisting or decoding portfolio data.
+#[derive(Debug, thiserror::Error)]
+pub enum PortfolioRepositoryError {
+    #[error("portfolio database operation failed")]
+    Database(#[from] sqlx::Error),
+    #[error("unsupported Portfolio Asset provider: {0}")]
+    UnsupportedProvider(String),
+    #[error("portfolio cannot be updated")]
+    CannotUpdate,
+}
+
+/// The result type exposed by the portfolio persistence port.
+pub type Result<T> = std::result::Result<T, PortfolioRepositoryError>;
 
 /// Persistence operations for saved portfolios and their assets.
 #[async_trait]

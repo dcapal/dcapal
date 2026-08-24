@@ -16,6 +16,17 @@ pub enum DcaError {
     Generic(String),
     #[error("Bad Request: {0}")]
     BadRequest(String),
+    #[error("{message}")]
+    ValidationFailure {
+        message: String,
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+    #[error("Application failure")]
+    ApplicationFailure {
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
     #[error("Price for market '{0}/{1}' not available")]
     PriceNotAvailable(AssetId, AssetId),
     #[error("Price for market '{0}' not available")]
@@ -92,7 +103,9 @@ impl IntoResponse for DcaError {
     fn into_response(self) -> axum::response::Response {
         error!("{:?}", &self);
         match self {
-            DcaError::BadRequest(_) => (StatusCode::BAD_REQUEST, format!("{self}")).into_response(),
+            DcaError::BadRequest(_) | DcaError::ValidationFailure { .. } => {
+                (StatusCode::BAD_REQUEST, format!("{self}")).into_response()
+            }
             DcaError::PriceNotAvailable(_, _) => {
                 (StatusCode::NOT_FOUND, format!("{self}")).into_response()
             }
