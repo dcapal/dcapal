@@ -4,9 +4,8 @@ Research date: 2026-08-05
 
 Implementation update (2026-08-13): issue #794 adopts the TimescaleDB
 PostgreSQL 18 application-database contract and keeps Supabase as a separate
-authentication stack. The durable decision and upgrade procedure are recorded
-in [backend ADR 0002](../../dcapal-backend/docs/adr/0002-timescaledb-application-database.md)
-and the [upgrade runbook](../runbooks/timescaledb-postgres-upgrade.md).
+authentication stack. The durable decision is recorded in
+[backend ADR 0002](../../dcapal-backend/docs/adr/0002-timescaledb-application-database.md).
 
 The numbered findings below describe the pre-implementation baseline where
 they refer to the former PostgreSQL 17 image or Supabase-backed test setup.

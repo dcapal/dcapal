@@ -63,3 +63,10 @@ CREATE TABLE portfolio_asset (
     CONSTRAINT fk_portfolio_asset_portfolio_id
         FOREIGN KEY (portfolio_id) REFERENCES portfolios (id)
 );
+
+CREATE TABLE portfolio_asset_reference (
+    id UUID NOT NULL PRIMARY KEY,
+    portfolio_asset_id UUID NOT NULL,
+    CONSTRAINT fk_portfolio_asset_reference_asset
+        FOREIGN KEY (portfolio_asset_id) REFERENCES portfolio_asset (id)
+);

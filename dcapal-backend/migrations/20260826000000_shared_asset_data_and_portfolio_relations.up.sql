@@ -1,4 +1,4 @@
--- PostgreSQL 18 is required because uuidv7() is used for both identities.
+-- PostgreSQL 18 is required because uuidv7() supplies shared asset identities.
 DO $$
 BEGIN
     IF current_setting('server_version_num')::integer < 180000 THEN
@@ -106,27 +106,12 @@ FROM assets_data AS shared
 WHERE shared.provider = asset.provider
   AND shared.symbol = asset.symbol;
 
--- Existing Portfolio Asset IDs predate the canonical UUIDv7 policy. There are
--- currently no dependent tables, so this map also documents the rewrite point
--- for future dependent-reference updates.
-CREATE TEMP TABLE portfolio_asset_id_map ON COMMIT DROP AS
-SELECT id AS old_id, uuidv7() AS new_id
-FROM portfolio_asset;
-
-UPDATE portfolio_asset AS asset
-SET id = id_map.new_id
-FROM portfolio_asset_id_map AS id_map
-WHERE asset.id = id_map.old_id;
-
 ALTER TABLE portfolio_asset
-    ALTER COLUMN id SET DEFAULT uuidv7(),
     ALTER COLUMN assets_data_id SET NOT NULL;
 
 ALTER TABLE portfolio_asset
     ADD CONSTRAINT portfolio_asset_assets_data_fk
-        FOREIGN KEY (assets_data_id) REFERENCES assets_data (id),
-    ADD CONSTRAINT portfolio_asset_portfolio_assets_data_key
-        UNIQUE (portfolio_id, assets_data_id);
+        FOREIGN KEY (assets_data_id) REFERENCES assets_data (id);
 
 ALTER TABLE portfolio_asset
     DROP COLUMN symbol,
