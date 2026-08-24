@@ -80,9 +80,9 @@ assert_value \
     WHERE u.email = :'smoke_email'
       AND p.id = :'smoke_portfolio_id'::uuid
       AND a.symbol = 'vwce.mi'
-      AND a.asset_class = 'EQUITY'
+      AND a.legacy_asset_class = 'EQUITY'
       AND a.currency = 'usd'
-      AND a.provider = 'YF'
+      AND a.legacy_provider = 'YF'
       AND a.quantity = 1
       AND a.target_weight = 100
       AND a.price = 100
