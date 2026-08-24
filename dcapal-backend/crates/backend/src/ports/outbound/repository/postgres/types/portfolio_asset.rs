@@ -83,7 +83,7 @@ impl AssetClass {
     }
 }
 
-/// A row from the `portfolio_asset` table.
+/// A row from the `portfolio_asset` table after canonical enum decoding.
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct PortfolioAssetRow {
     /// The asset row identifier.
@@ -95,11 +95,13 @@ pub struct PortfolioAssetRow {
     /// The asset display name.
     pub name: String,
     /// The asset class reported by the provider.
-    pub asset_class: String,
+    #[sqlx(try_from = "i16")]
+    pub asset_class: AssetClass,
     /// The asset's trading currency.
     pub currency: String,
     /// The provider supplying the asset data.
-    pub provider: String,
+    #[sqlx(try_from = "i16")]
+    pub provider: Provider,
     /// The current quantity held.
     pub quantity: Decimal,
     /// The target portfolio weight.

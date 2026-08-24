@@ -5,17 +5,14 @@ use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
 
-use crate::{
-    error::{DcaError, Result},
-    ports::{
-        inbound::rest::{
-            FeeStructure,
-            request::{PortfolioAssetRequest, PortfolioRequest, TransactionFeesRequest},
-        },
-        outbound::repository::{
-            portfolio::PortfolioRepository,
-            postgres::types::{AssetClass, PortfolioAssetRow, PortfolioRow, Provider},
-        },
+use crate::ports::{
+    inbound::rest::{
+        FeeStructure,
+        request::{PortfolioAssetRequest, PortfolioRequest, TransactionFeesRequest},
+    },
+    outbound::repository::{
+        portfolio::{PortfolioRepository, PortfolioRepositoryError, Result},
+        postgres::types::{AssetClass, PortfolioAssetRow, PortfolioRow, Provider},
     },
 };
 
@@ -57,14 +54,7 @@ impl SqlxPortfolioRepository {
 
         // Lock the current asset set so concurrent syncs cannot both reconcile it from stale data.
         let existing_assets = query_as::<_, PortfolioAssetRow>(
-            "SELECT id, symbol, portfolio_id, name,
-                    CASE asset_class
-                        WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
-                        WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
-                        ELSE 'OTHER'
-                    END AS asset_class,
-                    currency,
-                    CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+            "SELECT id, symbol, portfolio_id, name, asset_class, currency, provider,
                     quantity, target_weight, manual_price AS price, max_fee_impact, fee_type, fee_amount,
                     fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at
              FROM portfolio_asset
@@ -84,10 +74,7 @@ impl SqlxPortfolioRepository {
                 .find(|row| row.symbol == asset.symbol);
             let fee_fields = Self::extract_fee_fields(asset.fees.clone());
             let provider = Provider::from_legacy(&asset.provider).ok_or_else(|| {
-                DcaError::BadRequest(format!(
-                    "Unsupported Portfolio Asset provider: {}",
-                    asset.provider
-                ))
+                PortfolioRepositoryError::UnsupportedProvider(asset.provider.clone())
             })?;
             let asset_class = AssetClass::from_legacy(&asset.aclass);
 
@@ -99,13 +86,8 @@ impl SqlxPortfolioRepository {
                          average_buy_price = $10, max_fee_impact = $11, fee_type = $12,
                          fee_amount = $13, fee_rate = $14, min_fee = $15, max_fee = $16
                      WHERE id = $1
-                     RETURNING id, symbol, portfolio_id, name,
-                               CASE asset_class
-                                   WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
-                                   WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
-                                   ELSE 'OTHER'
-                               END AS asset_class,
-                               currency, CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+                     RETURNING id, symbol, portfolio_id, name, asset_class,
+                               currency, provider,
                                quantity, target_weight, manual_price AS price, max_fee_impact, fee_type,
                                fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
                                created_at, updated_at",
@@ -136,13 +118,8 @@ impl SqlxPortfolioRepository {
                           fee_type, fee_amount, fee_rate, min_fee, max_fee)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
                              $15, $16, $17)
-                     RETURNING id, symbol, portfolio_id, name,
-                               CASE asset_class
-                                   WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
-                                   WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
-                                   ELSE 'OTHER'
-                               END AS asset_class,
-                               currency, CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+                     RETURNING id, symbol, portfolio_id, name, asset_class,
+                               currency, provider,
                                quantity, target_weight, manual_price AS price, max_fee_impact, fee_type,
                                fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
                                created_at, updated_at",
@@ -243,13 +220,8 @@ impl PortfolioRepository for SqlxPortfolioRepository {
 
         let portfolio_ids: Vec<Uuid> = portfolios.iter().map(|portfolio| portfolio.id).collect();
         let assets = query_as::<_, PortfolioAssetRow>(
-            "SELECT id, symbol, portfolio_id, name,
-                    CASE asset_class
-                        WHEN 0 THEN 'OTHER' WHEN 1 THEN 'EQUITY' WHEN 2 THEN 'BOND'
-                        WHEN 3 THEN 'CASH' WHEN 4 THEN 'CRYPTO' WHEN 5 THEN 'COMMODITY'
-                        ELSE 'OTHER'
-                    END AS asset_class,
-                    currency, CASE provider WHEN 1 THEN 'Kraken' WHEN 2 THEN 'YF' END AS provider,
+            "SELECT id, symbol, portfolio_id, name, asset_class,
+                    currency, provider,
                     quantity, target_weight, manual_price AS price, max_fee_impact, fee_type, fee_amount,
                     fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at
              FROM portfolio_asset
@@ -311,9 +283,7 @@ impl PortfolioRepository for SqlxPortfolioRepository {
         if let Some(existing) = &existing
             && existing.user_id != user_id
         {
-            return Err(DcaError::BadRequest(
-                "Portfolio cannot be updated".to_string(),
-            ));
+            return Err(PortfolioRepositoryError::CannotUpdate);
         }
 
         let fee_fields = Self::extract_fee_fields(portfolio_req.fees.clone());

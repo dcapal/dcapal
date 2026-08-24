@@ -79,13 +79,13 @@ assert_value \
     JOIN users AS u ON u.id = p.user_id
     WHERE u.email = :'smoke_email'
       AND p.id = :'smoke_portfolio_id'::uuid
-      AND a.symbol = 'vwce.mi'
-      AND a.legacy_asset_class = 'EQUITY'
+      AND a.symbol = 'VWCE.MI'
+      AND a.asset_class = 1
       AND a.currency = 'usd'
-      AND a.legacy_provider = 'YF'
+      AND a.provider = 2
       AND a.quantity = 1
       AND a.target_weight = 100
-      AND a.price = 100
+      AND a.manual_price = 100
   ")"
 
 printf 'Timescale smoke data verified for %s and %s.\n' \

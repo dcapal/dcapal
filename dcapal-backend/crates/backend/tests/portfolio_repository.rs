@@ -1,12 +1,12 @@
 use chrono::Utc;
-use dcapal_backend::{
-    error::DcaError,
-    ports::{
-        inbound::rest::{
-            FeeStructure,
-            request::{PortfolioAssetRequest, PortfolioRequest},
-        },
-        outbound::repository::{portfolio::PortfolioRepository, postgres::SqlxPortfolioRepository},
+use dcapal_backend::ports::{
+    inbound::rest::{
+        FeeStructure,
+        request::{PortfolioAssetRequest, PortfolioRequest},
+    },
+    outbound::repository::{
+        portfolio::{PortfolioRepository, PortfolioRepositoryError},
+        postgres::SqlxPortfolioRepository,
     },
 };
 use rust_decimal::dec;
@@ -56,7 +56,9 @@ fn portfolio_request(assets: Vec<PortfolioAssetRequest>) -> PortfolioRequest {
 }
 
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
-async fn reads_portfolios_with_their_assets(pool: PgPool) -> dcapal_backend::error::Result<()> {
+async fn reads_portfolios_with_their_assets(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let repository = SqlxPortfolioRepository::new(pool);
     let portfolios = repository.get_user_portfolios_with_assets(USER_ID).await?;
 
@@ -69,9 +71,67 @@ async fn reads_portfolios_with_their_assets(pool: PgPool) -> dcapal_backend::err
 }
 
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn rejects_invalid_provider_codes_from_storage(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a canonical portfolio asset with an invalid provider code, WHEN the repository reads it,
+    // THEN it returns a column-decode error with the enum conversion cause intact.
+    sqlx::query("UPDATE portfolio_asset SET provider = 99 WHERE symbol = 'VWCE'")
+        .execute(&pool)
+        .await?;
+
+    let error = SqlxPortfolioRepository::new(pool)
+        .get_user_portfolios_with_assets(USER_ID)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        &error,
+        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, .. })
+            if index == "provider"
+    ));
+    let database_error = std::error::Error::source(&error).expect("database error source");
+    assert!(
+        std::error::Error::source(database_error).is_some(),
+        "column decode should retain the enum conversion cause"
+    );
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn rejects_invalid_asset_class_codes_from_storage(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a canonical portfolio asset with an invalid Asset Class code, WHEN the repository reads it,
+    // THEN it returns a column-decode error with the enum conversion cause intact.
+    sqlx::query("UPDATE portfolio_asset SET asset_class = 99 WHERE symbol = 'VWCE'")
+        .execute(&pool)
+        .await?;
+
+    let error = SqlxPortfolioRepository::new(pool)
+        .get_user_portfolios_with_assets(USER_ID)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        &error,
+        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, .. })
+            if index == "asset_class"
+    ));
+    let database_error = std::error::Error::source(&error).expect("database error source");
+    assert!(
+        std::error::Error::source(database_error).is_some(),
+        "column decode should retain the enum conversion cause"
+    );
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn upsert_updates_assets_and_removes_missing_assets(
     pool: PgPool,
-) -> dcapal_backend::error::Result<()> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let repository = SqlxPortfolioRepository::new(pool.clone());
     let (portfolio, assets) = repository
         .upsert(USER_ID, portfolio_request(vec![asset("VWCE")]))
@@ -96,7 +156,7 @@ async fn upsert_updates_assets_and_removes_missing_assets(
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn upsert_normalizes_symbols_before_matching_and_writing(
     pool: PgPool,
-) -> dcapal_backend::error::Result<()> {
+) -> Result<(), Box<dyn std::error::Error>> {
     // GIVEN a stored Portfolio Asset, WHEN clients submit lower and mixed-case symbols,
     // THEN synchronization retains one row and stores the canonical upper-case symbol.
     let repository = SqlxPortfolioRepository::new(pool.clone());
@@ -126,13 +186,16 @@ async fn upsert_normalizes_symbols_before_matching_and_writing(
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn ownership_is_required_for_upsert_and_delete(
     pool: PgPool,
-) -> dcapal_backend::error::Result<()> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let repository = SqlxPortfolioRepository::new(pool.clone());
     let result = repository
         .upsert(OTHER_USER_ID, portfolio_request(vec![asset("VWCE")]))
         .await;
 
-    assert!(matches!(result, Err(DcaError::BadRequest(_))));
+    assert!(matches!(
+        result,
+        Err(PortfolioRepositoryError::CannotUpdate)
+    ));
     repository.soft_delete(OTHER_USER_ID, PORTFOLIO_ID).await?;
 
     let deleted: bool = sqlx::query_scalar("SELECT deleted FROM portfolios WHERE id = $1")
@@ -145,7 +208,9 @@ async fn ownership_is_required_for_upsert_and_delete(
 }
 
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
-async fn soft_delete_updates_an_owned_portfolio(pool: PgPool) -> dcapal_backend::error::Result<()> {
+async fn soft_delete_updates_an_owned_portfolio(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let repository = SqlxPortfolioRepository::new(pool.clone());
     repository.soft_delete(USER_ID, PORTFOLIO_ID).await?;
 

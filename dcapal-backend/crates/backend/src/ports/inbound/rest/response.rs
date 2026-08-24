@@ -125,9 +125,9 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                 Ok(PortfolioAssetResponse {
                     symbol: asset.symbol.clone(),
                     name: asset.name.clone(),
-                    aclass: asset.asset_class.clone(),
+                    aclass: asset.asset_class.as_legacy_name().to_string(),
                     base_ccy: asset.currency.clone(),
-                    provider: asset.provider.clone(),
+                    provider: asset.provider.as_legacy_name().to_string(),
                     qty: asset.quantity,
                     target_weight: asset.target_weight,
                     price: asset.price,
@@ -209,6 +209,7 @@ mod test {
     use rust_decimal::dec;
 
     use super::*;
+    use crate::ports::outbound::repository::postgres::types::{AssetClass, Provider};
 
     #[test]
     fn map_model_to_response() {
@@ -236,9 +237,9 @@ mod test {
             symbol: String::from("VWCE"),
             portfolio_id,
             name: String::from("Vanguard FTSE All-World UCITS ETF USD Acc"),
-            asset_class: String::from("Stock"),
+            asset_class: AssetClass::Equity,
             currency: String::from("EUR"),
-            provider: String::from("IBKR"),
+            provider: Provider::YF,
             quantity: dec!(10.0),
             target_weight: dec!(1.0),
             price: dec!(100.0),
@@ -267,9 +268,9 @@ mod test {
             assets: vec![PortfolioAssetResponse {
                 symbol: asset_model.symbol.clone(),
                 name: asset_model.name.clone(),
-                aclass: asset_model.asset_class.clone(),
+                aclass: asset_model.asset_class.as_legacy_name().to_string(),
                 base_ccy: asset_model.currency.clone(),
-                provider: asset_model.provider.clone(),
+                provider: asset_model.provider.as_legacy_name().to_string(),
                 qty: asset_model.quantity,
                 target_weight: asset_model.target_weight,
                 price: asset_model.price,

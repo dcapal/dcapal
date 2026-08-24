@@ -94,18 +94,18 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
                 Decimal::from(30),
             ),
             (
-                Uuid::parse_str("20000000-0000-0000-0000-000000000006").unwrap(),
-                "GOLD".into(),
-                2,
-                5,
-                Decimal::from(60),
-            ),
-            (
                 Uuid::parse_str("20000000-0000-0000-0000-000000000002").unwrap(),
                 "FOO".into(),
                 1,
                 2,
                 Decimal::from(20),
+            ),
+            (
+                Uuid::parse_str("20000000-0000-0000-0000-000000000006").unwrap(),
+                "GOLD".into(),
+                2,
+                5,
+                Decimal::from(60),
             ),
             (
                 Uuid::parse_str("20000000-0000-0000-0000-000000000007").unwrap(),
