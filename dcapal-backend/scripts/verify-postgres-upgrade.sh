@@ -60,9 +60,14 @@ mapped_port() {
 # Runs the packaged DcaPal migrations against a supplied database URL.
 run_migrations() {
   local database_url="$1"
+  local target_version="${2:-}"
 
   cd "$ROOT_DIR"
-  DATABASE_URL="$database_url" cargo run --quiet -p migration
+  if [[ -n "$target_version" ]]; then
+    DATABASE_URL="$database_url" cargo run --quiet -p migration -- up-to -v "$target_version"
+  else
+    DATABASE_URL="$database_url" cargo run --quiet -p migration
+  fi
 }
 
 # Restores a custom-format dump while leaving Timescale-owned catalog data intact.
@@ -95,7 +100,10 @@ wait_for_database "$SOURCE_NAME"
 SOURCE_PORT="$(mapped_port "$SOURCE_NAME")"
 SOURCE_URL="postgresql://postgres:${PASSWORD}@127.0.0.1:${SOURCE_PORT}/postgres"
 
-run_migrations "$SOURCE_URL"
+# PostgreSQL 17 cannot provide uuidv7(), so the source is migrated only to
+# the last pre-UUIDv7 version before its logical dump. PostgreSQL 18 applies
+# the corrective shared-asset migration after restore.
+run_migrations "$SOURCE_URL" "20260814000000"
 
 docker exec -i "$SOURCE_NAME" psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL'
 INSERT INTO users (id, email, role)
@@ -207,23 +215,24 @@ BEGIN
     IF (
         SELECT COUNT(*)
         FROM portfolio_asset AS a
+        JOIN assets_data AS d ON d.id = a.assets_data_id
         JOIN portfolios AS p ON p.id = a.portfolio_id
-        WHERE a.id = '44444444-4444-4444-8444-444444444444'
-          AND p.id = '33333333-3333-4333-8333-333333333333'
-          AND a.symbol = 'VWCE.MI'
-          AND a.name = 'Upgrade asset'
-          AND a.asset_class = 1
-          AND a.currency = 'usd'
-          AND a.provider = 2
+        WHERE p.id = '33333333-3333-4333-8333-333333333333'
+          AND d.symbol = 'VWCE.MI'
+          AND d.name = 'Upgrade asset'
+          AND d.asset_class = 1
+          AND d.currency = 'usd'
+          AND d.provider = 2
           AND a.quantity = 1
           AND a.target_weight = 100
           AND a.manual_price = 100
           AND a.average_buy_price = 100
+          AND SUBSTRING(a.id::text FROM 15 FOR 1) = '7'
     ) <> 1 THEN
         RAISE EXCEPTION 'restored portfolio asset is missing or changed';
     END IF;
 
-    IF (SELECT COUNT(*) FROM _sqlx_migrations) < 6
+    IF (SELECT COUNT(*) FROM _sqlx_migrations) < 7
        OR EXISTS (SELECT 1 FROM _sqlx_migrations WHERE success = FALSE) THEN
         RAISE EXCEPTION 'migration history is incomplete or contains a failed migration';
     END IF;

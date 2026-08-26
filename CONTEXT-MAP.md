@@ -13,4 +13,4 @@
 
 ## Shared language
 
-The contexts share these concepts: `Portfolio`, `Portfolio asset`, `quote currency`, `target weight`, `investment budget`, `transaction fee policy`, and `allocation`.
+The contexts share these concepts: `Portfolio`, `shared asset metadata`, `Portfolio Asset relationship`, `Asset Class override`, `quote currency`, `target weight`, `investment budget`, `transaction fee policy`, and `allocation`.

@@ -76,38 +76,42 @@ impl AssetClass {
             Self::Other => "OTHER",
             Self::Equity => "EQUITY",
             Self::Bond => "BOND",
-            Self::Cash => "CASH",
+            Self::Cash => "CURRENCY",
             Self::Crypto => "CRYPTO",
             Self::Commodity => "COMMODITY",
         }
     }
 }
 
-/// A row from the `portfolio_asset` table after canonical enum decoding.
+/// A joined shared-asset and Portfolio relationship row after enum decoding.
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct PortfolioAssetRow {
-    /// The asset row identifier.
+    /// The Portfolio Asset relationship identifier.
     pub id: Uuid,
-    /// The provider symbol for the asset.
-    pub symbol: String,
     /// The portfolio containing the asset.
     pub portfolio_id: Uuid,
-    /// The asset display name.
+    /// The shared asset metadata identifier.
+    pub assets_data_id: Uuid,
+    /// The provider symbol for the shared asset.
+    pub symbol: String,
+    /// The immutable shared asset display name.
     pub name: String,
-    /// The asset class reported by the provider.
+    /// The shared default Asset Class.
     #[sqlx(try_from = "i16")]
     pub asset_class: AssetClass,
-    /// The asset's trading currency.
+    /// The Portfolio-specific Asset Class override.
+    pub asset_class_override: Option<i16>,
+    /// The shared asset's trading currency.
     pub currency: String,
-    /// The provider supplying the asset data.
+    /// The shared asset provider.
     #[sqlx(try_from = "i16")]
     pub provider: Provider,
     /// The current quantity held.
     pub quantity: Decimal,
     /// The target portfolio weight.
     pub target_weight: Decimal,
-    /// The latest known asset price.
-    pub price: Decimal,
+    /// The Portfolio-specific manual price override.
+    pub manual_price: Option<Decimal>,
     /// The maximum fee impact configured for transactions.
     pub max_fee_impact: Option<Decimal>,
     /// The persisted fee structure name.
@@ -126,6 +130,15 @@ pub struct PortfolioAssetRow {
     pub created_at: DateTime<Utc>,
     /// When the database row was last changed.
     pub updated_at: DateTime<Utc>,
+}
+
+impl PortfolioAssetRow {
+    /// Returns the Portfolio-specific class when present, otherwise the shared default.
+    pub fn effective_asset_class(&self) -> AssetClass {
+        self.asset_class_override
+            .and_then(|value| AssetClass::try_from(value).ok())
+            .unwrap_or(self.asset_class)
+    }
 }
 
 #[cfg(test)]

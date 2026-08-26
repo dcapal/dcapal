@@ -75,14 +75,15 @@ assert_value \
   "$(query "
     SELECT COUNT(*)
     FROM portfolio_asset AS a
+    JOIN assets_data AS d ON d.id = a.assets_data_id
     JOIN portfolios AS p ON p.id = a.portfolio_id
     JOIN users AS u ON u.id = p.user_id
     WHERE u.email = :'smoke_email'
       AND p.id = :'smoke_portfolio_id'::uuid
-      AND a.symbol = 'VWCE.MI'
-      AND a.asset_class = 1
-      AND a.currency = 'usd'
-      AND a.provider = 2
+      AND d.symbol = 'VWCE.MI'
+      AND d.asset_class = 1
+      AND d.currency = 'usd'
+      AND d.provider = 2
       AND a.quantity = 1
       AND a.target_weight = 100
       AND a.manual_price = 100
