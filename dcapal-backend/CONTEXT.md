@@ -22,8 +22,20 @@ A crypto or fiat asset known to the market-data catalog and usable as the base o
 _Avoid_: Asset, when the distinction from a portfolio asset matters; portfolio asset
 
 **Portfolio asset**:
-An asset entry in a portfolio, with portfolio-specific data such as quantity held, price, target weight, and fee policy overrides. It is portfolio data, not an entry in the market-data catalog, and it may represent an equity even when no market asset exists for it.
-_Avoid_: Market asset; holding, when referring to the complete portfolio entry
+The Portfolio Asset relationship between a saved Portfolio and shared asset metadata. It owns Portfolio-specific data such as quantity held, target weight, manual price, average buy price, fee policy, and an optional Asset Class override. It is Portfolio data, not an entry in the market-data catalog, and it may represent an equity even when no market asset exists for it.
+_Avoid_: Market asset; holding, when referring to the complete Portfolio entry
+
+**Shared asset metadata**:
+The canonical provider-bound record in `assets_data`, identified by numeric provider and upper-case symbol. It owns immutable name and currency metadata plus the shared default Asset Class. One record may be linked to many Portfolios.
+_Avoid_: Portfolio Asset relationship; current price; display-only asset
+
+**Portfolio Asset relationship**:
+The `portfolio_asset` row linking one saved Portfolio to one shared asset metadata record. Its uniqueness is `(portfolio_id, assets_data_id)`, and it never merges holding or allocation values with another Portfolio.
+_Avoid_: shared asset metadata; global holding
+
+**Asset Class override**:
+An optional class stored on a Portfolio Asset relationship. Null means that the relationship inherits the shared asset metadata default; a non-null value applies only to that Portfolio.
+_Avoid_: shared default Asset Class; provider asset type
 
 **Market**:
 A tradable pair of two market assets: a base asset and a quote asset. A market may have a current market price.
@@ -72,5 +84,5 @@ Removal of a saved portfolio from a user's set of portfolios, represented to syn
 _Avoid_: Imported portfolio expiry; archive
 
 **Portfolio asset provider**:
-The provider label attached to a portfolio asset to identify the source or pricing convention for that entry. It is different from the market data provider used by the backend to discover markets and refresh market prices.
+The provider identity carried by shared asset metadata. It is different from the market data provider role used by the backend to discover markets and refresh market prices, even when the same external service supplies both.
 _Avoid_: Market data provider; broker

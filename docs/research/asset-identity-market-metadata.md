@@ -13,7 +13,7 @@ This is a research finding, not a product-code change. It uses the current repos
 
 ## Executive findings
 
-1. **Keep symbol-based Portfolio identity, but scope it to a Portfolio.** The current frontend, REST payload, optimizer, and related ticket already use a provider-recognised `symbol` as the Portfolio Asset key. The compatible database invariant is `(portfolio_id, symbol)`: one symbol per saved Portfolio, the same symbol allowed in different Portfolios. This does not make `symbol` a globally unique market identity. A market-data identity remains provider- and venue-scoped metadata.
+1. **Separate shared asset metadata from Portfolio identity.** Shared asset metadata uses `(provider, upper-case symbol)` so the same provider-bound asset can be reused across Portfolios. The Portfolio Asset relationship uses `(portfolio_id, assets_data_id)`, so each Portfolio keeps its own holding and allocation values. A market-data identity remains provider- and venue-scoped metadata beyond this MVP key.
 
 2. **Do not use the market catalog's `AssetId` as the Portfolio Asset key.** Backend market assets are currently catalog entries identified by a string `id`, while a Portfolio Asset also carries user holdings, target weights, price, fees, and a source/provider label. These are different concepts. Preserve the exact provider symbol used for pricing, its provider namespace, and any exchange/market identifier alongside the Portfolio-local symbol.
 
@@ -88,13 +88,32 @@ CoinMarketCap is optional display-name enrichment in the Kraken path. It is not 
 
 ## Identity decision and the unique-asset direction
 
-The symbol-based Portfolio decision and the unique-asset direction are compatible, with one important boundary:
+The adopted decision keeps market identity separate while making reusable
+shared asset metadata explicit:
 
-- **Portfolio identity:** `(saved portfolio, canonical symbol)`. This is the key used by the frontend map and by the existing synchronization logic. The related ticket explicitly requires one symbol per saved Portfolio, permits the same symbol in different Portfolios, rejects duplicate symbols in one sync request, and requires a database uniqueness boundary. [Issue #714](https://github.com/dcapal/dcapal/issues/714)
-- **Market identity:** `(market-data provider, venue/exchange, provider asset or pair id)`. This is the identity needed to find a price, base/quote pair, exchange, or unit constraint. It must not replace the Portfolio-local symbol in this MVP.
-- **Required normalization decision:** define whether symbols compare case-insensitively and whether normalization happens before persistence. The frontend currently lowercases outgoing symbols, while the backend repository compares stored symbols exactly. A uniqueness migration must preflight duplicate values after applying the chosen equality rule; it must not silently merge conflicting rows. [Frontend sync mapping](https://github.com/dcapal/dcapal/blob/master/dcapal-frontend/src/api/portfolioSync.ts#L102-L114) and [backend symbol matching](https://github.com/dcapal/dcapal/blob/master/dcapal-backend/crates/backend/src/ports/outbound/repository/postgres/portfolio.rs#L44-L149)
-- **Do not add provider to the existing uniqueness key without a product decision.** The existing direction says `(portfolio, symbol)`, not `(portfolio, provider, symbol)`. Provider and raw symbol should be preserved for pricing and migration diagnostics, but changing the uniqueness key would allow two rows that the current frontend treats as the same asset.
-- **Preserve aliases rather than silently merging them.** Kraken's `XBT`/`BTC` and internal/display ids demonstrate that provider aliases exist. If a future canonicalization changes a symbol, retain the source symbol and provider identity long enough to explain or review the migration. The current frontend already rejects a duplicate selected symbol, and the current database has no uniqueness constraint. [Frontend duplicate guard](https://github.com/dcapal/dcapal/blob/master/dcapal-frontend/src/state/portfolioStore.ts#L591-L631) and [current database constraint set](https://github.com/dcapal/dcapal/blob/master/dcapal-backend/migrations/20250201132246_create_table_portfolio_asset.up.sql#L1-L23)
+- **Shared asset metadata:** `(provider, upper-case symbol)` in `assets_data`.
+  Provider is part of identity, so the same symbol from two providers remains
+  two shared records.
+- **Portfolio Asset relationship:** `(portfolio_id, assets_data_id)` in
+  `portfolio_asset`. A relationship owns quantity, target weight, manual
+  price, average buy price, fees, and an optional Asset Class override.
+- **Normalization:** symbols are upper-case before persistence. The migration
+  reports metadata conflicts and removes only later duplicate relationships in
+  one Portfolio; it never merges relationship values.
+- **Metadata policy:** name, currency, and shared default Asset Class are
+  seeded by the oldest row and remain immutable through Portfolio
+  synchronization. Later links reuse the shared record and receive canonical
+  metadata on reads.
+- **API policy:** the current v1 API retains its legacy flat effective-class
+  projection and provider aliases. The v2 contract is out of scope for this
+  migration and remains tracked by [Issue #773](https://github.com/dcapal/dcapal/issues/773).
+- **UUID policy:** both `assets_data` and `portfolio_asset` use UUIDv7 IDs on
+  PostgreSQL 18. The repair migration is forward-only in production, with a
+  development-only down migration.
+
+This boundary supersedes the earlier `(portfolio_id, symbol)` storage
+recommendation while preserving the frontend's convenient symbol map and the
+market-data provider/venue boundary. [Issue #714](https://github.com/dcapal/dcapal/issues/714)
 
 ## Six-class migration
 
@@ -144,7 +163,7 @@ For this MVP, `unknown` is the correct value for Yahoo-priced assets and for any
 
 At minimum, a coordinated Portfolio/market-data migration should retain these facts:
 
-1. **Portfolio-local identity:** canonical symbol used by the Portfolio, with a documented normalization/equality rule and `(portfolio_id, symbol)` uniqueness.
+1. **Portfolio-local identity:** the Portfolio Asset relationship is identified by `(portfolio_id, assets_data_id)`. Shared asset metadata is identified by `(provider, upper-case symbol)`, so a provider may be reused across Portfolios while different providers remain separate.
 2. **Source identity:** price provider, raw provider symbol, provider asset id, and exchange/venue or market id when the provider exposes them. Do not assume one global asset id across Yahoo, Kraken, CryptoWatch, or CoinMarketCap.
 3. **Display metadata:** name plus exchange/market label and provider type/category. Display name is not identity.
 4. **Planning classification:** one of the six product classes, separate from raw provider type and market-data asset kind.
@@ -157,10 +176,27 @@ The current Portfolio schema has only part of this set: symbol, name, three-clas
 
 ## Implementation-ready route
 
-1. Keep the Portfolio key symbol-based and enforce the already specified `(saved portfolio, symbol)` uniqueness rule after a non-destructive duplicate preflight. Define case normalization before the migration and preserve conflicting source values for review.
-2. Keep market identity separate. Add a normalized provider metadata boundary that can retain exact symbol, provider asset id, venue/exchange, market id, base/quote ids, source currency, and raw provider type.
+1. Store shared asset metadata in `assets_data` with unique `(provider, symbol)` after upper-case normalization. Keep `portfolio_asset` as the Portfolio Asset relationship with unique `(portfolio_id, assets_data_id)` after a non-destructive duplicate preflight. Preserve all relationship values and report metadata conflicts.
+2. Keep market identity separate from Portfolio allocation. The shared metadata boundary can retain exact symbol, provider asset id, venue/exchange, market id, base/quote ids, source currency, and raw provider type as the model grows.
 3. Make the six-class enum a planning contract. Migrate `EQUITY → Equities`, `CRYPTO → Crypto`, and `CURRENCY → Cash` as a reviewed default; require explicit handling for Bonds, Commodities, and Other and retain raw provider metadata.
 4. Replace the class-based whole-unit heuristic with a per-asset unit constraint in the optimizer contract. Use provider precision only when available; otherwise use `unknown` and let the user's whole/fractional preference be a separate recommendation rule.
 5. Preserve source price currency and Portfolio quote currency as separate fields. Continue to value holdings in the Portfolio quote currency, but retain enough provenance to explain the conversion and refresh timestamp.
 
-This route resolves the research question without changing product code. It leaves only the exact symbol normalization policy and the user-facing handling of unresolved six-class and unit-capability cases for the relevant decision tickets.
+## Adopted storage contract
+
+The implementation decision superseding the earlier symbol-only recommendation
+is to separate shared asset metadata from the Portfolio Asset relationship.
+The first linked row creates the shared `(provider, upper-case symbol)` record;
+later synchronization reuses it and ignores name, currency, and shared-class
+mismatches. The relationship keeps quantity, target weight, manual price,
+average buy price, fees, and `asset_class_override`. The current v1 API
+continues to return its legacy flat effective-class projection. The v2 API
+contract remains owned by [Issue #773](https://github.com/dcapal/dcapal/issues/773)
+and is not implemented by this migration. Both tables use UUIDv7 IDs on
+PostgreSQL 18. The repair migration is forward-only in production and has a
+development-only down migration.
+
+This route resolves the research question and records the adopted domain
+terms: shared asset metadata, Portfolio Asset relationship, and Asset Class
+override. The remaining unresolved six-class and unit-capability cases stay
+with their relevant product and optimizer decisions.

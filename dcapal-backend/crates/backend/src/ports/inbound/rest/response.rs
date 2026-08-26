@@ -125,13 +125,23 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                 Ok(PortfolioAssetResponse {
                     symbol: asset.symbol.clone(),
                     name: asset.name.clone(),
-                    aclass: asset.asset_class.as_legacy_name().to_string(),
+                    aclass: asset.effective_asset_class().as_legacy_name().to_string(),
                     base_ccy: asset.currency.clone(),
                     provider: asset.provider.as_legacy_name().to_string(),
                     qty: asset.quantity,
                     target_weight: asset.target_weight,
-                    price: asset.price,
-                    average_buy_price: asset.average_buy_price.unwrap_or(asset.price),
+                    price: asset.manual_price.ok_or_else(|| {
+                        DcaError::Generic(
+                            "v1 Portfolio Asset response requires a manual price.".to_string(),
+                        )
+                    })?,
+                    average_buy_price: asset.average_buy_price.or(asset.manual_price).ok_or_else(
+                        || {
+                            DcaError::Generic(
+                                "v1 Portfolio Asset response requires a price basis.".to_string(),
+                            )
+                        },
+                    )?,
                     fees,
                 })
             })
@@ -236,13 +246,15 @@ mod test {
             id: Uuid::new_v4(),
             symbol: String::from("VWCE"),
             portfolio_id,
+            assets_data_id: Uuid::new_v4(),
             name: String::from("Vanguard FTSE All-World UCITS ETF USD Acc"),
             asset_class: AssetClass::Equity,
+            asset_class_override: None,
             currency: String::from("EUR"),
             provider: Provider::YF,
             quantity: dec!(10.0),
             target_weight: dec!(1.0),
-            price: dec!(100.0),
+            manual_price: Some(dec!(100.0)),
             max_fee_impact: None,
             fee_type: None,
             fee_amount: None,
@@ -268,12 +280,15 @@ mod test {
             assets: vec![PortfolioAssetResponse {
                 symbol: asset_model.symbol.clone(),
                 name: asset_model.name.clone(),
-                aclass: asset_model.asset_class.as_legacy_name().to_string(),
+                aclass: asset_model
+                    .effective_asset_class()
+                    .as_legacy_name()
+                    .to_string(),
                 base_ccy: asset_model.currency.clone(),
                 provider: asset_model.provider.as_legacy_name().to_string(),
                 qty: asset_model.quantity,
                 target_weight: asset_model.target_weight,
-                price: asset_model.price,
+                price: asset_model.manual_price.unwrap(),
                 average_buy_price: dec!(90.0),
                 fees: None,
             }],

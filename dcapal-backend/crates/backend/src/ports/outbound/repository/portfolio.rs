@@ -20,6 +20,17 @@ pub enum PortfolioRepositoryError {
 /// The result type exposed by the portfolio persistence port.
 pub type Result<T> = std::result::Result<T, PortfolioRepositoryError>;
 
+impl PortfolioRepositoryError {
+    /// Returns whether PostgreSQL reported a retryable concurrency conflict.
+    pub fn is_retryable_concurrency(&self) -> bool {
+        matches!(
+            self,
+            Self::Database(sqlx::Error::Database(error))
+                if matches!(error.code().as_deref(), Some("40001") | Some("40P01"))
+        )
+    }
+}
+
 /// Persistence operations for saved portfolios and their assets.
 #[async_trait]
 pub trait PortfolioRepository: Send + Sync {

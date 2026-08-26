@@ -95,7 +95,7 @@ tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 utoipa = { version = "5.5.0", features = ["chrono", "decimal", "uuid", "axum_extras"] }
 utoipa-axum = "0.2.0"
-uuid = { version = "1.24.0", features = ["v4", "serde"] }
+uuid = { version = "1.24.0", features = ["v4", "v7", "serde"] }
 wasm-bindgen = { version = "0.2.126", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.76"
 wasm-bindgen-test = "0.3.76"
