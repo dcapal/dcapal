@@ -78,6 +78,14 @@ struct PortfolioAssetInput {
     fees: Option<TransactionFeesRequest>,
 }
 
+struct PortfolioInput {
+    id: Uuid,
+    name: String,
+    quote_ccy: String,
+    fees: Option<TransactionFeesRequest>,
+    last_updated_at: crate::DateTime,
+}
+
 impl AssetData {
     fn candidate(
         symbol: String,
@@ -321,11 +329,7 @@ impl SqlxPortfolioRepository {
     async fn upsert_portfolio(
         &self,
         user_id: Uuid,
-        portfolio_id: Uuid,
-        name: String,
-        quote_ccy: String,
-        fees: Option<TransactionFeesRequest>,
-        last_updated_at: crate::DateTime,
+        portfolio: PortfolioInput,
         assets: Vec<PortfolioAssetInput>,
     ) -> Result<(PortfolioRow, Vec<PortfolioAssetRow>)> {
         let mut tx = self.pool.begin().await?;
@@ -341,7 +345,7 @@ impl SqlxPortfolioRepository {
              WHERE id = $1
              FOR UPDATE",
         )
-        .bind(portfolio_id)
+        .bind(portfolio.id)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -351,7 +355,7 @@ impl SqlxPortfolioRepository {
             return Err(PortfolioRepositoryError::CannotUpdate);
         }
 
-        let fee_fields = Self::extract_fee_fields(fees);
+        let fee_fields = Self::extract_fee_fields(portfolio.fees);
         let portfolio = if existing.is_some() {
             query_as::<_, PortfolioRow>(
                 "UPDATE portfolios
@@ -363,10 +367,10 @@ impl SqlxPortfolioRepository {
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
             )
-            .bind(portfolio_id)
-            .bind(name)
-            .bind(quote_ccy)
-            .bind(last_updated_at)
+            .bind(portfolio.id)
+            .bind(&portfolio.name)
+            .bind(&portfolio.quote_ccy)
+            .bind(portfolio.last_updated_at)
             .bind(fee_fields.max_fee_impact)
             .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
@@ -385,11 +389,11 @@ impl SqlxPortfolioRepository {
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
             )
-            .bind(portfolio_id)
+            .bind(portfolio.id)
             .bind(user_id)
-            .bind(name)
-            .bind(quote_ccy)
-            .bind(last_updated_at)
+            .bind(&portfolio.name)
+            .bind(&portfolio.quote_ccy)
+            .bind(portfolio.last_updated_at)
             .bind(fee_fields.max_fee_impact)
             .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
@@ -400,7 +404,7 @@ impl SqlxPortfolioRepository {
             .await?
         };
 
-        let assets = Self::upsert_assets_transaction(&mut tx, portfolio_id, assets).await?;
+        let assets = Self::upsert_assets_transaction(&mut tx, portfolio.id, assets).await?;
 
         // A sync must expose the portfolio and its asset set as one consistent change.
         tx.commit().await?;
@@ -544,11 +548,13 @@ impl PortfolioRepository for SqlxPortfolioRepository {
 
         self.upsert_portfolio(
             user_id,
-            portfolio_req.id,
-            portfolio_req.name,
-            portfolio_req.quote_ccy,
-            portfolio_req.fees,
-            portfolio_req.last_updated_at,
+            PortfolioInput {
+                id: portfolio_req.id,
+                name: portfolio_req.name,
+                quote_ccy: portfolio_req.quote_ccy,
+                fees: portfolio_req.fees,
+                last_updated_at: portfolio_req.last_updated_at,
+            },
             assets,
         )
         .await
