@@ -29,11 +29,14 @@ env:
 jobs:
   validate-inputs:
     runs-on: ubuntu-slim
+    outputs:
+      resolved_image_tag: ${{ steps.validate.outputs.resolved_image_tag }}
     env:
       DEPLOY_ENVIRONMENT: ${{ inputs.deploy_environment }}
       IMAGE_TAG: ${{ inputs.image_tag }}
     steps:
-      - run: |
+      - id: validate
+        run: |
           set -euo pipefail
           case "${DEPLOY_ENVIRONMENT}" in
             development|production) ;;
@@ -43,6 +46,28 @@ jobs:
             echo "Image tag is not a valid Docker tag" >&2
             exit 1
           }
+
+          resolved_image_tag="${IMAGE_TAG}"
+          if [[ "${IMAGE_TAG}" == "master" ]]; then
+            image_json="$(docker buildx imagetools inspect "${DOCKER_REPO}:master" --format '{{json .Image}}')" || {
+              echo "Could not inspect the master image" >&2
+              exit 1
+            }
+            resolved_image_tag="$(jq -r '((.config // .["linux/amd64"].config).Labels // {})["org.opencontainers.image.revision"] // empty' <<< "${image_json}")" || {
+              echo "Could not parse the master image revision label" >&2
+              exit 1
+            }
+            if [[ ! "${resolved_image_tag}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Master image revision is not a valid lowercase 40-character SHA" >&2
+              exit 1
+            fi
+            docker buildx imagetools inspect "${DOCKER_REPO}:${resolved_image_tag}" >/dev/null || {
+              echo "The master image revision tag does not exist: ${resolved_image_tag}" >&2
+              exit 1
+            }
+          fi
+
+          echo "resolved_image_tag=${resolved_image_tag}" >> "${GITHUB_OUTPUT}"
 
   optimizer-build:
     runs-on: ubuntu-latest
@@ -120,7 +145,7 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: ubuntu-slim
-    needs: frontend-build
+    needs: [validate-inputs, frontend-build]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -247,7 +272,7 @@ jobs:
           version: "3.9"
           services:
             dcapal:
-              image: ${{ env.DOCKER_REPO }}:${{ inputs.image_tag }}
+              image: ${{ env.DOCKER_REPO }}:${{ needs.validate-inputs.outputs.resolved_image_tag }}
               env_file: dcapal.env
               restart: always
               ports:
