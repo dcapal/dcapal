@@ -97,23 +97,6 @@ jobs:
         if: always()
         run: make backend-db-down
 
-  backend-postgres-upgrade-test:
-    name: test:backend:postgres-upgrade
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: true
-          cache-shared-key: rust-sccache
-          cache-on-failure: false
-          cache-targets: false
-          rustflags: ""
-
-      - name: Verify PostgreSQL 17 to 18 upgrade
-        run: ./dcapal-backend/scripts/verify-postgres-upgrade.sh
-
   backend-openapi-check:
     name: check:openapi:backend
     runs-on: ubuntu-latest

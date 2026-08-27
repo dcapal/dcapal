@@ -15,7 +15,7 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
     let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(migration_count, 7);
+    assert_eq!(migration_count, 8);
 
     let seaorm_table: Option<String> =
         sqlx::query_scalar("SELECT to_regclass('seaql_migrations')::text")
@@ -81,6 +81,78 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
         ]
     );
 
+    let foo_asset: (Uuid, String, Decimal) = sqlx::query_as(
+        "SELECT pa.id, ad.name, pa.quantity
+         FROM portfolio_asset AS pa
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         WHERE ad.provider = 1 AND ad.symbol = 'FOO'",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(foo_asset.1, "Foo oldest");
+    assert_eq!(foo_asset.2, Decimal::from(2));
+    assert_eq!(foo_asset.0.get_version_num(), 7);
+
+    let reference_asset_id: Uuid =
+        sqlx::query_scalar("SELECT portfolio_asset_id FROM portfolio_asset_reference")
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(reference_asset_id, foo_asset.0);
+
+    let unchanged_user_id: Uuid = sqlx::query_scalar("SELECT id FROM users")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(
+        unchanged_user_id,
+        Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
+    );
+    let unchanged_portfolio_id: Uuid = sqlx::query_scalar("SELECT id FROM portfolios")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(
+        unchanged_portfolio_id,
+        Uuid::parse_str("10000000-0000-0000-0000-000000000001").unwrap()
+    );
+
+    let asset_id_position: i32 = sqlx::query_scalar(
+        "SELECT ordinal_position::int
+         FROM information_schema.columns
+         WHERE table_name = 'portfolio_asset' AND column_name = 'id'",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(asset_id_position, 1);
+
+    let unique_constraint_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM pg_constraint
+             WHERE conrelid = 'portfolio_asset'::regclass
+               AND conname = 'portfolio_asset_portfolio_assets_data_key'
+         )",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert!(unique_constraint_exists);
+
+    let duplicate_insert = sqlx::query(
+        "INSERT INTO portfolio_asset (
+             id, portfolio_id, assets_data_id, quantity, target_weight
+         )
+         SELECT $1, portfolio_id, assets_data_id, quantity, target_weight
+         FROM portfolio_asset
+         WHERE id = $2",
+    )
+    .bind(Uuid::now_v7())
+    .bind(foo_asset.0)
+    .execute(&pool)
+    .await;
+    assert!(duplicate_insert.is_err());
+
+    let ids_before_rerun: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM portfolio_asset ORDER BY id")
+            .fetch_all(&pool)
+            .await?;
+
     // GIVEN a successfully applied migration, WHEN SQLx runs it again,
     // THEN it skips the recorded migration and preserves the normalized rows.
     MIGRATOR.run(&pool).await?;
@@ -88,6 +160,12 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
         .fetch_one(&pool)
         .await?;
     assert_eq!(rerun_count, 8);
+
+    let ids_after_rerun: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM portfolio_asset ORDER BY id")
+            .fetch_all(&pool)
+            .await?;
+    assert_eq!(ids_after_rerun, ids_before_rerun);
 
     let check_constraint_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)
@@ -116,6 +194,86 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
     .fetch_one(&pool)
     .await?;
     assert_eq!(uuidv7_shared_count, 8);
+
+    let portfolio_asset_default: Option<String> = sqlx::query_scalar(
+        "SELECT column_default
+         FROM information_schema.columns
+         WHERE table_name = 'portfolio_asset' AND column_name = 'id'",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(portfolio_asset_default, None);
+
+    let assets_data_default: Option<String> = sqlx::query_scalar(
+        "SELECT column_default
+         FROM information_schema.columns
+         WHERE table_name = 'assets_data' AND column_name = 'id'",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(assets_data_default, None);
+
+    Ok(())
+}
+
+#[sqlx::test(
+    migrations = false,
+    fixtures("legacy_schema", "legacy_portfolio_assets")
+)]
+async fn failed_identity_migration_rolls_back_its_changes(pool: PgPool) -> sqlx::Result<()> {
+    // GIVEN an unexpected failure while rewriting IDs, WHEN the identity
+    // migration runs, THEN its ID and dependent-reference changes roll back.
+    sqlx::query(
+        "CREATE FUNCTION reject_portfolio_asset_id_rewrite()
+         RETURNS trigger AS $$
+         BEGIN
+             RAISE EXCEPTION 'test identity rewrite failure';
+         END;
+         $$ LANGUAGE plpgsql;",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "CREATE TRIGGER reject_portfolio_asset_id_rewrite
+         BEFORE UPDATE OF id ON portfolio_asset
+         FOR EACH ROW EXECUTE FUNCTION reject_portfolio_asset_id_rewrite();",
+    )
+    .execute(&pool)
+    .await?;
+
+    assert!(MIGRATOR.run(&pool).await.is_err());
+
+    let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(migration_count, 7);
+
+    let foo_id: Uuid = sqlx::query_scalar(
+        "SELECT pa.id
+         FROM portfolio_asset AS pa
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         WHERE ad.provider = 1 AND ad.symbol = 'FOO'",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(
+        foo_id,
+        Uuid::parse_str("20000000-0000-0000-0000-000000000002").unwrap()
+    );
+    let reference_id: Uuid =
+        sqlx::query_scalar("SELECT portfolio_asset_id FROM portfolio_asset_reference")
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(reference_id, foo_id);
+
+    let child_migration_applied: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM _sqlx_migrations WHERE version = 20260827000000
+         )",
+    )
+    .fetch_one(&pool)
+    .await?;
+    assert!(!child_migration_applied);
 
     Ok(())
 }

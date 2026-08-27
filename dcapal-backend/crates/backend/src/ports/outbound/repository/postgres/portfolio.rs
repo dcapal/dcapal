@@ -326,6 +326,7 @@ impl SqlxPortfolioRepository {
         Ok(updated_assets)
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn upsert_portfolio(
         &self,
         user_id: Uuid,

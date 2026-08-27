@@ -14,16 +14,9 @@ The deployment startup script also supports the existing explicit form:
 cargo run -p migration -- up -u "$DATABASE_URL"
 ```
 
-The PostgreSQL 17 to 18 upgrade verification uses the bounded form to apply
-only migrations that PostgreSQL 17 supports before taking its dump:
-
-```sh
-DATABASE_URL="$DATABASE_URL" cargo run -p migration -- up-to -v 20260814000000
-```
-
-The following migration creates shared `assets_data` records and rewrites
-Portfolio Asset relationship IDs with PostgreSQL 18 `uuidv7()`. It must run on
-PostgreSQL 18 or newer.
+The shared asset migration creates `assets_data` records, and the following
+identity migration rewrites Portfolio Asset relationship IDs with PostgreSQL
+18 `uuidv7()`. They must run on PostgreSQL 18 or newer.
 
 The SQLx runner records its history in `_sqlx_migrations`. It does not modify
 the existing SeaORM `seaql_migrations` table. The historical up migrations are
