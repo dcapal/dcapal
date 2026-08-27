@@ -24,10 +24,7 @@ use tracing::{error, info};
 use crate::{
     app::{
         infra,
-        services::{
-            ip2location::Ip2LocationService, market_data::MarketDataService,
-            portfolio::PortfolioService,
-        },
+        services::{market_data::MarketDataService, portfolio::PortfolioService},
         workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
     config::{Config, Postgres},
@@ -82,7 +79,6 @@ pub type AppContext = Arc<AppContextInner>;
 #[derive(Clone)]
 struct Services {
     mkt_data: Arc<MarketDataService>,
-    ip2location: Option<Arc<Ip2LocationService>>,
     portfolio: Arc<PortfolioService>,
 }
 
@@ -151,21 +147,8 @@ impl DcaServer {
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
-        let ip2location = {
-            if let Some(ref service_config) = config.app.services {
-                if let Some(ref ip_config) = service_config.ip {
-                    Some(Arc::new(Ip2LocationService::try_new(&ip_config.db_path)?))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
-
         let services = Services {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
-            ip2location,
             portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
         };
 
@@ -266,7 +249,12 @@ impl DcaServer {
         describe_counter!(
             infra::stats::VISITORS_TOTAL,
             Unit::Count,
-            "Number of API visitors"
+            "Number of visits from real IP addresses"
+        );
+        describe_counter!(
+            infra::stats::UNIQUE_VISITORS_TOTAL,
+            Unit::Count,
+            "Number of unique visitors from real IP addresses"
         );
         describe_counter!(
             infra::stats::REQUESTS_TOTAL,
@@ -285,11 +273,8 @@ impl DcaServer {
         );
 
         // Refresh Prometheus stats
-        if let Err(e) = refresh_total_visitors_stats(&self.ctx.repos.stats).await {
-            error!(
-                "Failed to refresh Prometheus {} metric: {e:?}",
-                infra::stats::VISITORS_TOTAL
-            );
+        if let Err(e) = refresh_visitors_stats(&self.ctx.repos.stats).await {
+            error!("Failed to refresh Prometheus visitor metrics: {e:?}");
         }
         if let Err(e) = refresh_imported_portfolios_stats(&self.ctx.repos.stats).await {
             error!(
@@ -349,23 +334,22 @@ async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
     Ok(pool)
 }
 
-async fn refresh_total_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
+/// Restores aggregate visitor counters from the persisted per-IP visit hash.
+async fn refresh_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
     let visitors = stats_repo.fetch_all_visitors().await?;
-    for (ip, count) in visitors {
-        // Refresh Prometheus visitors location
-        let geo = stats_repo.find_visitor_ip(&ip).await?;
-        if let Some(geo) = geo {
-            counter!(
-                infra::stats::VISITORS_TOTAL,
-                &[
-                    ("ip", geo.ip),
-                    ("latitude", geo.latitude),
-                    ("longitude", geo.longitude),
-                ]
-            )
-            .increment(count as u64);
-        }
-    }
+    let (total_visits, unique_visitors) = visitors.values().fold(
+        (0_u64, 0_u64),
+        |(total_visits, unique_visitors), &visit_count| {
+            if visit_count > 0 {
+                (total_visits + visit_count as u64, unique_visitors + 1)
+            } else {
+                (total_visits, unique_visitors)
+            }
+        },
+    );
+
+    counter!(infra::stats::VISITORS_TOTAL).increment(total_visits);
+    counter!(infra::stats::UNIQUE_VISITORS_TOTAL).increment(unique_visitors);
 
     Ok(())
 }
