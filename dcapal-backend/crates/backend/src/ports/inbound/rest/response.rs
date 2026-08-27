@@ -1,6 +1,9 @@
 use rust_decimal::Decimal;
 use serde::Serialize;
-use utoipa::ToSchema;
+use utoipa::{
+    ToSchema,
+    openapi::schema::{Object, ObjectBuilder, Type},
+};
 use uuid::Uuid;
 
 use crate::{
@@ -51,10 +54,12 @@ pub struct PortfolioAssetResponse {
     /// The asset display name.
     pub name: String,
     /// The asset class.
+    #[schema(schema_with = v1_response_asset_class_schema)]
     pub aclass: String,
     /// The asset currency.
     pub base_ccy: String,
     /// The data provider for the asset.
+    #[schema(schema_with = v1_response_provider_schema)]
     pub provider: String,
     #[serde(with = "rust_decimal::serde::str")]
     /// The quantity held.
@@ -71,6 +76,35 @@ pub struct PortfolioAssetResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The asset-level transaction fee settings.
     pub fees: Option<TransactionFeesResponse>,
+}
+
+/// Documents the canonical provider names emitted by the v1 synchronization response.
+fn v1_response_provider_schema() -> Object {
+    ObjectBuilder::new()
+        .schema_type(Type::String)
+        .enum_values(Some(["DCAPal", "YF"]))
+        .description(Some(
+            "Canonical v1 provider name. Kraken-backed assets are returned as DCAPal and Yahoo Finance assets as YF.",
+        ))
+        .build()
+}
+
+/// Documents the canonical Asset Class names emitted by the v1 synchronization response.
+fn v1_response_asset_class_schema() -> Object {
+    ObjectBuilder::new()
+        .schema_type(Type::String)
+        .enum_values(Some([
+            "EQUITY",
+            "BOND",
+            "CURRENCY",
+            "CRYPTO",
+            "COMMODITY",
+            "OTHER",
+        ]))
+        .description(Some(
+            "Canonical v1 Asset Class name. Cash and Currency are returned as CURRENCY.",
+        ))
+        .build()
 }
 
 impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
@@ -295,12 +329,104 @@ mod test {
             last_updated_at: portfolio_model.last_updated_at,
         };
 
-        let actual: PortfolioResponse = (portfolio_model, assets_model).try_into().unwrap();
+        let actual: PortfolioResponse = (portfolio_model.clone(), assets_model.clone())
+            .try_into()
+            .unwrap();
         assert_eq!(actual, expected);
 
         let serialized = serde_json::to_value(&actual).unwrap();
         assert_eq!(serialized["assets"][0]["qty"], "10.0");
         assert_eq!(serialized["assets"][0]["averageBuyPrice"], "90.0");
         assert_eq!(serialized["fees"]["feeStructure"]["feeAmount"], "2.95");
+
+        let mut missing_manual_price = asset_model;
+        missing_manual_price.manual_price = None;
+        let error = PortfolioResponse::try_from((portfolio_model, vec![missing_manual_price]))
+            .expect_err("missing manual price must fail closed");
+
+        assert!(matches!(
+            error,
+            DcaError::Generic(message)
+                if message == "v1 Portfolio Asset response requires a manual price."
+        ));
+    }
+
+    #[test]
+    fn response_uses_canonical_v1_provider_and_asset_class_names() {
+        // GIVEN canonical Portfolio Asset rows for every supported class, WHEN they are projected,
+        // THEN v1 emits uppercase class names and the legacy provider aliases.
+        let portfolio_id = Uuid::new_v4();
+        let now = Utc::now();
+        let portfolio = PortfolioRow {
+            id: portfolio_id,
+            user_id: Uuid::new_v4(),
+            name: "Portfolio".to_string(),
+            currency: "EUR".to_string(),
+            deleted: false,
+            last_updated_at: now,
+            max_fee_impact: None,
+            fee_type: None,
+            fee_amount: None,
+            fee_rate: None,
+            min_fee: None,
+            max_fee: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let expected_classes = [
+            (AssetClass::Other, "OTHER"),
+            (AssetClass::Equity, "EQUITY"),
+            (AssetClass::Bond, "BOND"),
+            (AssetClass::Cash, "CURRENCY"),
+            (AssetClass::Crypto, "CRYPTO"),
+            (AssetClass::Commodity, "COMMODITY"),
+        ];
+        let assets = expected_classes
+            .iter()
+            .enumerate()
+            .map(|(index, (asset_class, _))| PortfolioAssetRow {
+                id: Uuid::new_v4(),
+                symbol: format!("ASSET{index}"),
+                portfolio_id,
+                assets_data_id: Uuid::new_v4(),
+                name: "Asset".to_string(),
+                asset_class: *asset_class,
+                asset_class_override: None,
+                currency: "EUR".to_string(),
+                provider: if index == 0 {
+                    Provider::Kraken
+                } else {
+                    Provider::YF
+                },
+                quantity: dec!(1),
+                target_weight: dec!(1),
+                manual_price: Some(dec!(100)),
+                max_fee_impact: None,
+                fee_type: None,
+                fee_amount: None,
+                fee_rate: None,
+                min_fee: None,
+                max_fee: None,
+                average_buy_price: Some(dec!(90)),
+                created_at: now,
+                updated_at: now,
+            })
+            .collect::<Vec<_>>();
+
+        let response = PortfolioResponse::try_from((portfolio, assets)).unwrap();
+
+        let actual_classes = response
+            .assets
+            .iter()
+            .map(|asset| asset.aclass.as_str())
+            .collect::<Vec<_>>();
+        let expected_classes = expected_classes
+            .iter()
+            .map(|(_, wire_name)| *wire_name)
+            .collect::<Vec<_>>();
+        assert_eq!(actual_classes, expected_classes);
+        assert_eq!(response.assets[0].provider, "DCAPal");
+        assert_eq!(response.assets[1].provider, "YF");
     }
 }

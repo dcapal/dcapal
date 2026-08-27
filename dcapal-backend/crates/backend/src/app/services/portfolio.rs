@@ -10,15 +10,13 @@ use crate::ports::{
     },
     outbound::repository::{
         portfolio::{PortfolioRepository, PortfolioRepositoryError},
-        postgres::types::Provider,
+        postgres::types::{AssetClass, Provider},
     },
 };
 
 /// Errors raised while synchronizing portfolios.
 #[derive(Debug, thiserror::Error)]
 pub enum PortfolioServiceError {
-    #[error("unsupported Portfolio Asset provider: {provider}")]
-    UnsupportedProvider { provider: String },
     #[error("portfolio cannot be updated")]
     CannotUpdate(#[source] PortfolioRepositoryError),
     #[error("portfolio repository failed")]
@@ -39,10 +37,6 @@ impl From<PortfolioRepositoryError> for PortfolioServiceError {
 impl From<PortfolioServiceError> for DcaError {
     fn from(error: PortfolioServiceError) -> Self {
         match error {
-            PortfolioServiceError::UnsupportedProvider { provider } => Self::ValidationFailure {
-                message: format!("Unsupported Portfolio Asset provider: {provider}"),
-                source: Box::new(PortfolioServiceError::UnsupportedProvider { provider }),
-            },
             PortfolioServiceError::CannotUpdate(error) => Self::ValidationFailure {
                 message: "Portfolio cannot be updated".to_string(),
                 source: Box::new(PortfolioServiceError::CannotUpdate(error)),
@@ -75,7 +69,7 @@ impl PortfolioService {
         user_id: Uuid,
         req: SyncPortfoliosRequest,
     ) -> std::result::Result<SyncPortfoliosResponse, PortfolioServiceError> {
-        validate_sync_request(&req)?;
+        let req = normalize_sync_request(req);
 
         for attempt in 0..SYNC_MAX_ATTEMPTS {
             match self.sync_once(user_id, &req).await {
@@ -185,18 +179,22 @@ impl PortfolioServiceError {
     }
 }
 
-fn validate_sync_request(req: &SyncPortfoliosRequest) -> Result<(), PortfolioServiceError> {
-    for portfolio in &req.portfolios {
-        for asset in &portfolio.assets {
-            if Provider::from_legacy(&asset.provider).is_none() {
-                return Err(PortfolioServiceError::UnsupportedProvider {
-                    provider: asset.provider.clone(),
-                });
-            }
-        }
+fn normalize_sync_request(mut req: SyncPortfoliosRequest) -> SyncPortfoliosRequest {
+    for portfolio in &mut req.portfolios {
+        portfolio.assets.retain_mut(|asset| {
+            let Some(provider) = Provider::from_legacy(&asset.provider) else {
+                return false;
+            };
+
+            asset.provider = provider.as_legacy_name().to_string();
+            asset.aclass = AssetClass::from_legacy(&asset.aclass)
+                .as_legacy_name()
+                .to_string();
+            true
+        });
     }
 
-    Ok(())
+    req
 }
 
 #[cfg(test)]
@@ -205,7 +203,7 @@ mod tests {
         borrow::Cow,
         error::Error as StdError,
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicUsize, Ordering},
         },
     };
@@ -264,6 +262,7 @@ mod tests {
         failures_before_success: usize,
         error_code: &'static str,
         upsert_attempts: AtomicUsize,
+        last_upserted_portfolio: Mutex<Option<PortfolioRequest>>,
     }
 
     impl RetryRepository {
@@ -272,6 +271,7 @@ mod tests {
                 failures_before_success,
                 error_code,
                 upsert_attempts: AtomicUsize::new(0),
+                last_upserted_portfolio: Mutex::new(None),
             }
         }
     }
@@ -303,6 +303,7 @@ mod tests {
             PortfolioRow,
             Vec<PortfolioAssetRow>,
         )> {
+            *self.last_upserted_portfolio.lock().unwrap() = Some(portfolio.clone());
             let attempt = self.upsert_attempts.fetch_add(1, Ordering::Relaxed) + 1;
             if attempt <= self.failures_before_success {
                 return Err(PortfolioRepositoryError::Database(sqlx::Error::Database(
@@ -361,37 +362,57 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_provider_is_rejected_before_repository_access() {
-        // GIVEN a sync request with an unsupported provider, WHEN it is validated,
-        // THEN the service returns a client-validation error with the provider name.
-        let request = SyncPortfoliosRequest {
-            portfolios: vec![PortfolioRequest {
-                id: Uuid::new_v4(),
-                name: "Portfolio".to_string(),
-                quote_ccy: "EUR".to_string(),
-                fees: None,
-                assets: vec![PortfolioAssetRequest {
-                    symbol: "VWCE".to_string(),
-                    name: "Asset".to_string(),
-                    aclass: "EQUITY".to_string(),
-                    base_ccy: "EUR".to_string(),
-                    provider: "IBKR".to_string(),
-                    qty: Decimal::ONE,
-                    target_weight: Decimal::ONE,
-                    price: Decimal::ONE,
-                    average_buy_price: Decimal::ONE,
-                    fees: None,
-                }],
-                last_updated_at: Utc::now(),
-            }],
-            deleted_portfolios: Vec::new(),
-        };
+    fn sync_normalization_maps_aliases_and_drops_unsupported_assets() {
+        // GIVEN a sync request with mixed-case aliases and an unsupported provider,
+        // WHEN the request is normalized, THEN supported assets use canonical v1 names
+        // and unsupported assets are removed.
+        let mut request = valid_request();
+        request.portfolios[0].assets.push(PortfolioAssetRequest {
+            symbol: "BTC".to_string(),
+            name: "Bitcoin".to_string(),
+            aclass: "cash".to_string(),
+            base_ccy: "EUR".to_string(),
+            provider: "kRaKeN".to_string(),
+            qty: Decimal::ONE,
+            target_weight: Decimal::ONE,
+            price: Decimal::ONE,
+            average_buy_price: Decimal::ONE,
+            fees: None,
+        });
+        request.portfolios[0].assets.push(PortfolioAssetRequest {
+            symbol: "SPY".to_string(),
+            name: "S&P 500".to_string(),
+            aclass: "EQUITY".to_string(),
+            base_ccy: "USD".to_string(),
+            provider: "IBKR".to_string(),
+            qty: Decimal::ONE,
+            target_weight: Decimal::ONE,
+            price: Decimal::ONE,
+            average_buy_price: Decimal::ONE,
+            fees: None,
+        });
 
-        assert!(matches!(
-            validate_sync_request(&request),
-            Err(PortfolioServiceError::UnsupportedProvider { provider })
-                if provider == "IBKR"
-        ));
+        let normalized = normalize_sync_request(request);
+        let assets = &normalized.portfolios[0].assets;
+
+        assert_eq!(assets.len(), 2);
+        assert_eq!(assets[0].provider, "YF");
+        assert_eq!(assets[0].aclass, "EQUITY");
+        assert_eq!(assets[1].provider, "DCAPal");
+        assert_eq!(assets[1].aclass, "CURRENCY");
+    }
+
+    #[test]
+    fn sync_normalization_retains_portfolios_when_all_assets_are_unsupported() {
+        // GIVEN a portfolio containing only unsupported providers, WHEN the sync request
+        // is normalized, THEN the portfolio remains with an empty asset set.
+        let mut request = valid_request();
+        request.portfolios[0].assets[0].provider = "IBKR".to_string();
+
+        let normalized = normalize_sync_request(request);
+
+        assert_eq!(normalized.portfolios.len(), 1);
+        assert!(normalized.portfolios[0].assets.is_empty());
     }
 
     #[tokio::test]
@@ -408,6 +429,65 @@ mod tests {
             .expect("third attempt should succeed");
 
         assert_eq!(attempts.load(Ordering::Relaxed), 3);
+    }
+
+    #[tokio::test]
+    async fn sync_sends_only_supported_normalized_assets_to_repository() {
+        // GIVEN a sync request with valid and unsupported assets, WHEN the service synchronizes it,
+        // THEN the repository receives the portfolio with only canonical supported assets.
+        let repository = Arc::new(RetryRepository::new(0, "23505"));
+        let mut request = valid_request();
+        request.portfolios[0].assets.push(PortfolioAssetRequest {
+            symbol: "BTC".to_string(),
+            name: "Bitcoin".to_string(),
+            aclass: "CURRENCY".to_string(),
+            base_ccy: "EUR".to_string(),
+            provider: "IBKR".to_string(),
+            qty: Decimal::ONE,
+            target_weight: Decimal::ZERO,
+            price: Decimal::ONE,
+            average_buy_price: Decimal::ONE,
+            fees: None,
+        });
+        let service = PortfolioService::new(repository.clone());
+
+        service
+            .sync_portfolios(Uuid::new_v4(), request)
+            .await
+            .expect("supported assets should synchronize");
+
+        let synced = repository
+            .last_upserted_portfolio
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("repository should receive a portfolio");
+        assert_eq!(synced.assets.len(), 1);
+        assert_eq!(synced.assets[0].provider, "YF");
+        assert_eq!(synced.assets[0].aclass, "EQUITY");
+    }
+
+    #[tokio::test]
+    async fn sync_sends_an_empty_portfolio_when_all_assets_are_unsupported() {
+        // GIVEN a portfolio whose assets all use unsupported providers, WHEN it synchronizes,
+        // THEN the repository receives the parent portfolio with an empty asset list.
+        let repository = Arc::new(RetryRepository::new(0, "23505"));
+        let mut request = valid_request();
+        request.portfolios[0].assets[0].provider = "IBKR".to_string();
+        let service = PortfolioService::new(repository.clone());
+
+        service
+            .sync_portfolios(Uuid::new_v4(), request)
+            .await
+            .expect("empty portfolio should synchronize");
+
+        let synced = repository
+            .last_upserted_portfolio
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("repository should receive a portfolio");
+        assert!(synced.assets.is_empty());
     }
 
     #[tokio::test]
