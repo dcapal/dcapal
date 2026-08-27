@@ -23,7 +23,6 @@ impl Scenario {
     pub fn split(self) -> (JsProblemOptions, Expect) {
         let expect = self.expect;
         let options = match self.algorithm {
-            Algorithm::Basic => todo!(),
             Algorithm::Advanced => {
                 let budget = self.budget.to_f64().unwrap();
                 let assets = self
@@ -51,7 +50,6 @@ impl Scenario {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Algorithm {
-    Basic,
     Advanced,
 }
 
