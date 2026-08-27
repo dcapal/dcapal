@@ -6,7 +6,11 @@ const startNewPortfolio = async (
   currency = "eur"
 ): Promise<void> => {
   await page.goto("/");
-  await page.getByTestId("importStep.allocateYourSavings").first().click();
+  const allocateButton = page
+    .getByTestId("importStep.allocateYourSavings")
+    .first();
+  await expect(allocateButton).toHaveCSS("cursor", "pointer");
+  await allocateButton.click();
 
   const form = page.getByTestId("new-portfolio-form");
   await expect(form).toBeVisible();
