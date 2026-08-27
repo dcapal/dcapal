@@ -28,7 +28,7 @@ impl Provider {
     /// Returns the v1 synchronization provider name for this canonical provider.
     pub const fn as_legacy_name(self) -> &'static str {
         match self {
-            Self::Kraken => "Kraken",
+            Self::Kraken => "DCAPal",
             Self::YF => "YF",
         }
     }
@@ -55,18 +55,25 @@ pub enum AssetClass {
 impl AssetClass {
     /// Converts a legacy synchronization Asset Class into canonical storage.
     pub fn from_legacy(value: &str) -> Self {
+        Self::normalize_legacy(value).unwrap_or(Self::Other)
+    }
+
+    /// Converts a recognized legacy Asset Class name into its canonical class.
+    pub fn normalize_legacy(value: &str) -> Option<Self> {
         if value.eq_ignore_ascii_case("equity") {
-            Self::Equity
+            Some(Self::Equity)
         } else if value.eq_ignore_ascii_case("bond") {
-            Self::Bond
+            Some(Self::Bond)
         } else if value.eq_ignore_ascii_case("currency") || value.eq_ignore_ascii_case("cash") {
-            Self::Cash
+            Some(Self::Cash)
         } else if value.eq_ignore_ascii_case("crypto") {
-            Self::Crypto
+            Some(Self::Crypto)
         } else if value.eq_ignore_ascii_case("commodity") {
-            Self::Commodity
+            Some(Self::Commodity)
+        } else if value.eq_ignore_ascii_case("other") {
+            Some(Self::Other)
         } else {
-            Self::Other
+            None
         }
     }
 
@@ -178,13 +185,50 @@ mod tests {
     }
 
     #[test]
-    fn legacy_values_map_to_canonical_codes() {
-        // GIVEN legacy provider and Asset Class names, WHEN storage values are derived,
-        // THEN known aliases use canonical codes and unsupported names use the stated policy.
-        assert_eq!(Provider::from_legacy("DCAPal"), Some(Provider::Kraken));
-        assert_eq!(Provider::from_legacy("Yahoo"), Some(Provider::YF));
+    fn legacy_provider_aliases_are_case_insensitive() {
+        // GIVEN every supported legacy provider alias in mixed casing, WHEN it is normalized,
+        // THEN it maps to the canonical provider and v1 response name.
+        let aliases = [
+            ("dCaPaL", Provider::Kraken, "DCAPal"),
+            ("kRaKeN", Provider::Kraken, "DCAPal"),
+            ("yF", Provider::YF, "YF"),
+            ("YaHoO", Provider::YF, "YF"),
+        ];
+
+        for (value, expected, wire_name) in aliases {
+            assert_eq!(Provider::from_legacy(value), Some(expected));
+            assert_eq!(expected.as_legacy_name(), wire_name);
+        }
+
         assert_eq!(Provider::from_legacy("IBKR"), None);
+    }
+
+    #[test]
+    fn legacy_values_map_to_canonical_codes() {
+        // GIVEN a legacy Asset Class name, WHEN storage values are derived,
+        // THEN known aliases use canonical codes and unsupported names use the stated policy.
+        assert_eq!(Provider::Kraken.as_legacy_name(), "DCAPal");
         assert_eq!(AssetClass::from_legacy("CURRENCY"), AssetClass::Cash);
         assert_eq!(AssetClass::from_legacy("unclassified"), AssetClass::Other);
+    }
+
+    #[test]
+    fn legacy_asset_class_aliases_are_case_insensitive() {
+        // GIVEN supported legacy Asset Class aliases in different casing, WHEN they are normalized,
+        // THEN each alias maps to the canonical class used by v1.
+        let aliases = [
+            ("equity", AssetClass::Equity, "EQUITY"),
+            ("Bond", AssetClass::Bond, "BOND"),
+            ("cash", AssetClass::Cash, "CURRENCY"),
+            ("Currency", AssetClass::Cash, "CURRENCY"),
+            ("crypto", AssetClass::Crypto, "CRYPTO"),
+            ("COMMODITY", AssetClass::Commodity, "COMMODITY"),
+            ("other", AssetClass::Other, "OTHER"),
+        ];
+
+        for (value, expected, wire_name) in aliases {
+            assert_eq!(AssetClass::normalize_legacy(value), Some(expected));
+            assert_eq!(expected.as_legacy_name(), wire_name);
+        }
     }
 }
