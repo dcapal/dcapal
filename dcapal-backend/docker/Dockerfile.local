@@ -1,0 +1,68 @@
+# syntax=docker/dockerfile:1.7
+
+# Local images favour a quick, debuggable build. Production keeps using the
+# release Dockerfile and its release-with-debug profile.
+FROM rust:1.97.1-bookworm AS chef
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    cargo install cargo-chef
+WORKDIR /var/dcapal
+
+FROM chef AS planner
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
+COPY ./dcapal-backend ./dcapal-backend
+COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /var/dcapal/recipe.json recipe.json
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+      build-essential \
+      cmake \
+      git \
+      libclang-dev \
+      musl-tools \
+      perl \
+      pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# The local image deliberately uses the dev profile so editing the backend
+# does not pay for release LTO during UI iteration.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/var/dcapal/target \
+    cargo chef cook --profile dev --recipe-path recipe.json
+
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
+COPY ./dcapal-backend ./dcapal-backend
+COPY ./dcapal-optimizer-wasm ./dcapal-optimizer-wasm
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/var/dcapal/target \
+    cargo build --profile dev --bin dcapal-backend --bin migration \
+    && mkdir -p /var/dcapal/output \
+    && cp /var/dcapal/target/debug/dcapal-backend /var/dcapal/output/dcapal-backend \
+    && cp /var/dcapal/target/debug/migration /var/dcapal/output/migration
+
+FROM debian:bookworm-slim AS runtime
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+      ca-certificates \
+      curl \
+      jq \
+      libssl3 \
+      postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/dcapal/dcapal-backend
+RUN mkdir -p bin data/dcapal
+COPY --from=builder /var/dcapal/output/dcapal-backend ./bin/dcapal-backend
+COPY --from=builder /var/dcapal/output/migration ./bin/migration
+COPY ./dcapal-backend/scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
+ENTRYPOINT ["./start.sh"]
