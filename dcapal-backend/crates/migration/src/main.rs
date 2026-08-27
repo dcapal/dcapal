@@ -1,7 +1,7 @@
 use std::env;
 
 use anyhow::{Context, Result, bail};
-use migration::MIGRATOR;
+use migration::run_migrations;
 use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
@@ -12,11 +12,7 @@ async fn main() -> Result<()> {
         .await
         .with_context(|| format!("failed to connect to PostgreSQL at {database_url}"))?;
 
-    if let Some(target_version) = target_version {
-        MIGRATOR.run_to(target_version, &pool).await?;
-    } else {
-        MIGRATOR.run(&pool).await?;
-    }
+    run_migrations(&pool, target_version).await?;
     pool.close().await;
 
     Ok(())

@@ -1,5 +1,6 @@
--- Rewrite existing Portfolio Asset identifiers after the shared-asset
--- migration has removed duplicate relationships.
+-- Rewrite any existing Portfolio Asset identifiers that the shared-asset
+-- migration did not already rewrite. This keeps the migration compatible with
+-- databases where 20260826000000 was applied before this migration existed.
 CREATE TEMP TABLE portfolio_asset_id_map (
     old_id UUID PRIMARY KEY,
     new_id UUID NOT NULL UNIQUE
@@ -7,7 +8,8 @@ CREATE TEMP TABLE portfolio_asset_id_map (
 
 INSERT INTO portfolio_asset_id_map (old_id, new_id)
 SELECT id, uuidv7()
-FROM portfolio_asset;
+FROM portfolio_asset
+WHERE SUBSTRING(id::text FROM 15 FOR 1) <> '7';
 
 CREATE TEMP TABLE portfolio_asset_fk_definitions (
     child_schema NAME NOT NULL,

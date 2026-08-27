@@ -69,4 +69,5 @@ CREATE TABLE portfolio_asset_reference (
     portfolio_asset_id UUID NOT NULL,
     CONSTRAINT fk_portfolio_asset_reference_asset
         FOREIGN KEY (portfolio_asset_id) REFERENCES portfolio_asset (id)
+        ON UPDATE CASCADE
 );
