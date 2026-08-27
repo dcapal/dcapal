@@ -84,25 +84,36 @@ test("an investor edits quantities, prices, and allocation weights", async ({
   );
 
   const mwrHelp = page.getByRole("button", { name: "MWR" });
-  const tooltip = page.getByRole("tooltip");
   await expect(mwrHelp).toHaveCSS("cursor", "pointer");
-  await mwrHelp.click();
-  await expect(tooltip).toBeVisible({ timeout: 500 });
-  await expect(mwrHelp).toHaveAttribute("aria-expanded", "true");
-  await mwrHelp.click();
-  await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
-  await expect(tooltip).toBeHidden();
-  await page.mouse.move(40, 120);
-  await mwrHelp.hover();
-  await expect(tooltip).toBeVisible({ timeout: 500 });
-  await page.keyboard.press("Escape");
-  await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
-  await expect(tooltip).toBeHidden();
-  await mwrHelp.click();
-  await expect(tooltip).toBeVisible({ timeout: 500 });
-  await page.mouse.click(40, 120);
-  await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
-  await expect(tooltip).toBeHidden();
+  if ((page.viewportSize()?.width ?? 1024) < 768) {
+    const helpDrawer = page.getByRole("dialog");
+    await mwrHelp.click();
+    await expect(helpDrawer).toBeVisible();
+    await expect(helpDrawer).toContainText(
+      /Money-Weighted Return|Rendimento ponderato/
+    );
+    await page.keyboard.press("Escape");
+    await expect(helpDrawer).toBeHidden();
+  } else {
+    const tooltip = page.getByRole("tooltip");
+    await mwrHelp.click();
+    await expect(tooltip).toBeVisible({ timeout: 500 });
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "true");
+    await mwrHelp.click();
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
+    await expect(tooltip).toBeHidden();
+    await page.mouse.move(40, 120);
+    await mwrHelp.hover();
+    await expect(tooltip).toBeVisible({ timeout: 500 });
+    await page.keyboard.press("Escape");
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
+    await expect(tooltip).toBeHidden();
+    await mwrHelp.click();
+    await expect(tooltip).toBeVisible({ timeout: 500 });
+    await page.mouse.click(40, 120);
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
+    await expect(tooltip).toBeHidden();
+  }
 
   const equity = page.locator('[data-testid="asset-card"][data-symbol="VWCE"]');
   const bond = page.locator('[data-testid="asset-card"][data-symbol="AGGH"]');
