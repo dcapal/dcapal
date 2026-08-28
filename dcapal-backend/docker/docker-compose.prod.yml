@@ -1,4 +1,8 @@
 services:
+  redis:
+    volumes:
+      - ./data/redis:/data
+
   dcapal:
     image: leonardoarcari/dcapal:latest
     restart: always

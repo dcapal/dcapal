@@ -38,42 +38,52 @@ You can start using [DcaPal](https://dcapal.com) right away. It's free. No regis
 DcaPal does not store any user data. But if you are still concerned for your privacy, you can build and run it on your
 machine.
 
-**Start the local application environment**
+**Run the local application environment**
 
-`make local-up` starts the local Supabase Auth stack, renders the ignored
-backend configuration with its JWT signing keys, and starts the TimescaleDB,
-Redis, and DcaPal containers. Supabase's PostgreSQL instance is not used for
-DcaPal migrations or application data.
+The first run bootstraps the pinned Supabase and WASM tools, installs the
+workspace dependencies, creates ignored local configuration, starts Supabase,
+Redis, and TimescaleDB, and applies migrations. Later runs reuse the generated
+package, dependencies, database volume, and build caches.
+
+Choose the backend process that matches your work:
 
 ```bash
+# Fast path: run Rust on the host
 make local-up
+
+# Host backend plus frontend at http://localhost:3000
+make local-up-ui
+
+# Build dcapal-backend:local and run it in Compose
+make local-docker-up
+
+# Docker backend plus frontend at http://localhost:3000
+make local-docker-up-ui
 ```
 
-(Note: if you're using a Mac with an ARM processor, you should replace (in the docker-compose dev file) Cadvisor's image
-version with gcr.io/cadvisor/cadvisor:v0.47.1 and set platform: linux/aarch64)
+No configuration from another checkout is required. The helper creates
+`dcapal-backend/docker/local.env` from the committed example and renders the
+backend configuration for either host or container networking.
 
-**Run DcaPal frontend**
-
-Build DcaPal Optimizer
+Stop or reset the local environment with:
 
 ```bash
-cd dcapal-optimizer-wasm/crates/optimizer
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-wasm-pack build --release --out-dir ../../pkg
+make local-down              # host backend mode
+make local-docker-down       # Docker backend mode
+make local-reset             # remove this worktree's local volumes and containers
+make local-doctor             # check prerequisites
 ```
 
-Install JavaScript dependencies from the repository root. The optimizer build must happen first because the frontend uses its generated package as a local dependency.
+Observability is optional and Grafana uses port 3001:
 
 ```bash
-cd ../../..
-pnpm install --frozen-lockfile
+make local-observability-up
+make local-observability-down
 ```
 
-Run frontend server
-
-```bash
-pnpm frontend:dev
-```
+The application database is separate from Supabase's PostgreSQL instance.
+Supabase provides local authentication and its signing keys; DcaPal data and
+migrations use the TimescaleDB Compose service.
 
 ## Architecture
 

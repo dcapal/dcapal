@@ -8,6 +8,11 @@ TODO.md
 .DS_Store
 **/coverage/
 dcapal-frontend/test-results/
+.local/
+.pnpm-store/
+**/.env.local
+**/supabase.env
+**/local.env
 
 # ExecPlans are local working documents and must not be committed.
 docs/exec-plans/

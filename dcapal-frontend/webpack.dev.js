@@ -4,6 +4,8 @@ const common = require("./webpack.common.js");
 const path = require("path");
 
 const isE2eMode = process.env.REACT_APP_E2E_MSW === "1";
+const backendPort = process.env.BACKEND_PORT || "8080";
+const frontendPort = Number(process.env.FRONTEND_PORT || "3000");
 
 module.exports = (env, argv) =>
   merge(common(env, argv), {
@@ -17,7 +19,7 @@ module.exports = (env, argv) =>
       hot: !isE2eMode,
       liveReload: !isE2eMode,
       allowedHosts: "all",
-      port: 3000,
+      port: frontendPort,
       historyApiFallback: true,
       hot: true,
       proxy: [
@@ -35,7 +37,7 @@ module.exports = (env, argv) =>
         },
         {
           context: ["/api"],
-          target: "http://0.0.0.0:8080",
+          target: `http://127.0.0.1:${backendPort}`,
           pathRewrite: { "^/api": "" },
           changeOrigin: true,
         },
