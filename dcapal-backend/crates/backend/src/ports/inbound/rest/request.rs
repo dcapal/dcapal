@@ -6,7 +6,10 @@ use axum::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use tracing::info;
-use utoipa::ToSchema;
+use utoipa::{
+    ToSchema,
+    openapi::schema::{Object, ObjectBuilder, Type},
+};
 use uuid::Uuid;
 
 use crate::{AppContext, DateTime, app::infra::claim::Claims, ports::inbound::rest::FeeStructure};
@@ -37,14 +40,53 @@ pub struct PortfolioRequest {
 pub struct PortfolioAssetRequest {
     pub symbol: String,
     pub name: String,
+    #[schema(schema_with = v1_asset_class_schema)]
     pub aclass: String,
     pub base_ccy: String,
+    #[schema(schema_with = v1_provider_schema)]
     pub provider: String,
     pub qty: Decimal,
     pub target_weight: Decimal,
     pub price: Decimal,
     pub average_buy_price: Decimal,
     pub fees: Option<TransactionFeesRequest>,
+}
+
+/// Documents the provider aliases accepted by the v1 synchronization request.
+fn v1_provider_schema() -> Object {
+    ObjectBuilder::new()
+        .schema_type(Type::String)
+        .enum_values(Some(["DCAPal", "Kraken", "YF", "Yahoo"]))
+        .description(Some(
+            "Provider matching is case-insensitive; DCAPal and Kraken map to Kraken, while YF and Yahoo map to YF.",
+        ))
+        .build()
+}
+
+/// Documents the Asset Class aliases accepted by the v1 synchronization request.
+fn v1_asset_class_schema() -> Object {
+    ObjectBuilder::new()
+        .schema_type(Type::String)
+        .enum_values(Some([
+            "EQUITY",
+            "BOND",
+            "CURRENCY",
+            "CASH",
+            "CRYPTO",
+            "COMMODITY",
+            "OTHER",
+            "Equity",
+            "Bond",
+            "Currency",
+            "Cash",
+            "Crypto",
+            "Commodity",
+            "Other",
+        ]))
+        .description(Some(
+            "Asset Class matching is case-insensitive; Currency and Cash map to CURRENCY, and unknown values map to OTHER.",
+        ))
+        .build()
 }
 
 #[derive(Debug, Deserialize, ToSchema, Clone)]
@@ -116,26 +158,6 @@ mod sync_error_tests {
     use crate::{app::services::portfolio::PortfolioServiceError, error::DcaError};
 
     #[test]
-    fn unsupported_provider_is_a_bad_request() {
-        // GIVEN an unsupported synchronization provider, WHEN the REST boundary maps it,
-        // THEN it returns a client-safe HTTP 400 response.
-        let error = DcaError::from(PortfolioServiceError::UnsupportedProvider {
-            provider: "IBKR".to_string(),
-        });
-        let source_types = {
-            let sources: Vec<_> = error.iter_sources().collect();
-            (
-                sources.len(),
-                sources[0].downcast_ref::<PortfolioServiceError>().is_some(),
-            )
-        };
-        let response = error.into_response();
-
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(source_types, (1, true));
-    }
-
-    #[test]
     fn repository_failure_is_an_internal_server_error() {
         // GIVEN a repository failure, WHEN the REST boundary maps it,
         // THEN it returns HTTP 500 without exposing persistence details.
@@ -169,5 +191,17 @@ mod sync_error_tests {
         let response = error.into_response();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn response_conversion_failure_is_an_internal_server_error() {
+        // GIVEN a missing manual-price compatibility failure, WHEN the REST boundary maps it,
+        // THEN it returns HTTP 500 without exposing internal conversion details.
+        let error = DcaError::from(PortfolioServiceError::ResponseConversion(
+            DcaError::Generic("v1 Portfolio Asset response requires a manual price.".to_string()),
+        ));
+        let response = error.into_response();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

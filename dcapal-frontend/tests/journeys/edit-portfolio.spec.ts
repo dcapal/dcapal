@@ -50,6 +50,71 @@ test("an investor edits quantities, prices, and allocation weights", async ({
   });
   await page.goto("/allocate");
 
+  await expect(page.getByTestId("portfolio-search")).toHaveCSS(
+    "background-color",
+    "rgb(255, 255, 255)"
+  );
+  await expect(page.getByTestId("portfolio-search")).toHaveCSS(
+    "font-size",
+    "16px"
+  );
+  await expect(page.getByTestId("portfolio-search")).toHaveCSS(
+    "padding-top",
+    "0px"
+  );
+  await expect(page.getByTestId("portfolio-search")).toHaveCSS(
+    "padding-bottom",
+    "0px"
+  );
+  await expect(page.getByTestId("portfolio-preferences")).toHaveCSS(
+    "cursor",
+    "pointer"
+  );
+  await expect(page.locator("button:has(svg.lucide-save)")).toHaveCSS(
+    "cursor",
+    "pointer"
+  );
+  await expect(page.getByRole("button", { name: "Go back" })).toHaveCSS(
+    "cursor",
+    "pointer"
+  );
+  await expect(page.getByRole("button", { name: "Confirm weights" })).toHaveCSS(
+    "cursor",
+    "pointer"
+  );
+
+  const mwrHelp = page.getByRole("button", { name: "MWR" });
+  await expect(mwrHelp).toHaveCSS("cursor", "pointer");
+  if ((page.viewportSize()?.width ?? 1024) < 768) {
+    const helpDrawer = page.getByRole("dialog");
+    await mwrHelp.click();
+    await expect(helpDrawer).toBeVisible();
+    await expect(helpDrawer).toContainText(
+      /Money-Weighted Return|Rendimento ponderato/
+    );
+    await page.keyboard.press("Escape");
+    await expect(helpDrawer).toBeHidden();
+  } else {
+    const tooltip = page.getByRole("tooltip");
+    await mwrHelp.click();
+    await expect(tooltip).toBeVisible({ timeout: 500 });
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "true");
+    await mwrHelp.click();
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
+    await expect(tooltip).toBeHidden();
+    await page.mouse.move(40, 120);
+    await mwrHelp.hover();
+    await expect(tooltip).toBeVisible({ timeout: 500 });
+    await page.keyboard.press("Escape");
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
+    await expect(tooltip).toBeHidden();
+    await mwrHelp.click();
+    await expect(tooltip).toBeVisible({ timeout: 500 });
+    await page.mouse.click(40, 120);
+    await expect(mwrHelp).toHaveAttribute("aria-expanded", "false");
+    await expect(tooltip).toBeHidden();
+  }
+
   const equity = page.locator('[data-testid="asset-card"][data-symbol="VWCE"]');
   const bond = page.locator('[data-testid="asset-card"][data-symbol="AGGH"]');
   await expect(equity).toBeVisible();
@@ -94,6 +159,10 @@ test("the editor distinguishes under, exact, and over allocation", async ({
   await expect(
     page.getByRole("button", { name: "Confirm weights" })
   ).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Confirm weights" })).toHaveCSS(
+    "cursor",
+    "not-allowed"
+  );
 
   await equity.getByRole("spinbutton").nth(2).fill("40");
   await equity.getByRole("spinbutton").nth(2).blur();

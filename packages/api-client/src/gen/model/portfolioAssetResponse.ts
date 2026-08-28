@@ -4,6 +4,8 @@
  * DCA-Pal APIs
  * OpenAPI spec version: 0.9.0
  */
+import type { PortfolioAssetResponseAclass } from './portfolioAssetResponseAclass';
+import type { PortfolioAssetResponseProvider } from './portfolioAssetResponseProvider';
 import type { TransactionFeesResponse } from './transactionFeesResponse';
 
 /**
@@ -12,8 +14,8 @@ import type { TransactionFeesResponse } from './transactionFeesResponse';
  * Decimal values are serialized as JSON strings to preserve precision.
  */
 export interface PortfolioAssetResponse {
-  /** The asset class. */
-  aclass: string;
+  /** Canonical v1 Asset Class name. Cash and Currency are returned as CURRENCY. */
+  aclass: PortfolioAssetResponseAclass;
   /** The average price paid for the holding. */
   averageBuyPrice: string;
   /** The asset currency. */
@@ -23,8 +25,8 @@ export interface PortfolioAssetResponse {
   name: string;
   /** The latest known price. */
   price: string;
-  /** The data provider for the asset. */
-  provider: string;
+  /** Canonical v1 provider name. Kraken-backed assets are returned as DCAPal and Yahoo Finance assets as YF. */
+  provider: PortfolioAssetResponseProvider;
   /** The quantity held. */
   qty: string;
   /** The provider symbol for the asset. */

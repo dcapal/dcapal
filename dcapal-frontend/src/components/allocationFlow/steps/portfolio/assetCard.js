@@ -264,9 +264,10 @@ export const AssetCard = ({
         </div>
       )}
       <div className="w-full mt-4 flex flex-col gap-3">
-        <div
+        <button
+          type="button"
           data-testid="transaction-fees"
-          className="flex gap-1 items-center font-light text-xs"
+          className="inline-flex self-start appearance-none border-0 bg-transparent p-0 text-left gap-1 items-center font-light text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           {...getToggleProps()}
         >
           <span
@@ -277,7 +278,7 @@ export const AssetCard = ({
             {">"}
           </span>
           <span>{t("assetCard.transactionFees")}</span>
-        </div>
+        </button>
         <div
           className="w-full flex flex-col gap-1 justify-start text-sm"
           {...getCollapseProps()}

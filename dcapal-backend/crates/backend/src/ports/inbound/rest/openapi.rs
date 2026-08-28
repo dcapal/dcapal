@@ -249,6 +249,66 @@ mod tests {
         assert_no_local_schema_refs(schema);
     }
 
+    #[test]
+    fn v1_schemas_document_legacy_aliases_and_canonical_outputs() {
+        // GIVEN the generated v1 OpenAPI document, WHEN compatibility schemas are inspected,
+        // THEN requests document accepted aliases and responses document canonical spellings.
+        let (_, openapi) = super::super::build_openapi_router();
+        let openapi = openapi_value(&openapi).expect("serialize openapi");
+
+        let request_asset = &openapi["components"]["schemas"]["PortfolioAssetRequest"];
+        assert_enum_contains(
+            &request_asset["properties"]["provider"],
+            &["DCAPal", "Kraken", "YF", "Yahoo"],
+        );
+        assert_enum_contains(
+            &request_asset["properties"]["aclass"],
+            &[
+                "EQUITY",
+                "BOND",
+                "CURRENCY",
+                "CASH",
+                "CRYPTO",
+                "COMMODITY",
+                "OTHER",
+            ],
+        );
+        assert!(
+            request_asset["properties"]["provider"]["description"]
+                .as_str()
+                .expect("provider description")
+                .contains("case-insensitive")
+        );
+
+        let response_asset = &openapi["components"]["schemas"]["PortfolioAssetResponse"];
+        assert_enum_contains(&response_asset["properties"]["provider"], &["DCAPal", "YF"]);
+        assert_enum_contains(
+            &response_asset["properties"]["aclass"],
+            &["EQUITY", "BOND", "CURRENCY", "CRYPTO", "COMMODITY", "OTHER"],
+        );
+
+        let sync = &openapi["paths"]["/v1/sync/portfolios"]["post"];
+        assert!(sync["responses"].get("200").is_some());
+        assert!(sync["responses"].get("400").is_some());
+
+        let import = &openapi["paths"]["/import/portfolio"]["post"];
+        assert!(import["responses"].get("201").is_some());
+        assert!(import["responses"].get("400").is_some());
+    }
+
+    fn assert_enum_contains(schema: &Value, expected: &[&str]) {
+        let actual = schema["enum"]
+            .as_array()
+            .expect("schema enum")
+            .iter()
+            .map(|value| value.as_str().expect("string enum value"))
+            .collect::<Vec<_>>();
+
+        for value in expected {
+            assert!(actual.contains(value), "missing enum value {value}");
+        }
+    }
+
     fn assert_no_local_schema_refs(value: &Value) {
         match value {
             Value::Array(items) => {
