@@ -1,26 +1,30 @@
 # DcaPal Frontend
 
-Set up the [local Supabase environment](https://supabase.com/docs/guides/local-development):
+The complete local setup is managed from the repository root. It bootstraps the
+optimizer and JavaScript dependencies, starts local Supabase and the backend,
+and passes the generated Supabase URL and anonymous key to the frontend.
+
+For the normal UI development loop, run:
 
 ```shell
-make supabase-up
+make local-up-ui
 ```
 
-Once the docker instance is started, copy the displayed anon key and replace the `VITE_SUPABASE_ANON_KEY` in the
-`.env`
-file.
-
-```dotenv
-REACT_APP_ENABLE_COOKIE_BUTTON=0
-VITE_SUPABASE_URL=http://127.0.0.1:54321
-VITE_SUPABASE_ANON_KEY=<anon_key>
-```
-
-From the repository root, build the local optimizer package, install the workspace dependencies, and run the frontend server:
+The frontend is available at `http://localhost:3000`. The Docker backend mode
+uses the same frontend command and URL:
 
 ```shell
-(cd dcapal-optimizer-wasm/crates/optimizer && wasm-pack build --dev --out-dir ../../pkg)
-pnpm install --frozen-lockfile
+make local-docker-up-ui
+```
+
+The frontend watcher uses polling by default for reliable operation in fresh
+worktrees and environments with a low file-descriptor limit. Set
+`CHOKIDAR_USEPOLLING=false` when native watching is known to work.
+
+To run only the frontend against an already-running backend, first run
+`make bootstrap-local`, then:
+
+```shell
 pnpm frontend:dev
 ```
 
@@ -44,20 +48,22 @@ These smoke tests do not require local backend containers.
 
 The full-stack browser smoke uses the browser, local Supabase Auth, the
 frontend development server, the backend container, and the TimescaleDB Compose
-service.
-Start the local full stack with one command. It starts Supabase, reads its
-signing keys, renders the ignored backend `dcapal.yml`, and starts the
-TimescaleDB, Redis, and backend containers:
+service. Start the Docker-backed full stack with:
 
 ```shell
-make local-up
+make local-docker-up-ui
 ```
 
-Capture the local Supabase values and export them before running Playwright:
+The Make helper supplies the generated Supabase values automatically for the
+development server. Capture them manually only when a test script needs the
+values:
 
 ```shell
 cd dcapal-backend
-eval "$(npx supabase status --workdir ./config -o env)"
+eval "$(XDG_CACHE_HOME=../.local/pnpm-cache \
+  SUPABASE_HOME=../.local/supabase \
+  SUPABASE_TELEMETRY_DISABLED=1 \
+  pnpm dlx --package supabase@2.110.0 supabase status --workdir ./config -o env)"
 export SUPABASE_URL="$API_URL"
 export SUPABASE_ANON_KEY="$ANON_KEY"
 export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"

@@ -16,6 +16,10 @@ const openFeePreferences = async (page: Page): Promise<Locator> => {
   await page.getByTestId("portfolio-preferences").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close" })).toHaveCSS(
+    "cursor",
+    "pointer"
+  );
   return dialog;
 };
 
@@ -72,7 +76,12 @@ test("an investor can override fees for one asset and return to the default", as
   const asset = page.locator(
     '[data-testid="asset-card"][data-symbol="VWCE.MI"]'
   );
-  await asset.getByTestId("transaction-fees").click();
+  const transactionFees = asset.getByTestId("transaction-fees");
+  await expect(transactionFees).toHaveCSS("cursor", "pointer");
+  await expect(transactionFees).toHaveAttribute("aria-expanded", "false");
+  await transactionFees.focus();
+  await page.keyboard.press("Enter");
+  await expect(transactionFees).toHaveAttribute("aria-expanded", "true");
   await asset.getByText("Fixed", { exact: true }).click();
   const fields = asset.getByRole("spinbutton");
   await fields.nth(4).fill("2");

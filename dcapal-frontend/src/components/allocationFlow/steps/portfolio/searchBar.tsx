@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { Provider, useYahooPrice } from "@/api/priceProviders";
 import { useAppStore } from "@/state/appStore";
 import { useCurrentPortfolio } from "@/state/portfolioStore";
+import { Input } from "@/components/ui/input";
 import {
   PRICE_STALE_TIME,
   SEARCH_STALE_TIME,
@@ -207,9 +208,9 @@ export const SearchBar = (props: SearchBarProps) => {
 
   return (
     <div className="relative flex flex-col items-center justify-center">
-      <input
+      <Input
         data-testid="portfolio-search"
-        className="w-full h-12 px-6 pb-px border-2 rounded-3xl border-neutral-500/40 focus:border-neutral-500 focus-visible:outline-none uppercase placeholder:normal-case z-20"
+        className="w-full h-12 px-6 py-0 border-2 rounded-3xl bg-background border-neutral-500/40 text-base md:text-base focus:border-neutral-500 focus-visible:outline-none uppercase placeholder:normal-case z-20"
         value={props.text}
         placeholder={t("searchBar.placeholder")}
         onChange={handleAddAssetInputChange}

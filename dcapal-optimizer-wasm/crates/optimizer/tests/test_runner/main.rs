@@ -39,7 +39,6 @@ fn test_runner() -> anyhow::Result<()> {
         // Build problem from options and solve it
         let res = match options {
             JsProblemOptions::Advanced(o) => build_solve_advanced(o),
-            JsProblemOptions::Basic(_) => todo!(),
             JsProblemOptions::Analyze(_) => todo!("Analyze not implemented"),
         };
 
@@ -55,7 +54,6 @@ fn test_runner() -> anyhow::Result<()> {
             (Expect::Solved(expected), TestSolution::Advanced(sol)) => {
                 check_expect_advanced(&expected, &sol)
             }
-            (Expect::Solved(_), TestSolution::Basic) => todo!(),
             (Expect::BuildError, _) => unreachable!(),
         }
     }
@@ -104,5 +102,4 @@ fn check_expect_advanced(expected: &ExpectedSolution, sol: &Solution) {
 #[derive(Debug, Clone)]
 pub enum TestSolution {
     Advanced(advanced::Solution),
-    Basic,
 }

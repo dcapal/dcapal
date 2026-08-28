@@ -1,26 +1,21 @@
 services:
   redis:
     image: redis/redis-stack-server:7.2.0-v0
-    container_name: redis
-    restart: always
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     networks:
       - dcapalnetwork
     volumes:
-      - ./config/redis/redis-stack.conf:/redis-stack.conf
-      - ./config/redis/users.acl:/etc/redis/users.acl
-      - ./data/redis/:/data
+      - ./config/redis/redis-stack.conf:/redis-stack.conf:ro
+      - ./config/redis/users.acl:/etc/redis/users.acl:ro
     healthcheck:
-      test: redis-cli --raw ping
+      test: ["CMD-SHELL", "REDISCLI_AUTH=dcapal redis-cli --user dcapal ping | grep -q PONG"]
       interval: 10s
       timeout: 10s
       retries: 3
 
   db:
     image: timescale/timescaledb-ha:pg18.4-ts2.28.3-all-oss
-    container_name: db
-    restart: always
+    restart: unless-stopped
     expose:
       - "5432"
     # set shared memory limit when using docker-compose
@@ -28,9 +23,14 @@ services:
     networks:
       - dcapalnetwork
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d postgres -c 'SELECT 1' > /dev/null 2>&1" ]
+      # Authentication is checked by the backend entrypoint. Keeping this
+      # probe limited to server readiness lets a password mismatch produce a
+      # useful application error instead of an opaque unhealthy dependency.
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 10s
       retries: 10

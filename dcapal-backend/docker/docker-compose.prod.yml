@@ -1,4 +1,8 @@
 services:
+  redis:
+    volumes:
+      - ./data/redis:/data
+
   dcapal:
     image: ${DCAPAL_IMAGE:-leonardoarcari/dcapal:latest}
     env_file: ${DCAPAL_ENV_FILE:-dcapal.env}

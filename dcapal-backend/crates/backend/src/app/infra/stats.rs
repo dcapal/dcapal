@@ -4,6 +4,7 @@ use std::{
     time::Instant,
 };
 
+use crate::{AppContext, error::Result, ports::outbound::repository::StatsRepository};
 use axum::{
     extract::{ConnectInfo, Request, State},
     middleware::Next,
@@ -11,16 +12,13 @@ use axum::{
 };
 use hyper::HeaderMap;
 use metrics::{counter, histogram};
-use tracing::{info, log::error};
-
-use crate::{
-    AppContext, app::services::ip2location::Ip2LocationService, error::Result,
-    ports::outbound::repository::StatsRepository,
-};
 
 const BASE: &str = "dcapal";
 
+/// Total number of visits recorded from non-loopback IP addresses.
 pub const VISITORS_TOTAL: &str = concatcp!(BASE, '_', "visitors_total");
+/// Total number of distinct IP addresses recorded as visitors.
+pub const UNIQUE_VISITORS_TOTAL: &str = concatcp!(BASE, '_', "unique_visitors_total");
 pub const REQUESTS_TOTAL: &str = concatcp!(BASE, '_', "requests_total");
 pub const LATENCY_SUMMARY: &str = concatcp!(BASE, '_', "latency_summary");
 pub const IMPORTED_PORTFOLIOS_TOTAL: &str = concatcp!(BASE, '_', "imported_portfolios_total");
@@ -55,13 +53,7 @@ pub async fn requests_stats(
     counter!(REQUESTS_TOTAL, &[("path", path)]).increment(1);
 
     // Visitors stats
-    record_visitors_stats(
-        req.headers(),
-        addr,
-        state.repos.stats.clone(),
-        state.services.ip2location.clone(),
-    )
-    .await?;
+    record_visitors_stats(req.headers(), addr, state.repos.stats.clone()).await?;
 
     Ok(next.run(req).await)
 }
@@ -70,7 +62,6 @@ async fn record_visitors_stats(
     headers: &HeaderMap,
     addr: SocketAddr,
     repo: Arc<StatsRepository>,
-    ip_service: Option<Arc<Ip2LocationService>>,
 ) -> Result<()> {
     static IP_HEADERS: [&str; 2] = ["CF-Connecting-IP", "X-Real-IP"];
     static FALLBACK_IP: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -91,65 +82,10 @@ async fn record_visitors_stats(
     }
 
     let ip_str = ip.to_string();
-    repo.bump_visit(&ip_str).await?;
-
-    let Some(ip_service) = ip_service else {
-        return Ok(());
-    };
-
-    tokio::spawn(async move { fetch_geo_ip(ip, repo, ip_service).await });
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-async fn fetch_geo_ip(ip: IpAddr, repo: Arc<StatsRepository>, ip_service: Arc<Ip2LocationService>) {
-    if let Err(e) = fetch_geo_ip_inner(ip, repo, ip_service).await {
-        error!("Error occurred in fetching GeoIP for {ip}: {e:?}");
-    }
-}
-
-async fn fetch_geo_ip_inner(
-    ip: IpAddr,
-    repo: Arc<StatsRepository>,
-    ip_service: Arc<Ip2LocationService>,
-) -> Result<()> {
-    if ip.is_loopback() {
-        return Ok(());
-    }
-
-    let ip_str = ip.to_string();
-    if let Some(geo) = repo.find_visitor_ip(&ip_str).await? {
-        counter!(
-            VISITORS_TOTAL,
-            &[
-                ("ip", geo.ip),
-                ("latitude", geo.latitude),
-                ("longitude", geo.longitude),
-            ]
-        )
-        .increment(1);
-        return Ok(());
-    }
-
-    let Some(geo) = ip_service.lookup(ip) else {
-        error!("Visitor IP not found ({ip})");
-        return Ok(());
-    };
-
-    counter!(
-        VISITORS_TOTAL,
-        &[
-            ("ip", geo.ip.clone()),
-            ("latitude", geo.latitude.clone()),
-            ("longitude", geo.longitude.clone()),
-        ]
-    )
-    .increment(1);
-
-    let is_stored = repo.store_visitor_ip(&ip_str, &geo).await?;
-    if !is_stored {
-        info!("Visitor ip ({ip}) already exists");
+    let visit_count = repo.bump_visit(&ip_str).await?;
+    counter!(VISITORS_TOTAL).increment(1);
+    if visit_count == 1 {
+        counter!(UNIQUE_VISITORS_TOTAL).increment(1);
     }
 
     Ok(())

@@ -1,0 +1,50 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: [observability]
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    networks:
+      - dcapalnetwork
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.external-url=http://localhost:9090"
+    extra_hosts:
+      host.docker.internal: host-gateway
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: [observability]
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - dcapalnetwork
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    profiles: [observability]
+    restart: unless-stopped
+    ports:
+      - "8010:8080"
+    networks:
+      - dcapalnetwork
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+
+volumes:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,12 @@
+.git
+.github
+.local
+**/target
+**/node_modules
+**/pkg
+**/dist
+**/data
+**/*.log*
+dcapal-backend/dcapal.yml
+dcapal-backend/dcapal.env
+dcapal-backend/docker/local.env

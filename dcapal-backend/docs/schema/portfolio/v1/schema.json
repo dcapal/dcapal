@@ -146,11 +146,23 @@
           "minLength": 1
         },
         "aclass": {
-          "description": "Asset class",
+          "description": "Asset class. Matching is case-insensitive. Supported aliases are Equity, Bond, Cash, Currency, Crypto, Commodity, and Other; unknown values are stored as Other.",
+          "type": "string",
           "enum": [
             "EQUITY",
+            "BOND",
+            "CURRENCY",
+            "CASH",
             "CRYPTO",
-            "CURRENCY"
+            "COMMODITY",
+            "OTHER",
+            "Equity",
+            "Bond",
+            "Cash",
+            "Currency",
+            "Crypto",
+            "Commodity",
+            "Other"
           ]
         },
         "baseCcy": {
@@ -174,10 +186,13 @@
           "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
         },
         "provider": {
-          "description": "Price provider (choose DCAPal for Crypto, YF for anything else)",
+          "description": "Price provider. Matching is case-insensitive. Accepted aliases are DCAPal and Kraken for Kraken-backed assets, and YF and Yahoo for Yahoo Finance-backed assets. Choose DCAPal for Crypto and YF for anything else.",
+          "type": "string",
           "enum": [
             "DCAPal",
-            "YF"
+            "Kraken",
+            "YF",
+            "Yahoo"
           ]
         },
         "fees": {
