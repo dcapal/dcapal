@@ -15,30 +15,23 @@ default = ["console_error_panic_hook"]
 # WASM dependencies
 console_error_panic_hook = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true }
-wasm-bindgen-futures = { workspace = true }
 wasm-logger = { workspace = true }
 
 # Library dependencies
-anyhow = { workspace = true }
 getrandom = { workspace = true, features = ["wasm_js"] }
 lazy_static = { workspace = true }
 log = { workspace = true }
-js-sys = { workspace = true }
-minilp = { workspace = true }
 rand = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 serde = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
-thiserror = { workspace = true }
-
-# rand 0.9 still pulls getrandom 0.3; keep its WASM backend enabled until rand 0.10 lands.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom_03 = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 env_logger = { workspace = true }
 glob = { workspace = true }
 serde_json = { workspace = true }
 test-log = { workspace = true }
+thiserror = { workspace = true }
 wasm-bindgen-test = { workspace = true }

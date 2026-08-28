@@ -104,6 +104,17 @@ pub struct DcaServer {
 impl DcaServer {
     /// Builds a server and initializes its external service clients and repositories.
     pub async fn try_new(config: Config) -> Result<Self> {
+        if rustls::crypto::CryptoProvider::get_default().is_none() {
+            rustls::crypto::ring::default_provider()
+                .install_default()
+                .map_err(|_| {
+                    DcaError::StartupFailure(
+                        "Failed to install Rustls ring crypto provider".into(),
+                        anyhow::anyhow!("a Rustls crypto provider was installed concurrently"),
+                    )
+                })?;
+        }
+
         let config = Arc::new(config);
 
         let http = reqwest::Client::builder()
