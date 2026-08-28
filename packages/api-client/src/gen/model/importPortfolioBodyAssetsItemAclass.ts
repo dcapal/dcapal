@@ -6,13 +6,24 @@
  */
 
 /**
- * Asset class
+ * Asset class. Matching is case-insensitive. Supported aliases are Equity, Bond, Cash, Currency, Crypto, Commodity, and Other; unknown values are stored as Other.
  */
 export type ImportPortfolioBodyAssetsItemAclass = typeof ImportPortfolioBodyAssetsItemAclass[keyof typeof ImportPortfolioBodyAssetsItemAclass];
 
 
 export const ImportPortfolioBodyAssetsItemAclass = {
   EQUITY: 'EQUITY',
-  CRYPTO: 'CRYPTO',
+  BOND: 'BOND',
   CURRENCY: 'CURRENCY',
+  CASH: 'CASH',
+  CRYPTO: 'CRYPTO',
+  COMMODITY: 'COMMODITY',
+  OTHER: 'OTHER',
+  Equity: 'Equity',
+  Bond: 'Bond',
+  Cash: 'Cash',
+  Currency: 'Currency',
+  Crypto: 'Crypto',
+  Commodity: 'Commodity',
+  Other: 'Other',
 } as const;

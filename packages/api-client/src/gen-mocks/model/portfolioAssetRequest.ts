@@ -4,19 +4,23 @@
  * DCA-Pal APIs
  * OpenAPI spec version: 0.9.0
  */
+import type { PortfolioAssetRequestAclass } from './portfolioAssetRequestAclass';
+import type { PortfolioAssetRequestProvider } from './portfolioAssetRequestProvider';
 import type { TransactionFeesRequest } from './transactionFeesRequest';
 
 /**
  * An asset and its allocation values submitted for synchronization.
  */
 export interface PortfolioAssetRequest {
-  aclass: string;
+  /** Asset Class matching is case-insensitive; Currency and Cash map to CURRENCY, and unknown values map to OTHER. */
+  aclass: PortfolioAssetRequestAclass;
   averageBuyPrice: string;
   baseCcy: string;
   fees?: null | TransactionFeesRequest;
   name: string;
   price: string;
-  provider: string;
+  /** Provider matching is case-insensitive; DCAPal and Kraken map to Kraken, while YF and Yahoo map to YF. */
+  provider: PortfolioAssetRequestProvider;
   qty: string;
   symbol: string;
   targetWeight: string;

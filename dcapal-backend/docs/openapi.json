@@ -165,6 +165,23 @@
         "description": "An asset and its allocation values submitted for synchronization.",
         "properties": {
           "aclass": {
+            "description": "Asset Class matching is case-insensitive; Currency and Cash map to CURRENCY, and unknown values map to OTHER.",
+            "enum": [
+              "EQUITY",
+              "BOND",
+              "CURRENCY",
+              "CASH",
+              "CRYPTO",
+              "COMMODITY",
+              "OTHER",
+              "Equity",
+              "Bond",
+              "Currency",
+              "Cash",
+              "Crypto",
+              "Commodity",
+              "Other"
+            ],
             "type": "string"
           },
           "averageBuyPrice": {
@@ -190,6 +207,13 @@
             "type": "string"
           },
           "provider": {
+            "description": "Provider matching is case-insensitive; DCAPal and Kraken map to Kraken, while YF and Yahoo map to YF.",
+            "enum": [
+              "DCAPal",
+              "Kraken",
+              "YF",
+              "Yahoo"
+            ],
             "type": "string"
           },
           "qty": {
@@ -219,7 +243,15 @@
         "description": "An asset held by a portfolio.\n\nDecimal values are serialized as JSON strings to preserve precision.",
         "properties": {
           "aclass": {
-            "description": "The asset class.",
+            "description": "Canonical v1 Asset Class name. Cash and Currency are returned as CURRENCY.",
+            "enum": [
+              "EQUITY",
+              "BOND",
+              "CURRENCY",
+              "CRYPTO",
+              "COMMODITY",
+              "OTHER"
+            ],
             "type": "string"
           },
           "averageBuyPrice": {
@@ -250,7 +282,11 @@
             "type": "string"
           },
           "provider": {
-            "description": "The data provider for the asset.",
+            "description": "Canonical v1 provider name. Kraken-backed assets are returned as DCAPal and Yahoo Finance assets as YF.",
+            "enum": [
+              "DCAPal",
+              "YF"
+            ],
             "type": "string"
           },
           "qty": {
@@ -813,12 +849,24 @@
                       "description": "Portfolio asset",
                       "properties": {
                         "aclass": {
-                          "description": "Asset class",
+                          "description": "Asset class. Matching is case-insensitive. Supported aliases are Equity, Bond, Cash, Currency, Crypto, Commodity, and Other; unknown values are stored as Other.",
                           "enum": [
                             "EQUITY",
+                            "BOND",
+                            "CURRENCY",
+                            "CASH",
                             "CRYPTO",
-                            "CURRENCY"
-                          ]
+                            "COMMODITY",
+                            "OTHER",
+                            "Equity",
+                            "Bond",
+                            "Cash",
+                            "Currency",
+                            "Crypto",
+                            "Commodity",
+                            "Other"
+                          ],
+                          "type": "string"
                         },
                         "baseCcy": {
                           "description": "Asset base currency",
@@ -910,11 +958,14 @@
                           "type": "string"
                         },
                         "provider": {
-                          "description": "Price provider (choose DCAPal for Crypto, YF for anything else)",
+                          "description": "Price provider. Matching is case-insensitive. Accepted aliases are DCAPal and Kraken for Kraken-backed assets, and YF and Yahoo for Yahoo Finance-backed assets. Choose DCAPal for Crypto and YF for anything else.",
                           "enum": [
                             "DCAPal",
-                            "YF"
-                          ]
+                            "Kraken",
+                            "YF",
+                            "Yahoo"
+                          ],
+                          "type": "string"
                         },
                         "qty": {
                           "description": "Number of units of the asset in portfolio",

@@ -3,6 +3,10 @@ import {
   type SyncPortfoliosRequest,
   type SyncPortfoliosResponse,
 } from "@dcapal/api-client";
+import type {
+  PortfolioAssetRequestAclass,
+  PortfolioAssetRequestProvider,
+} from "@dcapal/api-client/model";
 
 import { aclassToString, feeTypeToString } from "@/state/portfolioDomain";
 
@@ -43,6 +47,15 @@ type PortfolioState = {
 // round them before the backend receives them.
 const decimalString = (value: number | null | undefined): string =>
   String(value ?? 0);
+
+// The v1 server accepts arbitrary strings so it can silently filter unsupported
+// providers and normalize legacy aliases at the boundary. OpenAPI documents the
+// known values, but this client must preserve unknown values for that behavior.
+const v1AssetClass = (value: string): PortfolioAssetRequestAclass =>
+  value as PortfolioAssetRequestAclass;
+
+const v1Provider = (value: string): PortfolioAssetRequestProvider =>
+  value as PortfolioAssetRequestProvider;
 
 const toFeesPayload = (
   fees: FeeState | undefined
@@ -102,9 +115,9 @@ export const toSyncPayload = (
     assets: Object.values(portfolio.assets).map((asset) => ({
       symbol: asset.symbol.toLowerCase(),
       name: asset.name,
-      aclass: aclassToString(asset.aclass),
+      aclass: v1AssetClass(aclassToString(asset.aclass)),
       baseCcy: asset.baseCcy,
-      provider: asset.provider,
+      provider: v1Provider(asset.provider),
       price: decimalString(asset.price),
       qty: decimalString(asset.qty),
       targetWeight: decimalString(asset.targetWeight),

@@ -12,7 +12,7 @@ import type { ImportPortfolioBodyAssetsItemProvider } from './importPortfolioBod
  * Portfolio asset
  */
 export type ImportPortfolioBodyAssetsItem = {
-  /** Asset class */
+  /** Asset class. Matching is case-insensitive. Supported aliases are Equity, Bond, Cash, Currency, Crypto, Commodity, and Other; unknown values are stored as Other. */
   aclass: ImportPortfolioBodyAssetsItemAclass;
   /**
      * Asset base currency
@@ -31,7 +31,7 @@ export type ImportPortfolioBodyAssetsItem = {
      * @pattern ^[0-9]+(?:\.[0-9]+)?$
      */
   price: string;
-  /** Price provider (choose DCAPal for Crypto, YF for anything else) */
+  /** Price provider. Matching is case-insensitive. Accepted aliases are DCAPal and Kraken for Kraken-backed assets, and YF and Yahoo for Yahoo Finance-backed assets. Choose DCAPal for Crypto and YF for anything else. */
   provider: ImportPortfolioBodyAssetsItemProvider;
   /**
      * Number of units of the asset in portfolio

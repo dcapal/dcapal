@@ -6,12 +6,14 @@
  */
 
 /**
- * Price provider (choose DCAPal for Crypto, YF for anything else)
+ * Price provider. Matching is case-insensitive. Accepted aliases are DCAPal and Kraken for Kraken-backed assets, and YF and Yahoo for Yahoo Finance-backed assets. Choose DCAPal for Crypto and YF for anything else.
  */
 export type ImportPortfolioBodyAssetsItemProvider = typeof ImportPortfolioBodyAssetsItemProvider[keyof typeof ImportPortfolioBodyAssetsItemProvider];
 
 
 export const ImportPortfolioBodyAssetsItemProvider = {
   DCAPal: 'DCAPal',
+  Kraken: 'Kraken',
   YF: 'YF',
+  Yahoo: 'Yahoo',
 } as const;
