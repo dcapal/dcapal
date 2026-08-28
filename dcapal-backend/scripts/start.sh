@@ -24,7 +24,14 @@ echo >&2 "Postgres is up - executing command"
 DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${APP_DB_NAME}
 export DATABASE_URL
 # Run migrations
-/var/dcapal/dcapal-backend/bin/migration up -u "$DATABASE_URL"
+migration_log=/tmp/dcapal-migration.log
+rm -f "$migration_log"
+if ! /var/dcapal/dcapal-backend/bin/migration up -u "$DATABASE_URL" > "$migration_log" 2>&1; then
+    sed -E 's#(postgresql://[^:]+:)[^@]+@#\1<REDACTED>@#g' "$migration_log" >&2 || true
+    echo >&2 "Database migrations failed. If the database password is mismatched, run make local-reset."
+    exit 1
+fi
+rm -f "$migration_log"
 
 # Start the application
 exec /var/dcapal/dcapal-backend/bin/dcapal-backend

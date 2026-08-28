@@ -263,38 +263,6 @@ jobs:
             ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}:
           EOF
 
-      - name: Configure docker-compose.prod.yml
-        env:
-          DCAPAL_API_PORT: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_API_PORT || secrets.DCAPAL_API_PORT_DEV }}
-          DCAPAL_METRICS_PORT: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_METRICS_PORT || secrets.DCAPAL_METRICS_PORT_DEV }}
-        run: |
-          cat > dcapal-backend/docker/docker-compose.prod.yml << EOF
-          version: "3.9"
-          services:
-            dcapal:
-              image: ${{ env.DOCKER_REPO }}:${{ needs.validate-inputs.outputs.resolved_image_tag }}
-              env_file: dcapal.env
-              restart: always
-              ports:
-                - ${DCAPAL_API_PORT}:8080
-                - ${DCAPAL_METRICS_PORT}:9000
-              networks:
-                - ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}
-              volumes:
-                - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
-                - ./data/dcapal:/var/dcapal/dcapal-backend/data
-              depends_on:
-                redis:
-                  condition: service_healthy
-                db:
-                  condition: service_healthy
-              healthcheck:
-                test: curl --fail http://localhost:8080 || exit 1
-                interval: 10s
-                timeout: 10s
-                retries: 5
-          EOF
-
       - name: Configure Redis ACL
         env:
           REDIS_USER: ${{ secrets.REDIS_USER }}
@@ -380,18 +348,24 @@ jobs:
         uses: appleboy/ssh-action@master
         env:
           DCAPAL_DIR: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_DIR || secrets.DCAPAL_DIR_DEV }}
+          DCAPAL_IMAGE: ${{ env.DOCKER_REPO }}:${{ needs.validate-inputs.outputs.resolved_image_tag }}
+          DCAPAL_ENV_FILE: dcapal.env
+          DCAPAL_API_PORT: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_API_PORT || secrets.DCAPAL_API_PORT_DEV }}
+          DCAPAL_METRICS_PORT: ${{ inputs.deploy_environment == 'production' && secrets.DCAPAL_METRICS_PORT || secrets.DCAPAL_METRICS_PORT_DEV }}
+          DCAPAL_NETWORK: ${{ inputs.deploy_environment == 'production' && 'dcapalnetwork' || 'dcapal-dev-network' }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
-          envs: DCAPAL_DIR
+          envs: DCAPAL_DIR,DCAPAL_IMAGE,DCAPAL_ENV_FILE,DCAPAL_API_PORT,DCAPAL_METRICS_PORT,DCAPAL_NETWORK
           script: |
             cd ${DCAPAL_DIR}
             ls -la
             mkdir -p ./data/dcapal
             mkdir -p ./data/db
             touch ./data/dcapal/dcapal.log
+            docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml config --quiet
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml down
             docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml up -d --wait --wait-timeout 180
