@@ -28,7 +28,8 @@ fi
 DATABASE_URL="${DATABASE_URL:-postgresql://${APP_USER}:${APP_USER_PWD}@${DB_HOST}:${DB_PORT}/${APP_DB_NAME}}"
 export DATABASE_URL
 # Run migrations
-migration_log=/var/dcapal/dcapal-backend/data/dcapal/migration.log
+migration_log=/tmp/dcapal-migration.log
+rm -f "$migration_log"
 if ! /var/dcapal/dcapal-backend/bin/migration up -u "$DATABASE_URL" > "$migration_log" 2>&1; then
     sed -E 's#(postgresql://[^:]+:)[^@]+@#\1<REDACTED>@#g' "$migration_log" >&2 || true
     echo >&2 "Database migrations failed. If the database password is mismatched, run make local-reset."

@@ -473,14 +473,15 @@ jobs:
           POSTGRES_PORT=${POSTGRES_PORT}
           EOF
 
-      - name: Configure docker compose override
+      - name: Configure production Compose variables
         run: |
-          cat > dcapal-backend/docker-compose.override.yml << EOF
-          services:
-            dcapal:
-              image: dcapal-backend:smoke
-              env_file: dcapal.env
-          EOF
+          {
+            echo "DCAPAL_IMAGE=dcapal-backend:smoke"
+            echo "DCAPAL_ENV_FILE=dcapal.env"
+            echo "DCAPAL_API_PORT=8080"
+            echo "DCAPAL_METRICS_PORT=9000"
+            echo "DCAPAL_NETWORK=dcapalnetwork"
+          } >> "$GITHUB_ENV"
 
       - name: Start Supabase
         run: cd dcapal-backend && supabase start --workdir ./config
@@ -520,17 +521,27 @@ jobs:
           export DCAPAL_POSTGRES_USER="${POSTGRES_USER}"
           export DCAPAL_POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
           export DCAPAL_POSTGRES_DATABASE="${POSTGRES_DB}"
-          export DCAPAL_LOG_FILE=data/dcapal/dcapal.log
+          export DCAPAL_LOG_FILE=data/dcapal.log
           export DCAPAL_LOG_ENABLE_STDOUT=true
           python3 dcapal-backend/scripts/render-dcapal-config.py \
             --output dcapal-backend/dcapal.yml
+
+      - name: Validate production Compose contract
+        run: |
+          cd dcapal-backend
+          docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml config --format json |
+            jq -e '
+              (.services.dcapal.volumes | any(.[]; .target == "/var/dcapal/dcapal-backend/data")) and
+              (.services.dcapal.depends_on.redis.condition == "service_healthy") and
+              (.services.dcapal.depends_on.db.condition == "service_healthy") and
+              (.services.dcapal.healthcheck != null)
+            '
 
       - name: Run backend stack and wait for health
         run: |
           cd dcapal-backend
           docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
+                         -f ./docker/docker-compose.prod.yml \
                          up --no-build --wait --wait-timeout 120
 
       - name: Run full-stack frontend smoke
@@ -547,21 +558,19 @@ jobs:
           retention-days: 30
 
       - name: Print backend logs on failure
-        if: ${{ failure() && hashFiles('dcapal-backend/docker-compose.override.yml') != '' }}
+        if: ${{ failure() }}
         run: |
           cd dcapal-backend
           docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
+                         -f ./docker/docker-compose.prod.yml \
                          logs
 
       - name: Stop backend stack
-        if: ${{ always() && hashFiles('dcapal-backend/docker-compose.override.yml') != '' }}
+        if: always()
         run: |
           cd dcapal-backend
           docker compose -f docker-compose.yml \
-                         -f ./docker/docker-compose.local.yml \
-                         -f docker-compose.override.yml \
+                         -f ./docker/docker-compose.prod.yml \
                          down
 
       - name: Stop Supabase
