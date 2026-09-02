@@ -19,6 +19,8 @@ use crate::{
     ports::outbound::repository::market_data::MarketDataRepository,
 };
 
+const MAX_MARKET_LOAD_ATTEMPTS: usize = 3;
+
 /// Provides cached access to market assets, markets, and conversion rates.
 pub struct MarketDataService {
     repo: Arc<MarketDataRepository>,
@@ -123,34 +125,42 @@ impl MarketDataService {
 
     /// Lookup a [`Market`] by [`MarketId`]
     pub async fn get_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
-        let generation = self.market_cache_generation.load(Ordering::Acquire);
-        {
-            let markets = self.markets.read();
-            if let Some(market) = markets.get(id)
-                && self.market_cache_generation.load(Ordering::Acquire) == generation
+        for _ in 0..MAX_MARKET_LOAD_ATTEMPTS {
+            let generation = self.market_cache_generation.load(Ordering::Acquire);
             {
-                return Ok(Some(market.clone()));
+                let markets = self.markets.read();
+                if let Some(market) = markets.get(id)
+                    && self.market_cache_generation.load(Ordering::Acquire) == generation
+                {
+                    return Ok(Some(market.clone()));
+                }
             }
+
+            let market = match self.load_market(id).await {
+                Ok(m) => m,
+                Err(e) => {
+                    error!("{:?}", e);
+                    None
+                }
+            };
+
+            let Some(market) = market else {
+                return Ok(None);
+            };
+
+            let mut markets = self.markets.write();
+            if self.market_cache_generation.load(Ordering::Acquire) != generation {
+                continue;
+            }
+            markets.insert(id.clone(), market.clone());
+            return Ok(Some(market));
         }
 
-        let market = match self.load_market(id).await {
-            Ok(m) => m,
-            Err(e) => {
-                error!("{:?}", e);
-                None
-            }
-        };
-
-        let Some(market) = market else {
-            return Ok(None);
-        };
-
-        let mut markets = self.markets.write();
-        if self.market_cache_generation.load(Ordering::Acquire) != generation {
-            return Ok(None);
-        }
-        markets.insert(id.clone(), market.clone());
-        Ok(Some(market))
+        info!(
+            mkt = id,
+            "Market cache generation changed during every load attempt"
+        );
+        Ok(None)
     }
 
     async fn load_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {

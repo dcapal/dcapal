@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use chrono::{NaiveDate, TimeZone, Utc};
-use tokio::time::{Instant, MissedTickBehavior};
+use tokio::time::Instant;
 use tracing::{debug, error, info};
 
 use crate::{
@@ -60,7 +60,6 @@ impl MarketDiscoveryWorker {
     async fn run_market_reconciliation(&self, stop_token: &mut StopToken) {
         let mut interval =
             tokio::time::interval_at(Instant::now() + INITIAL_DELAY, HOURLY_INTERVAL);
-        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
         loop {
             tokio::select! {
@@ -77,7 +76,6 @@ impl MarketDiscoveryWorker {
     async fn run_market_discovery(&self, stop_token: &mut StopToken) {
         let mut interval =
             tokio::time::interval_at(Instant::now() + INITIAL_DELAY, DAILY_CHECK_INTERVAL);
-        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
         loop {
             tokio::select! {
