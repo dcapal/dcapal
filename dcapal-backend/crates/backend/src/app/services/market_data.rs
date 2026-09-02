@@ -1,4 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use chrono::Utc;
 use parking_lot::RwLock;
@@ -13,9 +19,11 @@ use crate::{
     ports::outbound::repository::market_data::MarketDataRepository,
 };
 
+/// Provides cached access to market assets, markets, and conversion rates.
 pub struct MarketDataService {
     repo: Arc<MarketDataRepository>,
     markets: RwLock<HashMap<MarketId, Arc<Market>>>,
+    market_cache_generation: AtomicU64,
     pricers: RwLock<HashMap<(AssetId, AssetId), Option<Price>>>,
     price_deps: RwLock<HashMap<MarketId, Vec<(AssetId, AssetId)>>>,
     assets_cache: RwLock<AssetsCache>,
@@ -31,6 +39,7 @@ impl MarketDataService {
         Self {
             repo,
             markets,
+            market_cache_generation: AtomicU64::new(0),
             pricers,
             price_deps,
             assets_cache,
@@ -83,11 +92,43 @@ impl MarketDataService {
         cache.fiats = None;
     }
 
+    /// Clears cached markets and conversion rates after market reconciliation.
+    pub fn invalidate_market_cache(&self) {
+        self.market_cache_generation.fetch_add(1, Ordering::AcqRel);
+        self.markets.write().clear();
+        self.pricers.write().clear();
+        self.price_deps.write().clear();
+    }
+
+    /// Removes deleted markets and conversion rates that depend on them.
+    pub fn invalidate_markets(&self, ids: &[MarketId]) {
+        self.market_cache_generation.fetch_add(1, Ordering::AcqRel);
+        {
+            let mut markets = self.markets.write();
+            for id in ids {
+                markets.remove(id);
+            }
+        }
+
+        let mut pricers = self.pricers.write();
+        let mut price_deps = self.price_deps.write();
+        for id in ids {
+            if let Some(deps) = price_deps.remove(id) {
+                for dep in deps {
+                    pricers.remove(&dep);
+                }
+            }
+        }
+    }
+
     /// Lookup a [`Market`] by [`MarketId`]
     pub async fn get_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
+        let generation = self.market_cache_generation.load(Ordering::Acquire);
         {
             let markets = self.markets.read();
-            if let Some(market) = markets.get(id) {
+            if let Some(market) = markets.get(id)
+                && self.market_cache_generation.load(Ordering::Acquire) == generation
+            {
                 return Ok(Some(market.clone()));
             }
         }
@@ -105,6 +146,9 @@ impl MarketDataService {
         };
 
         let mut markets = self.markets.write();
+        if self.market_cache_generation.load(Ordering::Acquire) != generation {
+            return Ok(None);
+        }
         markets.insert(id.clone(), market.clone());
         Ok(Some(market))
     }
@@ -345,5 +389,57 @@ impl AssetsCache {
             fiats: None,
             crypto: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    #[test]
+    fn invalidating_a_market_removes_it_and_dependent_conversion_rates() {
+        // GIVEN a cached market and a synthetic conversion rate that depends on it
+        let pool = deadpool_redis::Config::from_url("redis://localhost/")
+            .builder()
+            .unwrap()
+            .build()
+            .unwrap();
+        let repo = Arc::new(MarketDataRepository::new(pool));
+        let service = MarketDataService::new(repo);
+        let market_id = "unieur".to_string();
+        let dependency = ("uni".to_string(), "eur".to_string());
+        let market = Market::new(
+            market_id.clone(),
+            Asset::Crypto(crate::app::domain::entity::Crypto::new_with_id(
+                "uni".into(),
+            )),
+            Asset::Fiat(crate::app::domain::entity::Fiat::new(
+                "eur".into(),
+                "Euro".into(),
+            )),
+            None,
+        );
+        service
+            .markets
+            .write()
+            .insert(market_id.clone(), Arc::new(market));
+        service
+            .pricers
+            .write()
+            .insert(dependency.clone(), Some(Price::new(1., Utc::now())));
+        service
+            .price_deps
+            .write()
+            .insert(market_id.clone(), vec![dependency.clone()]);
+
+        // WHEN the deleted market is invalidated
+        service.invalidate_markets(std::slice::from_ref(&market_id));
+
+        // THEN the market and its dependent conversion rate are no longer cached
+        assert!(!service.markets.read().contains_key(&market_id));
+        assert!(!service.pricers.read().contains_key(&dependency));
+        assert!(!service.price_deps.read().contains_key(&market_id));
     }
 }

@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use chrono::{TimeZone, Utc};
+use chrono::{NaiveDate, TimeZone, Utc};
+use tokio::time::{Instant, MissedTickBehavior};
 use tracing::{debug, error, info};
 
 use crate::{
@@ -18,8 +19,11 @@ use crate::{
     },
 };
 
-/// Worker to periodically discover new crypto assets and markets. As of today,
-/// new markets are checked every 24 hours.
+const INITIAL_DELAY: Duration = Duration::from_millis(50);
+const DAILY_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+const HOURLY_INTERVAL: Duration = Duration::from_secs(60 * 60);
+
+/// Worker that reconciles Kraken markets hourly and discovers new assets daily.
 pub struct MarketDiscoveryWorker {
     market_data_service: Arc<MarketDataService>,
     misc_repo: Arc<MiscRepository>,
@@ -46,16 +50,40 @@ impl MarketDiscoveryWorker {
     }
 
     pub async fn run(&self, mut stop_token: StopToken) {
-        let mut sleep = tokio::time::sleep(Duration::from_millis(50));
+        let mut reconciliation_stop_token = stop_token.clone();
+        let reconciliation = self.run_market_reconciliation(&mut reconciliation_stop_token);
+        let discovery = self.run_market_discovery(&mut stop_token);
+
+        tokio::join!(reconciliation, discovery);
+    }
+
+    async fn run_market_reconciliation(&self, stop_token: &mut StopToken) {
+        let mut interval =
+            tokio::time::interval_at(Instant::now() + INITIAL_DELAY, HOURLY_INTERVAL);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
         loop {
             tokio::select! {
-                _ = sleep => {}
-                _ = should_stop(&mut stop_token) => break,
+                _ = interval.tick() => {}
+                _ = should_stop(stop_token) => break,
             }
 
-            // Reset next check timeout
-            sleep = tokio::time::sleep(Duration::from_secs(60));
+            if let Err(e) = self.reconcile_markets().await {
+                error!("Failed to reconcile Kraken markets: {:?}", e);
+            }
+        }
+    }
+
+    async fn run_market_discovery(&self, stop_token: &mut StopToken) {
+        let mut interval =
+            tokio::time::interval_at(Instant::now() + INITIAL_DELAY, DAILY_CHECK_INTERVAL);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {}
+                _ = should_stop(stop_token) => break,
+            }
 
             let res = is_outdated(&self.misc_repo).await;
             if let Err(e) = res {
@@ -74,16 +102,32 @@ impl MarketDiscoveryWorker {
 
             if let Err(e) = self.discover_new_markets().await {
                 error!("Failed to update Kraken Assets and Markets data: {:?}", e);
+            } else {
+                let now = Utc::now();
+                if let Err(e) = self.misc_repo.set_cw_last_fetched(now).await {
+                    error!("Failed to update last update time: {:?}", e);
+                }
             }
-
-            let now = Utc::now();
-            if let Err(e) = self.misc_repo.set_cw_last_fetched(now).await {
-                error!("Failed to update last update time: {:?}", e);
-            }
-
-            // Reset next check timeout
-            sleep = tokio::time::sleep(Duration::from_secs(60));
         }
+    }
+
+    async fn reconcile_markets(&self) -> Result<()> {
+        let market_ids = self.providers.kraken.fetch_tradable_market_ids().await?;
+        let deleted = self
+            .market_data_repo
+            .delete_markets_not_in(&market_ids)
+            .await?;
+
+        if !deleted.is_empty() {
+            info!(
+                "Removed {} stale Kraken markets from Redis: {:?}",
+                deleted.len(),
+                deleted
+            );
+            self.market_data_service.invalidate_markets(&deleted);
+        }
+
+        Ok(())
     }
 
     async fn discover_new_markets(&self) -> Result<()> {
@@ -132,6 +176,7 @@ impl MarketDiscoveryWorker {
         }
 
         self.market_data_service.invalidate_asset_cache();
+        self.market_data_service.invalidate_market_cache();
 
         Ok(())
     }
@@ -139,11 +184,61 @@ impl MarketDiscoveryWorker {
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
     let last_fetched = misc.get_cw_last_fetched().await?;
-    if let Some(ts) = last_fetched {
-        let ts_day = Utc.from_utc_datetime(&ts.naive_utc()).date_naive();
-        let today = Utc::now().date_naive();
-        return Ok((ts_day < today, Some(ts)));
+    let today = Utc::now().date_naive();
+    Ok((is_outdated_at(last_fetched, today), last_fetched))
+}
+
+fn is_outdated_at(last_fetched: Option<DateTime>, today: NaiveDate) -> bool {
+    last_fetched
+        .map(|ts| Utc.from_utc_datetime(&ts.naive_utc()).date_naive() < today)
+        .unwrap_or(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{NaiveDate, TimeZone, Utc};
+
+    use super::{HOURLY_INTERVAL, is_outdated_at};
+
+    #[test]
+    fn missing_daily_marker_is_outdated() {
+        // GIVEN daily discovery has never completed
+        // WHEN the worker checks the marker
+        let outdated = is_outdated_at(None, NaiveDate::from_ymd_opt(2026, 9, 2).unwrap());
+
+        // THEN discovery is due
+        assert!(outdated);
     }
 
-    Ok((true, None))
+    #[test]
+    fn same_day_daily_marker_is_not_outdated() {
+        // GIVEN daily discovery completed earlier on the current UTC date
+        let last_fetched = Utc.with_ymd_and_hms(2026, 9, 2, 1, 2, 3).single();
+
+        // WHEN the worker checks the marker
+        let outdated = is_outdated_at(last_fetched, NaiveDate::from_ymd_opt(2026, 9, 2).unwrap());
+
+        // THEN discovery is not repeated until the next UTC date
+        assert!(!outdated);
+    }
+
+    #[test]
+    fn previous_day_daily_marker_is_outdated() {
+        // GIVEN daily discovery completed on the previous UTC date
+        let last_fetched = Utc.with_ymd_and_hms(2026, 9, 1, 23, 59, 59).single();
+
+        // WHEN the worker checks the marker
+        let outdated = is_outdated_at(last_fetched, NaiveDate::from_ymd_opt(2026, 9, 2).unwrap());
+
+        // THEN discovery is due again
+        assert!(outdated);
+    }
+
+    #[test]
+    fn market_reconciliation_runs_hourly() {
+        // GIVEN the market reconciliation schedule
+        // WHEN its interval is read
+        // THEN the worker waits one hour between runs
+        assert_eq!(HOURLY_INTERVAL, std::time::Duration::from_secs(3600));
+    }
 }
