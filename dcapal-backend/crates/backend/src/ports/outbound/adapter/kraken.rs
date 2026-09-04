@@ -49,23 +49,7 @@ impl KrakenProvider {
 
         // Fetch Kraken markets
         debug!(url = URL, "Fetching markets from Kraken");
-        let Some(res) = self.fetch_kraken_api::<AssetPairsResponse>(URL).await? else {
-            return Err(DcaError::Generic("AssetPairs not found".to_string()));
-        };
-
-        if !res.error.is_empty() {
-            error!("Error occurred while fetching asset pairs: {:?}", res.error);
-            return Err(DcaError::Generic(format!("{:?}", res.error)));
-        }
-
-        // Filter online market symbols and rename Kraken specific pairs to standard
-        // names
-        let market_symbols = res
-            .result
-            .values()
-            .filter(|&p| p.status == "online")
-            .map(|p| normalize_symbol(&p.wsname))
-            .collect::<Vec<String>>();
+        let market_symbols = self.fetch_online_market_symbols(URL).await?;
 
         let (markets, assets) = if self.cmc_api_key.is_some() {
             // If CoinMarketCap API key is available, enrich assets data with human-friendly
@@ -81,6 +65,28 @@ impl KrakenProvider {
         debug!("New markets: {}", serde_json::to_string(&markets).unwrap());
 
         Ok((assets, markets))
+    }
+
+    /// Fetches the complete set of currently online Kraken market ids.
+    pub async fn fetch_tradable_market_ids(&self) -> Result<HashSet<MarketId>> {
+        static URL: &str = "https://api.kraken.com/0/public/AssetPairs";
+
+        debug!(url = URL, "Fetching market snapshot from Kraken");
+        let market_symbols = self.fetch_online_market_symbols(URL).await?;
+        market_ids_from_symbols(&market_symbols)
+    }
+
+    async fn fetch_online_market_symbols(&self, url: &str) -> Result<Vec<String>> {
+        let Some(res) = self.fetch_kraken_api::<AssetPairsResponse>(url).await? else {
+            return Err(DcaError::Generic("AssetPairs not found".to_string()));
+        };
+
+        if !res.error.is_empty() {
+            error!("Error occurred while fetching asset pairs: {:?}", res.error);
+            return Err(DcaError::Generic(format!("{:?}", res.error)));
+        }
+
+        parse_online_market_symbols(&res)
     }
 
     pub async fn fetch_market_price(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
@@ -430,6 +436,83 @@ fn normalize_symbol(wsname: &str) -> String {
         .to_lowercase()
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct MarketSymbol<'a> {
+    base: &'a str,
+    quote: &'a str,
+    venue: Option<&'a str>,
+}
+
+/// Parses a Kraken websocket name into base, quote, and an optional venue.
+fn parse_market_symbol(symbol: &str) -> Option<MarketSymbol<'_>> {
+    let (base, quote_and_venue) = symbol.split_once('/')?;
+    let (quote, venue) = match quote_and_venue.split_once(':') {
+        Some((quote, venue)) => (quote, Some(venue)),
+        None => (quote_and_venue, None),
+    };
+
+    let valid_component =
+        |component: &str| !component.is_empty() && !component.chars().any(char::is_whitespace);
+
+    if !valid_component(base)
+        || base.contains(':')
+        || !valid_component(quote)
+        || quote.contains('/')
+        || venue.is_some_and(|venue| {
+            !valid_component(venue) || venue.contains('/') || venue.contains(':')
+        })
+    {
+        return None;
+    }
+
+    Some(MarketSymbol { base, quote, venue })
+}
+
+fn parse_online_market_symbols(response: &AssetPairsResponse) -> Result<Vec<String>> {
+    let symbols = response
+        .result
+        .values()
+        .filter(|pair| pair.status == "online")
+        .filter_map(|pair| {
+            let symbol = normalize_symbol(&pair.wsname);
+            let Some(parsed) = parse_market_symbol(&symbol) else {
+                warn!(symbol, "Ignoring malformed online Kraken market");
+                return None;
+            };
+            Some(format!("{}/{}", parsed.base, parsed.quote))
+        })
+        .collect::<Vec<_>>();
+
+    if symbols.is_empty() {
+        return Err(DcaError::Generic(
+            "Kraken returned no online markets".to_string(),
+        ));
+    }
+
+    Ok(symbols)
+}
+
+fn market_ids_from_symbols(market_symbols: &[String]) -> Result<HashSet<MarketId>> {
+    let ids = market_symbols
+        .iter()
+        .filter_map(|symbol| {
+            let Some(parsed) = parse_market_symbol(symbol) else {
+                warn!(symbol, "Ignoring malformed online Kraken market");
+                return None;
+            };
+            Some(format!("{}{}", parsed.base, parsed.quote))
+        })
+        .collect::<HashSet<_>>();
+
+    if ids.is_empty() {
+        return Err(DcaError::Generic(
+            "Kraken returned no online markets".to_string(),
+        ));
+    }
+
+    Ok(ids)
+}
+
 type MarketPair = (String, String);
 
 fn split_base_quote(market_symbols: &[String]) -> Vec<MarketPair> {
@@ -601,4 +684,166 @@ struct CMCInfoData {
     id: u64,
     symbol: String,
     name: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, HashSet};
+
+    use super::{
+        AssetPairsResponse, MarketSymbol, Pair, market_ids_from_symbols, parse_market_symbol,
+        parse_online_market_symbols,
+    };
+
+    #[test]
+    fn online_pair_snapshot_is_normalized_and_filters_offline_pairs() {
+        // GIVEN Kraken returns online pairs in an arbitrary map order, including an XBT pair
+        let response = AssetPairsResponse {
+            error: vec![],
+            result: HashMap::from([
+                (
+                    "xbt-usd".to_string(),
+                    Pair {
+                        wsname: "XBT/EUR".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+                (
+                    "eth-eur".to_string(),
+                    Pair {
+                        wsname: "ETH/EUR:darkpool".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+                (
+                    "ada-usd".to_string(),
+                    Pair {
+                        wsname: "ADA/USD".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+                (
+                    "old".to_string(),
+                    Pair {
+                        wsname: "BTC/GBP".to_string(),
+                        status: "offline".to_string(),
+                    },
+                ),
+            ]),
+        };
+
+        // WHEN the online pairs are parsed into a snapshot
+        let symbols = parse_online_market_symbols(&response).unwrap();
+        let ids = market_ids_from_symbols(&symbols).unwrap();
+
+        // THEN offline pairs are excluded and the result is normalized
+        assert_eq!(
+            symbols.into_iter().collect::<HashSet<_>>(),
+            ["btc/eur", "eth/eur", "ada/usd"]
+                .into_iter()
+                .map(String::from)
+                .collect()
+        );
+        assert_eq!(
+            ids,
+            [
+                "btceur".to_string(),
+                "etheur".to_string(),
+                "adausd".to_string()
+            ]
+            .into_iter()
+            .collect()
+        );
+    }
+
+    #[test]
+    fn market_symbol_parser_retains_optional_venue_separately() {
+        // GIVEN a normalized Kraken symbol with an optional venue
+        // WHEN the symbol is parsed
+        let parsed = parse_market_symbol("btc/eur:darkpool");
+
+        // THEN the base, quote, and venue are separated
+        assert_eq!(
+            parsed,
+            Some(MarketSymbol {
+                base: "btc",
+                quote: "eur",
+                venue: Some("darkpool")
+            })
+        );
+    }
+
+    #[test]
+    fn malformed_online_pair_is_ignored() {
+        // GIVEN Kraken returns one valid pair and malformed online pairs
+        let response = AssetPairsResponse {
+            error: vec![],
+            result: HashMap::from([
+                (
+                    "valid".to_string(),
+                    Pair {
+                        wsname: "BTC/EUR".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+                (
+                    "broken".to_string(),
+                    Pair {
+                        wsname: "BROKEN".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+                (
+                    "empty-venue".to_string(),
+                    Pair {
+                        wsname: "ETH/EUR:".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+                (
+                    "multiple-venues".to_string(),
+                    Pair {
+                        wsname: "ETH/EUR:SPOT:EXTRA".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+            ]),
+        };
+
+        // WHEN the online pairs are parsed
+        let symbols = parse_online_market_symbols(&response).unwrap();
+
+        // THEN the malformed pair is ignored and the valid pair is retained
+        assert_eq!(symbols, ["btc/eur"]);
+    }
+
+    #[test]
+    fn snapshot_without_usable_online_pairs_is_rejected() {
+        // GIVEN Kraken returns only offline or malformed pairs
+        let response = AssetPairsResponse {
+            error: vec![],
+            result: HashMap::from([
+                (
+                    "offline".to_string(),
+                    Pair {
+                        wsname: "BTC/EUR".to_string(),
+                        status: "offline".to_string(),
+                    },
+                ),
+                (
+                    "broken".to_string(),
+                    Pair {
+                        wsname: "BROKEN".to_string(),
+                        status: "online".to_string(),
+                    },
+                ),
+            ]),
+        };
+
+        // WHEN the online snapshot is parsed
+        let result = parse_online_market_symbols(&response);
+
+        // THEN the empty snapshot is rejected so it cannot delete every market
+        assert!(result.is_err());
+    }
 }
