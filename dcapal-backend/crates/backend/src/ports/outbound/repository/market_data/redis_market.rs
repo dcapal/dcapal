@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
+use std::collections::HashSet;
+
 use tracing::{debug, error};
 
 use super::MarketDataRepository;
@@ -10,10 +12,35 @@ use crate::{
 };
 
 const MARKET_KEY: &str = concatcp!(REDIS_BASE, ':', "market");
+const DELETE_STALE_MARKETS_SCRIPT: &str = r#"
+local existing = redis.call('HKEYS', KEYS[1])
+local keep = {}
+for _, id in ipairs(ARGV) do
+    keep[id] = true
+end
+
+local stale = {}
+for _, id in ipairs(existing) do
+    if not keep[id] then
+        table.insert(stale, id)
+    end
+end
+
+if #stale > 0 then
+    redis.call('HDEL', KEYS[1], unpack(stale))
+end
+
+return stale
+"#;
 
 #[async_trait]
 pub trait RedisMarket {
     async fn store(&self, conn: &mut impl redis::AsyncCommands) -> Result<bool>;
+
+    async fn delete_not_in(
+        market_ids: &HashSet<MarketId>,
+        conn: &mut impl redis::AsyncCommands,
+    ) -> Result<Vec<MarketId>>;
 
     async fn find_by_id(
         id: &MarketId,
@@ -42,6 +69,36 @@ impl RedisMarket for Market {
 
         debug!("Successfully stored '{} {}': {}", MARKET_KEY, self.id, json);
         Ok(true)
+    }
+
+    async fn delete_not_in(
+        market_ids: &HashSet<MarketId>,
+        conn: &mut impl redis::AsyncCommands,
+    ) -> Result<Vec<MarketId>> {
+        if market_ids.is_empty() {
+            return Err(DcaError::Generic(
+                "Cannot reconcile markets from an empty Kraken snapshot".to_string(),
+            ));
+        }
+
+        let mut cmd = redis::cmd("EVAL");
+        cmd.arg(DELETE_STALE_MARKETS_SCRIPT).arg(1).arg(MARKET_KEY);
+        for market_id in market_ids {
+            cmd.arg(market_id);
+        }
+
+        let deleted: Vec<MarketId> = cmd.query_async(conn).await?;
+
+        if deleted.is_empty() {
+            return Ok(deleted);
+        }
+
+        debug!(
+            "Removed {} stale Kraken markets from '{}'",
+            deleted.len(),
+            MARKET_KEY
+        );
+        Ok(deleted)
     }
 
     async fn find_by_id(
@@ -164,5 +221,91 @@ async fn resolve_market(market: MarketDto, repo: &MarketDataRepository) -> Resul
             Ok(None)
         }
         (Some(b), Some(q)) => Ok(Some(Market::new(market.id, b, q, market.price))),
+    }
+}
+
+#[cfg(test)]
+fn stale_market_ids(existing: &[MarketId], keep: &HashSet<MarketId>) -> HashSet<MarketId> {
+    existing
+        .iter()
+        .filter(|id| !keep.contains(*id))
+        .cloned()
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::stale_market_ids;
+
+    #[test]
+    fn reconciliation_deletes_only_fields_outside_the_snapshot() {
+        // GIVEN the market hash contains Kraken markets in an arbitrary order
+        let existing = [
+            "etheur".to_string(),
+            "btcusd".to_string(),
+            "legacy".to_string(),
+            "adaeur".to_string(),
+        ];
+        let desired = [
+            "adaeur".to_string(),
+            "btcusd".to_string(),
+            "etheur".to_string(),
+        ]
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+        // WHEN stale fields are selected for HDEL
+        let stale = stale_market_ids(&existing, &desired);
+
+        // THEN only the field absent from the complete snapshot is deleted
+        assert_eq!(stale, ["legacy".to_string()].into_iter().collect());
+    }
+
+    #[test]
+    fn reconciliation_selection_is_independent_of_redis_key_order() {
+        // GIVEN the Redis HKEYS result order changes between calls
+        let desired = ["btcusd".to_string()].into_iter().collect::<HashSet<_>>();
+
+        // WHEN stale fields are selected from both orderings
+        let first = stale_market_ids(
+            &[
+                "zeta".to_string(),
+                "alpha".to_string(),
+                "btcusd".to_string(),
+            ],
+            &desired,
+        );
+        let second = stale_market_ids(
+            &[
+                "alpha".to_string(),
+                "btcusd".to_string(),
+                "zeta".to_string(),
+            ],
+            &desired,
+        );
+
+        // THEN the same stale fields are selected for the single atomic HDEL
+        assert_eq!(
+            first,
+            ["alpha".to_string(), "zeta".to_string()]
+                .into_iter()
+                .collect()
+        );
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn reconciliation_selection_returns_no_fields_when_all_markets_are_live() {
+        // GIVEN every Redis market field exists in the current Kraken snapshot
+        let existing = ["btcusd".to_string(), "etheur".to_string()];
+        let desired = existing.iter().cloned().collect::<HashSet<_>>();
+
+        // WHEN stale fields are selected for HDEL
+        let stale = stale_market_ids(&existing, &desired);
+
+        // THEN no field is selected for deletion
+        assert!(stale.is_empty());
     }
 }
