@@ -1,6 +1,8 @@
 mod redis_asset;
 mod redis_market;
 
+use std::collections::HashSet;
+
 use self::{redis_asset::RedisAsset, redis_market::RedisMarket};
 use crate::{
     app::domain::entity::{Asset, AssetId, AssetKind, Market, MarketId},
@@ -57,6 +59,19 @@ impl MarketDataRepository {
         } else {
             Err(DcaError::RepositoryStoreFailure(market.id.clone()))
         }
+    }
+
+    /// Deletes market fields that are absent from a complete Kraken snapshot.
+    ///
+    /// Redis is inspected directly because the service market cache is lazy and
+    /// does not necessarily contain every stored market.
+    pub async fn delete_markets_not_in(
+        &self,
+        market_ids: &HashSet<MarketId>,
+    ) -> Result<Vec<MarketId>> {
+        let mut redis = self.redis.get().await?;
+
+        Market::delete_not_in(market_ids, &mut redis).await
     }
 
     pub async fn update_mkt_price(&self, market: &Market) -> Result<()> {
