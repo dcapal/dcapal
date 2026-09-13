@@ -9,7 +9,7 @@ catalog:
   "@babel/preset-env": ^8.0.2
   "@babel/preset-react": ^8.0.1
   "@babel/preset-typescript": ^8.0.1
-  "@vitest/coverage-v8": 4.1.10
+  "@vitest/coverage-v8": 4.1.11
   "@heroicons/react": ^2.2.0
   "@nivo/core": ^0.99.0
   "@playwright/test": ^1.62.1
@@ -71,7 +71,7 @@ catalog:
   "vanilla-cookieconsent": ^3.1.0
   "vaul": ^1.1.2
   "v8-to-istanbul": ^9.3.0
-  "vitest": ^4.1.10
+  "vitest": ^4.1.11
   "webpack": ^5.109.2
   "webpack-cli": ^7.2.2
   "webpack-dev-server": ^6.0.0
