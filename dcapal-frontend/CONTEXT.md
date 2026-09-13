@@ -8,6 +8,21 @@ This context helps a self-directed investor define portfolios, review their valu
 A named collection of portfolio assets, a quote currency, target weights, and fee policies. It may include current holdings, but strategic allocation guidance and other planning decisions are separate concepts rather than fields inside the Portfolio.
 _Avoid_: Account, order, strategic allocation, when referring to the asset collection
 
+**Portfolio overview**:
+The investor-facing summary of a Portfolio's current value, performance,
+holdings, target comparison, and available next actions. It is the main place
+to understand the selected Portfolio and choose whether to manage assets,
+review guidance, allocate, or rebalance.
+_Avoid_: Dashboard, account overview, when referring to the Portfolio summary
+
+**Drift diagnostic**:
+An explanation of how a Portfolio asset or Asset Class's Current weight compares
+with its Target weight and Drift band. It communicates whether the weight is
+below, within, or above the accepted range and may point to allocation or
+rebalancing as a next action.
+_Avoid_: Alert, warning, recommendation, when naming the explanation rather
+than the state or the action
+
 **Portfolio clone**:
 A new independent Portfolio copied from an existing Portfolio for experimentation. Changes to the clone do not change the original Portfolio; historical performance is calculated separately from asset time series for whichever Portfolio is selected.
 _Avoid_: Portfolio version, scenario, when referring to an experimental copy
