@@ -15,6 +15,12 @@ The start step is complete when the affected route, user journey, state transiti
 
 - Prefer shadcn/ui primitives when they fit the interaction. Build product-specific components as reusable components so the same behavior and accessibility contract can be used by more than one screen.
 - Keep the interface mobile-first and accessible. Preserve the shared behavior between mobile cards and desktop tables, clear names and focus order, keyboard support, Escape dismissal, visible validation, and non-colour status cues.
+- For new UI, read `src/design-system/README.md` and inspect the matching Storybook stories before creating a component or pattern.
+- Put new typed primitives and reusable product patterns under `src/design-system/`. Use Base UI composition and semantic design tokens; use `render` for element composition and do not introduce new Radix-style `asChild` APIs.
+- Keep Radix and Vaul imports limited to existing legacy consumers under `src/components/`. Do not add either library to new design-system components, and do not migrate existing screens unless the feature request includes that migration.
+- Name product patterns with the frontend glossary, for example `PortfolioAssetCard` and `DriftDiagnostic`. Keep user-facing language separate from implementation names.
+- Add typed Storybook stories for each intentional state and responsive contract. Include accessibility, focus, keyboard, validation, loading, error, success, destructive, and gated states when the component supports them.
+- Keep docs-safe stories closed and use Canvas-only or non-inline stories for dialogs, drawers, menus, and mutually exclusive states. Compare visual states with the supplied boards at 1440×900 and 390×844 before changing component geometry.
 
 ## Component structure
 
@@ -32,4 +38,4 @@ The start step is complete when the affected route, user journey, state transiti
 
 ## Completion check
 
-Frontend work is complete when the affected Playwright journey passes at each changed viewport, focused tests cover logic with no honest browser path, generated source has not been hand-edited, and the applicable type, lint, build, or test commands from the repository pass. Report any environment-dependent check that could not run.
+Frontend work is complete when the affected Playwright journey passes at each changed viewport, focused tests cover logic with no honest browser path, generated source has not been hand-edited, new design-system states have Storybook coverage, and the applicable type, lint, build, or test commands from the repository pass. Report any environment-dependent check that could not run.

@@ -358,6 +358,52 @@ jobs:
           path: coverage/frontend/
           retention-days: 30
 
+  frontend-storybook-tests:
+    name: test:storybook:frontend
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    needs: optimizer-build-test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # The generated package is a local dependency and must exist before pnpm install.
+      - name: Download dcapal-optimizer-wasm pkg
+        uses: actions/download-artifact@v8
+        with:
+          name: dcapal-optimizer-wasm-pkg
+          path: dcapal-optimizer-wasm/pkg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Version the browser cache so Playwright upgrades invalidate old binaries.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-v1-
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @dcapal/frontend exec playwright install --with-deps
+
+      - name: Run Storybook regression tests
+        run: pnpm --filter @dcapal/frontend storybook:test
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-report-storybook
+          path: dcapal-frontend/playwright-report/
+          retention-days: 30
+
   test-e2e-smoke:
     name: test:e2e:smoke
     timeout-minutes: 60

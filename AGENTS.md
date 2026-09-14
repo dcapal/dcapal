@@ -7,6 +7,10 @@
 - `docs/` — shared ADRs, research, plans, and agent guidance.
 - `CONTEXT-MAP.md` and each app's `CONTEXT.md` — context boundaries, glossary, and domain relationships.
 
+For frontend UI work, read `dcapal-frontend/AGENTS.md` and
+`dcapal-frontend/src/design-system/README.md`; those files define the typed
+design-system, Storybook, Base UI, and legacy-component rules.
+
 ## Domain docs
 
 Multi-context layout: root `CONTEXT-MAP.md` with per-app `CONTEXT.md` files and ADRs. See `docs/agents/domain.md`.

@@ -9,6 +9,13 @@ catalog:
   "@babel/preset-env": ^8.0.2
   "@babel/preset-react": ^8.0.1
   "@babel/preset-typescript": ^8.0.1
+  "@base-ui/react": ^1.8.0
+  "@axe-core/playwright": ^4.13.0
+  "@storybook/addon-a11y": ^8.6.17
+  "@storybook/addon-essentials": ^8.6.17
+  "@storybook/addon-webpack5-compiler-babel": ^3.0.6
+  "@storybook/react": ^8.6.17
+  "@storybook/react-webpack5": ^8.6.17
   "@vitest/coverage-v8": 4.1.11
   "@heroicons/react": ^2.2.0
   "@nivo/core": ^0.99.0
@@ -60,6 +67,7 @@ catalog:
   "react-i18next": ^17.0.11
   "react-router-dom": ^7.18.2
   "recharts": ^3.10.1
+  "storybook": ^8.6.17
   "style-loader": ^4.0.0
   "svg-url-loader": ^8.1.0
   "tailwind-merge": ^3.6.0
