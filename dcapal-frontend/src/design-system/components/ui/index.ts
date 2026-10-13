@@ -2,6 +2,7 @@ export * from "./button";
 export * from "./asset-ticker-chip";
 export * from "./card";
 export * from "./controls";
+export * from "./description-list";
 export * from "./feedback";
 export * from "./form";
 export * from "./input";

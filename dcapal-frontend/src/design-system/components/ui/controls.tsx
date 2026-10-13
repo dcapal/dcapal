@@ -91,6 +91,8 @@ export interface SegmentedControlProps extends Omit<
   onValueChange?: (value: string) => void;
   /** Compact controls match dense settings and fee forms. */
   size?: "sm" | "md";
+  /** Stretches the control to the full width of its container with equal options. */
+  block?: boolean;
 }
 
 /** A Base UI radio group presented as a compact, exclusive button row. */
@@ -106,6 +108,7 @@ export const SegmentedControl = React.forwardRef<
     defaultValue,
     onValueChange,
     size = "md",
+    block = false,
     ...props
   },
   ref
@@ -119,6 +122,7 @@ export const SegmentedControl = React.forwardRef<
       className={cn(
         "ds-segmented-control",
         `ds-segmented-control--${size}`,
+        block && "ds-segmented-control--block",
         className
       )}
       value={value}
@@ -227,5 +231,53 @@ export const RadioCardGroup = React.forwardRef<
         })}
       </span>
     </BaseRadioGroup>
+  );
+});
+
+export interface CheckboxCardProps extends Omit<
+  React.ComponentPropsWithoutRef<typeof BaseCheckbox.Root>,
+  "children" | "title"
+> {
+  /** Title shown for the option. */
+  title: React.ReactNode;
+  /** Supporting explanation shown below the title. */
+  description?: React.ReactNode;
+}
+
+/** A checkbox presented as a titled, described card that toggles as a whole. */
+export const CheckboxCard = React.forwardRef<
+  HTMLButtonElement,
+  CheckboxCardProps
+>(function CheckboxCard(
+  { className, title, description, disabled, ...props },
+  ref
+) {
+  const idPrefix = React.useId();
+  const titleId = `${idPrefix}-title`;
+  const descriptionId = `${idPrefix}-description`;
+
+  return (
+    <label
+      className={cn("ds-checkbox-card", className)}
+      data-disabled={disabled ? "" : undefined}
+    >
+      <Checkbox
+        ref={ref}
+        disabled={disabled}
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        {...props}
+      />
+      <span className="ds-checkbox-card__copy">
+        <span id={titleId} className="ds-checkbox-card__title">
+          {title}
+        </span>
+        {description ? (
+          <span id={descriptionId} className="ds-checkbox-card__description">
+            {description}
+          </span>
+        ) : null}
+      </span>
+    </label>
   );
 });
