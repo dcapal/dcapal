@@ -80,6 +80,24 @@ export const ButtonPressedStates: Story = {
   tags: ["!autodocs"],
 };
 
+export const CardGhost: Story = {
+  render: () => (
+    <div className="dcapal-theme" style={{ maxWidth: "32rem" }}>
+      <Card variant="ghost">
+        <CardHeader>
+          <CardTitle>Warm surface</CardTitle>
+          <CardDescription>
+            A low-emphasis card surface for first-use guidance and setup cues.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button>Continue</Button>
+        </CardContent>
+      </Card>
+    </div>
+  ),
+};
+
 export const FormStates: Story = {
   render: () => (
     <div

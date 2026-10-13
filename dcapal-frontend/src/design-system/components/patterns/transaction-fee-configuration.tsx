@@ -114,7 +114,7 @@ export function TransactionFeeConfigurationForm({
 }: TransactionFeeConfigurationFormProps) {
   const options = [
     ...(includePortfolioDefault
-      ? [{ value: "portfolio", label: "Portfolio default" }]
+      ? [{ value: "portfolio", label: "Default" }]
       : []),
     { value: "zero", label: "Zero" },
     { value: "fixed", label: "Fixed" },
@@ -256,7 +256,7 @@ export interface TransactionFeeConfigurationProps {
   initialFeeRate?: string;
   initialMinFee?: string;
   initialMaxFee?: string;
-  /** Values inherited by Portfolio default, kept separate from asset overrides. */
+  /** Values inherited by the portfolio default, kept separate from asset overrides. */
   portfolioDefaults?: Pick<
     TransactionFeeConfigurationValues,
     "maximumImpact" | "amount" | "feeRate" | "minFee" | "maxFee"

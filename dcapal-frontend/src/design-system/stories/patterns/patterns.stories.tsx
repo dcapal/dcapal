@@ -1,17 +1,40 @@
+import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { Pencil, PieChart, Plus, RefreshCw } from "lucide-react";
-import { Button } from "../../components/ui";
+import { Button, type PortfolioIconId } from "../../components/ui";
 import {
   AppShell,
   DriftDiagnostic,
-  FloatingActionMenu,
   MetricCard,
   PageHeader,
   PerformanceChart,
   PortfolioAssetCollection,
+  PortfolioFooter,
+  PortfolioIndex,
+  PortfolioSetupPage,
+  PortfolioWorkspace,
+  portfolioSummaryFixtures,
   TopNavigation,
 } from "../../components/patterns";
 import { portfolioAssets } from "../../fixtures/portfolio";
+import { PortfolioIconPicker } from "../../components/patterns/portfolio-icon-picker";
+
+const workspacePortfolioFixtures = {
+  "Core portfolio": {
+    currentValue: "€124,680.75",
+    dayChange: "+€612.18 (+0.49%)",
+    assets: portfolioAssets.slice(0, 4),
+  },
+  "Long-term growth": {
+    currentValue: "€52,340.12",
+    dayChange: "+€342.56 (+0.69%)",
+    assets: portfolioAssets.slice(0, 3),
+  },
+  "Emergency fund": {
+    currentValue: "€15,250.00",
+    dayChange: "+€12.50 (+0.08%)",
+    assets: portfolioAssets.slice(4),
+  },
+} as const;
 
 const meta = {
   title: "Patterns / Portfolio",
@@ -25,17 +48,58 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const portfolioOptions = [
+  { label: "Core portfolio", value: "core" },
+  { label: "Long-term growth", value: "growth" },
+  { label: "Emergency fund", value: "emergency" },
+] as const;
+
+function FloatingActionsNavigationPreview() {
+  const [portfolioId, setPortfolioId] = React.useState("core");
+  const portfolioOption =
+    portfolioOptions.find(({ value }) => value === portfolioId) ??
+    portfolioOptions[0];
+  const portfolio = workspacePortfolioFixtures[portfolioOption.label];
+
+  return (
+    <PortfolioWorkspace
+      portfolioName={portfolioOption.label}
+      portfolioOptions={portfolioOptions}
+      onPortfolioChange={setPortfolioId}
+      selectedItem="overview"
+    >
+      <PageHeader
+        title={portfolioOption.label}
+        description="As of 2 Aug 2026"
+        actions={<Button variant="primary">Add asset</Button>}
+      />
+      <div className="ds-metric-grid">
+        <MetricCard
+          metric={{
+            label: "Current value",
+            value: portfolio.currentValue,
+            context: "As of 2 Aug 2026",
+          }}
+        />
+        <MetricCard
+          metric={{
+            label: "Day change",
+            value: portfolio.dayChange,
+            context: "Since previous close",
+            trend: "positive",
+          }}
+        />
+      </div>
+    </PortfolioWorkspace>
+  );
+}
+
 export const Shell: Story = {
   render: () => (
-    <AppShell
-      navigation={
-        <TopNavigation
-          links={[
-            { label: "Overview", href: "#overview", active: true },
-            { label: "Historical analytics", href: "#history" },
-          ]}
-        />
-      }
+    <PortfolioWorkspace
+      portfolioName="Core portfolio"
+      portfolioOptions={portfolioOptions}
+      selectedItem="overview"
     >
       <PageHeader
         title="Core portfolio"
@@ -66,22 +130,17 @@ export const Shell: Story = {
           }}
         />
       </div>
-    </AppShell>
+    </PortfolioWorkspace>
   ),
 };
 
 export const ShellMobile: Story = {
   parameters: { viewport: { defaultViewport: "mobile" } },
   render: () => (
-    <AppShell
-      navigation={
-        <TopNavigation
-          links={[
-            { label: "Overview", href: "#overview", active: true },
-            { label: "Historical analytics", href: "#history" },
-          ]}
-        />
-      }
+    <PortfolioWorkspace
+      portfolioName="Core portfolio"
+      portfolioOptions={portfolioOptions}
+      selectedItem="overview"
     >
       <PageHeader title="Core portfolio" description="As of 2 Aug 2026" />
       <div className="ds-metric-grid">
@@ -94,8 +153,265 @@ export const ShellMobile: Story = {
           }}
         />
       </div>
+    </PortfolioWorkspace>
+  ),
+  tags: ["!autodocs"],
+};
+
+export const MyPortfoliosEmpty: Story = {
+  render: () => (
+    <AppShell
+      navigation={
+        <TopNavigation
+          showPortfolioSelector={false}
+          links={[
+            { label: "My portfolios", href: "/allocate", active: true },
+            { label: "Documentation", href: "/docs" },
+            { label: "About", href: "/about" },
+          ]}
+        />
+      }
+      footer={<PortfolioFooter />}
+    >
+      <PortfolioIndex
+        onCreatePortfolio={() => undefined}
+        onImportPortfolio={() => undefined}
+      />
     </AppShell>
   ),
+};
+
+export const MyPortfoliosEmptyMobile: Story = {
+  parameters: {
+    viewport: { defaultViewport: "mobile" },
+    docs: { story: { inline: false, iframeHeight: 1200 } },
+  },
+  render: () => (
+    <AppShell
+      navigation={
+        <TopNavigation showPortfolioSelector={false} showMenu={false} />
+      }
+      footer={<PortfolioFooter />}
+    >
+      <PortfolioIndex
+        onCreatePortfolio={() => undefined}
+        onImportPortfolio={() => undefined}
+      />
+    </AppShell>
+  ),
+  tags: ["!autodocs"],
+};
+
+export const MyPortfoliosPopulated: Story = {
+  render: () => {
+    const [portfolios, setPortfolios] = React.useState(
+      portfolioSummaryFixtures
+    );
+    return (
+      <AppShell
+        navigation={
+          <TopNavigation
+            showPortfolioSelector={false}
+            links={[
+              { label: "My portfolios", href: "/allocate", active: true },
+              { label: "Documentation", href: "/docs" },
+              { label: "About", href: "/about" },
+            ]}
+          />
+        }
+        footer={<PortfolioFooter />}
+      >
+        <PortfolioIndex
+          portfolios={portfolios}
+          onSelectPortfolio={() => undefined}
+          onCreatePortfolio={() => undefined}
+          onImportPortfolio={() => undefined}
+          onPortfolioIconChange={(portfolio, icon) =>
+            setPortfolios((current) =>
+              current.map((item) =>
+                item.id === portfolio.id ? { ...item, icon } : item
+              )
+            )
+          }
+        />
+      </AppShell>
+    );
+  },
+};
+
+export const MyPortfoliosPopulatedMobile: Story = {
+  parameters: { viewport: { defaultViewport: "mobile" } },
+  render: () => (
+    <AppShell
+      navigation={
+        <TopNavigation showPortfolioSelector={false} showMenu={false} />
+      }
+      footer={<PortfolioFooter />}
+    >
+      <PortfolioIndex
+        portfolios={portfolioSummaryFixtures}
+        onSelectPortfolio={() => undefined}
+        onCreatePortfolio={() => undefined}
+        onImportPortfolio={() => undefined}
+        onPortfolioIconChange={() => undefined}
+      />
+    </AppShell>
+  ),
+  tags: ["!autodocs"],
+};
+
+export const PortfolioIconCustomization: Story = {
+  render: () => {
+    const [icon, setIcon] = React.useState<PortfolioIconId>("pie-chart");
+    return (
+      <div
+        className="dcapal-theme"
+        style={{ padding: "var(--dcapal-space-6)", minHeight: "12rem" }}
+      >
+        <PortfolioIconPicker value={icon} onValueChange={setIcon} />
+      </div>
+    );
+  },
+  tags: ["!autodocs"],
+};
+
+export const PortfolioSetup: Story = {
+  render: () => (
+    <AppShell
+      navigation={
+        <TopNavigation showPortfolioSelector={false} showMenu={false} />
+      }
+      footer={<PortfolioFooter />}
+    >
+      <PortfolioSetupPage />
+    </AppShell>
+  ),
+  parameters: { docs: { story: { inline: false, iframeHeight: 1100 } } },
+};
+
+export const PortfolioSetupMobile: Story = {
+  parameters: {
+    viewport: { defaultViewport: "mobile" },
+    docs: { story: { inline: false, iframeHeight: 1200 } },
+  },
+  render: () => (
+    <AppShell
+      navigation={
+        <TopNavigation showPortfolioSelector={false} showMenu={false} />
+      }
+      footer={<PortfolioFooter />}
+    >
+      <PortfolioSetupPage />
+    </AppShell>
+  ),
+  tags: ["!autodocs"],
+};
+
+export const PortfolioWorkspaceShell: Story = {
+  render: () => {
+    const [portfolio, setPortfolio] = React.useState("Core portfolio");
+    const [selected, setSelected] = React.useState("overview");
+    const metrics =
+      workspacePortfolioFixtures[
+        portfolio as keyof typeof workspacePortfolioFixtures
+      ];
+    return (
+      <PortfolioWorkspace
+        portfolioName={portfolio}
+        portfolioOptions={portfolioOptions}
+        onPortfolioChange={(value) =>
+          setPortfolio(
+            portfolioOptions.find((option) => option.value === value)?.label ??
+              "Core portfolio"
+          )
+        }
+        selectedItem={selected}
+        onSelectItem={(item) => setSelected(item.id)}
+      >
+        <div id="overview">
+          <PageHeader title={portfolio} description="As of 2 Aug 2026" />
+          <div className="ds-metric-grid">
+            <MetricCard
+              metric={{ label: "Current value", value: metrics.currentValue }}
+            />
+            <MetricCard
+              metric={{
+                label: "Day change",
+                value: metrics.dayChange,
+                trend: "positive",
+              }}
+            />
+          </div>
+          <PortfolioAssetCollection
+            title="Holdings"
+            subtitle={null}
+            assets={metrics.assets}
+            presentation="overview"
+          />
+        </div>
+      </PortfolioWorkspace>
+    );
+  },
+};
+
+export const PortfolioWorkspaceShellMobile: Story = {
+  parameters: {
+    viewport: { defaultViewport: "mobile" },
+    docs: { story: { inline: false, iframeHeight: 1200 } },
+  },
+  render: () => {
+    const [portfolio, setPortfolio] = React.useState("Core portfolio");
+    const [selected, setSelected] = React.useState("overview");
+    const metrics =
+      workspacePortfolioFixtures[
+        portfolio as keyof typeof workspacePortfolioFixtures
+      ];
+    return (
+      <PortfolioWorkspace
+        portfolioName={portfolio}
+        portfolioOptions={portfolioOptions}
+        onPortfolioChange={(value) =>
+          setPortfolio(
+            portfolioOptions.find((option) => option.value === value)?.label ??
+              "Core portfolio"
+          )
+        }
+        selectedItem={selected}
+        onSelectItem={(item) => setSelected(item.id)}
+      >
+        <div id="overview">
+          <PageHeader title={portfolio} description="As of 2 Aug 2026" />
+          <div className="ds-metric-grid">
+            <MetricCard
+              metric={{ label: "Current value", value: metrics.currentValue }}
+            />
+            <MetricCard
+              metric={{
+                label: "Day change",
+                value: metrics.dayChange,
+                trend: "positive",
+              }}
+            />
+          </div>
+          <PortfolioAssetCollection
+            title="Holdings"
+            subtitle={null}
+            assets={metrics.assets}
+          />
+        </div>
+      </PortfolioWorkspace>
+    );
+  },
+  tags: ["!autodocs"],
+};
+
+export const PortfolioFooterStory: Story = {
+  render: () => <PortfolioFooter />,
+};
+
+export const PortfolioFooterMobile: Story = {
+  parameters: { viewport: { defaultViewport: "mobile" } },
+  render: () => <PortfolioFooter />,
   tags: ["!autodocs"],
 };
 
@@ -175,6 +491,41 @@ export const AssetsDesktop: Story = {
   tags: ["!autodocs"],
 };
 
+export const AssetsOverviewDesktop: Story = {
+  parameters: { viewport: { defaultViewport: "desktop" } },
+  render: () => (
+    <div className="dcapal-theme" style={{ padding: "var(--dcapal-space-6)" }}>
+      <PortfolioAssetCollection
+        title="Holdings"
+        subtitle={null}
+        presentation="overview"
+        assets={portfolioAssets}
+        onEdit={() => undefined}
+        onMenu={() => undefined}
+      />
+    </div>
+  ),
+  tags: ["!autodocs"],
+};
+
+export const AssetsLongName: Story = {
+  parameters: { viewport: { defaultViewport: "mobile" } },
+  render: () => (
+    <div className="dcapal-theme" style={{ padding: "var(--dcapal-space-6)" }}>
+      <PortfolioAssetCollection
+        assets={[
+          {
+            ...portfolioAssets[0],
+            id: "long-name",
+            name: "Vanguard FTSE All-World UCITS ETF Accumulating EUR Hedged",
+          },
+        ]}
+      />
+    </div>
+  ),
+  tags: ["!autodocs"],
+};
+
 export const ChartReady: Story = {
   render: () => (
     <div className="dcapal-theme" style={{ padding: "var(--dcapal-space-6)" }}>
@@ -211,99 +562,18 @@ export const ChartGated: Story = {
 };
 
 export const FloatingActions: Story = {
-  render: () => (
-    <div className="dcapal-theme" style={{ minHeight: "18rem" }}>
-      <FloatingActionMenu
-        actions={[
-          {
-            label: "Add asset",
-            icon: <Plus aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Allocate",
-            icon: <PieChart aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Rebalance",
-            icon: <RefreshCw aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Edit portfolio",
-            icon: <Pencil aria-hidden />,
-            onClick: () => undefined,
-          },
-        ]}
-      />
-    </div>
-  ),
+  render: () => <FloatingActionsNavigationPreview />,
   tags: ["!autodocs"],
 };
 
 export const FloatingActionsMobile: Story = {
   parameters: { viewport: { defaultViewport: "mobile" } },
-  render: () => (
-    <div className="dcapal-theme" style={{ minHeight: "18rem" }}>
-      <FloatingActionMenu
-        actions={[
-          {
-            label: "Add asset",
-            icon: <Plus aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Allocate",
-            icon: <PieChart aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Rebalance",
-            icon: <RefreshCw aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Edit portfolio",
-            icon: <Pencil aria-hidden />,
-            onClick: () => undefined,
-          },
-        ]}
-      />
-    </div>
-  ),
+  render: () => <FloatingActionsNavigationPreview />,
   tags: ["!autodocs"],
 };
 
 export const FloatingActionsDesktop: Story = {
   parameters: { viewport: { defaultViewport: "desktop" } },
-  render: () => (
-    <div className="dcapal-theme" style={{ minHeight: "18rem" }}>
-      <FloatingActionMenu
-        actions={[
-          {
-            label: "Add asset",
-            icon: <Plus aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Allocate",
-            icon: <PieChart aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Rebalance",
-            icon: <RefreshCw aria-hidden />,
-            onClick: () => undefined,
-          },
-          {
-            label: "Edit portfolio",
-            icon: <Pencil aria-hidden />,
-            onClick: () => undefined,
-          },
-        ]}
-      />
-    </div>
-  ),
+  render: () => <FloatingActionsNavigationPreview />,
   tags: ["!autodocs"],
 };
