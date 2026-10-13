@@ -14,6 +14,10 @@ const meta = {
       control: { type: "select" },
       options: ["populated", "empty"],
     },
+    firstUseStage: {
+      control: { type: "select" },
+      options: ["empty", "name", "asset", "weights"],
+    },
   },
 } satisfies Meta<typeof PortfolioOverviewComposition>;
 export default meta;
@@ -24,6 +28,32 @@ export const Populated: Story = {};
 export const FirstUse: Story = {
   args: { state: "empty" },
   tags: ["!autodocs"],
+};
+
+export const FirstUseNameComplete: Story = {
+  args: { state: "empty", firstUseStage: "name" },
+  tags: ["!autodocs"],
+};
+
+export const FirstUseAssetAdded: Story = {
+  args: { state: "empty", firstUseStage: "asset" },
+  tags: ["!autodocs"],
+};
+
+export const FirstUseWeightsComplete: Story = {
+  args: { state: "empty", firstUseStage: "weights" },
+  tags: ["!autodocs"],
+};
+
+export const FirstUseAssetAddedMobile: Story = {
+  args: { state: "empty", firstUseStage: "asset" },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 
 export const PopulatedMobile: Story = {

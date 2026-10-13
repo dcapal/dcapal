@@ -7,5 +7,6 @@ export * from "./form";
 export * from "./input";
 export * from "./navigation";
 export * from "./overlay";
+export * from "./portfolio-icon";
 export * from "./select";
 export * from "./table";

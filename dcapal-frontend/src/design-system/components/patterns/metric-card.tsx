@@ -6,16 +6,25 @@ export interface MetricCardProps {
   metric: PortfolioMetric;
   className?: string;
   density?: "default" | "compact";
+  /** Renders an informative not-yet-available state instead of a live value. */
+  placeholder?: boolean;
 }
 
 export function MetricCard({
   metric,
   className,
   density = "default",
+  placeholder = false,
 }: MetricCardProps) {
   return (
     <Card
-      className={cn("ds-metric-card", `ds-metric-card--${density}`, className)}
+      className={cn(
+        "ds-metric-card",
+        `ds-metric-card--${density}`,
+        placeholder && "ds-metric-card--placeholder",
+        className
+      )}
+      data-placeholder={placeholder || undefined}
     >
       <CardContent>
         <div className="ds-metric-card__label">{metric.label}</div>

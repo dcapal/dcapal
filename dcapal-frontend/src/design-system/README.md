@@ -20,36 +20,50 @@ feature.
 
 ## Design language
 
-The current direction follows the portfolio journey references:
+The current direction follows the selected Editorial wealth-planner boards:
 
-- one light theme with warm canvas and surface colours;
-- dark navigation chrome;
-- violet primary actions;
-- clear success, warning, information, and destructive states;
-- compact rounded cards with restrained elevation;
+- a shared warm-ivory canvas for pages, navigation, the portfolio rail, and footer;
+- deep ink text with muted supporting text and quiet dividers;
+- rust primary actions, with separate positive, warning, information, and error colours;
+- compact cards, thin borders, small radii, and restrained elevation;
+- Instrument Sans throughout, loaded through Google Fonts with a local sans-serif fallback;
 - equivalent mobile cards and desktop tables for portfolio assets.
 
 Use semantic tokens from `styles/` for every visual decision. Keep colour,
 spacing, radius, typography, and elevation values out of component files. The
 `dcapal-theme` scope protects existing application screens from changes to the
-new token layer.
+new token layer. Do not add bottom navigation to portfolio journeys: mobile
+navigation uses the existing FAB to open the canonical portfolio drawer, and
+desktop uses the sidebar rail.
 
 Card spacing is owned by the `Card` primitive. `CardContent` is padded when it
 stands alone; adjacent header, content, and footer slots remove only their
 shared interior edge. Use the finite `density="default" | "compact"` option
 when a board calls for a tighter card, not a one-off padding class.
+Use `variant="ghost"` for onboarding surfaces that should sit on the shared
+canvas without a raised card treatment. `PortfolioFooter` and
+`PortfolioWorkspaceSidebar` use the page canvas by default. The `warm` footer
+tone remains available for compatibility and resolves to that same canvas;
+pass `tone="dark"` only when the dark footer is intentional.
+
+`PortfolioWorkspaceSidebar` is the canonical portfolio navigation for both the
+desktop rail and mobile drawer. Portfolio identity uses the typed
+`PortfolioIcon` registry and `PortfolioIconPicker`; do not pass arbitrary icon
+nodes or build a second picker inside a card.
 
 Use `InputWithSuffix` for currency and percentage fields so the unit remains
-inside the control. Keep trigger values human-readable (for example,
-`Portfolio default`, `Fixed`, or `±5 pp`); internal enum values never appear in
-the interface. The Add asset action is a ghost action in the Investments
-header on desktop and a bottom-right FAB on mobile.
+inside the control. Keep trigger values human-readable (for example, `Default`,
+`Fixed`, or `±5 pp`); internal enum values never appear in the interface. Add
+asset is an overview action that opens a dialog on desktop and a full-height
+drawer on mobile. It is not a sidebar item. On mobile, the portfolio navigation
+FAB opens the shared navigation drawer; desktop never renders that FAB.
 
 Search results and unpriced results use the shared neutral `AssetTickerChip`.
-Collection cards and tables show the ticker as light text on the asset-name
-line, separated by a centered dot. They expose the same `Average cost basis`
-label and show an em dash when the fixture has no value. Numeric headers,
-values, and drift remain right-aligned and do not wrap.
+Collection cards and tables show the asset name first and the ticker below it.
+Mobile cards then show `TICKER · Asset class · Region` as a separate metadata
+line. Names wrap when needed and are never truncated. They expose the same
+`Average cost basis` label and show an em dash when the fixture has no value.
+Numeric headers, values, and drift remain right-aligned and do not wrap.
 
 Fee controls use the compact `SegmentedControl` for policy selection. Portfolio
 settings render the selected Zero, Fixed, or Variable form inline. Asset forms
@@ -111,7 +125,8 @@ patterns.
 Document intentional user states, not every possible prop combination. At
 minimum, cover disabled, loading, invalid, success, destructive, focus,
 keyboard, open/closed, and responsive states when the component supports
-them. Journey compositions should also show first-use and populated overview,
+them. Journey compositions should also show empty, name-complete, asset-added,
+target-weights-complete, and populated overview,
 search loading/empty/error/unpriced results, save success/error, drift below,
 within, and above target, registration-gated history, and dialog focus,
 Escape dismissal, and focus restoration.
@@ -139,6 +154,10 @@ state separately.
 - Keep new design-system source typed and independent of Radix/Vaul.
 - Preserve equivalent mobile and desktop behaviour where a layout changes.
 - Add intentional state stories and accessibility coverage.
+- Use `PortfolioAssetCollection` for every responsive asset presentation; do
+  not introduce a second holdings table for a shell composition.
+- Keep first-use metric placeholders and setup progress visible in every
+  deterministic overview stage.
 - Keep feature data, queries, validation, and calculations in hooks or pure
   modules outside presentational components.
 - Update the relevant ADR or glossary term when a new durable design or domain

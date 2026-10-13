@@ -18,7 +18,6 @@ const meta = {
       control: { type: "select" },
       options: ["settings", "strategic"],
     },
-    open: { control: { type: "boolean" } },
   },
 } satisfies Meta<typeof PortfolioSettingsComposition>;
 export default meta;
@@ -26,7 +25,6 @@ type Story = StoryObj<typeof meta>;
 
 export const AllocationMethod: Story = {};
 export const AllocationMethodMobile: Story = {
-  args: { open: true },
   tags: ["!autodocs"],
   globals: {
     viewport: {
@@ -36,15 +34,14 @@ export const AllocationMethodMobile: Story = {
   },
 };
 export const AllocationMethodOpen: Story = {
-  args: { open: true },
   tags: ["!autodocs"],
 };
 export const StrategicAllocation: Story = {
-  args: { view: "strategic", open: true },
+  args: { view: "strategic" },
   tags: ["!autodocs"],
 };
 export const StrategicAllocationMobile: Story = {
-  args: { view: "strategic", open: true },
+  args: { view: "strategic" },
   tags: ["!autodocs"],
   globals: {
     viewport: {

@@ -1,4 +1,4 @@
-import type * as React from "react";
+import * as React from "react";
 import type { PortfolioAsset } from "../../fixtures/portfolio";
 import { EmptyState } from "../ui";
 import { PortfolioAssetCard } from "./portfolio-asset-card";
@@ -6,6 +6,12 @@ import { PortfolioAssetTable } from "./portfolio-asset-table";
 
 export interface PortfolioAssetCollectionProps {
   assets: readonly PortfolioAsset[];
+  /** Selects a focused holdings summary or the full asset-management table. */
+  presentation?: "detailed" | "overview";
+  /** Optional heading override for embedding the collection in another pattern. */
+  title?: React.ReactNode;
+  /** Optional supporting copy shown below the collection heading. */
+  subtitle?: React.ReactNode;
   /** Optional actions rendered beside the collection heading on wide layouts. */
   headerActions?: React.ReactNode;
   onEdit?: (asset: PortfolioAsset) => void;
@@ -15,18 +21,28 @@ export interface PortfolioAssetCollectionProps {
 /** The responsive contract: one normalized model, equivalent card and table labels/actions. */
 export function PortfolioAssetCollection({
   assets,
+  presentation = "detailed",
+  title = "Investments",
+  subtitle = "Grouped by individual asset",
   headerActions,
   onEdit,
   onMenu,
 }: PortfolioAssetCollectionProps) {
+  const headingId = React.useId();
+
   return (
-    <section aria-label="Investments" className="ds-asset-collection">
+    <section
+      aria-labelledby={headingId}
+      className={`ds-asset-collection ds-asset-collection--${presentation}`}
+    >
       <header className="ds-asset-collection__header">
         <div>
-          <h2 className="ds-asset-collection__title">Investments</h2>
-          <span className="ds-asset-collection__subtitle">
-            Grouped by individual asset
-          </span>
+          <h2 className="ds-asset-collection__title" id={headingId}>
+            {title}
+          </h2>
+          {subtitle ? (
+            <span className="ds-asset-collection__subtitle">{subtitle}</span>
+          ) : null}
         </div>
         <div className="ds-asset-collection__header-side">
           {headerActions ? (
@@ -59,6 +75,7 @@ export function PortfolioAssetCollection({
           <div className="ds-asset-collection__table">
             <PortfolioAssetTable
               assets={assets}
+              presentation={presentation}
               onEdit={onEdit}
               onMenu={onMenu}
             />

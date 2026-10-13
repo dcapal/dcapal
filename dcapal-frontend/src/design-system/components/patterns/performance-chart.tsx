@@ -125,7 +125,7 @@ export function PerformanceChart({
         ) : state === "gated" ? (
           <EmptyState
             title="Sign in to view history"
-            description="Historical analytics are available after registration."
+            description="Portfolio performance is available after registration."
             action={<Button variant="primary">Create account</Button>}
           />
         ) : (

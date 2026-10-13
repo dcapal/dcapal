@@ -37,11 +37,41 @@ export const AllocationResult: Story = {
   args: { state: "result" },
   tags: ["!autodocs"],
 };
-export const AllocationReviewDeltas: Story = {
+export const AllocationResultMobile: Story = {
+  args: { state: "result" },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
+};
+export const RebalanceResult: Story = {
   args: { state: "result", mode: "rebalance" },
   tags: ["!autodocs"],
+};
+export const RebalanceResultMobile: Story = {
+  args: { state: "result", mode: "rebalance" },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 export const RebalanceOptions: Story = {
   args: { mode: "rebalance" },
   tags: ["!autodocs"],
+};
+export const RebalanceOptionsMobile: Story = {
+  args: { mode: "rebalance" },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };

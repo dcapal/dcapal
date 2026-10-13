@@ -21,9 +21,8 @@ const preview: Preview = {
           name: "Light canvas",
           value: "var(--dcapal-canvas)",
         },
-
-        dark_chrome: {
-          name: "Dark chrome",
+        ink_surface: {
+          name: "Ink surface",
           value: "var(--dcapal-chrome)",
         },
       },

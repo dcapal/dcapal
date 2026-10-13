@@ -36,13 +36,16 @@ export function PortfolioAssetCard({
           <div className="ds-asset-card__identity">
             <div className="ds-asset-card__title-row">
               <span className="ds-asset-card__name">{asset.name}</span>
-              <span className="ds-asset-card__ticker">
-                {` · ${asset.ticker}`}
+            </div>
+            <div className="ds-asset-card__ticker-row">
+              <span className="ds-asset-card__ticker">{asset.ticker}</span>
+              <span className="ds-asset-card__ticker-separator" aria-hidden>
+                ·
+              </span>
+              <span className="ds-asset-card__meta">
+                {formatAssetClass(asset)}
               </span>
             </div>
-            <span className="ds-asset-card__meta">
-              {formatAssetClass(asset)}
-            </span>
           </div>
           {onEdit ? (
             <IconButton
