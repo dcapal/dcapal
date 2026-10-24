@@ -4,8 +4,8 @@
  * DCA-Pal APIs
  * OpenAPI spec version: 0.9.0
  */
+import type { AssetRefV2 } from './assetRefV2';
 import type { PortfolioAssetV2ResponseAclassOverride } from './portfolioAssetV2ResponseAclassOverride';
-import type { SharedAssetV2Response } from './sharedAssetV2Response';
 import type { TransactionFeesV2Response } from './transactionFeesV2Response';
 
 /**
@@ -14,11 +14,10 @@ import type { TransactionFeesV2Response } from './transactionFeesV2Response';
 export interface PortfolioAssetV2Response {
   /** @nullable */
   aclassOverride?: PortfolioAssetV2ResponseAclassOverride;
-  asset: SharedAssetV2Response;
+  asset: AssetRefV2;
   /** @nullable */
   averageBuyPrice?: string | null;
   fees?: null | TransactionFeesV2Response;
-  id: string;
   /** @nullable */
   manualPrice?: string | null;
   quantity: string;

@@ -30,6 +30,8 @@ import type {
   GetPriceParams,
   ImportPortfolioBody,
   ImportPortfolioResponse,
+  LookupAssetsV2Params,
+  LookupAssetsV2Response,
   Price,
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
@@ -843,6 +845,142 @@ export function useGetImportedPortfolio<TData = Awaited<ReturnType<typeof getImp
 
 
 
+export type lookupAssetsV2Response200 = {
+  data: LookupAssetsV2Response
+  status: 200
+}
+
+export type lookupAssetsV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type lookupAssetsV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type lookupAssetsV2ResponseSuccess = (lookupAssetsV2Response200) & {
+  headers: Headers;
+};
+export type lookupAssetsV2ResponseError = (lookupAssetsV2Response400 | lookupAssetsV2Response500) & {
+  headers: Headers;
+};
+
+export const getLookupAssetsV2Url = (params: LookupAssetsV2Params,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["asset"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/markets/v2/assets/lookup?${stringifiedParams}` : `/markets/v2/assets/lookup`
+}
+
+/**
+ * @summary Reads the cached metadata of up to 20 assets without contacting providers.
+ */
+export const lookupAssetsV2 = async (params: LookupAssetsV2Params, options?: Parameters<typeof apiFetch>[1]): Promise<lookupAssetsV2ResponseSuccess> => {
+
+  return apiFetch<lookupAssetsV2ResponseSuccess>(getLookupAssetsV2Url(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLookupAssetsV2QueryKey = (params?: LookupAssetsV2Params,) => {
+    return [
+    `/markets/v2/assets/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getLookupAssetsV2QueryOptions = <TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = V2ErrorResponse>(params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLookupAssetsV2QueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupAssetsV2>>> = ({ signal }) => lookupAssetsV2(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type LookupAssetsV2QueryResult = NonNullable<Awaited<ReturnType<typeof lookupAssetsV2>>>
+export type LookupAssetsV2QueryError = V2ErrorResponse
+
+
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = V2ErrorResponse>(
+ params: LookupAssetsV2Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof lookupAssetsV2>>,
+          TError,
+          Awaited<ReturnType<typeof lookupAssetsV2>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = V2ErrorResponse>(
+ params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof lookupAssetsV2>>,
+          TError,
+          Awaited<ReturnType<typeof lookupAssetsV2>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = V2ErrorResponse>(
+ params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Reads the cached metadata of up to 20 assets without contacting providers.
+ */
+
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = V2ErrorResponse>(
+ params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getLookupAssetsV2QueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export type getPriceResponse200 = {
   data: Price
   status: 200
@@ -1089,10 +1227,15 @@ export type syncPortfoliosV2Response500 = {
   status: 500
 }
 
+export type syncPortfoliosV2Response502 = {
+  data: V2ErrorResponse
+  status: 502
+}
+
 export type syncPortfoliosV2ResponseSuccess = (syncPortfoliosV2Response200) & {
   headers: Headers;
 };
-export type syncPortfoliosV2ResponseError = (syncPortfoliosV2Response400 | syncPortfoliosV2Response403 | syncPortfoliosV2Response409 | syncPortfoliosV2Response500) & {
+export type syncPortfoliosV2ResponseError = (syncPortfoliosV2Response400 | syncPortfoliosV2Response403 | syncPortfoliosV2Response409 | syncPortfoliosV2Response500 | syncPortfoliosV2Response502) & {
   headers: Headers;
 };
 

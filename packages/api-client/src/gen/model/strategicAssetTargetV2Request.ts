@@ -4,11 +4,12 @@
  * DCA-Pal APIs
  * OpenAPI spec version: 0.9.0
  */
+import type { AssetRefV2 } from './assetRefV2';
 
 /**
  * A relative target for one Portfolio Asset inside its effective class.
  */
 export interface StrategicAssetTargetV2Request {
-  portfolioAssetId: string;
+  asset: AssetRefV2;
   relativeTargetWeight: string;
 }

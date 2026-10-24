@@ -4,21 +4,20 @@
  * DCA-Pal APIs
  * OpenAPI spec version: 0.9.0
  */
+import type { AssetRefV2 } from './assetRefV2';
 import type { PortfolioAssetV2RequestAclassOverride } from './portfolioAssetV2RequestAclassOverride';
-import type { SharedAssetV2Request } from './sharedAssetV2Request';
 import type { TransactionFeesV2Request } from './transactionFeesV2Request';
 
 /**
- * Portfolio-specific holding and allocation values.
+ * Portfolio-specific holding and allocation values for one referenced asset.
  */
 export interface PortfolioAssetV2Request {
   /** @nullable */
   aclassOverride?: PortfolioAssetV2RequestAclassOverride;
-  asset: SharedAssetV2Request;
+  asset: AssetRefV2;
   /** @nullable */
   averageBuyPrice?: string | null;
   fees?: null | TransactionFeesV2Request;
-  id: string;
   /** @nullable */
   manualPrice?: string | null;
   quantity: string;

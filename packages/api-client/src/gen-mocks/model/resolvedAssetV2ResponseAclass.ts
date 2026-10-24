@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.9.0
  */
 
-export type SharedAssetV2RequestAclass = typeof SharedAssetV2RequestAclass[keyof typeof SharedAssetV2RequestAclass];
+export type ResolvedAssetV2ResponseAclass = typeof ResolvedAssetV2ResponseAclass[keyof typeof ResolvedAssetV2ResponseAclass];
 
 
-export const SharedAssetV2RequestAclass = {
+export const ResolvedAssetV2ResponseAclass = {
   equity: 'equity',
   bond: 'bond',
   cash: 'cash',

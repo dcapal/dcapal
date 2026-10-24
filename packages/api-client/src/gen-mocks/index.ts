@@ -30,6 +30,8 @@ import type {
   GetPriceParams,
   ImportPortfolioBody,
   ImportPortfolioResponse,
+  LookupAssetsV2Params,
+  LookupAssetsV2Response,
   Price,
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
@@ -960,6 +962,156 @@ export function useGetImportedPortfolio<TData = Awaited<ReturnType<typeof getImp
 
 
 
+export type lookupAssetsV2Response200 = {
+  data: LookupAssetsV2Response
+  status: 200
+}
+
+export type lookupAssetsV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type lookupAssetsV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type lookupAssetsV2ResponseSuccess = (lookupAssetsV2Response200) & {
+  headers: Headers;
+};
+export type lookupAssetsV2ResponseError = (lookupAssetsV2Response400 | lookupAssetsV2Response500) & {
+  headers: Headers;
+};
+
+export const getLookupAssetsV2Url = (params: LookupAssetsV2Params,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["asset"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/markets/v2/assets/lookup?${stringifiedParams}` : `/markets/v2/assets/lookup`
+}
+
+/**
+ * @summary Reads the cached metadata of up to 20 assets without contacting providers.
+ */
+export const lookupAssetsV2 = async (params: LookupAssetsV2Params, options?: RequestInit): Promise<lookupAssetsV2ResponseSuccess> => {
+
+  const res = await fetch(getLookupAssetsV2Url(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  if (!res.ok) {
+
+    const err: globalThis.Error & {info?: lookupAssetsV2ResponseError['data'], status?: number} = new globalThis.Error();
+    const data : lookupAssetsV2ResponseError['data'] = body ? JSON.parse(body) : {}
+    err.info = data;
+    err.status = res.status;
+    throw err;
+  }
+  const data: lookupAssetsV2ResponseSuccess['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as lookupAssetsV2ResponseSuccess
+}
+
+
+
+
+
+export const getLookupAssetsV2QueryKey = (params?: LookupAssetsV2Params,) => {
+    return [
+    `/markets/v2/assets/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getLookupAssetsV2QueryOptions = <TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLookupAssetsV2QueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupAssetsV2>>> = ({ signal }) => lookupAssetsV2(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type LookupAssetsV2QueryResult = NonNullable<Awaited<ReturnType<typeof lookupAssetsV2>>>
+export type LookupAssetsV2QueryError = globalThis.Error & { info?: V2ErrorResponse; status?: number }
+
+
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: LookupAssetsV2Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof lookupAssetsV2>>,
+          TError,
+          Awaited<ReturnType<typeof lookupAssetsV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof lookupAssetsV2>>,
+          TError,
+          Awaited<ReturnType<typeof lookupAssetsV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Reads the cached metadata of up to 20 assets without contacting providers.
+ */
+
+export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: LookupAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupAssetsV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getLookupAssetsV2QueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export type getPriceResponse200 = {
   data: Price
   status: 200
@@ -1234,10 +1386,15 @@ export type syncPortfoliosV2Response500 = {
   status: 500
 }
 
+export type syncPortfoliosV2Response502 = {
+  data: V2ErrorResponse
+  status: 502
+}
+
 export type syncPortfoliosV2ResponseSuccess = (syncPortfoliosV2Response200) & {
   headers: Headers;
 };
-export type syncPortfoliosV2ResponseError = (syncPortfoliosV2Response400 | syncPortfoliosV2Response403 | syncPortfoliosV2Response409 | syncPortfoliosV2Response500) & {
+export type syncPortfoliosV2ResponseError = (syncPortfoliosV2Response400 | syncPortfoliosV2Response403 | syncPortfoliosV2Response409 | syncPortfoliosV2Response500 | syncPortfoliosV2Response502) & {
   headers: Headers;
 };
 
@@ -1345,6 +1502,8 @@ export const getGetAssetsDataResponseMock = (overrideResponse: Partial<Extract<Y
 
 export const getImportPortfolioResponseMock = (overrideResponse: Partial<Extract<ImportPortfolioResponse, object>> = {}): ImportPortfolioResponse => ({expires_at: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.string.alpha({length: {min: 10, max: 20}}), ...overrideResponse})
 
+export const getLookupAssetsV2ResponseMock = (overrideResponse: Partial<Extract<LookupAssetsV2Response, object>> = {}): LookupAssetsV2Response => ({assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), currency: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})})), notFound: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})})), ...overrideResponse})
+
 export const getGetPriceResponseMock = (overrideResponse: Partial<Extract<Price, object>> = {}): Price => ({price: faker.number.float({fractionDigits: 2}), ts: faker.number.int(), ...overrideResponse})
 
 export const getSyncPortfoliosResponseTransactionFeesResponseMock = (overrideResponse: Partial<TransactionFeesResponse> = {}): TransactionFeesResponse => ({...{feeStructure: faker.helpers.arrayElement([{type: faker.helpers.arrayElement(['zeroFee'] as const)},{feeAmount: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['fixed'] as const)},{feeRate: faker.string.alpha({length: {min: 10, max: 20}}), maxFee: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), minFee: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['variable'] as const)},]), maxFeeImpact: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])}, ...overrideResponse});
@@ -1353,9 +1512,9 @@ export const getSyncPortfoliosResponseMock = (overrideResponse: Partial<Extract<
 
 export const getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock = (overrideResponse: Partial<TransactionFeesV2Response> = {}): TransactionFeesV2Response => ({...{feeStructure: faker.helpers.arrayElement([{type: faker.helpers.arrayElement(['zeroFee'] as const)},{feeAmount: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['fixed'] as const)},{feeRate: faker.string.alpha({length: {min: 10, max: 20}}), maxFee: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), minFee: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), type: faker.helpers.arrayElement(['variable'] as const)},]), maxFeeImpact: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])}, ...overrideResponse});
 
-export const getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock = (overrideResponse: Partial<StrategicAllocationV2Response> = {}): StrategicAllocationV2Response => ({...{assetClassTargets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({assetClass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), targetWeight: faker.string.alpha({length: {min: 10, max: 20}})})), assetTargets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({portfolioAssetId: faker.string.uuid(), relativeTargetWeight: faker.string.alpha({length: {min: 10, max: 20}})}))}, ...overrideResponse});
+export const getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock = (overrideResponse: Partial<StrategicAllocationV2Response> = {}): StrategicAllocationV2Response => ({...{assetClassTargets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({assetClass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), targetWeight: faker.string.alpha({length: {min: 10, max: 20}})})), assetTargets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({asset: {provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})}, relativeTargetWeight: faker.string.alpha({length: {min: 10, max: 20}})}))}, ...overrideResponse});
 
-export const getSyncPortfoliosV2ResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosV2Response, object>> = {}): SyncPortfoliosV2Response => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({allocationMode: faker.helpers.arrayElement(Object.values(AllocationModeWire)), assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclassOverride: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), null]), undefined]), asset: {aclass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), currency: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})}, averageBuyPrice: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), undefined]), id: faker.string.uuid(), manualPrice: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), quantity: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])})), driftBand: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), undefined]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCurrency: faker.string.alpha({length: {min: 10, max: 20}}), strategicAllocation: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock()},]), undefined])})), ...overrideResponse})
+export const getSyncPortfoliosV2ResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosV2Response, object>> = {}): SyncPortfoliosV2Response => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({allocationMode: faker.helpers.arrayElement(Object.values(AllocationModeWire)), assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclassOverride: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), null]), undefined]), asset: {provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})}, averageBuyPrice: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), undefined]), manualPrice: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), quantity: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])})), driftBand: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), undefined]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCurrency: faker.string.alpha({length: {min: 10, max: 20}}), strategicAllocation: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock()},]), undefined])})), ...overrideResponse})
 
 
 export const getRootMockHandler = (overrideResponse?: string | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
@@ -1441,6 +1600,18 @@ export const getGetImportedPortfolioMockHandler = (overrideResponse?: unknown | 
   }, options)
 }
 
+export const getLookupAssetsV2MockHandler = (overrideResponse?: LookupAssetsV2Response | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<LookupAssetsV2Response> | LookupAssetsV2Response), options?: RequestHandlerOptions) => {
+  return http.get('*/markets/v2/assets/lookup', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getLookupAssetsV2ResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getGetPriceMockHandler = (overrideResponse?: Price | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<Price> | Price), options?: RequestHandlerOptions) => {
   return http.get('*/price/:asset', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
@@ -1484,6 +1655,7 @@ export const getDCAPalAPIsMock = () => [
   getGetAssetsDataMockHandler(),
   getImportPortfolioMockHandler(),
   getGetImportedPortfolioMockHandler(),
+  getLookupAssetsV2MockHandler(),
   getGetPriceMockHandler(),
   getSyncPortfoliosMockHandler(),
   getSyncPortfoliosV2MockHandler()
