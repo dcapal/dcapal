@@ -1,0 +1,204 @@
+/*
+ * DcaPal visual tokens.
+ *
+ * Tokens are scoped so this design-system can be introduced next to the
+ * existing application without changing any legacy route or component.
+ */
+.dcapal-theme {
+  --dcapal-canvas: oklch(98.5% 0.008 85);
+  --dcapal-surface: oklch(100% 0 0);
+  --dcapal-surface-subtle: oklch(97.4% 0.012 85);
+  --dcapal-surface-emphasis: oklch(94.5% 0.025 85);
+  --dcapal-foreground: oklch(24% 0.025 265);
+  --dcapal-foreground-muted: oklch(49% 0.03 265);
+  --dcapal-foreground-subtle: oklch(60% 0.025 265);
+  --dcapal-border: oklch(89% 0.018 85);
+  --dcapal-border-strong: oklch(80% 0.025 85);
+
+  --dcapal-primary: oklch(54% 0.21 290);
+  --dcapal-primary-hover: oklch(47% 0.2 290);
+  --dcapal-primary-pressed: oklch(41% 0.19 290);
+  --dcapal-primary-foreground: oklch(99% 0 0);
+  --dcapal-primary-soft: oklch(94% 0.04 290);
+  --dcapal-secondary-hover: oklch(91% 0.028 85);
+  --dcapal-secondary-pressed: oklch(87% 0.035 85);
+  --dcapal-outline-hover: oklch(96% 0.01 85);
+  --dcapal-outline-pressed: oklch(91% 0.02 85);
+  --dcapal-ghost-pressed: oklch(92% 0.025 85);
+  --dcapal-destructive-hover: oklch(49% 0.2 26);
+  --dcapal-destructive-pressed: oklch(43% 0.19 26);
+  --dcapal-link-pressed: oklch(42% 0.18 290);
+  --dcapal-success: oklch(53% 0.14 160);
+  --dcapal-success-soft: oklch(94% 0.045 160);
+  --dcapal-warning: oklch(52% 0.16 70);
+  --dcapal-warning-soft: oklch(95% 0.05 85);
+  --dcapal-destructive: oklch(56% 0.2 26);
+  --dcapal-destructive-soft: oklch(95% 0.035 26);
+  --dcapal-info: oklch(56% 0.14 245);
+  --dcapal-info-soft: oklch(94% 0.04 245);
+  --dcapal-overlay: oklch(18% 0.02 255 / 0.56);
+
+  --dcapal-chrome: oklch(20% 0.018 255);
+  --dcapal-chrome-foreground: oklch(98% 0.005 85);
+  --dcapal-chrome-muted: oklch(76% 0.015 255);
+  --dcapal-chrome-hover: oklch(100% 0 0 / 0.1);
+
+  --dcapal-asset-equities: oklch(58% 0.21 290);
+  --dcapal-asset-bonds: oklch(60% 0.16 250);
+  --dcapal-asset-cash: oklch(65% 0.13 160);
+  --dcapal-asset-crypto: oklch(72% 0.16 80);
+  --dcapal-asset-commodities: oklch(68% 0.17 45);
+  --dcapal-asset-other: oklch(62% 0.03 265);
+
+  --dcapal-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --dcapal-font-family: var(--dcapal-font-sans);
+  --dcapal-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+  --dcapal-text-xs: 0.75rem;
+  --dcapal-text-sm: 0.875rem;
+  --dcapal-text-md: 1rem;
+  --dcapal-text-lg: 1.125rem;
+  --dcapal-text-xl: 1.5rem;
+  --dcapal-text-2xl: 2rem;
+  --dcapal-leading-tight: 1.2;
+  --dcapal-leading-control: 1.25;
+  --dcapal-leading-badge: 1;
+  --dcapal-leading-normal: 1.5;
+  --dcapal-leading-relaxed: 1.65;
+
+  /* Shared type and interaction weights keep atoms visually consistent. */
+  --dcapal-font-weight-regular: 400;
+  --dcapal-font-weight-medium: 620;
+  --dcapal-font-weight-semibold: 650;
+  --dcapal-font-weight-strong: 680;
+  --dcapal-font-weight-bold: 700;
+  --dcapal-border-width: 1px;
+  --dcapal-border-width-strong: 2px;
+  --dcapal-focus-ring-width: 2px;
+  --dcapal-focus-ring-offset: 2px;
+  --dcapal-transition-fast: 120ms;
+  --dcapal-disabled-opacity: 0.55;
+  --dcapal-disabled-control: oklch(73% 0.025 265);
+  --dcapal-disabled-control-track: oklch(90% 0.02 265);
+  --dcapal-skeleton-duration: 1.5s;
+  --dcapal-skeleton-opacity: 0.48;
+
+  --dcapal-space-1: 0.25rem;
+  --dcapal-space-2: 0.5rem;
+  --dcapal-space-3: 0.75rem;
+  --dcapal-space-4: 1rem;
+  --dcapal-space-5: 1.25rem;
+  --dcapal-space-6: 1.5rem;
+  --dcapal-space-8: 2rem;
+  --dcapal-space-10: 2.5rem;
+  --dcapal-space-12: 3rem;
+  --dcapal-space-16: 4rem;
+
+  /* Shared geometry for compact portfolio surfaces. */
+  --dcapal-control-height-sm: 2rem;
+  --dcapal-control-height-md: 2.5rem;
+  --dcapal-control-height-lg: 3rem;
+  --dcapal-icon-size-sm: 1rem;
+  --dcapal-icon-size-md: 1.25rem;
+  --dcapal-icon-size-lg: 1.5rem;
+  --dcapal-control-size-check: 1.125rem;
+  --dcapal-switch-width: 2.75rem;
+  --dcapal-switch-height: 1.5rem;
+  --dcapal-switch-thumb: 1.125rem;
+  --dcapal-switch-travel: 1.25rem;
+  --dcapal-avatar-size-sm: 2rem;
+  --dcapal-avatar-size-md: 2.5rem;
+  --dcapal-avatar-size-lg: 3.5rem;
+  --dcapal-card-padding: var(--dcapal-space-5);
+  --dcapal-card-padding-compact: var(--dcapal-space-4);
+  --dcapal-card-content-padding: var(--dcapal-card-padding);
+  --dcapal-card-content-padding-compact: var(--dcapal-card-padding-compact);
+  --dcapal-card-section-gap: var(--dcapal-space-4);
+  --dcapal-layout-stack-gap: var(--dcapal-space-6);
+  --dcapal-dialog-section-gap: var(--dcapal-space-5);
+  --dcapal-dialog-section-gap-compact: var(--dcapal-space-3);
+  --dcapal-dialog-width-sm: 28rem;
+  --dcapal-dialog-width-md: 36rem;
+  --dcapal-dialog-width-lg: 42rem;
+  --dcapal-dialog-width-xs: 24rem;
+  --dcapal-dialog-width-wide: 40rem;
+  --dcapal-dialog-gutter: var(--dcapal-space-4);
+  --dcapal-select-min-width: 12rem;
+  --dcapal-select-currency-width: 4.5rem;
+  --dcapal-popup-max-height: 18rem;
+  --dcapal-chart-min-height: 15rem;
+  --dcapal-chart-plot-height: 11rem;
+  --dcapal-search-result-height: 4.25rem;
+  --dcapal-textarea-min-height: 6rem;
+  --dcapal-field-label-min-width: 8rem;
+  --dcapal-field-control-min-width: 12rem;
+  --dcapal-action-min-width: 7rem;
+  --dcapal-skeleton-height: 1rem;
+  --dcapal-foundation-swatch-min-width: 9rem;
+  --dcapal-foundation-swatch-height: 3rem;
+  --dcapal-chart-skeleton-height: 5rem;
+  --dcapal-input-suffix-width: 3.5rem;
+  --dcapal-strategic-label-min-width: 8rem;
+  --dcapal-strategic-target-min-width: 6rem;
+  --dcapal-strategic-band-min-width: 7rem;
+  --dcapal-strategic-label-mobile-min-width: 5.5rem;
+  --dcapal-strategic-target-mobile-min-width: 4.5rem;
+  --dcapal-strategic-band-mobile-min-width: 5.5rem;
+  --dcapal-round: 50%;
+  --dcapal-table-row-height: 3.5rem;
+  --dcapal-table-min-width: 64rem;
+  --dcapal-action-icon-size: var(--dcapal-control-height-md);
+  --dcapal-action-icon-size-compact: var(--dcapal-control-height-sm);
+  --dcapal-chart-height: 11rem;
+  --dcapal-chart-height-mobile: 9rem;
+  --dcapal-fab-size: 3.5rem;
+  --dcapal-fab-action-width: 9rem;
+  --dcapal-allocation-footer-padding: var(--dcapal-card-content-padding);
+  --dcapal-allocation-footer-padding-compact: var(--dcapal-card-content-padding-compact);
+  --dcapal-asset-ticker-chip-gap: var(--dcapal-space-2);
+  --dcapal-z-fab: 20;
+  --dcapal-z-overlay-backdrop: 40;
+  --dcapal-z-overlay: 41;
+  --dcapal-z-popover: 60;
+  --dcapal-z-overlay-nested-backdrop: 70;
+  --dcapal-z-overlay-nested: 71;
+
+  --dcapal-radius-sm: 0.375rem;
+  --dcapal-radius-md: 0.625rem;
+  --dcapal-radius-lg: 0.875rem;
+  --dcapal-radius-pill: 999px;
+  --dcapal-elevation-none: none;
+  --dcapal-elevation-raised: 0 1px 2px oklch(24% 0.025 265 / 0.06),
+    0 4px 12px oklch(24% 0.025 265 / 0.04);
+  --dcapal-elevation-overlay: 0 14px 42px oklch(24% 0.025 265 / 0.2),
+    0 4px 12px oklch(24% 0.025 265 / 0.08);
+
+  --dcapal-page-width: 78rem;
+  --dcapal-page-gutter: clamp(1rem, 3vw, 2rem);
+  --dcapal-header-height: 4rem;
+  --dcapal-header-gutter: clamp(1rem, 3vw, 2rem);
+  --dcapal-form-width: 32rem;
+  --dcapal-layout-page-width: var(--dcapal-page-width);
+  --dcapal-layout-gutter: var(--dcapal-page-gutter);
+  --dcapal-layout-header-height: var(--dcapal-header-height);
+  --dcapal-layout-form-width: var(--dcapal-form-width);
+
+  /* shadcn-compatible aliases, intentionally scoped to the design-system. */
+  --background: var(--dcapal-canvas);
+  --foreground: var(--dcapal-foreground);
+  --muted: var(--dcapal-surface-subtle);
+  --muted-foreground: var(--dcapal-foreground-muted);
+  --border: var(--dcapal-border);
+  --input: var(--dcapal-border-strong);
+  --card: var(--dcapal-surface);
+  --card-foreground: var(--dcapal-foreground);
+  --primary: var(--dcapal-primary);
+  --primary-foreground: var(--dcapal-primary-foreground);
+  --secondary: var(--dcapal-surface-emphasis);
+  --secondary-foreground: var(--dcapal-foreground);
+  --destructive: var(--dcapal-destructive);
+  --destructive-foreground: var(--dcapal-primary-foreground);
+  --ring: var(--dcapal-primary);
+  --radius: var(--dcapal-radius-md);
+}

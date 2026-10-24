@@ -17,7 +17,10 @@
     "test:e2e:smoke": "playwright test --config=playwright.smoke.config.js",
     "test:e2e:production-mock": "playwright test --config=playwright.production-mock.config.js",
     "test:e2e:coverage": "FRONTEND_COVERAGE=1 playwright test --project=coverage-chromium --project=coverage-mobile --workers=1",
-    "coverage:report": "node scripts/coverage-report.mjs"
+    "coverage:report": "node scripts/coverage-report.mjs",
+    "storybook": "storybook dev -p 6006 --disable-telemetry",
+    "storybook:build": "storybook build --disable-telemetry",
+    "storybook:test": "playwright test --config=playwright.storybook.config.js"
   },
   "repository": {
     "type": "git",
@@ -31,6 +34,7 @@
   },
   "homepage": "https://dcapal.com/",
   "dependencies": {
+    "@base-ui/react": "catalog:",
     "@dcapal/api-client": "workspace:*",
     "@heroicons/react": "catalog:",
     "@nivo/core": "catalog:",
@@ -75,7 +79,13 @@
     "@babel/preset-env": "catalog:",
     "@babel/preset-react": "catalog:",
     "@babel/preset-typescript": "catalog:",
+    "@axe-core/playwright": "catalog:",
     "@playwright/test": "catalog:",
+    "@storybook/addon-a11y": "catalog:",
+    "@storybook/addon-essentials": "catalog:",
+    "@storybook/addon-webpack5-compiler-babel": "catalog:",
+    "@storybook/react": "catalog:",
+    "@storybook/react-webpack5": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -105,7 +115,8 @@
     "webpack": "catalog:",
     "webpack-cli": "catalog:",
     "webpack-dev-server": "catalog:",
-    "webpack-merge": "catalog:"
+    "webpack-merge": "catalog:",
+    "storybook": "catalog:"
   },
   "msw": {
     "workerDirectory": [
