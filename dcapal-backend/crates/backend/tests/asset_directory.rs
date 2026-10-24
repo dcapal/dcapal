@@ -1,5 +1,5 @@
 use dcapal_backend::app::domain::{
-    asset::{AssetRef, ResolvedAsset},
+    asset::{AssetRef, MetadataSource, ResolvedAsset, StoredAsset},
     portfolio::{AssetClass, Provider},
 };
 use dcapal_backend::ports::outbound::repository::{
@@ -17,8 +17,43 @@ fn asset(provider: Provider, symbol: &str, name: &str) -> ResolvedAsset {
     }
 }
 
-/// GIVEN an empty directory, WHEN assets are inserted and then read by reference,
-/// THEN the stored metadata is returned and unknown references are omitted.
+fn stored(asset: ResolvedAsset, source: MetadataSource) -> StoredAsset {
+    StoredAsset { asset, source }
+}
+
+/// Inserts a row the way a v1 (or pre-provenance) backend does: without naming
+/// `metadata_source`, so the column default applies.
+async fn insert_client_supplied(
+    pool: &PgPool,
+    asset: &ResolvedAsset,
+) -> Result<(), Box<dyn std::error::Error>> {
+    sqlx::query(
+        "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)",
+    )
+    .bind(match asset.provider {
+        Provider::YF => 2_i16,
+        Provider::Kraken => 1_i16,
+    })
+    .bind(&asset.symbol)
+    .bind(&asset.name)
+    .bind(&asset.currency)
+    .bind(1_i16) // Equity
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn find(
+    directory: &SqlxAssetDirectory,
+    asset: &ResolvedAsset,
+) -> Result<StoredAsset, Box<dyn std::error::Error>> {
+    let mut found = directory.find_by_refs(&[asset.as_ref()]).await?;
+    Ok(found.pop().expect("asset should be stored"))
+}
+
+/// GIVEN an empty directory, WHEN resolved assets are upserted and then read by reference,
+/// THEN the stored metadata is returned as provider-confirmed and unknown references are omitted.
 #[sqlx::test(migrations = "../../migrations")]
 async fn stores_and_finds_assets_by_reference(
     pool: PgPool,
@@ -31,7 +66,7 @@ async fn stores_and_finds_assets_by_reference(
     };
 
     directory
-        .insert_missing(&[vwce.clone(), btc.clone()])
+        .upsert_resolved(&[vwce.clone(), btc.clone()])
         .await?;
     let mut found = directory
         .find_by_refs(&[
@@ -40,16 +75,22 @@ async fn stores_and_finds_assets_by_reference(
             AssetRef::new(Provider::YF, "BTC"),
         ])
         .await?;
-    found.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+    found.sort_by(|a, b| a.asset.symbol.cmp(&b.asset.symbol));
 
-    assert_eq!(found, vec![btc, vwce]);
+    assert_eq!(
+        found,
+        vec![
+            stored(btc, MetadataSource::ProviderConfirmed),
+            stored(vwce, MetadataSource::ProviderConfirmed)
+        ]
+    );
     Ok(())
 }
 
-/// GIVEN a stored asset, WHEN another writer inserts the same provider and symbol with
-/// different metadata, THEN the insert succeeds and the first writer's metadata remains.
+/// GIVEN a provider-confirmed asset, WHEN another resolution upserts the same provider and
+/// symbol with different metadata, THEN the upsert succeeds and the first confirmed metadata remains.
 #[sqlx::test(migrations = "../../migrations")]
-async fn insert_missing_is_idempotent_and_first_writer_wins(
+async fn upsert_never_overwrites_provider_confirmed_rows(
     pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let directory = SqlxAssetDirectory::new(pool);
@@ -58,16 +99,80 @@ async fn insert_missing_is_idempotent_and_first_writer_wins(
     let other = asset(Provider::YF, "MSFT", "Microsoft");
 
     directory
-        .insert_missing(std::slice::from_ref(&first))
+        .upsert_resolved(std::slice::from_ref(&first))
         .await?;
-    directory.insert_missing(&[second, other.clone()]).await?;
-    directory.insert_missing(&[]).await?;
-    let mut found = directory
-        .find_by_refs(&[first.as_ref(), other.as_ref()])
-        .await?;
-    found.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+    directory.upsert_resolved(&[second, other.clone()]).await?;
+    directory.upsert_resolved(&[]).await?;
 
-    assert_eq!(found, vec![first, other]);
+    assert_eq!(
+        find(&directory, &first).await?,
+        stored(first, MetadataSource::ProviderConfirmed)
+    );
+    assert_eq!(
+        find(&directory, &other).await?,
+        stored(other, MetadataSource::ProviderConfirmed)
+    );
+    Ok(())
+}
+
+/// GIVEN a client-supplied row, WHEN the provider's metadata is upserted,
+/// THEN name, currency and class are replaced and the row becomes provider-confirmed.
+#[sqlx::test(migrations = "../../migrations")]
+async fn upsert_overwrites_client_supplied_rows_and_confirms_them(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = SqlxAssetDirectory::new(pool.clone());
+    let client = asset(Provider::YF, "AAPL", "bogus name");
+    insert_client_supplied(&pool, &client).await?;
+    assert_eq!(
+        find(&directory, &client).await?,
+        stored(client.clone(), MetadataSource::ClientSupplied)
+    );
+    let official = ResolvedAsset {
+        currency: "USD".to_string(),
+        asset_class: AssetClass::Crypto,
+        ..asset(Provider::YF, "AAPL", "Apple Inc.")
+    };
+
+    directory
+        .upsert_resolved(std::slice::from_ref(&official))
+        .await?;
+
+    assert_eq!(
+        find(&directory, &official).await?,
+        stored(official, MetadataSource::ProviderConfirmed)
+    );
+    Ok(())
+}
+
+/// GIVEN a client-supplied row and a provider-confirmed row, WHEN both are confirmed,
+/// THEN the client-supplied row flips to provider-confirmed with its metadata untouched
+/// and the confirmed row is unchanged.
+#[sqlx::test(migrations = "../../migrations")]
+async fn confirm_flips_the_source_without_touching_metadata(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = SqlxAssetDirectory::new(pool.clone());
+    let client = asset(Provider::Kraken, "ETH", "Ether (client)");
+    let verified = asset(Provider::YF, "AAPL", "Apple Inc.");
+    insert_client_supplied(&pool, &client).await?;
+    directory
+        .upsert_resolved(std::slice::from_ref(&verified))
+        .await?;
+
+    directory
+        .confirm(&[client.as_ref(), verified.as_ref()])
+        .await?;
+    directory.confirm(&[]).await?;
+
+    assert_eq!(
+        find(&directory, &client).await?,
+        stored(client, MetadataSource::ProviderConfirmed)
+    );
+    assert_eq!(
+        find(&directory, &verified).await?,
+        stored(verified, MetadataSource::ProviderConfirmed)
+    );
     Ok(())
 }
 

@@ -84,10 +84,7 @@ impl SyncPortfoliosV2Command {
             .flat_map(|portfolio| portfolio.assets.iter().map(|asset| asset.asset.clone()))
             .collect::<Vec<_>>();
         let resolved = if references.is_empty() {
-            ResolvedAssets {
-                all: Vec::new(),
-                newly_resolved: Vec::new(),
-            }
+            ResolvedAssets::empty()
         } else {
             assets
                 .resolve(&references)
@@ -133,10 +130,16 @@ impl SyncPortfoliosV2Command {
         &self.assets.all
     }
 
-    /// Borrows the assets that were unknown to the shared directory and must
-    /// be onboarded before the write.
-    pub fn newly_resolved_assets(&self) -> &[ResolvedAsset] {
-        &self.assets.newly_resolved
+    /// Borrows the provider-resolved assets (new or refreshed) that must be
+    /// upserted into the shared directory before the write.
+    pub fn assets_to_upsert(&self) -> &[ResolvedAsset] {
+        &self.assets.to_upsert
+    }
+
+    /// Borrows the references of client-supplied directory rows that the
+    /// provider confirmed and that must be marked so before the write.
+    pub fn assets_to_confirm(&self) -> &[AssetRef] {
+        &self.assets.to_confirm
     }
 
     /// Consumes the command and returns its normalized request.

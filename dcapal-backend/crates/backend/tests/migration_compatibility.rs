@@ -15,7 +15,7 @@ async fn sqlx_migrations_normalize_a_pre_shared_schema(pool: PgPool) -> sqlx::Re
     let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(migration_count, 9);
+    assert_eq!(migration_count, 10);
 
     let average_buy_price: Option<String> = sqlx::query_scalar(
         "SELECT data_type

@@ -209,10 +209,11 @@ impl PortfolioService {
         let user_id = command.user_id();
         // Shared asset rows are stored before the transaction opens so that no
         // provider or directory round trip happens while rows are locked.
-        // Only assets the directory lacked need storing; known ones are skipped.
-        if !command.newly_resolved_assets().is_empty() {
+        // Only assets the directory lacked or held unconfirmed need writing;
+        // provider-confirmed ones are skipped.
+        if !command.assets_to_upsert().is_empty() || !command.assets_to_confirm().is_empty() {
             self.assets
-                .onboard(command.newly_resolved_assets())
+                .onboard(command.assets_to_upsert(), command.assets_to_confirm())
                 .await
                 .map_err(PortfolioServiceError::Asset)?;
         }
@@ -378,7 +379,7 @@ mod tests {
         directory.expect_find_by_refs().returning(|_| Ok(vec![]));
         let onboard_log = log.clone();
         directory
-            .expect_insert_missing()
+            .expect_upsert_resolved()
             .times(1)
             .returning(move |assets| {
                 assert_eq!(assets, [resolved_vwce()]);
@@ -398,10 +399,13 @@ mod tests {
         // THEN the directory is never asked to insert anything (no insert expectation).
         let repository = Arc::new(RetryRepository::new(0, "23505"));
         let mut directory = MockAssetDirectory::new();
-        directory
-            .expect_find_by_refs()
-            .returning(|_| Ok(vec![resolved_vwce()]));
-        directory.expect_insert_missing().never();
+        directory.expect_find_by_refs().returning(|_| {
+            Ok(vec![crate::app::domain::asset::StoredAsset {
+                asset: resolved_vwce(),
+                source: crate::app::domain::asset::MetadataSource::ProviderConfirmed,
+            }])
+        });
+        directory.expect_upsert_resolved().never();
         let assets = Arc::new(AssetService::new(
             Arc::new(directory),
             Arc::new(MockAssetProvider::new()),
@@ -487,7 +491,7 @@ mod tests {
         let attempts = &repository.upsert_attempts;
         let mut directory = MockAssetDirectory::new();
         directory.expect_find_by_refs().returning(|_| Ok(vec![]));
-        directory.expect_insert_missing().returning(|_| {
+        directory.expect_upsert_resolved().returning(|_| {
             Err(
                 crate::ports::outbound::repository::asset::AssetDirectoryError::CorruptData(
                     "boom".to_string(),

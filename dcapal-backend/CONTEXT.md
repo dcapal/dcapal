@@ -26,7 +26,7 @@ The Portfolio Asset relationship between a saved Portfolio and shared asset meta
 _Avoid_: Market asset; holding, when referring to the complete Portfolio entry
 
 **Shared asset metadata**:
-The canonical provider-bound record in `assets_data`, identified by numeric provider and upper-case symbol. It owns immutable name and currency metadata plus the shared default Asset Class. One record may be linked to many Portfolios.
+The canonical provider-bound record in `assets_data`, identified by numeric provider and upper-case symbol. It owns name and currency metadata plus the shared default Asset Class, with a provenance flag (client-supplied or provider-confirmed); provider-confirmed metadata is never overwritten (see ADR 0005). One record may be linked to many Portfolios.
 _Avoid_: Portfolio Asset relationship; current price; display-only asset
 
 **Portfolio Asset relationship**:

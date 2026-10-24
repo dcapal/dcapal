@@ -115,7 +115,7 @@ fn v2_simple_request(assets: Vec<(PortfolioAssetV2, Decimal)>) -> SyncPortfolios
 /// Stores a YF asset in the shared directory, as the service does before a sync.
 async fn onboard(pool: &PgPool, symbol: &str) -> Result<(), Box<dyn std::error::Error>> {
     SqlxAssetDirectory::new(pool.clone())
-        .insert_missing(&[ResolvedAsset {
+        .upsert_resolved(&[ResolvedAsset {
             provider: AppProvider::YF,
             symbol: symbol.to_string(),
             name: format!("{symbol} asset"),
@@ -485,6 +485,28 @@ async fn reuses_shared_asset_metadata_but_creates_a_new_relationship(
     assert_eq!(relationship_count, 2);
     assert_eq!(distinct_shared_ids, 1);
 
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v1_upsert_creates_client_supplied_shared_assets(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a v1 Portfolio carrying client-chosen metadata for a new asset,
+    // WHEN the v1 upsert path stores it,
+    // THEN the shared row exists with the client-supplied provenance (0), so v2
+    // later verifies it against the provider before trusting it.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    repository
+        .upsert(USER_ID, portfolio_request(vec![asset("V1ONLY")]))
+        .await?;
+
+    let source: i16 =
+        sqlx::query_scalar("SELECT metadata_source FROM assets_data WHERE symbol = 'V1ONLY'")
+            .fetch_one(&pool)
+            .await?;
+
+    assert_eq!(source, 0);
     Ok(())
 }
 
@@ -962,6 +984,11 @@ async fn v2_service_onboards_unknown_assets_before_persisting(
     .fetch_one(&pool)
     .await?;
     assert_eq!(stored, ("New company".to_string(), "USD".to_string()));
+    let source: i16 =
+        sqlx::query_scalar("SELECT metadata_source FROM assets_data WHERE symbol = 'NEWCO'")
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(source, 1);
 
     Ok(())
 }

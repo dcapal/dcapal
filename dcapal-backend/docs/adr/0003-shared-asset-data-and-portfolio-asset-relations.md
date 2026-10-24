@@ -27,9 +27,12 @@ average buy price, fee fields, timestamps, and nullable
 
 An absent Asset Class override means that the Portfolio inherits the shared
 default. A present override is Portfolio-specific. Portfolio synchronization
-may create a missing shared record, but it does not replace an existing
-record's name, currency, or shared default class. Later writes return the
-canonical stored metadata and update only the relationship row.
+may create a missing shared record, but v1 synchronization does not replace
+an existing record's name, currency, or shared default class. Later writes
+return the canonical stored metadata and update only the relationship row.
+The only writer that may replace metadata is v2 asset resolution, and only
+for rows whose `metadata_source` says the provider has not confirmed them
+(see [ADR 0005](0005-reference-only-asset-sync.md)).
 
 The forward-only migration after `20260814000000` backfills shared records
 from the oldest surviving row, reports duplicate and metadata-conflict
