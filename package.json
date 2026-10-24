@@ -21,7 +21,7 @@
       "compression": "1.8.2",
       "webpack-dev-middleware@6": "7.4.6",
       "webpack-dev-middleware@7": "7.4.6",
-      "webpack-dev-middleware@8": "8.3.0",
+      "webpack-dev-middleware@8": "8.5.0",
       "body-parser": "2.4.0",
       "launch-editor": "2.14.2",
       "postcss-selector-parser": "7.1.6",
