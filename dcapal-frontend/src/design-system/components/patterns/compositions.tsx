@@ -799,7 +799,10 @@ export function AddAssetComposition({
         </div>
       ) : null}
       {showResults ? (
-        <div className="ds-search-results" aria-label="Asset search results">
+        <section
+          className="ds-search-results"
+          aria-label="Asset search results"
+        >
           {searchResults.map((asset) => (
             <SearchResultCard
               key={asset.id}
@@ -808,7 +811,7 @@ export function AddAssetComposition({
               onSelect={() => handleSelectResult(asset.id)}
             />
           ))}
-        </div>
+        </section>
       ) : null}
       {searchState === "empty" ? (
         <EmptyState
