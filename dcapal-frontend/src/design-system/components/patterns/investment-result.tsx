@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Check, Info } from "lucide-react";
-import { formatCurrency } from "../../fixtures/portfolio";
+import { formatCurrency, formatPercent } from "../../fixtures/portfolio";
 import {
   Alert,
   Badge,
@@ -20,22 +20,113 @@ import {
   formatQuantity,
   formatQuantityChange,
 } from "./invest-format";
-import type { InvestmentResultModel } from "./invest-types";
+import { collapsesToClassRow, groupResultByClass } from "./invest-classes";
+import type {
+  AllocationMode,
+  InvestmentResultChange,
+  InvestmentResultModel,
+} from "./invest-types";
 import { MetricStrip } from "./metric-card";
 import { StickyActionBar } from "./sticky-action-bar";
 
 export interface InvestmentResultProps {
   result: InvestmentResultModel;
+  /** Strategic mode lists the changes by asset class. Defaults to simple. */
+  mode?: AllocationMode;
   /** Returns to the portfolio overview. */
   onBackToPortfolio?: () => void;
   /** Starts a new Invest journey. */
   onPlanAnother?: () => void;
 }
 
+/** One-line standing of a class after the update, or null when the result has no class figures. */
+function classStanding(
+  weightNow: number | null,
+  targetWeight: number | null
+): string | null {
+  return weightNow === null || targetWeight === null
+    ? null
+    : `${formatPercent(weightNow)} now · target ${formatPercent(targetWeight)}`;
+}
+
 function changeVariant(delta: number): BadgeVariant {
   if (delta > 0) return "success";
   if (delta < 0) return "destructive";
   return "neutral";
+}
+
+/** The signed quantity change of an asset as a badge. */
+function ChangeBadge({ change }: { change: InvestmentResultChange }) {
+  const delta = change.quantityAfter - change.quantityBefore;
+  return (
+    <Badge variant={changeVariant(delta)}>{formatQuantityChange(delta)}</Badge>
+  );
+}
+
+/** "before → after units" for an asset. */
+function quantityText(change: InvestmentResultChange): string {
+  return `${formatQuantity(change.quantityBefore)} → ${formatQuantity(change.quantityAfter)} units`;
+}
+
+/** Table row with the quantity of one asset before, after and the change. */
+function ResultChangeRow({
+  change,
+  nested = false,
+  assetClass,
+}: {
+  change: InvestmentResultChange;
+  nested?: boolean;
+  assetClass?: InvestmentResultChange["assetClass"];
+}) {
+  return (
+    <TableRow
+      className={nested ? "ds-table__row--nested" : undefined}
+      data-asset-class={assetClass}
+      data-row-kind={nested ? "asset" : undefined}
+    >
+      <TableCell>
+        <span
+          className={
+            nested
+              ? "ds-table__asset-identity ds-table__asset-identity--nested"
+              : "ds-table__asset-identity"
+          }
+        >
+          <strong>{change.ticker}</strong>
+          <span className="ds-table__asset-ticker">{change.name}</span>
+        </span>
+      </TableCell>
+      <TableCell numeric>{formatQuantity(change.quantityBefore)}</TableCell>
+      <TableCell numeric>
+        <strong>{formatQuantity(change.quantityAfter)}</strong>
+      </TableCell>
+      <TableCell numeric>
+        <ChangeBadge change={change} />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/** Mobile card with the quantity of one asset before and after. */
+function ResultChangeCard({
+  change,
+  nested = false,
+}: {
+  change: InvestmentResultChange;
+  nested?: boolean;
+}) {
+  return (
+    <li className="ds-result-card" data-row-kind={nested ? "asset" : undefined}>
+      <div className="ds-result-card__top">
+        <strong>{change.ticker}</strong>
+        <ChangeBadge change={change} />
+      </div>
+      <p className="ds-result-card__meta">
+        {formatQuantity(change.quantityBefore)} {"→"}{" "}
+        <strong>{formatQuantity(change.quantityAfter)}</strong> units
+      </p>
+    </li>
+  );
 }
 
 /**
@@ -45,10 +136,13 @@ function changeVariant(delta: number): BadgeVariant {
  */
 export function InvestmentResult({
   result,
+  mode = "simple",
   onBackToPortfolio,
   onPlanAnother,
 }: InvestmentResultProps) {
   const headingId = React.useId();
+  const strategic = mode === "strategic";
+  const groups = groupResultByClass(result);
 
   return (
     <div className="ds-result ds-invest-flow">
@@ -63,26 +157,62 @@ export function InvestmentResult({
           <p className="ds-result__lead">
             We saved the new quantities and cleared your budget.
           </p>
-          <ul className="ds-result__cards" aria-label="Updated quantities">
-            {result.changes.map((change) => {
-              const delta = change.quantityAfter - change.quantityBefore;
-              return (
-                <li className="ds-result-card" key={change.id}>
-                  <div className="ds-result-card__top">
-                    <strong>{change.ticker}</strong>
-                    <Badge variant={changeVariant(delta)}>
-                      {formatQuantityChange(delta)}
-                    </Badge>
-                  </div>
-                  <p className="ds-result-card__meta">
-                    {formatQuantity(change.quantityBefore)} {"→"}{" "}
-                    <strong>{formatQuantity(change.quantityAfter)}</strong>{" "}
-                    units
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+          {strategic ? (
+            <ul
+              className="ds-result__cards ds-result__cards--classes"
+              aria-label="Updated quantities by asset class"
+            >
+              {groups.map((group) => {
+                const standing = classStanding(
+                  group.weightNow,
+                  group.targetWeight
+                );
+                const classOnly = collapsesToClassRow(
+                  group.assetClass,
+                  group.changes.length
+                );
+                return (
+                  <li
+                    className="ds-result-group-card"
+                    key={group.assetClass}
+                    data-asset-class={group.assetClass}
+                    data-row-kind="class"
+                  >
+                    <div className="ds-result-group-card__header">
+                      <strong>{group.label}</strong>
+                      {classOnly ? (
+                        <ChangeBadge change={group.changes[0]} />
+                      ) : null}
+                      {standing ? <span>{standing}</span> : null}
+                      {classOnly ? (
+                        <span>{quantityText(group.changes[0])}</span>
+                      ) : null}
+                    </div>
+                    {classOnly ? null : (
+                      <ul
+                        className="ds-result-group-card__assets"
+                        aria-label={`${group.label} assets`}
+                      >
+                        {group.changes.map((change) => (
+                          <ResultChangeCard
+                            key={change.id}
+                            change={change}
+                            nested
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <ul className="ds-result__cards" aria-label="Updated quantities">
+              {result.changes.map((change) => (
+                <ResultChangeCard key={change.id} change={change} />
+              ))}
+            </ul>
+          )}
           <div className="ds-result__table">
             <Table aria-label="Updated quantities" className="ds-table--result">
               <TableHeader>
@@ -94,32 +224,66 @@ export function InvestmentResult({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.changes.map((change) => {
-                  const delta = change.quantityAfter - change.quantityBefore;
-                  return (
-                    <TableRow key={change.id}>
-                      <TableCell>
-                        <span className="ds-table__asset-identity">
-                          <strong>{change.ticker}</strong>
-                          <span className="ds-table__asset-ticker">
-                            {change.name}
-                          </span>
-                        </span>
-                      </TableCell>
-                      <TableCell numeric>
-                        {formatQuantity(change.quantityBefore)}
-                      </TableCell>
-                      <TableCell numeric>
-                        <strong>{formatQuantity(change.quantityAfter)}</strong>
-                      </TableCell>
-                      <TableCell numeric>
-                        <Badge variant={changeVariant(delta)}>
-                          {formatQuantityChange(delta)}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {strategic
+                  ? groups.flatMap((group) => {
+                      const classOnly = collapsesToClassRow(
+                        group.assetClass,
+                        group.changes.length
+                      );
+                      const standing = classStanding(
+                        group.weightNow,
+                        group.targetWeight
+                      );
+                      return [
+                        <TableRow
+                          key={group.assetClass}
+                          className="ds-table__row--group"
+                          data-asset-class={group.assetClass}
+                          data-row-kind="class"
+                        >
+                          <TableCell>
+                            <span className="ds-table__asset-identity">
+                              <strong>{group.label}</strong>
+                              {standing ? (
+                                <span className="ds-table__asset-ticker">
+                                  {standing}
+                                </span>
+                              ) : null}
+                            </span>
+                          </TableCell>
+                          <TableCell numeric>
+                            {classOnly
+                              ? formatQuantity(group.changes[0].quantityBefore)
+                              : null}
+                          </TableCell>
+                          <TableCell numeric>
+                            {classOnly ? (
+                              <strong>
+                                {formatQuantity(group.changes[0].quantityAfter)}
+                              </strong>
+                            ) : null}
+                          </TableCell>
+                          <TableCell numeric>
+                            {classOnly ? (
+                              <ChangeBadge change={group.changes[0]} />
+                            ) : null}
+                          </TableCell>
+                        </TableRow>,
+                        ...(classOnly
+                          ? []
+                          : group.changes.map((change) => (
+                              <ResultChangeRow
+                                key={change.id}
+                                change={change}
+                                nested
+                                assetClass={group.assetClass}
+                              />
+                            ))),
+                      ];
+                    })
+                  : result.changes.map((change) => (
+                      <ResultChangeRow key={change.id} change={change} />
+                    ))}
               </TableBody>
             </Table>
           </div>

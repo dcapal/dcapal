@@ -16,8 +16,10 @@ import {
   type AlertVariant,
 } from "../ui";
 import { AllocationAfterList } from "./allocation-after-list";
+import { groupProposalByClass } from "./invest-classes";
 import { formatPoints } from "./invest-format";
 import type {
+  AllocationMode,
   FundedBy,
   InvestmentPlan,
   InvestmentProposalModel,
@@ -39,7 +41,7 @@ const defaultMessages: Record<MessageState, ProposalStateMessage> = {
   blocked: {
     title: "Target weights must total 100%",
     description:
-      "Adjust your target weights in the portfolio settings, then try again.",
+      "Adjust your target weights from the Portfolio page, then try again.",
   },
   "needs-amount": {
     title: "Nothing to invest yet",
@@ -81,6 +83,8 @@ export interface InvestmentProposalProps {
   state: ProposalState;
   /** The recommendation; needed by the ready, fees-too-high and price-too-high states. */
   proposal: InvestmentProposalModel | null;
+  /** Allocation mode: Strategic groups transactions and bars by asset class. Defaults to simple. */
+  mode?: AllocationMode;
   /** The choices that produced the proposal, summarised under "Your rules". */
   plan: InvestmentPlan;
   /** One line describing the active fee policy. */
@@ -188,6 +192,7 @@ function rulesItems(
 export function InvestmentProposal({
   state,
   proposal,
+  mode = "simple",
   plan,
   commissionSummary,
   suggestedAmount,
@@ -307,7 +312,9 @@ export function InvestmentProposal({
             <Alert variant={variant}>
               <Icon aria-hidden size={18} />
               <div>
-                <AlertTitle>{message.title}</AlertTitle>
+                <AlertTitle aria-level={2} role="heading">
+                  {message.title}
+                </AlertTitle>
                 <AlertDescription>{message.description}</AlertDescription>
               </div>
             </Alert>
@@ -360,6 +367,9 @@ export function InvestmentProposal({
               <ProposedTransactionCollection
                 transactions={model.transactions}
                 currency={model.currency}
+                groups={
+                  mode === "strategic" ? groupProposalByClass(model) : undefined
+                }
               />
               {model.salesCommissionNotEstimated &&
               model.transactions.some((t) => t.action === "sell") ? (
@@ -371,7 +381,7 @@ export function InvestmentProposal({
           </Card>
           <Card>
             <CardContent>
-              <AllocationAfterList rows={model.allocationAfter} />
+              <AllocationAfterList rows={model.allocationAfter} mode={mode} />
             </CardContent>
           </Card>
           <StickyActionBar
@@ -389,7 +399,10 @@ export function InvestmentProposal({
             metric={{
               label: "Drift",
               value: `${formatPoints(model.driftBefore)} → ${formatPoints(model.driftAfter)}`,
-              context: "Total distance from your targets, before and after.",
+              context:
+                mode === "strategic"
+                  ? "Total distance from your class targets, before and after."
+                  : "Total distance from your targets, before and after.",
             }}
           />
           <Card density="compact">

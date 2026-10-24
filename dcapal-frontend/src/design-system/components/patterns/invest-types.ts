@@ -1,5 +1,12 @@
 import type { AssetClass } from "../../fixtures/portfolio";
 
+/**
+ * How the investor defines target weights. Simple allocation sets an absolute
+ * weight per Portfolio Asset; Strategic allocation sets asset-class weights and
+ * a relative weight per asset inside its class.
+ */
+export type AllocationMode = "simple" | "strategic";
+
 /** The path an investor takes once they have seen their drift. */
 export type InvestmentStrategy = "add-money" | "rebalance";
 
@@ -26,6 +33,26 @@ export interface DriftSnapshot {
   totalDriftPp: number;
   /** The Portfolio Asset with the widest gap, or null when there are none. */
   largestGap: DriftRowModel | null;
+}
+
+/** A Portfolio Asset inside a class group, with its share of the class target. */
+export interface ClassDriftAsset extends DriftRowModel {
+  /** Relative target weight: the asset target over its class target, in percent. */
+  shareOfClass: number;
+}
+
+/** One asset class compared with its class target, with its assets nested below. */
+export interface ClassDriftGroup {
+  assetClass: AssetClass;
+  label: string;
+  /** Current weight of the class, in percent of the Portfolio. */
+  currentWeight: number;
+  /** Asset-class target weight: the sum of its assets' absolute targets. */
+  targetWeight: number;
+  /** Current weight minus class target, in percentage points. */
+  driftPp: number;
+  /** Assets of the class, widest gap first. */
+  assets: ClassDriftAsset[];
 }
 
 /** The investor's inputs for one Invest journey. */
@@ -93,6 +120,40 @@ export interface AllocationAfterRow {
   targetWeight: number;
 }
 
+/** One asset of a class group in a proposal, with its transaction if it has one. */
+export interface ProposalClassAsset {
+  row: AllocationAfterRow;
+  /** The Proposed transaction for the asset, or null when it is held as is. */
+  transaction: ProposedTransaction | null;
+  /** Relative target weight: the asset target over its class target, in percent. */
+  shareOfClass: number;
+}
+
+/** One asset class of a proposal: its weight change and the assets within it. */
+export interface ProposalClassGroup {
+  assetClass: AssetClass;
+  label: string;
+  weightBefore: number;
+  weightAfter: number;
+  /** Asset-class target weight: the sum of its assets' absolute targets. */
+  targetWeight: number;
+  /** Money moved into the class (positive) or out of it (negative), in the quote currency. */
+  netMoney: number;
+  buys: number;
+  sells: number;
+  assets: ProposalClassAsset[];
+}
+
+/** An asset class's weight before and after a proposal. */
+export interface AllocationAfterClassGroup {
+  assetClass: AssetClass;
+  label: string;
+  assetCount: number;
+  weightBefore: number;
+  weightAfter: number;
+  targetWeight: number;
+}
+
 /** Where the money for the buys of a proposal comes from. */
 export interface FundedBy {
   /** New money from the investment budget. */
@@ -129,8 +190,17 @@ export interface InvestmentResultChange {
   id: string;
   name: string;
   ticker: string;
+  /** Asset class of the asset; lets the Strategic view group changes by class. */
+  assetClass?: AssetClass;
   quantityBefore: number;
   quantityAfter: number;
+}
+
+/** An asset class's weight once a proposal is applied, against its class target. */
+export interface InvestmentResultClass {
+  assetClass: AssetClass;
+  weightNow: number;
+  targetWeight: number;
 }
 
 /** The summary shown after the investor updates their holdings. */
@@ -138,6 +208,8 @@ export interface InvestmentResultModel {
   strategy: InvestmentStrategy;
   currency: string;
   changes: InvestmentResultChange[];
+  /** Class weights now, for the Strategic view; absent when only assets are known. */
+  classes?: InvestmentResultClass[];
   /** Total drift now, in percentage points. */
   driftNow: number;
   cashNow: number;

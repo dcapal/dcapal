@@ -4,6 +4,7 @@ import { Button, Card, CardContent } from "../../components/ui";
 import {
   AllocationAfterList,
   AllocationBar,
+  checkTargetTotals,
   DriftOverview,
   InvestmentPathActions,
   InvestmentPlanForm,
@@ -14,6 +15,7 @@ import {
   PortfolioWorkspace,
   ProposedTransactionCollection,
   StickyActionBar,
+  targetTotalsMessage,
   type InvestmentPlan,
   type ProposalState,
   type SuggestedAmountState,
@@ -29,6 +31,7 @@ import {
   onTargetDrift,
   priceTooHighPlan,
   priceTooHighProposal,
+  blockedInvestTargets,
   proposalStateMessages,
   rebalancePlan,
   rebalanceProposal,
@@ -329,7 +332,11 @@ function ProposalDemo({ state, strategy }: ProposalDemoProps) {
   const message =
     state === "ready" || state === "loading"
       ? undefined
-      : proposalStateMessages[state];
+      : state === "blocked"
+        ? (targetTotalsMessage(
+            checkTargetTotals(blockedInvestTargets.simple)
+          ) ?? undefined)
+        : proposalStateMessages[state];
 
   return (
     <div className="dcapal-theme">

@@ -1,18 +1,25 @@
 import * as React from "react";
+import { ArrowLeftRight, Plus } from "lucide-react";
 import { formatCurrency } from "../../fixtures/portfolio";
 import {
   addMoneyPlan,
   addMoneyProposal,
+  addMoneyProposalStrategic,
   addMoneyResult,
+  addMoneyResultStrategic,
+  blockedInvestTargets,
   feesTooHighPlan,
   feesTooHighProposal,
   investDrift,
+  investTargets,
   priceTooHighPlan,
   priceTooHighProposal,
   proposalStateMessages,
   rebalancePlan,
   rebalanceProposal,
+  rebalanceProposalStrategic,
   rebalanceResult,
+  rebalanceResultStrategic,
   suggestedAmountStates,
 } from "../../fixtures/invest";
 import {
@@ -21,12 +28,19 @@ import {
 } from "./compositions";
 import { DriftOverview } from "./drift-overview";
 import { canContinue, parseAmountInput } from "./invest-plan";
+import {
+  checkTargetTotals,
+  targetTotalsMessage,
+  type TargetDefinition,
+} from "./invest-targets";
 import type {
+  AllocationMode,
   InvestmentPlan,
   InvestmentProposalModel,
   InvestmentStrategy,
   ProposalState,
 } from "./invest-types";
+import { Alert, AlertDescription, AlertTitle, Button } from "../ui";
 import { InvestmentPathActions } from "./investment-path-actions";
 import { InvestmentPlanForm } from "./investment-plan-form";
 import { InvestmentProposal } from "./investment-proposal";
@@ -38,6 +52,20 @@ import type { TransactionFeeConfigurationValues } from "./transaction-fee-config
 export type InvestScreen = "drift" | "plan" | "proposal" | "updated";
 
 export interface InvestCompositionProps {
+  /**
+   * How targets are defined. Strategic groups every step by asset class; the
+   * default Simple allocation lists assets only.
+   */
+  mode?: AllocationMode;
+  /**
+   * The target weights behind the journey. When they do not total 100% at
+   * every level, Add money and Rebalance are unavailable and the proposal is
+   * blocked. Defaults to complete targets, or incomplete ones when the
+   * proposal state is forced to blocked.
+   */
+  targets?: TargetDefinition;
+  /** Called when the investor asks to edit targets from the blocked state. */
+  onEditTargets?: () => void;
   /** The step the journey starts on. */
   screen?: InvestScreen;
   /** The path preselected on the plan step. */
@@ -106,12 +134,18 @@ function describeFees({ policy, values }: FeeSettings): string {
 function scenarioFor(
   strategy: InvestmentStrategy,
   amount: number | null,
-  forced: ProposalState | undefined
+  forced: ProposalState | undefined,
+  mode: AllocationMode,
+  targetsComplete: boolean
 ): {
   state: ProposalState;
   plan: InvestmentPlan;
   proposal: InvestmentProposalModel | null;
 } {
+  if (!targetsComplete || forced === "blocked") {
+    const plan = strategy === "rebalance" ? rebalancePlan : addMoneyPlan;
+    return { state: "blocked", plan, proposal: null };
+  }
   if (forced === "fees-too-high") {
     return {
       state: forced,
@@ -144,9 +178,18 @@ function scenarioFor(
       proposal: feesTooHighProposal,
     };
   }
+  const strategic = mode === "strategic";
   return strategy === "rebalance"
-    ? { state: "ready", plan: rebalancePlan, proposal: rebalanceProposal }
-    : { state: "ready", plan: addMoneyPlan, proposal: addMoneyProposal };
+    ? {
+        state: "ready",
+        plan: rebalancePlan,
+        proposal: strategic ? rebalanceProposalStrategic : rebalanceProposal,
+      }
+    : {
+        state: "ready",
+        plan: addMoneyPlan,
+        proposal: strategic ? addMoneyProposalStrategic : addMoneyProposal,
+      };
 }
 
 const screenCopy: Record<
@@ -180,6 +223,9 @@ const screenCopy: Record<
  * figures of a proposal are fixed per path.
  */
 export function InvestComposition({
+  mode = "simple",
+  targets,
+  onEditTargets,
   screen = "drift",
   strategy = "add-money",
   proposalState,
@@ -198,8 +244,25 @@ export function InvestComposition({
   const [amountEdited, setAmountEdited] = React.useState(false);
   const [fees, setFees] = React.useState(defaultFees);
   const [feesOpen, setFeesOpen] = React.useState(feeDialogOpen);
+  const targetDefinition =
+    targets ??
+    (proposalState === "blocked"
+      ? blockedInvestTargets[mode]
+      : investTargets[mode]);
+  const targetCheck = checkTargetTotals(targetDefinition);
+  // The drift view shows the same class targets and shares the gate checks.
+  const strategicTargets =
+    mode === "strategic" && targetDefinition.classTargets
+      ? {
+          classTargets: targetDefinition.classTargets,
+          shares: Object.fromEntries(
+            targetDefinition.assets.map((entry) => [entry.id, entry.weight])
+          ),
+        }
+      : undefined;
+  const blockedMessage = targetTotalsMessage(targetCheck);
   const [shownState, setShownState] = React.useState<ProposalState>(
-    proposalState ?? "ready"
+    proposalState ?? (targetCheck.ok ? "ready" : "blocked")
   );
   const timer = React.useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
@@ -216,8 +279,8 @@ export function InvestComposition({
     setAmountEdited(false);
   }, [strategy]);
   React.useEffect(() => {
-    setShownState(proposalState ?? "ready");
-  }, [proposalState]);
+    setShownState(proposalState ?? (targetCheck.ok ? "ready" : "blocked"));
+  }, [proposalState, targetCheck.ok]);
   React.useEffect(() => {
     setFeesOpen(feeDialogOpen);
   }, [feeDialogOpen]);
@@ -232,7 +295,13 @@ export function InvestComposition({
   }, [currentScreen]);
 
   const amount = parseAmountInput(amountText);
-  const scenario = scenarioFor(plan.strategy, amount, proposalState);
+  const scenario = scenarioFor(
+    plan.strategy,
+    amount,
+    proposalState,
+    mode,
+    targetCheck.ok
+  );
   const target = scenario.state;
 
   /** Shows the loading state, then the proposal state once the delay passes. */
@@ -297,8 +366,15 @@ export function InvestComposition({
 
   const copy = screenCopy[currentScreen];
   const feeSummary = describeFees(fees);
-  const result =
-    plan.strategy === "rebalance" ? rebalanceResult : addMoneyResult;
+  const strategic = mode === "strategic";
+  const rebalancing = plan.strategy === "rebalance";
+  const result = strategic
+    ? rebalancing
+      ? rebalanceResultStrategic
+      : addMoneyResultStrategic
+    : rebalancing
+      ? rebalanceResult
+      : addMoneyResult;
 
   return (
     <PortfolioCompositionShell
@@ -308,6 +384,27 @@ export function InvestComposition({
         setCurrentScreen("drift");
       }}
       selectedItem="invest"
+      // Steps with a sticky action bar carry their own actions, so only the
+      // drift view offers the floating page-actions menu.
+      pageActions={
+        currentScreen === "drift"
+          ? [
+              {
+                label: "Add money",
+                icon: <Plus aria-hidden />,
+                primary: true,
+                disabled: !targetCheck.ok,
+                onClick: () => startPath("add-money"),
+              },
+              {
+                label: "Rebalance",
+                icon: <ArrowLeftRight aria-hidden />,
+                disabled: !targetCheck.ok,
+                onClick: () => startPath("rebalance"),
+              },
+            ]
+          : undefined
+      }
       onSelectItem={(item) => {
         if (item.id === "invest") {
           setCurrentScreen("drift");
@@ -331,12 +428,28 @@ export function InvestComposition({
               <InvestmentPathActions
                 onAddMoney={() => startPath("add-money")}
                 onRebalance={() => startPath("rebalance")}
+                disabled={!targetCheck.ok}
               />
             ) : undefined
           }
         />
+        {currentScreen === "drift" && blockedMessage ? (
+          <Alert variant="destructive">
+            <div>
+              <AlertTitle>{blockedMessage.title}</AlertTitle>
+              <AlertDescription>{blockedMessage.description}</AlertDescription>
+              <Button variant="link" size="sm" onClick={onEditTargets}>
+                Edit targets
+              </Button>
+            </div>
+          </Alert>
+        ) : null}
         {currentScreen === "drift" ? (
-          <DriftOverview snapshot={investDrift} />
+          <DriftOverview
+            snapshot={investDrift}
+            mode={mode}
+            targets={strategicTargets}
+          />
         ) : null}
         {currentScreen === "plan" ? (
           <InvestmentPlanForm
@@ -348,6 +461,7 @@ export function InvestComposition({
             suggested={suggestedAmountStates.amount}
             onUseSuggested={useSuggested}
             drift={investDrift}
+            mode={mode}
             commissions={{
               summary: feeSummary,
               policy: fees.policy,
@@ -367,6 +481,7 @@ export function InvestComposition({
         {currentScreen === "proposal" ? (
           <InvestmentProposal
             state={shownState}
+            mode={mode}
             proposal={scenario.proposal}
             plan={{
               ...scenario.plan,
@@ -381,7 +496,9 @@ export function InvestComposition({
               shownState === "fees-too-high" ||
               shownState === "price-too-high"
                 ? undefined
-                : proposalStateMessages[shownState]
+                : shownState === "blocked"
+                  ? (blockedMessage ?? undefined)
+                  : proposalStateMessages[shownState]
             }
             onBack={goToPlan}
             onChangeRules={goToPlan}
@@ -396,11 +513,13 @@ export function InvestComposition({
             }}
             onTryAgain={calculate}
             onBackToDrift={goToDrift}
+            onEditTargets={onEditTargets}
           />
         ) : null}
         {currentScreen === "updated" ? (
           <InvestmentResult
             result={result}
+            mode={mode}
             onBackToPortfolio={backToPortfolio}
             onPlanAnother={planAnother}
           />

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDeviation,
   formatPoints,
+  formatTargetWeight,
   formatQuantity,
   formatQuantityChange,
 } from "./invest-format";
@@ -38,5 +39,15 @@ describe("invest formatting", () => {
     expect(formatDeviation(-23.1)).toBe("−23.1 pp");
     expect(formatDeviation(0.01)).toBe("0.0 pp");
     expect(formatPoints(29.5)).toBe("29.5 pp");
+  });
+
+  /**
+   * GIVEN whole and fractional target weights
+   * WHEN they are formatted as target weights
+   * THEN whole weights drop the decimal and others keep one.
+   */
+  it("formats target weights", () => {
+    expect(formatTargetWeight(65)).toBe("65%");
+    expect(formatTargetWeight(12.5)).toBe("12.5%");
   });
 });

@@ -1,52 +1,54 @@
-import * as React from "react";
 import { MoreVertical, Pencil } from "lucide-react";
-import { Card, CardContent, IconButton } from "../ui";
+import { AssetTickerChip, IconButton } from "../ui";
 import {
-  formatAssetClass,
+  assetClassLabels,
   formatCurrency,
-  formatDrift,
   formatPercent,
   type PortfolioAsset,
 } from "../../fixtures/portfolio";
 import { cn } from "../../lib/cn";
+import { PortfolioDriftBadge } from "./portfolio-asset-drift-badge";
+import {
+  assetRegion,
+  type PortfolioAssetEntry,
+} from "./portfolio-asset-groups";
 
 export interface PortfolioAssetCardProps {
-  asset: PortfolioAsset;
+  /** The asset with the weights derived from its market value. */
+  entry: PortfolioAssetEntry;
+  /**
+   * Set when the card sits inside an asset-class card. A grouped card is a
+   * compact row that shows the asset's share of its class instead of the
+   * class and region.
+   */
+  grouped?: boolean;
+  /** `detailed` adds quantity, price and cost basis, matching the desktop table. */
+  presentation?: "detailed" | "overview";
   onEdit?: (asset: PortfolioAsset) => void;
   onMenu?: (asset: PortfolioAsset) => void;
 }
+
+/**
+ * The mobile counterpart of a portfolio asset table row. The name wraps beside
+ * the drift badge; a second line carries the ticker chip, context and value.
+ */
 export function PortfolioAssetCard({
-  asset,
+  entry,
+  grouped = false,
+  presentation = "detailed",
   onEdit,
   onMenu,
 }: PortfolioAssetCardProps) {
-  const driftVariant =
-    asset.driftPp > 1 ? "warning" : asset.driftPp < -1 ? "primary" : "success";
+  const { asset } = entry;
   return (
-    <Card className="ds-asset-card">
-      <CardContent>
-        <div className="ds-asset-card__heading">
-          <span
-            className={cn(
-              "ds-asset-card__dot",
-              `ds-asset-card__dot--${asset.assetClass}`
-            )}
-            aria-hidden
-          />{" "}
-          <div className="ds-asset-card__identity">
-            <div className="ds-asset-card__title-row">
-              <span className="ds-asset-card__name">{asset.name}</span>
-            </div>
-            <div className="ds-asset-card__ticker-row">
-              <span className="ds-asset-card__ticker">{asset.ticker}</span>
-              <span className="ds-asset-card__ticker-separator" aria-hidden>
-                ·
-              </span>
-              <span className="ds-asset-card__meta">
-                {formatAssetClass(asset)}
-              </span>
-            </div>
-          </div>
+    <article
+      className={cn("ds-asset-card", grouped && "ds-asset-card--grouped")}
+      data-asset-class={asset.assetClass}
+    >
+      <div className="ds-asset-card__heading">
+        <span className="ds-asset-card__name">{asset.name}</span>
+        <div className="ds-asset-card__trailing">
+          <PortfolioDriftBadge driftPp={entry.driftPp} />
           {onEdit ? (
             <IconButton
               label={`Edit ${asset.ticker}`}
@@ -68,66 +70,34 @@ export function PortfolioAssetCard({
             </IconButton>
           ) : null}
         </div>
-        <div className="ds-asset-card__stats">
-          <Stat
-            label="Quantity"
-            value={asset.quantity ? asset.quantity.toFixed(2) : "—"}
-          />
-          <Stat
-            label="Current price"
-            value={formatCurrency(asset.price, asset.currency)}
-          />
-          <Stat
-            label="Average cost basis"
-            value={
-              asset.averageCostBasis === undefined
-                ? "—"
-                : formatCurrency(asset.averageCostBasis, asset.currency)
-            }
-          />
-          <Stat
-            label="Current value"
-            value={formatCurrency(asset.value, asset.currency)}
-          />
-          <Stat
-            label="Target weight"
-            value={formatPercent(asset.targetWeight)}
-          />
-          <Stat
-            label="Current weight"
-            value={formatPercent(asset.currentWeight)}
-          />
-          <Stat
-            label="Drift"
-            value={formatDrift(asset.driftPp)}
-            valueVariant={driftVariant}
-          />
+      </div>
+      <div className="ds-asset-card__line">
+        <AssetTickerChip ticker={asset.ticker} />
+        <span className="ds-asset-card__meta">
+          {grouped
+            ? `${formatPercent(entry.currentWeight)} → ${formatPercent(entry.targetWeight)} · ${formatPercent(entry.targetShareOfClass)} of class`
+            : `${assetClassLabels[asset.assetClass]} · ${assetRegion(asset)}`}
+        </span>
+        <span className="ds-asset-card__value">
+          {formatCurrency(asset.value, asset.currency)}
+        </span>
+      </div>
+      {grouped ? null : (
+        <div className="ds-asset-card__meta">
+          {formatPercent(entry.currentWeight)} now ·{" "}
+          {formatPercent(entry.targetWeight)} target
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  valueVariant,
-}: {
-  label: string;
-  value: string;
-  valueVariant?: "primary" | "success" | "warning";
-}) {
-  return (
-    <div className="ds-asset-card__stat">
-      <span className="ds-asset-card__stat-label">{label}</span>
-      <span
-        className={cn(
-          "ds-asset-card__stat-value",
-          valueVariant && `ds-asset-card__stat-value--${valueVariant}`
-        )}
-      >
-        {value}
-      </span>
-    </div>
+      )}
+      {presentation === "detailed" ? (
+        <p className="ds-asset-card__details">
+          Quantity {asset.quantity ? asset.quantity.toFixed(2) : "—"} · Current
+          price {formatCurrency(asset.price, asset.currency)} · Average cost
+          basis{" "}
+          {asset.averageCostBasis === undefined
+            ? "—"
+            : formatCurrency(asset.averageCostBasis, asset.currency)}
+        </p>
+      ) : null}
+    </article>
   );
 }

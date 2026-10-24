@@ -13,9 +13,10 @@ export interface StickyActionBarProps {
 
 /**
  * The actions of a step. On wide screens they sit in the flow below the
- * content; on small screens they stick to the bottom edge, and the floating
- * navigation button moves above them through
- * `--dcapal-sticky-action-bar-offset`.
+ * content; on small screens they stick to the bottom edge. A page that pins
+ * this bar supplies no `pageActions`, so the floating page-actions button
+ * never shares the corner; should one appear anyway it rides above the bar
+ * through `--dcapal-sticky-action-bar-offset`.
  */
 export function StickyActionBar({
   label,

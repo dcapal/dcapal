@@ -10,6 +10,7 @@ const meta = {
     docs: { story: { inline: false, iframeHeight: 1100 } },
   },
   argTypes: {
+    mode: { control: { type: "select" }, options: ["simple", "strategic"] },
     screen: {
       control: { type: "select" },
       options: ["drift", "plan", "proposal", "updated"],
@@ -147,7 +148,11 @@ export const ProposalLoading: Story = {
   tags: ["!autodocs"],
 };
 export const ProposalBlocked: Story = {
-  args: { screen: "proposal", proposalState: "blocked" },
+  args: {
+    screen: "proposal",
+    proposalState: "blocked",
+    onEditTargets: () => undefined,
+  },
   tags: ["!autodocs"],
 };
 export const ProposalNeedsAmount: Story = {
@@ -168,5 +173,100 @@ export const ProposalPriceTooHigh: Story = {
 };
 export const ProposalError: Story = {
   args: { screen: "proposal", proposalState: "error" },
+  tags: ["!autodocs"],
+};
+
+/** Edit targets lives in the portfolio settings, which this demo does not open. */
+const editTargets = () => undefined;
+
+/** Strategic allocation: every step groups assets under their asset class. */
+export const DriftStrategic: Story = {
+  args: { mode: "strategic" },
+  tags: ["!autodocs"],
+};
+export const DriftStrategicMobile: Story = {
+  args: { mode: "strategic" },
+  parameters: mobile,
+  tags: ["!autodocs"],
+};
+export const DriftStrategicLaptop: Story = {
+  args: { mode: "strategic" },
+  parameters: laptop,
+  tags: ["!autodocs"],
+};
+export const DriftStrategicCompact: Story = {
+  args: { mode: "strategic" },
+  parameters: compact,
+  tags: ["!autodocs"],
+};
+
+export const PlanStrategic: Story = {
+  args: { mode: "strategic", screen: "plan", strategy: "add-money" },
+  tags: ["!autodocs"],
+};
+export const PlanStrategicMobile: Story = {
+  args: { mode: "strategic", screen: "plan", strategy: "add-money" },
+  parameters: mobile,
+  tags: ["!autodocs"],
+};
+
+export const ProposalStrategicAddMoney: Story = {
+  args: { mode: "strategic", screen: "proposal", strategy: "add-money" },
+  tags: ["!autodocs"],
+};
+export const ProposalStrategicAddMoneyMobile: Story = {
+  args: { mode: "strategic", screen: "proposal", strategy: "add-money" },
+  parameters: mobile,
+  tags: ["!autodocs"],
+};
+export const ProposalStrategicAddMoneyLaptop: Story = {
+  args: { mode: "strategic", screen: "proposal", strategy: "add-money" },
+  parameters: laptop,
+  tags: ["!autodocs"],
+};
+export const ProposalStrategicAddMoneyCompact: Story = {
+  args: { mode: "strategic", screen: "proposal", strategy: "add-money" },
+  parameters: compact,
+  tags: ["!autodocs"],
+};
+
+export const ProposalStrategicRebalance: Story = {
+  args: { mode: "strategic", screen: "proposal", strategy: "rebalance" },
+  tags: ["!autodocs"],
+};
+export const ProposalStrategicRebalanceMobile: Story = {
+  args: { mode: "strategic", screen: "proposal", strategy: "rebalance" },
+  parameters: mobile,
+  tags: ["!autodocs"],
+};
+
+export const UpdatedStrategic: Story = {
+  args: { mode: "strategic", screen: "updated", strategy: "rebalance" },
+  tags: ["!autodocs"],
+};
+export const UpdatedStrategicMobile: Story = {
+  args: { mode: "strategic", screen: "updated", strategy: "rebalance" },
+  parameters: mobile,
+  tags: ["!autodocs"],
+};
+
+/** Class targets and in-class shares do not total 100%, so nothing can be proposed. */
+export const ProposalBlockedStrategic: Story = {
+  args: {
+    mode: "strategic",
+    screen: "proposal",
+    proposalState: "blocked",
+    onEditTargets: editTargets,
+  },
+  tags: ["!autodocs"],
+};
+export const ProposalBlockedStrategicMobile: Story = {
+  args: {
+    mode: "strategic",
+    screen: "proposal",
+    proposalState: "blocked",
+    onEditTargets: editTargets,
+  },
+  parameters: mobile,
   tags: ["!autodocs"],
 };

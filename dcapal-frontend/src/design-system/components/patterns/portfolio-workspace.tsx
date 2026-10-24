@@ -1,15 +1,10 @@
 import * as React from "react";
-import {
-  ArrowLeft,
-  Compass,
-  Home,
-  Menu,
-  Settings2,
-  TrendingUp,
-  X,
-} from "lucide-react";
-import { IconButton, Sheet, SheetClose, SheetContent, SheetTitle } from "../ui";
+import { ArrowLeft, Compass, Home, Settings2, TrendingUp } from "lucide-react";
 import { TopNavigation } from "./app-shell";
+import {
+  FloatingActionMenu,
+  type FloatingActionMenuAction,
+} from "./floating-action-menu";
 import { PortfolioFooter, type PortfolioFooterTone } from "./portfolio-footer";
 import {
   PortfolioWorkspaceSidebar,
@@ -35,6 +30,14 @@ export interface PortfolioWorkspaceProps {
   onSelectItem?: (item: PortfolioWorkspaceNavItem) => boolean | void;
   mobileNavigationOpen?: boolean;
   onMobileNavigationOpenChange?: (open: boolean) => void;
+  /**
+   * The actions of the current page, offered on phones through the floating
+   * "Open page actions" button. Leave it empty on pages that pin a sticky
+   * action bar. Navigation never goes here.
+   */
+  pageActions?: ReadonlyArray<FloatingActionMenuAction>;
+  /** Opens the page-actions menu on first render (Canvas stories). */
+  pageActionsDefaultOpen?: boolean;
   children: React.ReactNode;
   footer?: boolean;
   footerTone?: PortfolioFooterTone;
@@ -87,7 +90,11 @@ const defaultGroups: PortfolioWorkspaceNavGroup[] = [
   },
 ];
 
-/** Portfolio workspace shell with desktop rail and a mobile navigation sheet. */
+/**
+ * Portfolio workspace shell. Desktop shows the navigation rail; phones open
+ * the same navigation from the top bar's menu button and reach the current
+ * page's actions through the floating page-actions menu.
+ */
 export function PortfolioWorkspace({
   portfolioName,
   asOf = "As of 2 Aug 2026",
@@ -100,6 +107,8 @@ export function PortfolioWorkspace({
   onSelectItem,
   mobileNavigationOpen,
   onMobileNavigationOpenChange,
+  pageActions = [],
+  pageActionsDefaultOpen,
   children,
   footer = true,
   footerTone = "light",
@@ -119,7 +128,22 @@ export function PortfolioWorkspace({
         portfolioName={portfolioName}
         portfolioOptions={portfolioOptions}
         onPortfolioChange={onPortfolioChange}
-        showMenu={false}
+        showMenu
+        menuOpen={navigationOpen}
+        onMenuOpenChange={setNavigationOpen}
+        menuTitle="Portfolio navigation"
+        menuButtonClassName="ds-portfolio-workspace__menu"
+        mobileMenuContent={
+          <PortfolioWorkspaceSidebar
+            portfolioName={portfolioName}
+            asOf={asOf}
+            groups={navGroups}
+            selectedItem={selectedItem}
+            onSelectItem={onSelectItem}
+            onNavigate={() => setNavigationOpen(false)}
+            mode="drawer"
+          />
+        }
       />
       <div className="ds-portfolio-workspace__body">
         <PortfolioWorkspaceSidebar
@@ -147,38 +171,10 @@ export function PortfolioWorkspace({
         </main>
       </div>
       {footer ? <PortfolioFooter tone={footerTone} /> : null}
-      <IconButton
-        className="ds-portfolio-workspace__navigation-fab"
-        label="Open portfolio navigation"
-        variant="ghost"
-        aria-expanded={navigationOpen}
-        onClick={() => setNavigationOpen(true)}
-      >
-        <Menu aria-hidden />
-      </IconButton>
-      <Sheet open={navigationOpen} onOpenChange={setNavigationOpen}>
-        <SheetContent className="ds-workspace-nav-sheet">
-          <div className="ds-workspace-nav-sheet__header">
-            <SheetTitle>Portfolio navigation</SheetTitle>
-            <SheetClose
-              render={
-                <IconButton label="Close portfolio navigation" variant="ghost">
-                  <X aria-hidden />
-                </IconButton>
-              }
-            />
-          </div>
-          <PortfolioWorkspaceSidebar
-            portfolioName={portfolioName}
-            asOf={asOf}
-            groups={navGroups}
-            selectedItem={selectedItem}
-            onSelectItem={onSelectItem}
-            onNavigate={() => setNavigationOpen(false)}
-            mode="drawer"
-          />
-        </SheetContent>
-      </Sheet>
+      <FloatingActionMenu
+        actions={pageActions}
+        defaultOpen={pageActionsDefaultOpen}
+      />
     </div>
   );
 }
