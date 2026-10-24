@@ -6,13 +6,15 @@ use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
         AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
-        FeeStructure as AppFeeStructure, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
-        StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
-        TransactionFees,
+        FeeStructure as AppFeeStructure, PortfolioAssetV2, PortfolioV2, StrategicAllocationV2,
+        StrategicAssetClassTargetV2, StrategicAssetTargetV2, TransactionFees,
     },
 };
 use crate::ports::outbound::repository::portfolio::PortfolioRepositoryError;
 use crate::ports::outbound::repository::portfolio::Result;
+use crate::ports::outbound::repository::postgres::convert::{
+    app_asset_class, app_provider, db_asset_class,
+};
 use crate::ports::outbound::repository::postgres::types::{
     AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
 };
@@ -54,8 +56,14 @@ pub(super) struct V2SnapshotRow {
     pub(super) asset_min_fee: Option<Decimal>,
     pub(super) asset_max_fee: Option<Decimal>,
     pub(super) asset_average_buy_price: Option<Decimal>,
-    pub(super) class_target_asset_class: Option<i16>,
-    pub(super) class_target_weight: Option<Decimal>,
+}
+
+/// A stored Strategic Asset Class target of one Portfolio.
+#[derive(Debug, sqlx::FromRow)]
+pub(super) struct V2ClassTargetRow {
+    pub(super) portfolio_id: Uuid,
+    pub(super) asset_class: i16,
+    pub(super) target_weight: Decimal,
 }
 
 pub(super) struct V2AssetWithWeight {
@@ -85,45 +93,6 @@ pub(super) fn corrupt_data(message: impl Into<String>) -> PortfolioRepositoryErr
 
 fn stored_percentage_is_valid(value: Decimal) -> bool {
     (Decimal::ZERO..=Decimal::from(100)).contains(&value)
-}
-
-pub(super) fn db_asset_class(class: AppAssetClass) -> DbAssetClass {
-    match class {
-        AppAssetClass::Other => DbAssetClass::Other,
-        AppAssetClass::Equity => DbAssetClass::Equity,
-        AppAssetClass::Bond => DbAssetClass::Bond,
-        AppAssetClass::Cash => DbAssetClass::Cash,
-        AppAssetClass::Crypto => DbAssetClass::Crypto,
-        AppAssetClass::Commodity => DbAssetClass::Commodity,
-    }
-}
-
-pub(super) fn app_asset_class(class: DbAssetClass) -> AppAssetClass {
-    match class {
-        DbAssetClass::Other => AppAssetClass::Other,
-        DbAssetClass::Equity => AppAssetClass::Equity,
-        DbAssetClass::Bond => AppAssetClass::Bond,
-        DbAssetClass::Cash => AppAssetClass::Cash,
-        DbAssetClass::Crypto => AppAssetClass::Crypto,
-        DbAssetClass::Commodity => AppAssetClass::Commodity,
-    }
-}
-
-pub(super) fn db_provider(provider: AppProvider) -> Result<DbProvider> {
-    match provider {
-        AppProvider::YF => Ok(DbProvider::YF),
-        AppProvider::Kraken => Ok(DbProvider::Kraken),
-        AppProvider::Unsupported(value) => {
-            Err(PortfolioRepositoryError::UnsupportedProvider(value))
-        }
-    }
-}
-
-fn app_provider(provider: DbProvider) -> AppProvider {
-    match provider {
-        DbProvider::YF => AppProvider::YF,
-        DbProvider::Kraken => AppProvider::Kraken,
-    }
 }
 
 pub(super) fn v2_mode(mode: AppAllocationMode) -> DbAllocationMode {
@@ -343,26 +312,65 @@ fn v2_portfolio_row(snapshot: &V2SnapshotRow) -> PortfolioRow {
     }
 }
 
-fn v2_snapshot_portfolios(rows: Vec<V2SnapshotRow>) -> Result<Vec<PortfolioV2>> {
+/// Decodes the stored Strategic Asset Class targets of one Portfolio, ignoring
+/// repeated classes.
+fn decode_class_targets(rows: Vec<V2ClassTargetRow>) -> Result<Vec<StrategicAssetClassTargetV2>> {
+    let mut class_ids = std::collections::HashSet::new();
+    let mut targets = Vec::new();
+    for row in rows {
+        if !class_ids.insert(row.asset_class) {
+            continue;
+        }
+        let asset_class = DbAssetClass::try_from(row.asset_class).map_err(|_| {
+            corrupt_data("Portfolio snapshot contains an invalid Strategic Asset Class")
+        })?;
+        if !stored_percentage_is_valid(row.target_weight) {
+            return Err(corrupt_data(
+                "Portfolio snapshot contains an invalid Strategic target weight",
+            ));
+        }
+        targets.push(StrategicAssetClassTargetV2 {
+            asset_class: app_asset_class(asset_class),
+            target_weight: row.target_weight,
+        });
+    }
+    Ok(targets)
+}
+
+/// Builds one response per Portfolio, attaching its Strategic Asset Class
+/// targets by Portfolio id.
+fn v2_snapshot_portfolios(
+    rows: Vec<V2SnapshotRow>,
+    class_target_rows: Vec<V2ClassTargetRow>,
+) -> Result<Vec<PortfolioV2>> {
+    let mut class_targets_by_portfolio =
+        std::collections::HashMap::<Uuid, Vec<V2ClassTargetRow>>::new();
+    for row in class_target_rows {
+        class_targets_by_portfolio
+            .entry(row.portfolio_id)
+            .or_default()
+            .push(row);
+    }
     let mut portfolios = Vec::new();
     let mut portfolio: Option<PortfolioRow> = None;
     let mut assets = Vec::new();
     let mut asset_ids = std::collections::HashSet::new();
-    let mut class_targets = Vec::new();
-    let mut class_ids = std::collections::HashSet::new();
     let mut portfolio_id = None;
 
     for row in rows {
         if portfolio_id != Some(row.portfolio_id) {
             if let Some(previous) = portfolio.take() {
+                let class_targets = decode_class_targets(
+                    class_targets_by_portfolio
+                        .remove(&previous.id)
+                        .unwrap_or_default(),
+                )?;
                 portfolios.push(v2_portfolio_response(previous, assets, class_targets)?);
             }
             portfolio_id = Some(row.portfolio_id);
             portfolio = Some(v2_portfolio_row(&row));
             assets = Vec::new();
             asset_ids.clear();
-            class_targets = Vec::new();
-            class_ids.clear();
         }
 
         if row.asset_id.is_none() && has_partial_asset_data(&row) {
@@ -372,11 +380,9 @@ fn v2_snapshot_portfolios(rows: Vec<V2SnapshotRow>) -> Result<Vec<PortfolioV2>> 
         }
         if let Some(asset_id) = row.asset_id {
             if !asset_ids.insert(asset_id) {
-                if row.class_target_asset_class.is_none() {
-                    return Err(corrupt_data(
-                        "Portfolio snapshot contains a duplicate Portfolio Asset row",
-                    ));
-                }
+                return Err(corrupt_data(
+                    "Portfolio snapshot contains a duplicate Portfolio Asset row",
+                ));
             } else {
                 let symbol = row
                     .asset_symbol
@@ -406,32 +412,13 @@ fn v2_snapshot_portfolios(rows: Vec<V2SnapshotRow>) -> Result<Vec<PortfolioV2>> 
                 })?);
             }
         }
-
-        match (row.class_target_asset_class, row.class_target_weight) {
-            (None, None) => {}
-            (Some(asset_class), Some(target_weight)) if class_ids.insert(asset_class) => {
-                let asset_class = DbAssetClass::try_from(asset_class).map_err(|_| {
-                    corrupt_data("Portfolio snapshot contains an invalid Strategic Asset Class")
-                })?;
-                if !stored_percentage_is_valid(target_weight) {
-                    return Err(corrupt_data(
-                        "Portfolio snapshot contains an invalid Strategic target weight",
-                    ));
-                }
-                class_targets.push(StrategicAssetClassTargetV2 {
-                    asset_class: app_asset_class(asset_class),
-                    target_weight,
-                });
-            }
-            (Some(_), Some(_)) => {}
-            _ => {
-                return Err(corrupt_data(
-                    "Portfolio snapshot contains a partial Strategic target",
-                ));
-            }
-        }
     }
     if let Some(last) = portfolio {
+        let class_targets = decode_class_targets(
+            class_targets_by_portfolio
+                .remove(&last.id)
+                .unwrap_or_default(),
+        )?;
         portfolios.push(v2_portfolio_response(last, assets, class_targets)?);
     }
     Ok(portfolios)
@@ -480,20 +467,28 @@ pub(super) async fn load(
                 pa.max_fee_impact AS asset_max_fee_impact, pa.fee_type AS asset_fee_type,
                 pa.fee_amount AS asset_fee_amount, pa.fee_rate AS asset_fee_rate,
                 pa.min_fee AS asset_min_fee, pa.max_fee AS asset_max_fee,
-                pa.average_buy_price AS asset_average_buy_price,
-                class_target.asset_class AS class_target_asset_class,
-                class_target.target_weight AS class_target_weight
+                pa.average_buy_price AS asset_average_buy_price
          FROM portfolios AS p
-         LEFT JOIN portfolio_asset AS pa ON pa.portfolio_id = p.id
+         LEFT JOIN portfolio_asset AS pa ON pa.portfolio_id = p.id AND NOT p.deleted
          LEFT JOIN assets_data AS ad ON ad.id = pa.assets_data_id
          LEFT JOIN portfolio_asset_allocation AS paa
            ON paa.portfolio_id = pa.portfolio_id
           AND paa.portfolio_asset_id = pa.id
-         LEFT JOIN strategic_asset_class_targets AS class_target
-           ON class_target.portfolio_id = p.id
          WHERE p.user_id = $1
-         ORDER BY p.id, pa.id, class_target.asset_class
+         ORDER BY p.id, pa.id
          FOR UPDATE OF p",
+    )
+    .bind(user_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    // Class targets are loaded apart so they do not multiply the asset rows;
+    // soft-deleted Portfolios are tombstones and need neither assets nor targets.
+    let class_target_rows = query_as::<_, V2ClassTargetRow>(
+        "SELECT t.portfolio_id, t.asset_class, t.target_weight
+         FROM strategic_asset_class_targets AS t
+         JOIN portfolios AS p ON p.id = t.portfolio_id
+         WHERE p.user_id = $1 AND NOT p.deleted
+         ORDER BY t.portfolio_id, t.asset_class",
     )
     .bind(user_id)
     .fetch_all(&mut **tx)
@@ -509,6 +504,6 @@ pub(super) async fn load(
             }
             rows
         });
-    let snapshots = v2_snapshot_portfolios(rows)?;
+    let snapshots = v2_snapshot_portfolios(rows, class_target_rows)?;
     Ok(portfolio_rows.into_iter().zip(snapshots).collect())
 }

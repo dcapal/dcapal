@@ -8,7 +8,7 @@ use crate::{
             asset::{AssetRef, ResolvedAsset},
             portfolio::SyncPortfoliosV2Request,
         },
-        services::asset::{AssetService, AssetServiceError},
+        services::asset::{AssetService, AssetServiceError, ResolvedAssets},
     },
     ports::outbound::{
         adapter::AssetProviderError,
@@ -31,7 +31,7 @@ pub use validation::{FieldPath, OwnershipLocation, ValidationError, ValidationIs
 pub struct SyncPortfoliosV2Command {
     user_id: Uuid,
     request: SyncPortfoliosV2Request,
-    assets: Vec<ResolvedAsset>,
+    assets: ResolvedAssets,
 }
 
 impl SyncPortfoliosV2Command {
@@ -84,7 +84,10 @@ impl SyncPortfoliosV2Command {
             .flat_map(|portfolio| portfolio.assets.iter().map(|asset| asset.asset.clone()))
             .collect::<Vec<_>>();
         let resolved = if references.is_empty() {
-            Vec::new()
+            ResolvedAssets {
+                all: Vec::new(),
+                newly_resolved: Vec::new(),
+            }
         } else {
             assets
                 .resolve(&references)
@@ -95,6 +98,9 @@ impl SyncPortfoliosV2Command {
                             &request,
                             &unresolved,
                         ))
+                    }
+                    AssetServiceError::TooManyNewAssets { .. } => {
+                        SyncPortfoliosV2CommandError::Validation(too_many_new_assets())
                     }
                     AssetServiceError::ProviderUnavailable(error) => {
                         SyncPortfoliosV2CommandError::ProviderUnavailable(error)
@@ -124,13 +130,27 @@ impl SyncPortfoliosV2Command {
 
     /// Borrows the shared metadata of every distinct referenced asset.
     pub fn assets(&self) -> &[ResolvedAsset] {
-        &self.assets
+        &self.assets.all
+    }
+
+    /// Borrows the assets that were unknown to the shared directory and must
+    /// be onboarded before the write.
+    pub fn newly_resolved_assets(&self) -> &[ResolvedAsset] {
+        &self.assets.newly_resolved
     }
 
     /// Consumes the command and returns its normalized request.
     pub fn into_request(self) -> SyncPortfoliosV2Request {
         self.request
     }
+}
+
+/// Builds the validation error for a sync that introduces too many new assets.
+fn too_many_new_assets() -> ValidationError {
+    ValidationError::single(
+        FieldPath::root().field("portfolios"),
+        validation::MESSAGE_TOO_MANY_NEW_ASSETS,
+    )
 }
 
 /// Builds one validation issue for every submitted occurrence of an unresolved reference.
@@ -347,6 +367,31 @@ mod tests {
                 "portfolios[1].assets[0].asset"
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn rejects_a_sync_introducing_too_many_new_assets() {
+        // GIVEN an empty directory and a Portfolio referencing more unknown assets than the cap,
+        // WHEN the command is built,
+        // THEN validation fails at `portfolios` and no provider is contacted.
+        let repository = repository_with_owners(Vec::new());
+        let mut provider = MockAssetProvider::new();
+        provider.expect_lookup().never();
+        let assets = assets_service(empty_directory(), provider);
+        let many = (0..=crate::app::services::asset::MAX_NEW_ASSETS_PER_RESOLUTION)
+            .map(|i| asset(&format!("S{i}")))
+            .collect();
+
+        let error =
+            SyncPortfoliosV2Command::try_new(Uuid::nil(), request(many), &repository, &assets)
+                .await
+                .expect_err("too many new assets should be rejected");
+
+        let SyncPortfoliosV2CommandError::Validation(error) = error else {
+            panic!("expected a validation error");
+        };
+        assert_eq!(error.issues.len(), 1);
+        assert_eq!(error.issues[0].path.render(), "portfolios");
     }
 
     #[tokio::test]

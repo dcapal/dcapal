@@ -11,13 +11,6 @@ pub enum Provider {
     YF,
     /// Kraken.
     Kraken,
-    /// A provider identifier that no adapter supports.
-    ///
-    /// The v2 REST boundary rejects such identifiers as validation errors, so
-    /// this variant never reaches the v2 command; outbound adapters keep it
-    /// as a defensive failure case.
-    #[display("Unsupported({_0})")]
-    Unsupported(String),
 }
 
 impl Provider {
@@ -26,7 +19,6 @@ impl Provider {
         match self {
             Self::YF => "yf",
             Self::Kraken => "kraken",
-            Self::Unsupported(value) => value,
         }
     }
 

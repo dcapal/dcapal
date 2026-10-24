@@ -16,12 +16,22 @@ use crate::{
 /// Maximum number of provider lookups in flight for one resolution.
 const PROVIDER_CONCURRENCY: usize = 8;
 
+/// Maximum number of distinct references unknown to the directory that one
+/// resolution may send to providers.
+pub const MAX_NEW_ASSETS_PER_RESOLUTION: usize = 50;
+
 /// Errors raised while resolving or reading shared asset metadata.
 #[derive(Debug, thiserror::Error)]
 pub enum AssetServiceError {
     /// These references are unknown to the directory and to their provider.
     #[error("{} asset reference(s) cannot be resolved", .0.len())]
     Unresolved(Vec<AssetRef>),
+    /// One resolution would send more unknown references to providers than allowed.
+    #[error("more than {limit} new assets cannot be resolved at once")]
+    TooManyNewAssets {
+        /// The maximum number of unknown references per resolution.
+        limit: usize,
+    },
     /// A provider could not answer, so the references' existence is undecided.
     #[error("asset provider is unavailable")]
     ProviderUnavailable(#[source] AssetProviderError),
@@ -37,6 +47,15 @@ pub struct AssetLookup {
     pub assets: Vec<ResolvedAsset>,
     /// References that are not stored.
     pub not_found: Vec<AssetRef>,
+}
+
+/// Outcome of resolving references: every asset plus the ones to onboard.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedAssets {
+    /// Metadata of every distinct reference, in first-seen order.
+    pub all: Vec<ResolvedAsset>,
+    /// The subset that came from a provider and is absent from the directory.
+    pub newly_resolved: Vec<ResolvedAsset>,
 }
 
 /// Resolves asset references into shared metadata.
@@ -65,19 +84,24 @@ impl AssetService {
         Ok(AssetLookup { assets, not_found })
     }
 
-    /// Returns the metadata of every distinct reference, in first-seen order.
+    /// Returns the metadata of every distinct reference, in first-seen order,
+    /// and separately the assets that were not yet in the directory.
     ///
     /// References missing from the directory are looked up at their provider
-    /// with bounded concurrency. Nothing is stored; see [`Self::onboard`].
+    /// with bounded concurrency, unless more than
+    /// [`MAX_NEW_ASSETS_PER_RESOLUTION`] are missing, which fails before any
+    /// provider call. Nothing is stored; see [`Self::onboard`].
     /// A provider failure takes precedence over unresolved references because
     /// the failure leaves their existence undecided.
-    pub async fn resolve(
-        &self,
-        refs: &[AssetRef],
-    ) -> Result<Vec<ResolvedAsset>, AssetServiceError> {
+    pub async fn resolve(&self, refs: &[AssetRef]) -> Result<ResolvedAssets, AssetServiceError> {
         let distinct = dedupe(refs);
         let known = self.directory.find_by_refs(&distinct).await?;
         let (mut resolved, missing) = split_known(&distinct, known);
+        if missing.len() > MAX_NEW_ASSETS_PER_RESOLUTION {
+            return Err(AssetServiceError::TooManyNewAssets {
+                limit: MAX_NEW_ASSETS_PER_RESOLUTION,
+            });
+        }
 
         // Owned references keep the lookup futures free of borrowed closure
         // arguments, which would make them unusable inside Axum handlers.
@@ -108,9 +132,14 @@ impl AssetService {
             return Err(AssetServiceError::Unresolved(unresolved));
         }
 
-        resolved.extend(found);
-        resolved.sort_by_key(|asset| distinct.iter().position(|d| *d == asset.as_ref()));
-        Ok(resolved)
+        let position = |asset: &ResolvedAsset| distinct.iter().position(|d| *d == asset.as_ref());
+        found.sort_by_key(position);
+        resolved.extend(found.iter().cloned());
+        resolved.sort_by_key(position);
+        Ok(ResolvedAssets {
+            all: resolved,
+            newly_resolved: found,
+        })
     }
 
     /// Stores resolved assets that the directory lacks; existing ones win.
@@ -191,7 +220,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved, vec![asset("A"), asset("B")]);
+        assert_eq!(resolved.all, vec![asset("A"), asset("B")]);
+        assert!(resolved.newly_resolved.is_empty());
     }
 
     #[tokio::test]
@@ -215,7 +245,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved, vec![asset("B"), asset("A")]);
+        assert_eq!(resolved.all, vec![asset("B"), asset("A")]);
+        assert_eq!(resolved.newly_resolved, vec![asset("B")]);
     }
 
     #[tokio::test]
@@ -285,7 +316,57 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved, vec![asset("A")]);
+        assert_eq!(resolved.all, vec![asset("A")]);
+    }
+
+    #[tokio::test]
+    async fn rejects_more_unknown_assets_than_the_cap_before_any_provider_call() {
+        // GIVEN an empty directory and one more unknown reference than the cap allows,
+        // WHEN the references are resolved,
+        // THEN resolution fails with TooManyNewAssets and no provider is called.
+        let mut directory = MockAssetDirectory::new();
+        directory.expect_find_by_refs().returning(|_| Ok(vec![]));
+        let mut provider = MockAssetProvider::new();
+        provider.expect_lookup().never();
+        let refs = (0..=MAX_NEW_ASSETS_PER_RESOLUTION)
+            .map(|i| reference(&format!("S{i}")))
+            .collect::<Vec<_>>();
+
+        let error = service(directory, provider)
+            .resolve(&refs)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssetServiceError::TooManyNewAssets { limit } if limit == MAX_NEW_ASSETS_PER_RESOLUTION
+        ));
+    }
+
+    #[tokio::test]
+    async fn known_assets_do_not_count_towards_the_new_asset_cap() {
+        // GIVEN a directory holding more assets than the cap plus one unknown reference,
+        // WHEN they are resolved,
+        // THEN only the unknown one reaches the provider and resolution succeeds.
+        let known = (0..=MAX_NEW_ASSETS_PER_RESOLUTION)
+            .map(|i| asset(&format!("K{i}")))
+            .collect::<Vec<_>>();
+        let mut refs = known.iter().map(|a| a.as_ref()).collect::<Vec<_>>();
+        refs.push(reference("NEW"));
+        let mut directory = MockAssetDirectory::new();
+        directory
+            .expect_find_by_refs()
+            .returning(move |_| Ok(known.clone()));
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .times(1)
+            .returning(|r| Ok(Some(asset(&r.symbol))));
+
+        let resolved = service(directory, provider).resolve(&refs).await.unwrap();
+
+        assert_eq!(resolved.all.len(), MAX_NEW_ASSETS_PER_RESOLUTION + 2);
+        assert_eq!(resolved.newly_resolved, vec![asset("NEW")]);
     }
 
     #[tokio::test]

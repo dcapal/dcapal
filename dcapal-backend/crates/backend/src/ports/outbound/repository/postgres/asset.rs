@@ -3,13 +3,13 @@ use sqlx::{PgPool, QueryBuilder, query_as};
 use uuid::Uuid;
 
 use crate::{
-    app::domain::{
-        asset::{AssetRef, ResolvedAsset},
-        portfolio::{AssetClass as AppAssetClass, Provider as AppProvider},
-    },
+    app::domain::asset::{AssetRef, ResolvedAsset},
     ports::outbound::repository::{
         asset::{AssetDirectory, AssetDirectoryError},
-        postgres::types::{AssetClass as DbAssetClass, Provider as DbProvider},
+        postgres::{
+            convert::{app_asset_class, app_provider, db_asset_class, db_provider},
+            types::{AssetClass as DbAssetClass, Provider as DbProvider},
+        },
     },
 };
 
@@ -48,7 +48,7 @@ impl AssetDirectory for SqlxAssetDirectory {
         let mut providers = Vec::with_capacity(refs.len());
         let mut symbols = Vec::with_capacity(refs.len());
         for reference in refs {
-            providers.push(i16::from(db_provider(&reference.provider)?));
+            providers.push(i16::from(db_provider(&reference.provider)));
             symbols.push(reference.symbol.clone());
         }
 
@@ -80,7 +80,7 @@ impl AssetDirectory for SqlxAssetDirectory {
         for asset in assets {
             values.push((
                 Uuid::now_v7(),
-                i16::from(db_provider(&asset.provider)?),
+                i16::from(db_provider(&asset.provider)),
                 i16::from(db_asset_class(asset.asset_class)),
                 asset,
             ));
@@ -111,41 +111,10 @@ fn resolved_asset(row: AssetRow) -> Result<ResolvedAsset, AssetDirectoryError> {
     })?;
 
     Ok(ResolvedAsset {
-        provider: match provider {
-            DbProvider::YF => AppProvider::YF,
-            DbProvider::Kraken => AppProvider::Kraken,
-        },
+        provider: app_provider(provider),
         symbol: row.symbol,
         name: row.name,
         currency: row.currency,
-        asset_class: match class {
-            DbAssetClass::Other => AppAssetClass::Other,
-            DbAssetClass::Equity => AppAssetClass::Equity,
-            DbAssetClass::Bond => AppAssetClass::Bond,
-            DbAssetClass::Cash => AppAssetClass::Cash,
-            DbAssetClass::Crypto => AppAssetClass::Crypto,
-            DbAssetClass::Commodity => AppAssetClass::Commodity,
-        },
+        asset_class: app_asset_class(class),
     })
-}
-
-fn db_provider(provider: &AppProvider) -> Result<DbProvider, AssetDirectoryError> {
-    match provider {
-        AppProvider::YF => Ok(DbProvider::YF),
-        AppProvider::Kraken => Ok(DbProvider::Kraken),
-        AppProvider::Unsupported(value) => {
-            Err(AssetDirectoryError::UnsupportedProvider(value.clone()))
-        }
-    }
-}
-
-fn db_asset_class(class: AppAssetClass) -> DbAssetClass {
-    match class {
-        AppAssetClass::Other => DbAssetClass::Other,
-        AppAssetClass::Equity => DbAssetClass::Equity,
-        AppAssetClass::Bond => DbAssetClass::Bond,
-        AppAssetClass::Cash => DbAssetClass::Cash,
-        AppAssetClass::Crypto => DbAssetClass::Crypto,
-        AppAssetClass::Commodity => DbAssetClass::Commodity,
-    }
 }

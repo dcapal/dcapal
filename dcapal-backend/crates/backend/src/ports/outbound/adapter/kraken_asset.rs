@@ -6,7 +6,7 @@ use super::asset_provider::{AssetProvider, AssetProviderError};
 use crate::{
     app::domain::{
         asset::{AssetRef, ResolvedAsset},
-        entity::Asset,
+        entity::{Asset, AssetKind},
         portfolio::{AssetClass, Provider},
     },
     ports::outbound::repository::market_data::MarketDataRepository,
@@ -14,8 +14,10 @@ use crate::{
 
 /// Resolves Kraken assets from the Redis asset catalog kept by market discovery.
 ///
-/// The catalog stores no display name for cryptocurrencies, so the upper-case
-/// symbol serves as name and as trading currency. Fiat catalog entries carry
+/// The catalog stores no display name for cryptocurrencies, so the symbol as
+/// submitted serves as name and as trading currency (a placeholder name). An
+/// empty catalog (cold start) is reported as a provider outage rather than as
+/// an unknown symbol; this path needs Redis and is not unit tested. Fiat catalog entries carry
 /// their English name and resolve to cash in their own currency.
 pub struct KrakenAssetProvider {
     catalog: Arc<MarketDataRepository>,
@@ -31,12 +33,6 @@ impl KrakenAssetProvider {
 #[async_trait]
 impl AssetProvider for KrakenAssetProvider {
     async fn lookup(&self, asset: &AssetRef) -> Result<Option<ResolvedAsset>, AssetProviderError> {
-        if asset.provider != Provider::Kraken {
-            return Err(AssetProviderError::UnsupportedProvider(
-                asset.provider.to_string(),
-            ));
-        }
-
         let id = asset.symbol.to_ascii_lowercase();
         let found = self
             .catalog
@@ -44,7 +40,35 @@ impl AssetProvider for KrakenAssetProvider {
             .await
             .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
 
-        Ok(found.map(|catalog_asset| resolved_from_catalog(asset, &catalog_asset)))
+        if let Some(catalog_asset) = found {
+            return Ok(Some(resolved_from_catalog(asset, &catalog_asset)));
+        }
+
+        // A catalog that was never loaded (cold start) cannot tell an unknown
+        // symbol from a missing catalog, so it is reported as unavailable.
+        if self.catalog_is_empty().await? {
+            return Err(AssetProviderError::Unavailable(
+                "asset catalog is empty".into(),
+            ));
+        }
+        Ok(None)
+    }
+}
+
+impl KrakenAssetProvider {
+    /// Tells whether the catalog holds neither crypto nor fiat assets.
+    async fn catalog_is_empty(&self) -> Result<bool, AssetProviderError> {
+        for kind in [AssetKind::Crypto, AssetKind::Fiat] {
+            let assets = self
+                .catalog
+                .load_assets_by_type(kind)
+                .await
+                .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+            if !assets.is_empty() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 }
 

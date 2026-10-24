@@ -209,10 +209,13 @@ impl PortfolioService {
         let user_id = command.user_id();
         // Shared asset rows are stored before the transaction opens so that no
         // provider or directory round trip happens while rows are locked.
-        self.assets
-            .onboard(command.assets())
-            .await
-            .map_err(PortfolioServiceError::Asset)?;
+        // Only assets the directory lacked need storing; known ones are skipped.
+        if !command.newly_resolved_assets().is_empty() {
+            self.assets
+                .onboard(command.newly_resolved_assets())
+                .await
+                .map_err(PortfolioServiceError::Asset)?;
+        }
         let request = command.into_request();
         let response = retry_sync(
             || self.portfolio_repository.sync_v2(user_id, request.clone()),
@@ -359,13 +362,20 @@ mod tests {
         }
     }
 
-    /// Asset service whose directory already knows VWCE and records every
-    /// onboarding call as `"onboard"` in `log`.
+    /// Provider that knows VWCE, used when the directory lacks it.
+    fn vwce_provider() -> MockAssetProvider {
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .returning(|_| Ok(Some(resolved_vwce())));
+        provider
+    }
+
+    /// Asset service whose directory lacks VWCE, whose provider knows it, and
+    /// which records every onboarding call as `"onboard"` in `log`.
     fn logging_assets(log: &Arc<Mutex<Vec<&'static str>>>) -> Arc<AssetService> {
         let mut directory = MockAssetDirectory::new();
-        directory
-            .expect_find_by_refs()
-            .returning(|_| Ok(vec![resolved_vwce()]));
+        directory.expect_find_by_refs().returning(|_| Ok(vec![]));
         let onboard_log = log.clone();
         directory
             .expect_insert_missing()
@@ -377,8 +387,31 @@ mod tests {
             });
         Arc::new(AssetService::new(
             Arc::new(directory),
-            Arc::new(MockAssetProvider::new()),
+            Arc::new(vwce_provider()),
         ))
+    }
+
+    #[tokio::test]
+    async fn v2_known_assets_are_not_onboarded() {
+        // GIVEN a v2 sync whose only asset is already in the shared directory,
+        // WHEN the service synchronizes it,
+        // THEN the directory is never asked to insert anything (no insert expectation).
+        let repository = Arc::new(RetryRepository::new(0, "23505"));
+        let mut directory = MockAssetDirectory::new();
+        directory
+            .expect_find_by_refs()
+            .returning(|_| Ok(vec![resolved_vwce()]));
+        directory.expect_insert_missing().never();
+        let assets = Arc::new(AssetService::new(
+            Arc::new(directory),
+            Arc::new(MockAssetProvider::new()),
+        ));
+        let service = PortfolioService::new(repository.clone(), assets.clone());
+
+        service
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref(), &assets).await)
+            .await
+            .expect("known-only sync should succeed");
     }
 
     #[tokio::test]
@@ -453,9 +486,7 @@ mod tests {
         let repository = Arc::new(RetryRepository::new(0, "23505"));
         let attempts = &repository.upsert_attempts;
         let mut directory = MockAssetDirectory::new();
-        directory
-            .expect_find_by_refs()
-            .returning(|_| Ok(vec![resolved_vwce()]));
+        directory.expect_find_by_refs().returning(|_| Ok(vec![]));
         directory.expect_insert_missing().returning(|_| {
             Err(
                 crate::ports::outbound::repository::asset::AssetDirectoryError::CorruptData(
@@ -465,7 +496,7 @@ mod tests {
         });
         let assets = Arc::new(AssetService::new(
             Arc::new(directory),
-            Arc::new(MockAssetProvider::new()),
+            Arc::new(vwce_provider()),
         ));
         let service = PortfolioService::new(repository.clone(), assets.clone());
 

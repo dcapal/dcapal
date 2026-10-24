@@ -57,6 +57,9 @@ const MESSAGE_STRATEGIC_TARGETS_EMPTY: &str = "must be empty in simple allocatio
 const MESSAGE_ASSET_REFERENCE: &str = "must reference an Asset in the same Portfolio";
 const MESSAGE_DUPLICATE_CLASS_TARGET: &str = "duplicate Asset Class target";
 const MESSAGE_DUPLICATE_ASSET_TARGET: &str = "duplicate Portfolio Asset target";
+/// Message for a sync that would onboard more new assets than allowed.
+pub const MESSAGE_TOO_MANY_NEW_ASSETS: &str =
+    "introduces too many new assets in one synchronization; sync fewer new assets at a time";
 pub(super) const MESSAGE_UNRESOLVED_ASSET: &str = "is not a known asset";
 const MESSAGE_MAX_AT_LEAST_MIN: &str = "must be greater than or equal to minFee";
 

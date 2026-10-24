@@ -9,8 +9,6 @@ use crate::app::domain::asset::{AssetRef, ResolvedAsset};
 pub enum AssetDirectoryError {
     #[error("asset directory database operation failed")]
     Database(#[from] sqlx::Error),
-    #[error("unsupported asset provider: {0}")]
-    UnsupportedProvider(String),
     #[error("stored asset data is corrupt: {0}")]
     CorruptData(String),
 }

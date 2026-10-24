@@ -1822,7 +1822,7 @@
             }
           },
           {
-            "description": "Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`.\nRepeat the parameter for several assets (1 to 20 per call).",
+            "description": "Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`. Repeat the parameter for several assets (1 to 20 per call).",
             "in": "query",
             "name": "asset",
             "required": true,

@@ -21,7 +21,8 @@ replaces this with reference-only assets.
   responses carry only that reference plus Portfolio-specific values; Strategic
   asset targets reference assets the same way. Relationship identity is
   `(Portfolio, provider, symbol)`; relationship IDs stay internal.
-- Unknown providers are validation errors at their exact field path.
+- Unknown providers are validation errors at their exact field path; they fail
+  the request rather than being dropped.
 - `SyncPortfoliosV2Command::try_new` validates, checks Portfolio ownership,
   and resolves every distinct reference through `AssetService::resolve`
   (shared directory first, then the provider). Unknown assets become
@@ -47,6 +48,18 @@ replaces this with reference-only assets.
   ownership checks and the unsupported-provider filtering were removed.
 - A request referencing an asset for the first time may call a provider, so
   sync latency and availability depend on providers for new assets.
+- One synchronization may send at most 50 distinct references unknown to the
+  directory to providers (`MAX_NEW_ASSETS_PER_RESOLUTION`); beyond that it
+  fails with a `400` validation error at `portfolios` before any provider
+  call. Known references do not count. Only newly resolved assets are written
+  to the directory.
+- Yahoo lookups time out after 10 seconds (reported as `502`); HTTP 400, 404
+  and 422 mean the symbol is unknown, while 429 and 5xx mean the provider is
+  unavailable. The currency is kept exactly as Yahoo returns it so pence codes
+  such as `GBp` are not turned into `GBP`.
+- Kraken has no display name for cryptocurrencies, so the symbol itself is
+  stored as the placeholder name and trading currency. An empty Kraken
+  catalog (cold start) is reported as `502` rather than as an unknown symbol.
 - Clients must use `GET /markets/v2/assets/lookup` to read asset metadata.
 - Assets in Portfolios skipped as stale or tombstoned are still resolved.
 - This supersedes the full-asset-data and client-generated relationship ID

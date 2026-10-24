@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::Utc;
 use rust_decimal::Decimal;
-use sqlx::{Postgres, Transaction, query, query_as, query_scalar};
+use sqlx::{Postgres, QueryBuilder, Transaction, query, query_as, query_scalar};
 use uuid::Uuid;
 
 use crate::app::domain::{
@@ -14,6 +14,9 @@ use crate::app::domain::{
 };
 use crate::ports::outbound::repository::portfolio::{
     OwnershipConflict, PortfolioRepositoryError, Result,
+};
+use crate::ports::outbound::repository::postgres::convert::{
+    app_asset_class, db_asset_class, db_provider,
 };
 use crate::ports::outbound::repository::postgres::types::{
     AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, PortfolioRow,
@@ -32,9 +35,7 @@ async fn load_asset_ids(
     let mut providers = Vec::with_capacity(assets.len());
     let mut symbols = Vec::with_capacity(assets.len());
     for asset in assets {
-        providers.push(i16::from(sync_v2_snapshot::db_provider(
-            asset.asset.provider.clone(),
-        )?));
+        providers.push(i16::from(db_provider(&asset.asset.provider)));
         symbols.push(asset.asset.symbol.clone());
     }
     let rows: Vec<(Uuid, i16, String)> = query_as(
@@ -54,7 +55,7 @@ async fn load_asset_ids(
 
     let mut ids = HashMap::with_capacity(assets.len());
     for asset in assets {
-        let provider = i16::from(sync_v2_snapshot::db_provider(asset.asset.provider.clone())?);
+        let provider = i16::from(db_provider(&asset.asset.provider));
         let id = stored
             .get(&(provider, asset.asset.symbol.clone()))
             .ok_or_else(|| {
@@ -67,6 +68,183 @@ async fn load_asset_ids(
         ids.insert(asset.asset.clone(), *id);
     }
     Ok(ids)
+}
+
+/// Upserts every submitted Portfolio Asset relationship in one statement and
+/// returns the persisted rows keyed by shared asset identifier.
+///
+/// A new relationship gets a fresh identifier; an existing one keeps its
+/// identifier (and therefore its allocation row).
+async fn upsert_relationships(
+    tx: &mut Transaction<'_, Postgres>,
+    portfolio: &PortfolioV2,
+    asset_ids: &HashMap<AssetRef, Uuid>,
+    now: chrono::DateTime<Utc>,
+) -> Result<HashMap<Uuid, PortfolioAssetRecord>> {
+    if portfolio.assets.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut builder = QueryBuilder::<Postgres>::new(
+        "INSERT INTO portfolio_asset
+             (id, portfolio_id, assets_data_id, asset_class_override,
+              quantity, manual_price, average_buy_price, max_fee_impact,
+              fee_type, fee_amount, fee_rate, min_fee, max_fee,
+              created_at, updated_at) ",
+    );
+    builder.push_values(&portfolio.assets, |mut row, asset| {
+        let fee_fields = FeeFields::from_fees(asset.fees.as_ref());
+        row.push_bind(Uuid::now_v7())
+            .push_bind(portfolio.id)
+            .push_bind(asset_ids[&asset.asset])
+            .push_bind(
+                asset
+                    .asset_class_override
+                    .map(db_asset_class)
+                    .map(i16::from),
+            )
+            .push_bind(asset.quantity)
+            .push_bind(asset.manual_price)
+            .push_bind(asset.average_buy_price)
+            .push_bind(fee_fields.max_fee_impact)
+            .push_bind(fee_fields.fee_type)
+            .push_bind(fee_fields.fee_amount)
+            .push_bind(fee_fields.fee_rate)
+            .push_bind(fee_fields.min_fee)
+            .push_bind(fee_fields.max_fee)
+            .push_bind(now)
+            .push_bind(now);
+    });
+    builder.push(
+        " ON CONFLICT (portfolio_id, assets_data_id) DO UPDATE
+          SET asset_class_override = EXCLUDED.asset_class_override,
+              quantity = EXCLUDED.quantity,
+              manual_price = EXCLUDED.manual_price,
+              average_buy_price = EXCLUDED.average_buy_price,
+              max_fee_impact = EXCLUDED.max_fee_impact,
+              fee_type = EXCLUDED.fee_type,
+              fee_amount = EXCLUDED.fee_amount,
+              fee_rate = EXCLUDED.fee_rate,
+              min_fee = EXCLUDED.min_fee,
+              max_fee = EXCLUDED.max_fee,
+              updated_at = EXCLUDED.updated_at
+          RETURNING id, portfolio_id, assets_data_id, asset_class_override,
+                    quantity, manual_price, max_fee_impact, fee_type,
+                    fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
+                    created_at, updated_at",
+    );
+
+    let rows = builder
+        .build_query_as::<PortfolioAssetRecord>()
+        .fetch_all(&mut **tx)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| (row.assets_data_id, row))
+        .collect())
+}
+
+/// Upserts the target weight of every relationship in one statement and
+/// returns the persisted weights keyed by relationship identifier.
+///
+/// Weights come from each asset's own target in simple mode and from the
+/// relative Strategic target in strategic mode.
+async fn upsert_allocations(
+    tx: &mut Transaction<'_, Postgres>,
+    portfolio: &PortfolioV2,
+    mode: DbAllocationMode,
+    relationships: &HashMap<Uuid, PortfolioAssetRecord>,
+    asset_ids: &HashMap<AssetRef, Uuid>,
+    relative_targets: &HashMap<&AssetRef, Decimal>,
+    now: chrono::DateTime<Utc>,
+) -> Result<HashMap<Uuid, Decimal>> {
+    if portfolio.assets.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut rows = Vec::with_capacity(portfolio.assets.len());
+    for asset in &portfolio.assets {
+        let relationship = relationships
+            .get(&asset_ids[&asset.asset])
+            .ok_or_else(|| sync_v2_snapshot::corrupt_data("relationship was not persisted"))?;
+        let weight = match mode {
+            DbAllocationMode::Simple => asset.target_weight.unwrap_or_default(),
+            DbAllocationMode::Strategic => relative_targets
+                .get(&asset.asset)
+                .copied()
+                .unwrap_or_default(),
+        };
+        rows.push((relationship.id, weight));
+    }
+
+    let mut builder = QueryBuilder::<Postgres>::new(
+        "INSERT INTO portfolio_asset_allocation
+             (portfolio_id, portfolio_asset_id, weight, updated_at) ",
+    );
+    builder.push_values(rows, |mut row, (relationship_id, weight)| {
+        row.push_bind(portfolio.id)
+            .push_bind(relationship_id)
+            .push_bind(weight)
+            .push_bind(now);
+    });
+    builder.push(
+        " ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
+          SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at
+          RETURNING portfolio_asset_id, weight",
+    );
+
+    let persisted: Vec<(Uuid, Decimal)> = builder.build_query_as().fetch_all(&mut **tx).await?;
+    Ok(persisted.into_iter().collect())
+}
+
+/// Replaces the Portfolio's Strategic Asset Class targets with the submitted
+/// ones, using one delete and at most one insert.
+async fn replace_class_targets(
+    tx: &mut Transaction<'_, Postgres>,
+    portfolio: &PortfolioV2,
+) -> Result<Vec<StrategicAssetClassTargetV2>> {
+    query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = $1")
+        .bind(portfolio.id)
+        .execute(&mut **tx)
+        .await?;
+    let targets = match &portfolio.strategic_allocation {
+        Some(allocation) if !allocation.asset_class_targets.is_empty() => {
+            &allocation.asset_class_targets
+        }
+        _ => return Ok(Vec::new()),
+    };
+
+    let mut builder = QueryBuilder::<Postgres>::new(
+        "INSERT INTO strategic_asset_class_targets
+             (portfolio_id, asset_class, target_weight, updated_at) ",
+    );
+    builder.push_values(targets, |mut row, target| {
+        row.push_bind(portfolio.id)
+            .push_bind(i16::from(db_asset_class(target.asset_class)))
+            .push_bind(target.target_weight)
+            .push("NOW()");
+    });
+    builder.push(" RETURNING asset_class, target_weight");
+    let persisted: Vec<(i16, Decimal)> = builder.build_query_as().fetch_all(&mut **tx).await?;
+
+    // Report the targets in submitted order regardless of RETURNING order.
+    let persisted: HashMap<i16, Decimal> = persisted.into_iter().collect();
+    targets
+        .iter()
+        .map(|target| {
+            let code = i16::from(db_asset_class(target.asset_class));
+            let target_weight = persisted.get(&code).copied().ok_or_else(|| {
+                sync_v2_snapshot::corrupt_data("inserted Strategic Asset Class is missing")
+            })?;
+            let asset_class = DbAssetClass::try_from(code).map_err(|_| {
+                sync_v2_snapshot::corrupt_data("inserted Strategic Asset Class is invalid")
+            })?;
+            Ok(StrategicAssetClassTargetV2 {
+                asset_class: app_asset_class(asset_class),
+                target_weight,
+            })
+        })
+        .collect()
 }
 
 /// Reconciles one validated Portfolio aggregate inside the caller's transaction.
@@ -192,81 +370,28 @@ async fn upsert_v2_portfolio_tx(
                 .collect()
         })
         .unwrap_or_default();
+    let now = Utc::now();
+    let relationships = upsert_relationships(tx, portfolio_request, &asset_ids, now).await?;
+    let weights = upsert_allocations(
+        tx,
+        portfolio_request,
+        mode,
+        &relationships,
+        &asset_ids,
+        &relative_targets,
+        now,
+    )
+    .await?;
+
     let mut updated_assets = Vec::with_capacity(portfolio_request.assets.len());
-
     for asset in &portfolio_request.assets {
-        let assets_data_id = asset_ids[&asset.asset];
-        let requested_override = asset
-            .asset_class_override
-            .map(sync_v2_snapshot::db_asset_class)
-            .map(i16::from);
-        let target_weight = match mode {
-            DbAllocationMode::Simple => asset.target_weight.unwrap_or_default(),
-            DbAllocationMode::Strategic => relative_targets
-                .get(&asset.asset)
-                .copied()
-                .unwrap_or_default(),
-        };
-        let fee_fields = FeeFields::from_fees(asset.fees.as_ref());
-        let now = Utc::now();
-
-        // A new relationship gets a fresh identifier; an existing one keeps its
-        // identifier (and therefore its allocation row).
-        let relationship = query_as::<_, PortfolioAssetRecord>(
-            "INSERT INTO portfolio_asset
-                 (id, portfolio_id, assets_data_id, asset_class_override,
-                  quantity, manual_price, average_buy_price, max_fee_impact,
-                  fee_type, fee_amount, fee_rate, min_fee, max_fee,
-                  created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
-             ON CONFLICT (portfolio_id, assets_data_id) DO UPDATE
-             SET asset_class_override = EXCLUDED.asset_class_override,
-                 quantity = EXCLUDED.quantity,
-                 manual_price = EXCLUDED.manual_price,
-                 average_buy_price = EXCLUDED.average_buy_price,
-                 max_fee_impact = EXCLUDED.max_fee_impact,
-                 fee_type = EXCLUDED.fee_type,
-                 fee_amount = EXCLUDED.fee_amount,
-                 fee_rate = EXCLUDED.fee_rate,
-                 min_fee = EXCLUDED.min_fee,
-                 max_fee = EXCLUDED.max_fee,
-                 updated_at = EXCLUDED.updated_at
-             RETURNING id, portfolio_id, assets_data_id, asset_class_override,
-                       quantity, manual_price, max_fee_impact, fee_type,
-                       fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
-                       created_at, updated_at",
-        )
-        .bind(Uuid::now_v7())
-        .bind(portfolio_request.id)
-        .bind(assets_data_id)
-        .bind(requested_override)
-        .bind(asset.quantity)
-        .bind(asset.manual_price)
-        .bind(asset.average_buy_price)
-        .bind(fee_fields.max_fee_impact)
-        .bind(fee_fields.fee_type)
-        .bind(fee_fields.fee_amount)
-        .bind(fee_fields.fee_rate)
-        .bind(fee_fields.min_fee)
-        .bind(fee_fields.max_fee)
-        .bind(now)
-        .fetch_one(&mut **tx)
-        .await?;
-
-        let persisted_target_weight: Decimal = query_scalar(
-            "INSERT INTO portfolio_asset_allocation
-                 (portfolio_id, portfolio_asset_id, weight, updated_at)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
-             SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at
-             RETURNING weight",
-        )
-        .bind(portfolio_request.id)
-        .bind(relationship.id)
-        .bind(target_weight)
-        .bind(now)
-        .fetch_one(&mut **tx)
-        .await?;
+        let relationship = relationships
+            .get(&asset_ids[&asset.asset])
+            .ok_or_else(|| sync_v2_snapshot::corrupt_data("relationship was not persisted"))?;
+        let persisted_target_weight = weights
+            .get(&relationship.id)
+            .copied()
+            .ok_or_else(|| sync_v2_snapshot::corrupt_data("allocation was not persisted"))?;
         updated_assets.push(sync_v2_snapshot::v2_asset_response(
             sync_v2_snapshot::V2AssetResponseInput {
                 asset: asset.asset.clone(),
@@ -275,7 +400,7 @@ async fn upsert_v2_portfolio_tx(
                 target_weight: persisted_target_weight,
                 manual_price: relationship.manual_price,
                 max_fee_impact: relationship.max_fee_impact,
-                fee_type: relationship.fee_type,
+                fee_type: relationship.fee_type.clone(),
                 fee_amount: relationship.fee_amount,
                 fee_rate: relationship.fee_rate,
                 min_fee: relationship.min_fee,
@@ -285,36 +410,7 @@ async fn upsert_v2_portfolio_tx(
         )?);
     }
 
-    query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = $1")
-        .bind(portfolio_request.id)
-        .execute(&mut **tx)
-        .await?;
-    let mut class_targets = Vec::new();
-    if let Some(allocation) = &portfolio_request.strategic_allocation {
-        for target in &allocation.asset_class_targets {
-            let (asset_class, target_weight): (i16, Decimal) = query_as(
-                "INSERT INTO strategic_asset_class_targets
-                     (portfolio_id, asset_class, target_weight, updated_at)
-                 VALUES ($1, $2, $3, NOW())
-                 RETURNING asset_class, target_weight",
-            )
-            .bind(portfolio_request.id)
-            .bind(i16::from(sync_v2_snapshot::db_asset_class(
-                target.asset_class,
-            )))
-            .bind(target.target_weight)
-            .fetch_one(&mut **tx)
-            .await?;
-            class_targets.push(StrategicAssetClassTargetV2 {
-                asset_class: sync_v2_snapshot::app_asset_class(
-                    DbAssetClass::try_from(asset_class).map_err(|_| {
-                        sync_v2_snapshot::corrupt_data("inserted Strategic Asset Class is invalid")
-                    })?,
-                ),
-                target_weight,
-            });
-        }
-    }
+    let class_targets = replace_class_targets(tx, portfolio_request).await?;
     sync_v2_snapshot::v2_portfolio_response(persisted_portfolio, updated_assets, class_targets)
 }
 

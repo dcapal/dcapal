@@ -48,6 +48,7 @@ tracing-subscriber = { workspace = true }
 utoipa = { workspace = true }
 utoipa-axum = { workspace = true }
 uuid = { workspace = true }
+url = { workspace = true }
 rquest = { workspace = true }
 
 [dev-dependencies]

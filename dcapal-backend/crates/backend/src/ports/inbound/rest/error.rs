@@ -8,7 +8,10 @@ use crate::{
     app::{
         commands::{
             lookup_assets::LookupAssetsCommandError,
-            sync_portfolios_v2::SyncPortfoliosV2CommandError,
+            sync_portfolios_v2::{
+                FieldPath, SyncPortfoliosV2CommandError, ValidationError,
+                validation::MESSAGE_TOO_MANY_NEW_ASSETS,
+            },
         },
         services::{asset::AssetServiceError, portfolio::PortfolioServiceError},
     },
@@ -74,9 +77,18 @@ impl From<SyncPortfoliosV2CommandError> for V2HttpError {
 ///
 /// `Unresolved` is reported with real field paths by the sync command, so it
 /// only reaches here if a caller bypassed that mapping, which is a server bug.
+/// `TooManyNewAssets` is a client error reported as a validation failure.
 fn asset_failure(error: &AssetServiceError) -> (StatusCode, V2ErrorResponse) {
     match error {
         AssetServiceError::ProviderUnavailable(_) => provider_unavailable(),
+        AssetServiceError::TooManyNewAssets { .. } => (
+            StatusCode::BAD_REQUEST,
+            V2ValidationError::from(ValidationError::single(
+                FieldPath::root().field("portfolios"),
+                MESSAGE_TOO_MANY_NEW_ASSETS,
+            ))
+            .response(),
+        ),
         AssetServiceError::Directory(_) | AssetServiceError::Unresolved(_) => asset_internal(),
     }
 }
@@ -238,6 +250,22 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "validation_error");
         assert_eq!(body["errors"][0]["field"], "portfolios[0].name");
+    }
+
+    #[tokio::test]
+    async fn too_many_new_assets_is_a_validation_error() {
+        // GIVEN an asset-service failure for too many new assets,
+        // WHEN the v2 boundary adapts it,
+        // THEN the response is a 400 validation_error at `portfolios`.
+        let (status, body) =
+            response_body(V2HttpError::Asset(AssetServiceError::TooManyNewAssets {
+                limit: 50,
+            }))
+            .await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["code"], "validation_error");
+        assert_eq!(body["errors"][0]["field"], "portfolios");
     }
 
     #[tokio::test]

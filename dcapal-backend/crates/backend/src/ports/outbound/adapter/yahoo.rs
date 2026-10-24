@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
 use axum::{
@@ -158,6 +158,10 @@ impl YahooProvider {
 
 const CHART_BASE_URL: &str = "https://query1.finance.yahoo.com/v8/finance/chart/";
 
+/// Upper bound on one Yahoo asset lookup, so a stalled request cannot hold a
+/// synchronization open.
+const LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
+
 #[async_trait]
 impl AssetProvider for YahooProvider {
     /// Resolves an asset from the `meta` block of a one-day Yahoo chart.
@@ -165,16 +169,11 @@ impl AssetProvider for YahooProvider {
         &self,
         asset: &AssetRef,
     ) -> std::result::Result<Option<ResolvedAsset>, AssetProviderError> {
-        if asset.provider != Provider::YF {
-            return Err(AssetProviderError::UnsupportedProvider(
-                asset.provider.to_string(),
-            ));
-        }
-
         let url = lookup_url(&asset.symbol)?;
         let response = self
             .http
             .get(url.as_str())
+            .timeout(LOOKUP_TIMEOUT)
             .send()
             .await
             .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
@@ -189,8 +188,8 @@ impl AssetProvider for YahooProvider {
 }
 
 /// Builds the chart URL for a symbol, percent-encoding it as a path segment.
-fn lookup_url(symbol: &str) -> std::result::Result<reqwest::Url, AssetProviderError> {
-    let mut url = reqwest::Url::parse(CHART_BASE_URL)
+fn lookup_url(symbol: &str) -> std::result::Result<url::Url, AssetProviderError> {
+    let mut url = url::Url::parse(CHART_BASE_URL)
         .map_err(|e| AssetProviderError::Malformed(e.to_string()))?;
     url.path_segments_mut()
         .map_err(|_| AssetProviderError::Malformed("chart URL cannot be a base".to_string()))?
@@ -204,9 +203,12 @@ fn lookup_url(symbol: &str) -> std::result::Result<reqwest::Url, AssetProviderEr
 
 /// Turns a Yahoo chart reply into the metadata of the requested asset.
 ///
-/// A 404 status or a `Not Found` chart error means Yahoo does not list the
-/// symbol. Any other non-success status, undecodable body, or `meta` lacking a
-/// currency or name is a provider failure. The requested symbol, not the one
+/// HTTP 400, 404 and 422, or a `Not Found` chart error, mean Yahoo does not
+/// list the symbol or rejects it. Any other non-success status (including 429
+/// and 5xx), undecodable body, or `meta` lacking a currency or name is a
+/// provider failure. The currency is kept exactly as Yahoo returns it (trimmed
+/// only) because case is significant: `GBp` denotes pence while `GBP` denotes
+/// pounds. The requested symbol, not the one
 /// echoed by Yahoo, is the asset key so aliases stay addressable.
 ///
 /// `instrumentType` maps conservatively: EQUITY, ETF and MUTUALFUND are
@@ -218,7 +220,7 @@ fn parse_lookup_response(
     status: u16,
     body: &[u8],
 ) -> std::result::Result<Option<ResolvedAsset>, AssetProviderError> {
-    if status == 404 {
+    if matches!(status, 400 | 404 | 422) {
         return Ok(None);
     }
     if !(200..300).contains(&status) {
@@ -250,8 +252,7 @@ fn parse_lookup_response(
         .ok_or_else(|| AssetProviderError::Malformed("empty chart.result".to_string()))?;
 
     let currency = non_blank(meta.currency)
-        .ok_or_else(|| AssetProviderError::Malformed("missing meta.currency".to_string()))?
-        .to_ascii_uppercase();
+        .ok_or_else(|| AssetProviderError::Malformed("missing meta.currency".to_string()))?;
     let name = non_blank(meta.long_name)
         .or_else(|| non_blank(meta.short_name))
         .ok_or_else(|| AssetProviderError::Malformed("missing meta.longName".to_string()))?;
@@ -371,6 +372,22 @@ mod lookup_tests {
     }
 
     #[test]
+    fn keeps_the_currency_case_so_pence_codes_survive() {
+        // GIVEN a Yahoo chart reply for a London listing quoted in pence ("GBp"),
+        // WHEN the reply is parsed,
+        // THEN the currency stays "GBp" instead of becoming pounds ("GBP").
+        let body = chart_body(
+            r#"{"currency":" GBp ","symbol":"VOD.L","instrumentType":"EQUITY","longName":"Vodafone"}"#,
+        );
+
+        let asset = parse_lookup_response(&reference("VOD.L"), 200, body.as_bytes())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(asset.currency, "GBp");
+    }
+
+    #[test]
     fn resolves_cryptocurrency() {
         // GIVEN a Yahoo chart reply for BTC-USD, WHEN it is parsed,
         // THEN the asset is crypto quoted in USD.
@@ -403,14 +420,17 @@ mod lookup_tests {
 
     #[test]
     fn not_found_body_is_an_unknown_ticker() {
-        // GIVEN Yahoo's 404 body for a delisted or unknown symbol,
+        // GIVEN Yahoo's 400/404/422 replies for a delisted, unknown or rejected symbol,
         // WHEN it is parsed, THEN the symbol is reported as unknown, not as a failure.
         let body = r#"{"chart":{"result":null,"error":{"code":"Not Found","description":"No data found, symbol may be delisted"}}}"#;
 
-        assert_eq!(
-            parse_lookup_response(&reference("NOPE"), 404, body.as_bytes()).unwrap(),
-            None
-        );
+        for status in [400, 404, 422] {
+            assert_eq!(
+                parse_lookup_response(&reference("NOPE"), status, body.as_bytes()).unwrap(),
+                None,
+                "status {status}"
+            );
+        }
         assert_eq!(
             parse_lookup_response(&reference("NOPE"), 200, body.as_bytes()).unwrap(),
             None
@@ -419,12 +439,17 @@ mod lookup_tests {
 
     #[test]
     fn failures_are_provider_errors() {
-        // GIVEN a 5xx status, an undecodable body, and a reply lacking currency,
+        // GIVEN a 429/5xx/other status, an undecodable body, and a reply lacking currency,
         // WHEN each is parsed, THEN each is a provider error rather than an unknown ticker.
-        assert!(matches!(
-            parse_lookup_response(&reference("X"), 503, b""),
-            Err(AssetProviderError::Unavailable(_))
-        ));
+        for status in [429, 500, 503, 401] {
+            assert!(
+                matches!(
+                    parse_lookup_response(&reference("X"), status, b""),
+                    Err(AssetProviderError::Unavailable(_))
+                ),
+                "status {status}"
+            );
+        }
         assert!(matches!(
             parse_lookup_response(&reference("X"), 200, b"<html>"),
             Err(AssetProviderError::Malformed(_))

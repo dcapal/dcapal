@@ -18,9 +18,6 @@ pub enum AssetProviderError {
     /// The provider answered with data that cannot be turned into an asset.
     #[error("asset provider returned malformed data: {0}")]
     Malformed(String),
-    /// The reference names a provider this adapter does not serve.
-    #[error("asset provider does not serve '{0}'")]
-    UnsupportedProvider(String),
 }
 
 /// Looks up the metadata of a single asset at its provider.
@@ -53,9 +50,6 @@ impl AssetProvider for ProviderRoutedAssetProvider {
         match &asset.provider {
             Provider::YF => self.yahoo.lookup(asset).await,
             Provider::Kraken => self.kraken.lookup(asset).await,
-            Provider::Unsupported(value) => {
-                Err(AssetProviderError::UnsupportedProvider(value.clone()))
-            }
         }
     }
 }
@@ -94,24 +88,5 @@ mod tests {
 
         assert_eq!(yf.unwrap(), Some(resolved(Provider::YF, "AAPL")));
         assert_eq!(kr.unwrap(), None);
-    }
-
-    #[tokio::test]
-    async fn rejects_unsupported_providers() {
-        // GIVEN a router, WHEN a reference with an unsupported provider is looked up,
-        // THEN the lookup fails without reaching any adapter.
-        let router = ProviderRoutedAssetProvider::new(
-            Arc::new(MockAssetProvider::new()),
-            Arc::new(MockAssetProvider::new()),
-        );
-
-        let result = router
-            .lookup(&AssetRef::new(Provider::Unsupported("ibkr".into()), "X"))
-            .await;
-
-        assert!(matches!(
-            result,
-            Err(AssetProviderError::UnsupportedProvider(_))
-        ));
     }
 }
