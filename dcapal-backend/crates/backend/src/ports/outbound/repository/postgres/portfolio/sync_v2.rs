@@ -8,15 +8,14 @@ use uuid::Uuid;
 use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
-        PortfolioAssetV2, PortfolioV2, StrategicAssetClassTargetV2, SyncPortfoliosV2Request,
-        SyncPortfoliosV2Response,
+        PortfolioV2, StrategicAssetClassTargetV2, SyncPortfoliosV2Request, SyncPortfoliosV2Response,
     },
 };
 use crate::ports::outbound::repository::portfolio::{
     OwnershipConflict, PortfolioRepositoryError, Result,
 };
 use crate::ports::outbound::repository::postgres::convert::{
-    app_asset_class, db_asset_class, db_provider,
+    app_asset_class, db_allocation_mode, db_asset_class, unnest_refs,
 };
 use crate::ports::outbound::repository::postgres::types::{
     AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, PortfolioRow,
@@ -24,27 +23,31 @@ use crate::ports::outbound::repository::postgres::types::{
 
 use super::{FeeFields, PortfolioAssetRecord, SqlxPortfolioRepository, sync_v2_snapshot};
 
-/// Looks up the shared asset identifiers of every asset referenced by a Portfolio.
+/// Looks up the shared asset identifiers of the given asset references.
 ///
 /// The assets were onboarded by the service before the transaction started, so
 /// a missing reference is a caller bug rather than a user error.
-async fn load_asset_ids(
+async fn load_asset_ids<'a>(
     tx: &mut Transaction<'_, Postgres>,
-    assets: &[PortfolioAssetV2],
-) -> Result<HashMap<AssetRef, Uuid>> {
-    let mut providers = Vec::with_capacity(assets.len());
-    let mut symbols = Vec::with_capacity(assets.len());
-    for asset in assets {
-        providers.push(i16::from(db_provider(&asset.asset.provider)));
-        symbols.push(asset.asset.symbol.clone());
+    refs: impl IntoIterator<Item = &'a AssetRef>,
+) -> Result<HashMap<&'a AssetRef, Uuid>> {
+    let mut seen = HashSet::new();
+    let distinct: Vec<&AssetRef> = refs
+        .into_iter()
+        .filter(|reference| seen.insert(*reference))
+        .collect();
+    if distinct.is_empty() {
+        return Ok(HashMap::new());
     }
+
+    let (providers, symbols) = unnest_refs(distinct.iter().copied());
     let rows: Vec<(Uuid, i16, String)> = query_as(
         "SELECT ad.id, ad.provider, ad.symbol
          FROM assets_data AS ad
          JOIN UNNEST($1::smallint[], $2::text[]) AS wanted(provider, symbol)
            ON ad.provider = wanted.provider AND ad.symbol = wanted.symbol",
     )
-    .bind(providers)
+    .bind(&providers)
     .bind(symbols)
     .fetch_all(&mut **tx)
     .await?;
@@ -53,21 +56,22 @@ async fn load_asset_ids(
         .map(|(id, provider, symbol)| ((provider, symbol), id))
         .collect();
 
-    let mut ids = HashMap::with_capacity(assets.len());
-    for asset in assets {
-        let provider = i16::from(db_provider(&asset.asset.provider));
-        let id = stored
-            .get(&(provider, asset.asset.symbol.clone()))
-            .ok_or_else(|| {
-                PortfolioRepositoryError::AssetNotOnboarded(format!(
-                    "{}:{}",
-                    asset.asset.provider.as_str(),
-                    asset.asset.symbol
-                ))
-            })?;
-        ids.insert(asset.asset.clone(), *id);
-    }
-    Ok(ids)
+    distinct
+        .into_iter()
+        .zip(providers)
+        .map(|(reference, provider)| {
+            stored
+                .get(&(provider, reference.symbol.clone()))
+                .map(|id| (reference, *id))
+                .ok_or_else(|| {
+                    PortfolioRepositoryError::AssetNotOnboarded(format!(
+                        "{}:{}",
+                        reference.provider.as_str(),
+                        reference.symbol
+                    ))
+                })
+        })
+        .collect()
 }
 
 /// Upserts every submitted Portfolio Asset relationship in one statement and
@@ -78,7 +82,7 @@ async fn load_asset_ids(
 async fn upsert_relationships(
     tx: &mut Transaction<'_, Postgres>,
     portfolio: &PortfolioV2,
-    asset_ids: &HashMap<AssetRef, Uuid>,
+    asset_ids: &HashMap<&AssetRef, Uuid>,
     now: chrono::DateTime<Utc>,
 ) -> Result<HashMap<Uuid, PortfolioAssetRecord>> {
     if portfolio.assets.is_empty() {
@@ -154,7 +158,7 @@ async fn upsert_allocations(
     portfolio: &PortfolioV2,
     mode: DbAllocationMode,
     relationships: &HashMap<Uuid, PortfolioAssetRecord>,
-    asset_ids: &HashMap<AssetRef, Uuid>,
+    asset_ids: &HashMap<&AssetRef, Uuid>,
     relative_targets: &HashMap<&AssetRef, Decimal>,
     now: chrono::DateTime<Utc>,
 ) -> Result<HashMap<Uuid, Decimal>> {
@@ -247,13 +251,12 @@ async fn replace_class_targets(
         .collect()
 }
 
-/// Reconciles one validated Portfolio aggregate inside the caller's transaction.
-async fn upsert_v2_portfolio_tx(
+/// Locks the stored Portfolio row with the given identifier, if any.
+async fn lock_portfolio(
     tx: &mut Transaction<'_, Postgres>,
-    user_id: Uuid,
-    portfolio_request: &PortfolioV2,
-) -> Result<PortfolioV2> {
-    let existing = query_as::<_, PortfolioRow>(
+    id: Uuid,
+) -> Result<Option<PortfolioRow>> {
+    Ok(query_as::<_, PortfolioRow>(
         "SELECT id, user_id, name, currency, deleted, last_updated_at,
                 allocation_mode, drift_band, strategic_allocation_present,
                 max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
@@ -262,28 +265,41 @@ async fn upsert_v2_portfolio_tx(
          WHERE id = $1
          FOR UPDATE",
     )
-    .bind(portfolio_request.id)
+    .bind(id)
     .fetch_optional(&mut **tx)
-    .await?;
+    .await?)
+}
 
-    if let Some(existing) = &existing {
-        if existing.user_id != user_id {
-            return Err(PortfolioRepositoryError::OwnershipConflict(
-                OwnershipConflict::Portfolio {
-                    id: portfolio_request.id,
-                },
-            ));
+/// Reconciles one validated Portfolio aggregate inside the caller's transaction.
+///
+/// `snapshot_row` is the already-locked row of the user's own Portfolio when
+/// the snapshot holds it. Otherwise the identifier is looked up and locked, so
+/// that a row owned by another user is still detected.
+async fn upsert_v2_portfolio_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    portfolio_request: &PortfolioV2,
+    snapshot_row: Option<&PortfolioRow>,
+    asset_ids: &HashMap<&AssetRef, Uuid>,
+) -> Result<PortfolioV2> {
+    let locked;
+    let existing = match snapshot_row {
+        Some(row) => Some(row),
+        None => {
+            locked = lock_portfolio(tx, portfolio_request.id).await?;
+            locked.as_ref()
         }
-        if existing.deleted {
-            return Err(PortfolioRepositoryError::OwnershipConflict(
-                OwnershipConflict::Portfolio {
-                    id: portfolio_request.id,
-                },
-            ));
-        }
+    };
+
+    if existing.is_some_and(|existing| existing.user_id != user_id || existing.deleted) {
+        return Err(PortfolioRepositoryError::OwnershipConflict(
+            OwnershipConflict::Portfolio {
+                id: portfolio_request.id,
+            },
+        ));
     }
 
-    let mode = sync_v2_snapshot::v2_mode(portfolio_request.allocation_mode);
+    let mode = db_allocation_mode(portfolio_request.allocation_mode);
     let fee_fields = FeeFields::from_fees(portfolio_request.fees.as_ref());
     let persisted_portfolio = if existing.is_some() {
         query_as::<_, PortfolioRow>(
@@ -345,11 +361,13 @@ async fn upsert_v2_portfolio_tx(
         .await?
     };
 
-    let asset_ids = load_asset_ids(tx, &portfolio_request.assets).await?;
-
     // Relationships are identified by (Portfolio, shared asset): drop the rows
     // whose asset is no longer submitted; the allocation rows cascade.
-    let retained_asset_ids: Vec<Uuid> = asset_ids.values().copied().collect();
+    let retained_asset_ids: Vec<Uuid> = portfolio_request
+        .assets
+        .iter()
+        .map(|asset| asset_ids[&asset.asset])
+        .collect();
     query(
         "DELETE FROM portfolio_asset
          WHERE portfolio_id = $1 AND assets_data_id <> ALL($2)",
@@ -371,13 +389,13 @@ async fn upsert_v2_portfolio_tx(
         })
         .unwrap_or_default();
     let now = Utc::now();
-    let relationships = upsert_relationships(tx, portfolio_request, &asset_ids, now).await?;
+    let relationships = upsert_relationships(tx, portfolio_request, asset_ids, now).await?;
     let weights = upsert_allocations(
         tx,
         portfolio_request,
         mode,
         &relationships,
-        &asset_ids,
+        asset_ids,
         &relative_targets,
         now,
     )
@@ -414,11 +432,19 @@ async fn upsert_v2_portfolio_tx(
     sync_v2_snapshot::v2_portfolio_response(persisted_portfolio, updated_assets, class_targets)
 }
 
+/// Tells whether a submitted Portfolio must be written: it is new, or it is
+/// newer than the stored one, which must not be a tombstone.
+fn is_written(portfolio: &PortfolioV2, current: Option<&PortfolioRow>) -> bool {
+    current.is_none_or(|current| {
+        !current.deleted && current.last_updated_at < portfolio.last_updated_at
+    })
+}
+
 /// Executes a complete v2 synchronization in one serializable transaction.
 pub(super) async fn sync(
     repository: &SqlxPortfolioRepository,
     user_id: Uuid,
-    request: SyncPortfoliosV2Request,
+    request: &SyncPortfoliosV2Request,
 ) -> Result<SyncPortfoliosV2Response> {
     let mut tx = repository.pool.begin().await?;
     query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
@@ -426,11 +452,18 @@ pub(super) async fn sync(
         .await?;
 
     // Lock and load one complete snapshot before resolving incoming records.
-    let current_snapshot = sync_v2_snapshot::load(&mut tx, user_id).await?;
-    let current_by_id: HashMap<Uuid, (_, PortfolioV2)> = current_snapshot
+    // Stored rows and responses are kept apart so that a response can be moved
+    // into the result while the rows stay borrowed.
+    let (current_rows, mut current_responses): (Vec<PortfolioRow>, Vec<Option<PortfolioV2>>) =
+        sync_v2_snapshot::load(&mut tx, user_id)
+            .await?
+            .into_iter()
+            .map(|(row, response)| (row, Some(response)))
+            .unzip();
+    let current_by_id: HashMap<Uuid, usize> = current_rows
         .iter()
-        .cloned()
-        .map(|(portfolio, response)| (portfolio.id, (portfolio, response)))
+        .enumerate()
+        .map(|(position, row)| (row.id, position))
         .collect();
     let incoming_ids: HashSet<Uuid> = request
         .portfolios
@@ -439,63 +472,65 @@ pub(super) async fn sync(
         .collect();
     let requested_deleted_ids: HashSet<Uuid> = request.deleted_portfolios.iter().copied().collect();
 
+    // Only Portfolios that are not tombstoned and not older than the stored
+    // ones are written, so only their assets need to be looked up. The
+    // references are collected before awaiting: a pending iterator over
+    // borrowed closures would make the future unusable inside Axum handlers.
+    let referenced: Vec<&AssetRef> = request
+        .portfolios
+        .iter()
+        .filter(|portfolio| {
+            is_written(
+                portfolio,
+                current_by_id
+                    .get(&portfolio.id)
+                    .map(|&position| &current_rows[position]),
+            )
+        })
+        .flat_map(|portfolio| portfolio.assets.iter().map(|asset| &asset.asset))
+        .collect();
+    let asset_ids = load_asset_ids(&mut tx, referenced).await?;
+
     let mut updated_portfolios = Vec::new();
     let mut deleted_portfolios = Vec::new();
     for portfolio in &request.portfolios {
-        match current_by_id.get(&portfolio.id) {
-            Some((current, _)) if current.deleted => deleted_portfolios.push(portfolio.id),
-            Some((current, response)) if current.last_updated_at >= portfolio.last_updated_at => {
-                updated_portfolios.push(response.clone());
+        let position = current_by_id.get(&portfolio.id).copied();
+        let current = position.map(|position| &current_rows[position]);
+        if !is_written(portfolio, current) {
+            let position = position.expect("only stored Portfolios are skipped");
+            if current_rows[position].deleted {
+                deleted_portfolios.push(portfolio.id);
+            } else {
+                updated_portfolios.extend(current_responses[position].take());
             }
-            Some(_) | None => {
-                updated_portfolios.push(upsert_v2_portfolio_tx(&mut tx, user_id, portfolio).await?);
-            }
+            continue;
         }
+        updated_portfolios
+            .push(upsert_v2_portfolio_tx(&mut tx, user_id, portfolio, current, &asset_ids).await?);
     }
 
     // Return server-side aggregates omitted by the client.
-    for (current, response) in &current_snapshot {
+    for (current, response) in current_rows.iter().zip(current_responses) {
         if incoming_ids.contains(&current.id) || requested_deleted_ids.contains(&current.id) {
             continue;
         }
         if current.deleted {
             deleted_portfolios.push(current.id);
         } else {
-            updated_portfolios.push(response.clone());
+            updated_portfolios.extend(response);
         }
     }
 
+    let mut acknowledged: HashSet<Uuid> = deleted_portfolios.iter().copied().collect();
     for deleted_id in &request.deleted_portfolios {
-        let owner: Option<Uuid> = query_scalar("SELECT user_id FROM portfolios WHERE id = $1")
-            .bind(deleted_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-        if let Some(owner) = owner
-            && owner != user_id
-        {
-            return Err(PortfolioRepositoryError::OwnershipConflict(
-                OwnershipConflict::Portfolio { id: *deleted_id },
-            ));
-        }
-        if owner.is_some() {
-            query("UPDATE portfolios SET deleted = TRUE, updated_at = NOW() WHERE id = $1")
-                .bind(deleted_id)
-                .execute(&mut *tx)
-                .await?;
-        } else {
-            query(
-                "INSERT INTO portfolios
-                     (id, user_id, name, currency, deleted, last_updated_at,
-                      allocation_mode, strategic_allocation_present)
-                 VALUES ($1, $2, '', '', TRUE, NOW(), $3, FALSE)",
-            )
-            .bind(deleted_id)
-            .bind(user_id)
-            .bind(i16::from(DbAllocationMode::Simple))
-            .execute(&mut *tx)
-            .await?;
-        }
-        if !deleted_portfolios.contains(deleted_id) {
+        tombstone_portfolio(
+            &mut tx,
+            user_id,
+            *deleted_id,
+            current_by_id.contains_key(deleted_id),
+        )
+        .await?;
+        if acknowledged.insert(*deleted_id) {
             deleted_portfolios.push(*deleted_id);
         }
     }
@@ -505,4 +540,55 @@ pub(super) async fn sync(
         updated_portfolios,
         deleted_portfolios,
     })
+}
+
+/// Turns the Portfolio with the given identifier into a tombstone of `user_id`.
+///
+/// `owned` tells that the user's snapshot already holds the Portfolio, so its
+/// owner is known. Otherwise the stored owner is looked up: another user's
+/// Portfolio is a conflict and an unknown identifier gets a new tombstone row.
+async fn tombstone_portfolio(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    id: Uuid,
+    owned: bool,
+) -> Result<()> {
+    let exists = if owned {
+        true
+    } else {
+        let owner: Option<Uuid> = query_scalar("SELECT user_id FROM portfolios WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&mut **tx)
+            .await?;
+        if owner.is_some_and(|owner| owner != user_id) {
+            return Err(PortfolioRepositoryError::OwnershipConflict(
+                OwnershipConflict::Portfolio { id },
+            ));
+        }
+        owner.is_some()
+    };
+
+    if exists {
+        query("UPDATE portfolios SET deleted = TRUE, updated_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&mut **tx)
+            .await?;
+    } else {
+        query(
+            "INSERT INTO portfolios
+                 (id, user_id, name, currency, deleted, last_updated_at,
+                  allocation_mode, strategic_allocation_present)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)",
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind("")
+        .bind("")
+        .bind(true)
+        .bind(i16::from(DbAllocationMode::Simple))
+        .bind(false)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
 }

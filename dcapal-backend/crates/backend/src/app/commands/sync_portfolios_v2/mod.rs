@@ -78,16 +78,20 @@ impl SyncPortfoliosV2Command {
             }
         }
 
-        let references = request
+        let has_references = request
             .portfolios
             .iter()
-            .flat_map(|portfolio| portfolio.assets.iter().map(|asset| asset.asset.clone()))
-            .collect::<Vec<_>>();
-        let resolved = if references.is_empty() {
-            ResolvedAssets::empty()
-        } else {
+            .any(|portfolio| !portfolio.assets.is_empty());
+        let resolved = if has_references {
+            // Collected before awaiting: a pending iterator over borrowed
+            // closures would make the future unusable inside Axum handlers.
+            let references = request
+                .portfolios
+                .iter()
+                .flat_map(|portfolio| portfolio.assets.iter().map(|asset| &asset.asset))
+                .collect::<Vec<_>>();
             assets
-                .resolve(&references)
+                .resolve(references)
                 .await
                 .map_err(|error| match error {
                     AssetServiceError::Unresolved(unresolved) => {
@@ -106,6 +110,8 @@ impl SyncPortfoliosV2Command {
                         SyncPortfoliosV2CommandError::Directory(error)
                     }
                 })?
+        } else {
+            ResolvedAssets::default()
         };
 
         Ok(Self {
@@ -115,17 +121,13 @@ impl SyncPortfoliosV2Command {
         })
     }
 
-    /// Borrows the validated request for an outbound operation.
-    pub fn request(&self) -> &SyncPortfoliosV2Request {
-        &self.request
-    }
-
     /// Returns the authenticated user resolved during command construction.
     pub const fn user_id(&self) -> Uuid {
         self.user_id
     }
 
     /// Borrows the shared metadata of every distinct referenced asset.
+    #[cfg(test)]
     pub fn assets(&self) -> &[ResolvedAsset] {
         &self.assets.all
     }
@@ -149,7 +151,7 @@ impl SyncPortfoliosV2Command {
 }
 
 /// Builds the validation error for a sync that introduces too many new assets.
-fn too_many_new_assets() -> ValidationError {
+pub(crate) fn too_many_new_assets() -> ValidationError {
     ValidationError::single(
         FieldPath::root().field("portfolios"),
         validation::MESSAGE_TOO_MANY_NEW_ASSETS,

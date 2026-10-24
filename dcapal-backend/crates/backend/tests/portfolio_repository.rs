@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use dcapal_backend::app::commands::sync_portfolios_v2::SyncPortfoliosV2Command;
-use dcapal_backend::app::domain::asset::{AssetRef, ResolvedAsset};
+use dcapal_backend::app::domain::asset::{AssetRef, MetadataSource, ResolvedAsset};
 use dcapal_backend::app::domain::portfolio::{
     AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
     StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
@@ -252,7 +252,7 @@ async fn rejects_corrupt_v2_snapshot_fee_data(
     let error = SqlxPortfolioRepository::new(pool)
         .sync_v2(
             USER_ID,
-            SyncPortfoliosV2Request {
+            &SyncPortfoliosV2Request {
                 schema_version: 2,
                 portfolios: Vec::new(),
                 deleted_portfolios: Vec::new(),
@@ -287,7 +287,7 @@ async fn rejects_corrupt_v2_snapshot_asset_override(
     let error = SqlxPortfolioRepository::new(pool)
         .sync_v2(
             USER_ID,
-            SyncPortfoliosV2Request {
+            &SyncPortfoliosV2Request {
                 schema_version: 2,
                 portfolios: Vec::new(),
                 deleted_portfolios: Vec::new(),
@@ -460,24 +460,27 @@ async fn reuses_shared_asset_metadata_but_creates_a_new_relationship(
     assert_eq!(shared_id.get_version_num(), 7);
 
     let shared_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM assets_data WHERE provider = 2 AND symbol = 'VWCE'",
+        "SELECT COUNT(*) FROM assets_data WHERE provider = $1 AND symbol = 'VWCE'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
     let relationship_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)
          FROM portfolio_asset AS pa
          JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-         WHERE ad.provider = 2 AND ad.symbol = 'VWCE'",
+         WHERE ad.provider = $1 AND ad.symbol = 'VWCE'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
     let distinct_shared_ids: i64 = sqlx::query_scalar(
         "SELECT COUNT(DISTINCT assets_data_id)
          FROM portfolio_asset AS pa
          JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-         WHERE ad.provider = 2 AND ad.symbol = 'VWCE'",
+         WHERE ad.provider = $1 AND ad.symbol = 'VWCE'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
 
@@ -494,7 +497,7 @@ async fn v1_upsert_creates_client_supplied_shared_assets(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GIVEN a v1 Portfolio carrying client-chosen metadata for a new asset,
     // WHEN the v1 upsert path stores it,
-    // THEN the shared row exists with the client-supplied provenance (0), so v2
+    // THEN the shared row exists with the client-supplied provenance, so v2
     // later verifies it against the provider before trusting it.
     let repository = SqlxPortfolioRepository::new(pool.clone());
     repository
@@ -506,7 +509,7 @@ async fn v1_upsert_creates_client_supplied_shared_assets(
             .fetch_one(&pool)
             .await?;
 
-    assert_eq!(source, 0);
+    assert_eq!(source, i16::from(MetadataSource::ClientSupplied));
     Ok(())
 }
 
@@ -645,16 +648,18 @@ async fn concurrent_syncs_reuse_shared_data_without_duplicate_relationships(
     second_result?;
 
     let shared_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM assets_data WHERE provider = 2 AND symbol = 'CONCURRENT'",
+        "SELECT COUNT(*) FROM assets_data WHERE provider = $1 AND symbol = 'CONCURRENT'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
     let relationship_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)
          FROM portfolio_asset AS pa
          JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-         WHERE ad.provider = 2 AND ad.symbol = 'CONCURRENT'",
+         WHERE ad.provider = $1 AND ad.symbol = 'CONCURRENT'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
 
@@ -690,7 +695,13 @@ async fn provider_is_part_of_shared_asset_identity(
     .bind(PORTFOLIO_ID)
     .fetch_all(&pool)
     .await?;
-    assert_eq!(identities, vec![(1, "BTC".into()), (2, "BTC".into())]);
+    assert_eq!(
+        identities,
+        vec![
+            (i16::from(Provider::Kraken), "BTC".into()),
+            (i16::from(Provider::YF), "BTC".into())
+        ]
+    );
 
     Ok(())
 }
@@ -742,7 +753,7 @@ async fn v2_sync_persists_strategic_descendants_and_exact_decimals(
     };
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    let response = repository.sync_v2(USER_ID, request).await?;
+    let response = repository.sync_v2(USER_ID, &request).await?;
 
     let portfolio = &response.updated_portfolios[0];
     assert_eq!(portfolio.allocation_mode, AllocationMode::Strategic);
@@ -807,7 +818,7 @@ async fn v2_sync_reuses_relationships_by_portfolio_and_asset(
     let request = v2_simple_request(vec![(cash, dec!(25)), (vwce, dec!(75))]);
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    let response = repository.sync_v2(USER_ID, request).await?;
+    let response = repository.sync_v2(USER_ID, &request).await?;
     assert_eq!(response.updated_portfolios[0].assets.len(), 2);
 
     let stored: Vec<(Uuid, String, Decimal, Decimal)> = sqlx::query_as(
@@ -854,7 +865,7 @@ async fn v2_sync_deletes_relationships_for_dropped_assets(
     let request = v2_simple_request(vec![(v2_asset("VWCE"), dec!(100))]);
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    let response = repository.sync_v2(USER_ID, request).await?;
+    let response = repository.sync_v2(USER_ID, &request).await?;
     assert_eq!(response.updated_portfolios[0].assets.len(), 1);
 
     let relationships: Vec<Uuid> =
@@ -893,7 +904,7 @@ async fn v2_sync_switching_an_asset_is_a_delete_and_an_insert(
     ]);
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    repository.sync_v2(USER_ID, request).await?;
+    repository.sync_v2(USER_ID, &request).await?;
 
     let stored: Vec<(Uuid, String, Decimal)> = sqlx::query_as(
         "SELECT pa.id, ad.symbol, paa.weight
@@ -933,7 +944,7 @@ async fn v2_sync_stores_class_overrides_verbatim_and_hides_relationship_ids(
     let request = v2_simple_request(vec![(vwce, dec!(100))]);
 
     let repository = SqlxPortfolioRepository::new(pool);
-    let response = repository.sync_v2(USER_ID, request).await?;
+    let response = repository.sync_v2(USER_ID, &request).await?;
 
     let portfolio = response.updated_portfolios[0].clone();
     assert_eq!(
@@ -988,7 +999,7 @@ async fn v2_service_onboards_unknown_assets_before_persisting(
         sqlx::query_scalar("SELECT metadata_source FROM assets_data WHERE symbol = 'NEWCO'")
             .fetch_one(&pool)
             .await?;
-    assert_eq!(source, 1);
+    assert_eq!(source, i16::from(MetadataSource::ProviderConfirmed));
 
     Ok(())
 }
@@ -1020,7 +1031,7 @@ async fn v2_sync_rejects_a_portfolio_owned_by_another_user(
     assert!(matches!(
         repository.sync_v2(
             OTHER_USER_ID,
-            request,
+            &request,
         ).await,
         Err(PortfolioRepositoryError::OwnershipConflict(OwnershipConflict::Portfolio { id }))
             if id == PORTFOLIO_ID
@@ -1050,7 +1061,7 @@ async fn v2_sync_keeps_unknown_deletions_as_terminal_tombstones(
         deleted_portfolios: vec![tombstone_id],
     };
 
-    let response = repository.sync_v2(USER_ID, deletion).await?;
+    let response = repository.sync_v2(USER_ID, &deletion).await?;
     assert_eq!(response.deleted_portfolios, vec![tombstone_id]);
 
     let tombstone: (Uuid, bool) =
@@ -1075,7 +1086,7 @@ async fn v2_sync_keeps_unknown_deletions_as_terminal_tombstones(
         }],
         deleted_portfolios: Vec::new(),
     };
-    let stale_response = repository.sync_v2(USER_ID, stale).await?;
+    let stale_response = repository.sync_v2(USER_ID, &stale).await?;
     assert_eq!(stale_response.deleted_portfolios, vec![tombstone_id]);
 
     let name: String = sqlx::query_scalar("SELECT name FROM portfolios WHERE id = $1")
@@ -1100,7 +1111,7 @@ async fn v2_sync_rolls_back_parent_when_an_asset_was_not_onboarded(
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
     assert!(matches!(
-        repository.sync_v2(USER_ID, request).await,
+        repository.sync_v2(USER_ID, &request).await,
         Err(PortfolioRepositoryError::AssetNotOnboarded(_))
     ));
 

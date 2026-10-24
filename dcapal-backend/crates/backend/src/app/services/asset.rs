@@ -8,10 +8,7 @@ use futures::{StreamExt, stream};
 use crate::{
     app::{
         commands::lookup_assets::LookupAssetsCommand,
-        domain::{
-            asset::{AssetRef, MetadataSource, ResolvedAsset, StoredAsset},
-            portfolio::Provider,
-        },
+        domain::asset::{AssetRef, MetadataSource, ResolvedAsset, StoredAsset},
     },
     ports::outbound::{
         adapter::{AssetProvider, AssetProviderError},
@@ -59,7 +56,7 @@ pub struct AssetLookup {
 }
 
 /// Outcome of resolving references: every asset plus what to write back.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ResolvedAssets {
     /// Metadata finally used for every distinct reference, in first-seen order.
     pub all: Vec<ResolvedAsset>,
@@ -72,16 +69,8 @@ pub struct ResolvedAssets {
 }
 
 impl ResolvedAssets {
-    /// Returns a result with nothing resolved and nothing to write.
-    pub fn empty() -> Self {
-        Self {
-            all: Vec::new(),
-            to_upsert: Vec::new(),
-            to_confirm: Vec::new(),
-        }
-    }
-
     /// Tells whether the directory has nothing to be told.
+    #[cfg(test)]
     pub fn is_clean(&self) -> bool {
         self.to_upsert.is_empty() && self.to_confirm.is_empty()
     }
@@ -138,7 +127,10 @@ impl AssetService {
     /// Nothing is stored; see [`Self::onboard`].
     /// A provider failure for a missing reference takes precedence over
     /// unresolved references because the failure leaves their existence undecided.
-    pub async fn resolve(&self, refs: &[AssetRef]) -> Result<ResolvedAssets, AssetServiceError> {
+    pub async fn resolve<'a>(
+        &self,
+        refs: impl IntoIterator<Item = &'a AssetRef>,
+    ) -> Result<ResolvedAssets, AssetServiceError> {
         let distinct = dedupe(refs);
         let known = self.directory.find_by_refs(&distinct).await?;
         let (stored, missing) = split_known(&distinct, known);
@@ -192,13 +184,13 @@ impl AssetService {
                 (LookupPurpose::New, Ok(None)) => unresolved.push(reference),
                 (LookupPurpose::New, Err(error)) => outage = outage.or(Some(error)),
                 (LookupPurpose::Refresh, Ok(Some(asset))) => {
-                    if reference.provider == Provider::Kraken {
-                        // The Kraken catalog only yields the symbol as name, which
-                        // would replace a possibly better cached name.
-                        to_confirm.push(reference);
-                    } else {
+                    if reference.provider.has_authoritative_metadata() {
                         used.insert(reference, asset.clone());
                         to_upsert.push(asset);
+                    } else {
+                        // The provider only yields the symbol as name, which
+                        // would replace a possibly better cached name.
+                        to_confirm.push(reference);
                     }
                 }
                 // A refresh is best effort: keep the cached metadata.
@@ -208,14 +200,20 @@ impl AssetService {
         if let Some(error) = outage {
             return Err(AssetServiceError::ProviderUnavailable(error));
         }
+
+        // Position of every distinct reference, to report results in request order.
+        let order = distinct
+            .iter()
+            .enumerate()
+            .map(|(position, reference)| (reference, position))
+            .collect::<HashMap<_, _>>();
         if !unresolved.is_empty() {
-            unresolved.sort_by_key(|r| distinct.iter().position(|d| d == r));
+            unresolved.sort_by_key(|reference| order.get(reference).copied());
             return Err(AssetServiceError::Unresolved(unresolved));
         }
 
-        let position = |reference: &AssetRef| distinct.iter().position(|d| d == reference);
-        to_upsert.sort_by_key(|asset| position(&asset.as_ref()));
-        to_confirm.sort_by_key(position);
+        to_upsert.sort_by_key(|asset| order.get(&asset.as_ref()).copied());
+        to_confirm.sort_by_key(|reference| order.get(reference).copied());
         let all = distinct
             .iter()
             .filter_map(|reference| used.remove(reference))
@@ -245,10 +243,11 @@ impl AssetService {
     }
 }
 
-fn dedupe(refs: &[AssetRef]) -> Vec<AssetRef> {
+/// Returns the distinct references in first-seen order, cloning each only once.
+fn dedupe<'a>(refs: impl IntoIterator<Item = &'a AssetRef>) -> Vec<AssetRef> {
     let mut seen = HashSet::new();
-    refs.iter()
-        .filter(|r| seen.insert((*r).clone()))
+    refs.into_iter()
+        .filter(|reference| seen.insert(*reference))
         .cloned()
         .collect()
 }

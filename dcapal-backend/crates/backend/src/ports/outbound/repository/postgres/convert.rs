@@ -1,9 +1,15 @@
 //! Canonical conversions between application enums and their stored codes.
 
 use crate::{
-    app::domain::portfolio::{AssetClass as AppAssetClass, Provider as AppProvider},
+    app::domain::{
+        asset::AssetRef,
+        portfolio::{
+            AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
+            Provider as AppProvider,
+        },
+    },
     ports::outbound::repository::postgres::types::{
-        AssetClass as DbAssetClass, Provider as DbProvider,
+        AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
     },
 };
 
@@ -45,4 +51,35 @@ pub(super) fn app_asset_class(class: DbAssetClass) -> AppAssetClass {
         DbAssetClass::Crypto => AppAssetClass::Crypto,
         DbAssetClass::Commodity => AppAssetClass::Commodity,
     }
+}
+
+/// Maps an application Allocation Mode to its stored representation.
+pub(super) fn db_allocation_mode(mode: AppAllocationMode) -> DbAllocationMode {
+    match mode {
+        AppAllocationMode::Simple => DbAllocationMode::Simple,
+        AppAllocationMode::Strategic => DbAllocationMode::Strategic,
+    }
+}
+
+/// Maps a stored Allocation Mode to its application representation.
+pub(super) fn app_allocation_mode(mode: DbAllocationMode) -> AppAllocationMode {
+    match mode {
+        DbAllocationMode::Simple => AppAllocationMode::Simple,
+        DbAllocationMode::Strategic => AppAllocationMode::Strategic,
+    }
+}
+
+/// Splits asset references into the parallel provider-code and symbol arrays
+/// that SQL `UNNEST($1::smallint[], $2::text[])` joins consume.
+pub(super) fn unnest_refs<'a>(
+    refs: impl IntoIterator<Item = &'a AssetRef>,
+) -> (Vec<i16>, Vec<String>) {
+    refs.into_iter()
+        .map(|reference| {
+            (
+                i16::from(db_provider(&reference.provider)),
+                reference.symbol.clone(),
+            )
+        })
+        .unzip()
 }

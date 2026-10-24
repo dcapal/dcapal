@@ -200,6 +200,31 @@ fn combine_asset_rows(
         updated_at: relationship.updated_at,
     }
 }
+/// Stores the target weight of one Portfolio Asset relationship, replacing any
+/// previous weight.
+async fn upsert_allocation(
+    tx: &mut Transaction<'_, Postgres>,
+    portfolio_id: Uuid,
+    relationship_id: Uuid,
+    weight: Decimal,
+    updated_at: DateTime<Utc>,
+) -> Result<()> {
+    query(
+        "INSERT INTO portfolio_asset_allocation
+           (portfolio_id, portfolio_asset_id, weight, updated_at)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
+           SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
+    )
+    .bind(portfolio_id)
+    .bind(relationship_id)
+    .bind(weight)
+    .bind(updated_at)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 impl SqlxPortfolioRepository {
     /// Creates a portfolio repository backed by the provided PostgreSQL pool.
     pub fn new(pool: sqlx::PgPool) -> Self {
@@ -303,18 +328,13 @@ impl SqlxPortfolioRepository {
                 .fetch_one(&mut **tx)
                 .await?;
 
-                query(
-                    "INSERT INTO portfolio_asset_allocation
-                       (portfolio_id, portfolio_asset_id, weight, updated_at)
-                       VALUES ($1, $2, $3, $4)
-                       ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
-                       SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
+                upsert_allocation(
+                    tx,
+                    portfolio_id,
+                    relationship.id,
+                    asset.target_weight,
+                    candidate.updated_at,
                 )
-                .bind(portfolio_id)
-                .bind(relationship.id)
-                .bind(asset.target_weight)
-                .bind(candidate.updated_at)
-                .execute(&mut **tx)
                 .await?;
 
                 combine_asset_rows(shared_asset, relationship, asset.target_weight)
@@ -349,18 +369,13 @@ impl SqlxPortfolioRepository {
                 .fetch_one(&mut **tx)
                 .await?;
 
-                query(
-                    "INSERT INTO portfolio_asset_allocation
-                       (portfolio_id, portfolio_asset_id, weight, updated_at)
-                       VALUES ($1, $2, $3, $4)
-                       ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
-                       SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
+                upsert_allocation(
+                    tx,
+                    portfolio_id,
+                    relationship.id,
+                    asset.target_weight,
+                    candidate.updated_at,
                 )
-                .bind(portfolio_id)
-                .bind(relationship.id)
-                .bind(asset.target_weight)
-                .bind(candidate.updated_at)
-                .execute(&mut **tx)
                 .await?;
 
                 combine_asset_rows(shared_asset, relationship, asset.target_weight)
@@ -635,7 +650,7 @@ impl PortfolioRepository for SqlxPortfolioRepository {
     async fn sync_v2(
         &self,
         user_id: Uuid,
-        request: SyncPortfoliosV2Request,
+        request: &SyncPortfoliosV2Request,
     ) -> Result<SyncPortfoliosV2Response> {
         sync_v2::sync(self, user_id, request).await
     }

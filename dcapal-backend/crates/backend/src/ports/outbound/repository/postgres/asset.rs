@@ -9,7 +9,7 @@ use crate::{
     ports::outbound::repository::{
         asset::{AssetDirectory, AssetDirectoryError},
         postgres::{
-            convert::{app_asset_class, app_provider, db_asset_class, db_provider},
+            convert::{app_asset_class, app_provider, db_asset_class, db_provider, unnest_refs},
             types::{AssetClass as DbAssetClass, Provider as DbProvider},
         },
     },
@@ -48,12 +48,7 @@ impl AssetDirectory for SqlxAssetDirectory {
             return Ok(Vec::new());
         }
 
-        let mut providers = Vec::with_capacity(refs.len());
-        let mut symbols = Vec::with_capacity(refs.len());
-        for reference in refs {
-            providers.push(i16::from(db_provider(&reference.provider)));
-            symbols.push(reference.symbol.clone());
-        }
+        let (providers, symbols) = unnest_refs(refs);
 
         let rows = query_as::<_, AssetRow>(
             "SELECT ad.provider, ad.symbol, ad.name, ad.currency, ad.asset_class,
@@ -103,7 +98,7 @@ impl AssetDirectory for SqlxAssetDirectory {
                 .push_bind(&asset.name)
                 .push_bind(&asset.currency)
                 .push_bind(class)
-                .push_bind(MetadataSource::ProviderConfirmed.code())
+                .push_bind(i16::from(MetadataSource::ProviderConfirmed))
                 .push_bind(now)
                 .push_bind(now);
         });
@@ -116,7 +111,7 @@ impl AssetDirectory for SqlxAssetDirectory {
                   updated_at = EXCLUDED.updated_at
               WHERE assets_data.metadata_source = ",
         );
-        builder.push_bind(MetadataSource::ClientSupplied.code());
+        builder.push_bind(i16::from(MetadataSource::ClientSupplied));
 
         builder.build().execute(&self.pool).await?;
         Ok(())
@@ -127,12 +122,7 @@ impl AssetDirectory for SqlxAssetDirectory {
             return Ok(());
         }
 
-        let mut providers = Vec::with_capacity(refs.len());
-        let mut symbols = Vec::with_capacity(refs.len());
-        for reference in refs {
-            providers.push(i16::from(db_provider(&reference.provider)));
-            symbols.push(reference.symbol.clone());
-        }
+        let (providers, symbols) = unnest_refs(refs);
 
         sqlx::query(
             "UPDATE assets_data AS ad
@@ -144,8 +134,8 @@ impl AssetDirectory for SqlxAssetDirectory {
         )
         .bind(providers)
         .bind(symbols)
-        .bind(MetadataSource::ProviderConfirmed.code())
-        .bind(MetadataSource::ClientSupplied.code())
+        .bind(i16::from(MetadataSource::ProviderConfirmed))
+        .bind(i16::from(MetadataSource::ClientSupplied))
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -153,8 +143,11 @@ impl AssetDirectory for SqlxAssetDirectory {
 }
 
 fn stored_asset(row: AssetRow) -> Result<StoredAsset, AssetDirectoryError> {
-    let source = MetadataSource::try_from(row.metadata_source).map_err(|code| {
-        AssetDirectoryError::CorruptData(format!("unknown metadata source code {code}"))
+    let source = MetadataSource::try_from(row.metadata_source).map_err(|_| {
+        AssetDirectoryError::CorruptData(format!(
+            "unknown metadata source code {}",
+            row.metadata_source
+        ))
     })?;
     Ok(StoredAsset {
         asset: resolved_asset(row)?,

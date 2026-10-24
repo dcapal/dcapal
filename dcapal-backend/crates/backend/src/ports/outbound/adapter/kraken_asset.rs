@@ -6,7 +6,7 @@ use super::asset_provider::{AssetProvider, AssetProviderError};
 use crate::{
     app::domain::{
         asset::{AssetRef, ResolvedAsset},
-        entity::{Asset, AssetKind},
+        entity::Asset,
         portfolio::{AssetClass, Provider},
     },
     ports::outbound::repository::market_data::MarketDataRepository,
@@ -58,17 +58,12 @@ impl AssetProvider for KrakenAssetProvider {
 impl KrakenAssetProvider {
     /// Tells whether the catalog holds neither crypto nor fiat assets.
     async fn catalog_is_empty(&self) -> Result<bool, AssetProviderError> {
-        for kind in [AssetKind::Crypto, AssetKind::Fiat] {
-            let assets = self
-                .catalog
-                .load_assets_by_type(kind)
-                .await
-                .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
-            if !assets.is_empty() {
-                return Ok(false);
-            }
-        }
-        Ok(true)
+        let has_assets = self
+            .catalog
+            .has_assets()
+            .await
+            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+        Ok(!has_assets)
     }
 }
 

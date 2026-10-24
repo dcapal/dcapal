@@ -8,15 +8,12 @@ use crate::{
     app::{
         commands::{
             lookup_assets::LookupAssetsCommandError,
-            sync_portfolios_v2::{
-                FieldPath, SyncPortfoliosV2CommandError, ValidationError,
-                validation::MESSAGE_TOO_MANY_NEW_ASSETS,
-            },
+            sync_portfolios_v2::{SyncPortfoliosV2CommandError, too_many_new_assets},
         },
         services::{asset::AssetServiceError, portfolio::PortfolioServiceError},
     },
     ports::inbound::rest::types::sync_portfolio_v2::{
-        V2ErrorResponse, V2FieldError, V2ValidationError,
+        V2ErrorResponse, V2FieldError, V2ValidationError, VALIDATION_CODE,
     },
 };
 
@@ -38,39 +35,15 @@ const PROVIDER_UNAVAILABLE_MESSAGE: &str =
 #[derive(Debug, thiserror::Error)]
 pub enum V2HttpError {
     #[error("v2 validation failed")]
-    Validation(#[source] V2ValidationError),
+    Validation(#[from] V2ValidationError),
     #[error("v2 command construction failed")]
-    Command(#[source] SyncPortfoliosV2CommandError),
+    Command(#[from] SyncPortfoliosV2CommandError),
     #[error("v2 Portfolio synchronization failed")]
-    Service(#[source] PortfolioServiceError),
+    Service(#[from] PortfolioServiceError),
     #[error("v2 asset lookup request is invalid")]
-    LookupCommand(#[source] LookupAssetsCommandError),
+    LookupCommand(#[from] LookupAssetsCommandError),
     #[error("v2 asset service failed")]
-    Asset(#[source] AssetServiceError),
-}
-
-impl From<LookupAssetsCommandError> for V2HttpError {
-    fn from(error: LookupAssetsCommandError) -> Self {
-        Self::LookupCommand(error)
-    }
-}
-
-impl From<AssetServiceError> for V2HttpError {
-    fn from(error: AssetServiceError) -> Self {
-        Self::Asset(error)
-    }
-}
-
-impl From<PortfolioServiceError> for V2HttpError {
-    fn from(error: PortfolioServiceError) -> Self {
-        Self::Service(error)
-    }
-}
-
-impl From<SyncPortfoliosV2CommandError> for V2HttpError {
-    fn from(error: SyncPortfoliosV2CommandError) -> Self {
-        Self::Command(error)
-    }
+    Asset(#[from] AssetServiceError),
 }
 
 /// Maps an asset-service failure to its response.
@@ -83,34 +56,60 @@ fn asset_failure(error: &AssetServiceError) -> (StatusCode, V2ErrorResponse) {
         AssetServiceError::ProviderUnavailable(_) => provider_unavailable(),
         AssetServiceError::TooManyNewAssets { .. } => (
             StatusCode::BAD_REQUEST,
-            V2ValidationError::from(ValidationError::single(
-                FieldPath::root().field("portfolios"),
-                MESSAGE_TOO_MANY_NEW_ASSETS,
-            ))
-            .response(),
+            V2ValidationError::from(too_many_new_assets()).response(),
         ),
         AssetServiceError::Directory(_) | AssetServiceError::Unresolved(_) => asset_internal(),
     }
 }
 
-fn provider_unavailable() -> (StatusCode, V2ErrorResponse) {
+/// Builds a response without field-level errors.
+fn plain(status: StatusCode, code: &str, message: &str) -> (StatusCode, V2ErrorResponse) {
     (
-        StatusCode::BAD_GATEWAY,
+        status,
         V2ErrorResponse {
-            code: PROVIDER_UNAVAILABLE_CODE.to_string(),
-            message: PROVIDER_UNAVAILABLE_MESSAGE.to_string(),
+            code: code.to_string(),
+            message: message.to_string(),
             errors: Vec::new(),
         },
     )
 }
 
+fn provider_unavailable() -> (StatusCode, V2ErrorResponse) {
+    plain(
+        StatusCode::BAD_GATEWAY,
+        PROVIDER_UNAVAILABLE_CODE,
+        PROVIDER_UNAVAILABLE_MESSAGE,
+    )
+}
+
 fn asset_internal() -> (StatusCode, V2ErrorResponse) {
-    (
+    plain(
         StatusCode::INTERNAL_SERVER_ERROR,
+        INTERNAL_CODE,
+        ASSET_INTERNAL_MESSAGE,
+    )
+}
+
+/// Builds the response of a Portfolio synchronization that failed internally.
+fn sync_internal() -> (StatusCode, V2ErrorResponse) {
+    plain(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        INTERNAL_CODE,
+        INTERNAL_MESSAGE,
+    )
+}
+
+/// Builds the 403 response for a resource of another user, naming `field`.
+fn ownership(field: String) -> (StatusCode, V2ErrorResponse) {
+    (
+        StatusCode::FORBIDDEN,
         V2ErrorResponse {
-            code: INTERNAL_CODE.to_string(),
-            message: ASSET_INTERNAL_MESSAGE.to_string(),
-            errors: Vec::new(),
+            code: OWNERSHIP_CODE.to_string(),
+            message: OWNERSHIP_MESSAGE.to_string(),
+            errors: vec![V2FieldError {
+                field,
+                message: OWNERSHIP_FIELD_MESSAGE.to_string(),
+            }],
         },
     )
 }
@@ -123,95 +122,40 @@ impl IntoResponse for V2HttpError {
                 StatusCode::BAD_REQUEST,
                 V2ValidationError::from(error).response(),
             ),
-            Self::Command(SyncPortfoliosV2CommandError::Ownership(location)) => (
-                StatusCode::FORBIDDEN,
-                V2ErrorResponse {
-                    code: OWNERSHIP_CODE.to_string(),
-                    message: OWNERSHIP_MESSAGE.to_string(),
-                    errors: vec![V2FieldError {
-                        field: location.field_path().render(),
-                        message: OWNERSHIP_FIELD_MESSAGE.to_string(),
-                    }],
-                },
-            ),
+            Self::Command(SyncPortfoliosV2CommandError::Ownership(location)) => {
+                ownership(location.field_path().render())
+            }
             Self::Command(SyncPortfoliosV2CommandError::ProviderUnavailable(_)) => {
                 provider_unavailable()
             }
             Self::Command(SyncPortfoliosV2CommandError::Directory(_)) => asset_internal(),
             Self::Service(PortfolioServiceError::Asset(error)) => asset_failure(&error),
-            Self::Command(SyncPortfoliosV2CommandError::Repository(_)) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                V2ErrorResponse {
-                    code: INTERNAL_CODE.to_string(),
-                    message: INTERNAL_MESSAGE.to_string(),
-                    errors: Vec::new(),
-                },
-            ),
-            Self::Service(PortfolioServiceError::Validation(error)) => (
-                StatusCode::BAD_REQUEST,
-                V2ValidationError::from(error).response(),
-            ),
-            Self::Service(PortfolioServiceError::CannotUpdate(_)) => (
-                StatusCode::FORBIDDEN,
-                V2ErrorResponse {
-                    code: OWNERSHIP_CODE.to_string(),
-                    message: OWNERSHIP_MESSAGE.to_string(),
-                    errors: vec![V2FieldError {
-                        field: "portfolios".to_string(),
-                        message: OWNERSHIP_FIELD_MESSAGE.to_string(),
-                    }],
-                },
-            ),
-            Self::Service(PortfolioServiceError::Ownership { location }) => (
-                StatusCode::FORBIDDEN,
-                V2ErrorResponse {
-                    code: OWNERSHIP_CODE.to_string(),
-                    message: OWNERSHIP_MESSAGE.to_string(),
-                    errors: vec![V2FieldError {
-                        field: location.field_path().render(),
-                        message: OWNERSHIP_FIELD_MESSAGE.to_string(),
-                    }],
-                },
-            ),
-            Self::Service(PortfolioServiceError::Conflict(_)) => (
-                StatusCode::CONFLICT,
-                V2ErrorResponse {
-                    code: CONFLICT_CODE.to_string(),
-                    message: CONFLICT_MESSAGE.to_string(),
-                    errors: Vec::new(),
-                },
-            ),
+            Self::Service(PortfolioServiceError::CannotUpdate(_)) => {
+                ownership("portfolios".to_string())
+            }
+            Self::Service(PortfolioServiceError::Conflict(_)) => {
+                plain(StatusCode::CONFLICT, CONFLICT_CODE, CONFLICT_MESSAGE)
+            }
             Self::LookupCommand(error) => {
-                let field = match &error {
-                    LookupAssetsCommandError::Invalid { index, .. } => format!("asset[{index}]"),
-                    _ => "asset".to_string(),
+                let (field, message) = match error {
+                    LookupAssetsCommandError::Invalid { index, reason } => {
+                        (format!("asset[{index}]"), reason.to_string())
+                    }
+                    other => ("asset".to_string(), other.to_string()),
                 };
                 (
                     StatusCode::BAD_REQUEST,
                     V2ErrorResponse {
-                        code: "validation_error".to_string(),
+                        code: VALIDATION_CODE.to_string(),
                         message: LOOKUP_INVALID_MESSAGE.to_string(),
-                        errors: vec![V2FieldError {
-                            field,
-                            message: match error {
-                                LookupAssetsCommandError::Invalid { reason, .. } => {
-                                    reason.to_string()
-                                }
-                                other => other.to_string(),
-                            },
-                        }],
+                        errors: vec![V2FieldError { field, message }],
                     },
                 )
             }
             Self::Asset(error) => asset_failure(&error),
-            Self::Service(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                V2ErrorResponse {
-                    code: INTERNAL_CODE.to_string(),
-                    message: INTERNAL_MESSAGE.to_string(),
-                    errors: Vec::new(),
-                },
-            ),
+            Self::Command(SyncPortfoliosV2CommandError::Repository(_)) | Self::Service(_) => {
+                sync_internal()
+            }
         };
 
         (status, Json(body)).into_response()
@@ -221,7 +165,7 @@ impl IntoResponse for V2HttpError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::commands::sync_portfolios_v2::FieldPath;
+    use crate::app::commands::sync_portfolios_v2::{FieldPath, OwnershipLocation};
     use crate::ports::outbound::repository::portfolio::PortfolioRepositoryError;
 
     async fn response_body(error: V2HttpError) -> (StatusCode, serde_json::Value) {
@@ -242,8 +186,8 @@ mod tests {
             FieldPath::root().field("portfolios").index(0).field("name"),
             "must not be empty",
         );
-        let (status, body) = response_body(V2HttpError::Service(
-            PortfolioServiceError::Validation(validation),
+        let (status, body) = response_body(V2HttpError::Command(
+            SyncPortfoliosV2CommandError::Validation(validation),
         ))
         .await;
 
@@ -344,14 +288,14 @@ mod tests {
         // THEN serialization conflicts remain retryable while other failures
         // remain internal errors.
         let (status, body) = response_body(V2HttpError::Service(PortfolioServiceError::Conflict(
-            PortfolioRepositoryError::UnsupportedV2,
+            PortfolioRepositoryError::CorruptData("x".into()),
         )))
         .await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body["code"], CONFLICT_CODE);
 
         let (status, body) = response_body(V2HttpError::Service(
-            PortfolioServiceError::Repository(PortfolioRepositoryError::UnsupportedV2),
+            PortfolioServiceError::Repository(PortfolioRepositoryError::CorruptData("x".into())),
         ))
         .await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
@@ -363,20 +307,28 @@ mod tests {
         // GIVEN an ownership error for the second submitted Portfolio, WHEN the
         // v2 HTTP boundary converts it, THEN it returns 403 and preserves that
         // path in the structured error body.
-        let response = V2HttpError::Service(PortfolioServiceError::Ownership {
-            location: crate::app::commands::sync_portfolios_v2::OwnershipLocation::Portfolio {
-                index: 1,
-            },
-        })
-        .into_response();
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let (status, body) = response_body(V2HttpError::Command(
+            SyncPortfoliosV2CommandError::Ownership(OwnershipLocation::Portfolio { index: 1 }),
+        ))
+        .await;
 
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .expect("ownership response body");
-        let body: serde_json::Value =
-            serde_json::from_slice(&body).expect("structured ownership response");
+        assert_eq!(status, StatusCode::FORBIDDEN);
         assert_eq!(body["code"], "ownership_error");
         assert_eq!(body["errors"][0]["field"], "portfolios[1].id");
+    }
+
+    #[tokio::test]
+    async fn repository_ownership_conflicts_are_forbidden_at_portfolios() {
+        // GIVEN the repository refused to update a Portfolio of another user,
+        // WHEN the v2 HTTP boundary converts it,
+        // THEN it returns 403 ownership_error naming `portfolios`.
+        let (status, body) = response_body(V2HttpError::Service(
+            PortfolioServiceError::CannotUpdate(PortfolioRepositoryError::CannotUpdate),
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(body["code"], "ownership_error");
+        assert_eq!(body["errors"][0]["field"], "portfolios");
     }
 }

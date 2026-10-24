@@ -42,7 +42,6 @@ const FIELD_RELATIVE_TARGET_WEIGHT: &str = "relativeTargetWeight";
 
 const MESSAGE_SCHEMA_VERSION: &str = "must be 2";
 const MESSAGE_DUPLICATE_PORTFOLIO_ID: &str = "duplicate Portfolio id";
-const MESSAGE_DUPLICATE_DELETED_ID: &str = "duplicate Portfolio id";
 const MESSAGE_PORTFOLIO_DELETED_AND_SYNCED: &str = "cannot be both synchronized and deleted";
 const MESSAGE_NOT_EMPTY: &str = "must not be empty";
 const MESSAGE_BETWEEN_ZERO_AND_HUNDRED: &str = "must be between 0 and 100";
@@ -188,7 +187,7 @@ pub(crate) fn validate_and_normalize(
         for (index, deleted_id) in request.deleted_portfolios.iter().enumerate() {
             let mut index_path = deleted_path.enter_index(index);
             if !deleted_ids.insert(*deleted_id) {
-                index_path.issue_here(MESSAGE_DUPLICATE_DELETED_ID);
+                index_path.issue_here(MESSAGE_DUPLICATE_PORTFOLIO_ID);
             }
         }
     }
@@ -289,7 +288,7 @@ fn validate_portfolio(
         visitor.issue_field(FIELD_QUOTE_CURRENCY, MESSAGE_NOT_EMPTY);
     }
     if let Some(value) = portfolio.drift_band
-        && validate_percentage(value).is_some()
+        && !is_percentage(value)
     {
         visitor.issue_field(FIELD_DRIFT_BAND, MESSAGE_BETWEEN_ZERO_AND_HUNDRED);
     }
@@ -310,16 +309,16 @@ fn validate_portfolio(
                 let mut reference_path = asset_path.enter_field(FIELD_ASSET);
                 reference_path.issue_here(MESSAGE_DUPLICATE_IDENTITY);
             }
-            if validate_non_negative(asset.quantity).is_some() {
+            if !is_non_negative(asset.quantity) {
                 asset_path.issue_field(FIELD_QUANTITY, MESSAGE_NON_NEGATIVE);
             }
             if let Some(value) = asset.manual_price
-                && validate_positive(value).is_some()
+                && !is_positive(value)
             {
                 asset_path.issue_field(FIELD_MANUAL_PRICE, MESSAGE_POSITIVE);
             }
             if let Some(value) = asset.average_buy_price
-                && validate_positive(value).is_some()
+                && !is_positive(value)
             {
                 asset_path.issue_field(FIELD_AVERAGE_BUY_PRICE, MESSAGE_POSITIVE);
             }
@@ -386,7 +385,7 @@ fn validate_portfolio(
 
 /// Puts an asset reference's symbol in its canonical trimmed upper-case form.
 fn normalize_symbol(reference: &mut AssetRef) {
-    reference.symbol = reference.symbol.trim().to_ascii_uppercase();
+    reference.symbol = AssetRef::canonical_symbol(&reference.symbol);
 }
 
 fn validate_strategic(
@@ -431,7 +430,7 @@ fn validate_fees(fees: Option<&TransactionFees>, visitor: &mut PathGuard<'_>) {
     let Some(fees) = fees else { return };
     let mut fees_path = visitor.enter_field(FIELD_FEES);
     if let Some(value) = fees.max_fee_impact
-        && validate_percentage(value).is_some()
+        && !is_percentage(value)
     {
         fees_path.issue_field(FIELD_MAX_FEE_IMPACT, MESSAGE_BETWEEN_ZERO_AND_HUNDRED);
     }
@@ -440,7 +439,7 @@ fn validate_fees(fees: Option<&TransactionFees>, visitor: &mut PathGuard<'_>) {
         match fees.fee_structure {
             FeeStructure::ZeroFee => {}
             FeeStructure::Fixed { fee_amount } => {
-                if validate_non_negative(fee_amount).is_some() {
+                if !is_non_negative(fee_amount) {
                     fee_structure_path.issue_field(FIELD_FEE_AMOUNT, MESSAGE_NON_NEGATIVE);
                 }
             }
@@ -449,17 +448,17 @@ fn validate_fees(fees: Option<&TransactionFees>, visitor: &mut PathGuard<'_>) {
                 min_fee,
                 max_fee,
             } => {
-                if validate_percentage(fee_rate).is_some() {
+                if !is_percentage(fee_rate) {
                     fee_structure_path
                         .issue_field(FIELD_FEE_RATE, MESSAGE_BETWEEN_ZERO_AND_HUNDRED);
                 }
                 if let Some(value) = min_fee
-                    && validate_non_negative(value).is_some()
+                    && !is_non_negative(value)
                 {
                     fee_structure_path.issue_field(FIELD_MIN_FEE, MESSAGE_NON_NEGATIVE);
                 }
                 if let Some(value) = max_fee
-                    && validate_non_negative(value).is_some()
+                    && !is_non_negative(value)
                 {
                     fee_structure_path.issue_field(FIELD_MAX_FEE, MESSAGE_NON_NEGATIVE);
                 }
@@ -473,26 +472,29 @@ fn validate_fees(fees: Option<&TransactionFees>, visitor: &mut PathGuard<'_>) {
     }
 }
 
+/// Tells whether `value` is a percentage between 0 and 100 inclusive.
+fn is_percentage(value: Decimal) -> bool {
+    (Decimal::ZERO..=Decimal::from(100)).contains(&value)
+}
+
+fn is_non_negative(value: Decimal) -> bool {
+    value >= Decimal::ZERO
+}
+
+fn is_positive(value: Decimal) -> bool {
+    value > Decimal::ZERO
+}
+
+/// Returns why `value` is not a valid target weight: a percentage with at most
+/// two decimal places.
 fn target_message(value: Decimal) -> Option<&'static str> {
-    validate_target_percentage(value)
-}
-
-fn validate_percentage(value: Decimal) -> Option<&'static str> {
-    (value < Decimal::ZERO || value > Decimal::from(100))
-        .then_some(MESSAGE_BETWEEN_ZERO_AND_HUNDRED)
-}
-
-fn validate_target_percentage(value: Decimal) -> Option<&'static str> {
-    validate_percentage(value)
-        .or_else(|| (value.scale() > 2).then_some(MESSAGE_AT_MOST_TWO_DECIMALS))
-}
-
-fn validate_non_negative(value: Decimal) -> Option<&'static str> {
-    (value < Decimal::ZERO).then_some(MESSAGE_NON_NEGATIVE)
-}
-
-fn validate_positive(value: Decimal) -> Option<&'static str> {
-    (value <= Decimal::ZERO).then_some(MESSAGE_POSITIVE)
+    if !is_percentage(value) {
+        Some(MESSAGE_BETWEEN_ZERO_AND_HUNDRED)
+    } else if value.scale() > 2 {
+        Some(MESSAGE_AT_MOST_TWO_DECIMALS)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

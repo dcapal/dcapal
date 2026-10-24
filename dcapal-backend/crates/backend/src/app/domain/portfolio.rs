@@ -22,6 +22,18 @@ impl Provider {
         }
     }
 
+    /// Tells whether the provider's own lookup yields metadata better than what
+    /// a client may have cached, so a refresh may replace the cached name.
+    ///
+    /// The Kraken catalog only knows the symbol, which would overwrite a
+    /// possibly more descriptive cached name; Yahoo Finance reports real names.
+    pub const fn has_authoritative_metadata(&self) -> bool {
+        match self {
+            Self::YF => true,
+            Self::Kraken => false,
+        }
+    }
+
     /// Parses a canonical v2 provider identifier.
     pub fn parse(value: &str) -> Option<Self> {
         if value.trim().eq_ignore_ascii_case("yf") {

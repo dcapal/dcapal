@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query_as};
 use uuid::Uuid;
@@ -5,15 +7,15 @@ use uuid::Uuid;
 use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
-        AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
-        FeeStructure as AppFeeStructure, PortfolioAssetV2, PortfolioV2, StrategicAllocationV2,
-        StrategicAssetClassTargetV2, StrategicAssetTargetV2, TransactionFees,
+        AllocationMode as AppAllocationMode, FeeStructure as AppFeeStructure, PortfolioAssetV2,
+        PortfolioV2, StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
+        TransactionFees,
     },
 };
 use crate::ports::outbound::repository::portfolio::PortfolioRepositoryError;
 use crate::ports::outbound::repository::portfolio::Result;
 use crate::ports::outbound::repository::postgres::convert::{
-    app_asset_class, app_provider, db_asset_class,
+    app_allocation_mode, app_asset_class, app_provider, db_asset_class,
 };
 use crate::ports::outbound::repository::postgres::types::{
     AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
@@ -93,17 +95,6 @@ pub(super) fn corrupt_data(message: impl Into<String>) -> PortfolioRepositoryErr
 
 fn stored_percentage_is_valid(value: Decimal) -> bool {
     (Decimal::ZERO..=Decimal::from(100)).contains(&value)
-}
-
-pub(super) fn v2_mode(mode: AppAllocationMode) -> DbAllocationMode {
-    match mode {
-        AppAllocationMode::Simple => DbAllocationMode::Simple,
-        AppAllocationMode::Strategic => DbAllocationMode::Strategic,
-    }
-}
-
-fn asset_class_rank(class: AppAssetClass) -> i16 {
-    i16::from(db_asset_class(class))
 }
 
 fn v2_fee_response(
@@ -235,11 +226,8 @@ pub(super) fn v2_portfolio_response(
         (a.asset.asset.provider.as_str(), &a.asset.asset.symbol)
             .cmp(&(b.asset.asset.provider.as_str(), &b.asset.asset.symbol))
     });
-    class_targets.sort_by_key(|target| asset_class_rank(target.asset_class));
-    let allocation_mode = match portfolio.allocation_mode {
-        DbAllocationMode::Simple => AppAllocationMode::Simple,
-        DbAllocationMode::Strategic => AppAllocationMode::Strategic,
-    };
+    class_targets.sort_by_key(|target| i16::from(db_asset_class(target.asset_class)));
+    let allocation_mode = app_allocation_mode(portfolio.allocation_mode);
     let asset_responses = assets
         .iter_mut()
         .map(|asset| {
@@ -337,14 +325,34 @@ fn decode_class_targets(rows: Vec<V2ClassTargetRow>) -> Result<Vec<StrategicAsse
     Ok(targets)
 }
 
-/// Builds one response per Portfolio, attaching its Strategic Asset Class
-/// targets by Portfolio id.
+/// Completes the Portfolio whose rows were just read: attaches its Strategic
+/// Asset Class targets and appends it with its stored row to `portfolios`.
+fn finish_portfolio(
+    portfolio: Option<PortfolioRow>,
+    assets: Vec<V2AssetWithWeight>,
+    class_targets_by_portfolio: &mut HashMap<Uuid, Vec<V2ClassTargetRow>>,
+    portfolios: &mut Vec<(PortfolioRow, PortfolioV2)>,
+) -> Result<()> {
+    let Some(row) = portfolio else {
+        return Ok(());
+    };
+    let class_targets = decode_class_targets(
+        class_targets_by_portfolio
+            .remove(&row.id)
+            .unwrap_or_default(),
+    )?;
+    let response = v2_portfolio_response(row.clone(), assets, class_targets)?;
+    portfolios.push((row, response));
+    Ok(())
+}
+
+/// Builds one stored row and response per Portfolio, attaching its Strategic
+/// Asset Class targets by Portfolio id.
 fn v2_snapshot_portfolios(
     rows: Vec<V2SnapshotRow>,
     class_target_rows: Vec<V2ClassTargetRow>,
-) -> Result<Vec<PortfolioV2>> {
-    let mut class_targets_by_portfolio =
-        std::collections::HashMap::<Uuid, Vec<V2ClassTargetRow>>::new();
+) -> Result<Vec<(PortfolioRow, PortfolioV2)>> {
+    let mut class_targets_by_portfolio = HashMap::<Uuid, Vec<V2ClassTargetRow>>::new();
     for row in class_target_rows {
         class_targets_by_portfolio
             .entry(row.portfolio_id)
@@ -354,22 +362,17 @@ fn v2_snapshot_portfolios(
     let mut portfolios = Vec::new();
     let mut portfolio: Option<PortfolioRow> = None;
     let mut assets = Vec::new();
-    let mut asset_ids = std::collections::HashSet::new();
-    let mut portfolio_id = None;
+    let mut asset_ids = HashSet::new();
 
     for row in rows {
-        if portfolio_id != Some(row.portfolio_id) {
-            if let Some(previous) = portfolio.take() {
-                let class_targets = decode_class_targets(
-                    class_targets_by_portfolio
-                        .remove(&previous.id)
-                        .unwrap_or_default(),
-                )?;
-                portfolios.push(v2_portfolio_response(previous, assets, class_targets)?);
-            }
-            portfolio_id = Some(row.portfolio_id);
+        if portfolio.as_ref().map(|current| current.id) != Some(row.portfolio_id) {
+            finish_portfolio(
+                portfolio.take(),
+                std::mem::take(&mut assets),
+                &mut class_targets_by_portfolio,
+                &mut portfolios,
+            )?;
             portfolio = Some(v2_portfolio_row(&row));
-            assets = Vec::new();
             asset_ids.clear();
         }
 
@@ -383,44 +386,42 @@ fn v2_snapshot_portfolios(
                 return Err(corrupt_data(
                     "Portfolio snapshot contains a duplicate Portfolio Asset row",
                 ));
-            } else {
-                let symbol = row
-                    .asset_symbol
-                    .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset symbol"))?;
-                let provider = DbProvider::try_from(row.asset_provider.ok_or_else(|| {
+            }
+            let symbol = row
+                .asset_symbol
+                .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset symbol"))?;
+            let provider =
+                DbProvider::try_from(row.asset_provider.ok_or_else(|| {
                     corrupt_data("Portfolio snapshot is missing an Asset provider")
                 })?)
                 .map_err(|_| corrupt_data("Portfolio snapshot contains an invalid Provider"))?;
-                assets.push(v2_asset_response(V2AssetResponseInput {
-                    asset: AssetRef {
-                        provider: app_provider(provider),
-                        symbol,
-                    },
-                    asset_class_override: row.asset_class_override,
-                    quantity: row.asset_quantity.ok_or_else(|| {
-                        corrupt_data("Portfolio snapshot is missing an Asset quantity")
-                    })?,
-                    target_weight: row.asset_target_weight.unwrap_or_default(),
-                    manual_price: row.asset_manual_price,
-                    max_fee_impact: row.asset_max_fee_impact,
-                    fee_type: row.asset_fee_type,
-                    fee_amount: row.asset_fee_amount,
-                    fee_rate: row.asset_fee_rate,
-                    min_fee: row.asset_min_fee,
-                    max_fee: row.asset_max_fee,
-                    average_buy_price: row.asset_average_buy_price,
-                })?);
-            }
+            assets.push(v2_asset_response(V2AssetResponseInput {
+                asset: AssetRef {
+                    provider: app_provider(provider),
+                    symbol,
+                },
+                asset_class_override: row.asset_class_override,
+                quantity: row.asset_quantity.ok_or_else(|| {
+                    corrupt_data("Portfolio snapshot is missing an Asset quantity")
+                })?,
+                target_weight: row.asset_target_weight.unwrap_or_default(),
+                manual_price: row.asset_manual_price,
+                max_fee_impact: row.asset_max_fee_impact,
+                fee_type: row.asset_fee_type,
+                fee_amount: row.asset_fee_amount,
+                fee_rate: row.asset_fee_rate,
+                min_fee: row.asset_min_fee,
+                max_fee: row.asset_max_fee,
+                average_buy_price: row.asset_average_buy_price,
+            })?);
         }
     }
-    if let Some(last) = portfolio {
-        let class_targets = decode_class_targets(
-            class_targets_by_portfolio
-                .remove(&last.id)
-                .unwrap_or_default(),
-        )?;
-        portfolios.push(v2_portfolio_response(last, assets, class_targets)?);
-    }
+    finish_portfolio(
+        portfolio,
+        assets,
+        &mut class_targets_by_portfolio,
+        &mut portfolios,
+    )?;
     Ok(portfolios)
 }
 
@@ -444,7 +445,7 @@ fn has_partial_asset_data(row: &V2SnapshotRow) -> bool {
 pub(super) async fn load(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
-) -> Result<Vec<(PortfolioRow, crate::app::domain::portfolio::PortfolioV2)>> {
+) -> Result<Vec<(PortfolioRow, PortfolioV2)>> {
     let rows = query_as::<_, V2SnapshotRow>(
         "SELECT p.id AS portfolio_id, p.user_id AS portfolio_user_id,
                 p.name AS portfolio_name, p.currency AS portfolio_currency,
@@ -493,17 +494,5 @@ pub(super) async fn load(
     .bind(user_id)
     .fetch_all(&mut **tx)
     .await?;
-    let portfolio_rows = rows
-        .iter()
-        .fold(Vec::<PortfolioRow>::new(), |mut rows, row| {
-            if rows
-                .last()
-                .is_none_or(|current| current.id != row.portfolio_id)
-            {
-                rows.push(v2_portfolio_row(row));
-            }
-            rows
-        });
-    let snapshots = v2_snapshot_portfolios(rows, class_target_rows)?;
-    Ok(portfolio_rows.into_iter().zip(snapshots).collect())
+    v2_snapshot_portfolios(rows, class_target_rows)
 }

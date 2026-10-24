@@ -4,8 +4,6 @@ use crate::app::domain::asset::AssetRef;
 impl From<V2ConversionError> for V2ValidationError {
     fn from(error: V2ConversionError) -> Self {
         Self {
-            response_code: VALIDATION_CODE,
-            response_message: VALIDATION_MESSAGE,
             errors: error.errors,
         }
     }
@@ -36,8 +34,6 @@ impl V2ConversionError {
 impl From<ValidationError> for V2ValidationError {
     fn from(error: ValidationError) -> Self {
         Self {
-            response_code: VALIDATION_CODE,
-            response_message: VALIDATION_MESSAGE,
             errors: error
                 .issues
                 .into_iter()
@@ -157,7 +153,7 @@ impl TryFrom<AssetRefV2> for AssetRef {
             .ok_or_else(|| V2ConversionError::field("provider", KNOWN_PROVIDER_MESSAGE))?;
         Ok(Self {
             provider,
-            symbol: reference.symbol,
+            symbol: AssetRef::canonical_symbol(&reference.symbol),
         })
     }
 }

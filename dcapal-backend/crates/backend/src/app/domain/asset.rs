@@ -1,5 +1,7 @@
 //! Provider-bound asset references and their resolved shared metadata.
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+
 use crate::app::domain::portfolio::{AssetClass, Provider};
 
 /// Reference to an asset by the provider that lists it and its provider symbol.
@@ -17,8 +19,13 @@ impl AssetRef {
     pub fn new(provider: Provider, symbol: &str) -> Self {
         Self {
             provider,
-            symbol: symbol.trim().to_ascii_uppercase(),
+            symbol: Self::canonical_symbol(symbol),
         }
+    }
+
+    /// Returns the canonical form of a provider symbol: trimmed and upper-cased.
+    pub fn canonical_symbol(symbol: &str) -> String {
+        symbol.trim().to_ascii_uppercase()
     }
 }
 
@@ -45,7 +52,7 @@ impl ResolvedAsset {
 /// Origin of the metadata stored for a shared asset.
 ///
 /// The discriminants are the values persisted in `assets_data.metadata_source`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i16)]
 pub enum MetadataSource {
     /// Supplied by a client through v1 synchronization, or stored before
@@ -53,26 +60,6 @@ pub enum MetadataSource {
     ClientSupplied = 0,
     /// Confirmed by the asset's provider.
     ProviderConfirmed = 1,
-}
-
-impl MetadataSource {
-    /// Returns the persisted discriminant.
-    pub const fn code(self) -> i16 {
-        self as i16
-    }
-}
-
-impl TryFrom<i16> for MetadataSource {
-    type Error = i16;
-
-    /// Decodes a persisted discriminant, returning it back when unknown.
-    fn try_from(code: i16) -> Result<Self, Self::Error> {
-        match code {
-            0 => Ok(Self::ClientSupplied),
-            1 => Ok(Self::ProviderConfirmed),
-            other => Err(other),
-        }
-    }
 }
 
 /// Shared asset metadata as stored in the directory, with its provenance.

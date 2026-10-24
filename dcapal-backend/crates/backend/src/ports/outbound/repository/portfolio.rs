@@ -24,8 +24,6 @@ pub enum PortfolioRepositoryError {
     OwnershipConflict(OwnershipConflict),
     #[error("v2 synchronization references an asset that was not onboarded: {0}")]
     AssetNotOnboarded(String),
-    #[error("v2 portfolio synchronization is not supported by this repository")]
-    UnsupportedV2,
     #[error("stored portfolio data is corrupt: {0}")]
     CorruptData(String),
 }
@@ -86,6 +84,6 @@ pub trait PortfolioRepository: Send + Sync {
     async fn sync_v2(
         &self,
         user_id: Uuid,
-        request: SyncPortfoliosV2Request,
+        request: &SyncPortfoliosV2Request,
     ) -> Result<SyncPortfoliosV2Response>;
 }

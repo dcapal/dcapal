@@ -3,7 +3,11 @@ use dcapal_backend::app::domain::{
     portfolio::{AssetClass, Provider},
 };
 use dcapal_backend::ports::outbound::repository::{
-    asset::AssetDirectory, postgres::SqlxAssetDirectory,
+    asset::AssetDirectory,
+    postgres::{
+        SqlxAssetDirectory,
+        types::{AssetClass as DbAssetClass, Provider as DbProvider},
+    },
 };
 use sqlx::PgPool;
 
@@ -31,14 +35,14 @@ async fn insert_client_supplied(
         "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class)
          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)",
     )
-    .bind(match asset.provider {
-        Provider::YF => 2_i16,
-        Provider::Kraken => 1_i16,
-    })
+    .bind(i16::from(match asset.provider {
+        Provider::YF => DbProvider::YF,
+        Provider::Kraken => DbProvider::Kraken,
+    }))
     .bind(&asset.symbol)
     .bind(&asset.name)
     .bind(&asset.currency)
-    .bind(1_i16) // Equity
+    .bind(i16::from(DbAssetClass::Equity))
     .execute(pool)
     .await?;
     Ok(())

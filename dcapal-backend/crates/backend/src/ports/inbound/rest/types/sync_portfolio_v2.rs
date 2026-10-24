@@ -48,16 +48,6 @@ pub enum AllocationModeWire {
     Strategic,
 }
 
-impl AllocationModeWire {
-    /// Returns the lower-case API value.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Simple => "simple",
-            Self::Strategic => "strategic",
-        }
-    }
-}
-
 /// Reference to a provider-listed asset; shared metadata is resolved server-side.
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -273,16 +263,15 @@ pub struct V2ErrorResponse {
     pub errors: Vec<V2FieldError>,
 }
 
-/// Service-level validation failure used by the v2 REST boundary.
+/// Validation failure reported by the v2 REST boundary as a 400 response.
 #[derive(Debug, thiserror::Error)]
-#[error("{response_message}")]
+#[error("The Portfolio aggregate is invalid.")]
 pub struct V2ValidationError {
-    pub response_code: &'static str,
-    pub response_message: &'static str,
     pub errors: Vec<V2FieldError>,
 }
 
-const VALIDATION_CODE: &str = "validation_error";
+/// Error code of every v2 validation failure.
+pub(crate) const VALIDATION_CODE: &str = "validation_error";
 const VALIDATION_MESSAGE: &str = "The Portfolio aggregate is invalid.";
 const KNOWN_ASSET_CLASS_MESSAGE: &str = "must be a known Asset Class";
 const KNOWN_PROVIDER_MESSAGE: &str = "must be one of yf, kraken";
@@ -296,24 +285,12 @@ pub struct V2ConversionError {
 }
 
 impl V2ValidationError {
-    /// Creates a validation failure with one field issue.
-    pub fn field(field: impl Into<String>, message: impl Into<String>) -> Self {
-        Self {
-            response_code: VALIDATION_CODE,
-            response_message: VALIDATION_MESSAGE,
-            errors: vec![V2FieldError {
-                field: field.into(),
-                message: message.into(),
-            }],
-        }
-    }
-
-    /// Converts the service error into the wire response body.
-    pub fn response(&self) -> V2ErrorResponse {
+    /// Converts the validation failure into the wire response body.
+    pub fn response(self) -> V2ErrorResponse {
         V2ErrorResponse {
-            code: self.response_code.to_string(),
-            message: self.response_message.to_string(),
-            errors: self.errors.clone(),
+            code: VALIDATION_CODE.to_string(),
+            message: VALIDATION_MESSAGE.to_string(),
+            errors: self.errors,
         }
     }
 }

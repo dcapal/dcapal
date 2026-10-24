@@ -4,10 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     app::{
-        commands::sync_portfolios_v2::{
-            OwnershipLocation, SyncPortfoliosV2Command, SyncPortfoliosV2CommandError,
-            ValidationError,
-        },
+        commands::sync_portfolios_v2::SyncPortfoliosV2Command,
         domain::portfolio::SyncPortfoliosV2Response,
         infra::retry::retry_sync,
         services::asset::{AssetService, AssetServiceError},
@@ -34,10 +31,6 @@ pub enum PortfolioServiceError {
     Repository(#[source] PortfolioRepositoryError),
     #[error("portfolio response conversion failed")]
     ResponseConversion(#[source] crate::error::DcaError),
-    #[error("v2 Portfolio validation failed")]
-    Validation(#[source] ValidationError),
-    #[error("v2 Portfolio ownership violation at {location:?}")]
-    Ownership { location: OwnershipLocation },
     #[error("portfolio synchronization conflict")]
     Conflict(#[source] PortfolioRepositoryError),
     #[error("referenced assets could not be onboarded")]
@@ -54,32 +47,12 @@ impl From<PortfolioRepositoryError> for PortfolioServiceError {
     }
 }
 
-impl From<SyncPortfoliosV2CommandError> for PortfolioServiceError {
-    fn from(error: SyncPortfoliosV2CommandError) -> Self {
-        match error {
-            SyncPortfoliosV2CommandError::Validation(error) => Self::Validation(error),
-            SyncPortfoliosV2CommandError::Ownership(location) => Self::Ownership { location },
-            SyncPortfoliosV2CommandError::Repository(error) => Self::Repository(error),
-            SyncPortfoliosV2CommandError::ProviderUnavailable(error) => {
-                Self::Asset(AssetServiceError::ProviderUnavailable(error))
-            }
-            SyncPortfoliosV2CommandError::Directory(error) => {
-                Self::Asset(AssetServiceError::Directory(error))
-            }
-        }
-    }
-}
-
 impl From<PortfolioServiceError> for DcaError {
     fn from(error: PortfolioServiceError) -> Self {
         match error {
             PortfolioServiceError::CannotUpdate(error) => Self::ValidationFailure {
                 message: "Portfolio cannot be updated".to_string(),
                 source: Box::new(PortfolioServiceError::CannotUpdate(error)),
-            },
-            PortfolioServiceError::Validation(error) => Self::ValidationFailure {
-                message: error.to_string(),
-                source: Box::new(error),
             },
             error => Self::ApplicationFailure {
                 source: Box::new(error),
@@ -211,15 +184,13 @@ impl PortfolioService {
         // provider or directory round trip happens while rows are locked.
         // Only assets the directory lacked or held unconfirmed need writing;
         // provider-confirmed ones are skipped.
-        if !command.assets_to_upsert().is_empty() || !command.assets_to_confirm().is_empty() {
-            self.assets
-                .onboard(command.assets_to_upsert(), command.assets_to_confirm())
-                .await
-                .map_err(PortfolioServiceError::Asset)?;
-        }
+        self.assets
+            .onboard(command.assets_to_upsert(), command.assets_to_confirm())
+            .await
+            .map_err(PortfolioServiceError::Asset)?;
         let request = command.into_request();
         let response = retry_sync(
-            || self.portfolio_repository.sync_v2(user_id, request.clone()),
+            || self.portfolio_repository.sync_v2(user_id, &request),
             PortfolioRepositoryError::is_retryable_concurrency,
         )
         .await;
@@ -812,7 +783,7 @@ mod tests {
         async fn sync_v2(
             &self,
             _user_id: Uuid,
-            request: SyncPortfoliosV2Request,
+            request: &SyncPortfoliosV2Request,
         ) -> crate::ports::outbound::repository::portfolio::Result<SyncPortfoliosV2Response>
         {
             if let Some(log) = &self.log {
@@ -828,8 +799,8 @@ mod tests {
             }
 
             Ok(SyncPortfoliosV2Response {
-                updated_portfolios: request.portfolios,
-                deleted_portfolios: request.deleted_portfolios,
+                updated_portfolios: request.portfolios.clone(),
+                deleted_portfolios: request.deleted_portfolios.clone(),
             })
         }
     }
