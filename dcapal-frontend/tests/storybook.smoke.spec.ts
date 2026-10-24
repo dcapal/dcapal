@@ -210,7 +210,10 @@ test.describe("Storybook journey smoke", () => {
           page.getByRole("region", { name: "Asset search results" })
         ).toBeVisible();
         await page.getByRole("button", { name: /VWCE/ }).click();
-        await page.getByRole("button", { name: "Add asset" }).click();
+        // Exact match: the mobile drawer's "Close add asset" button must not count.
+        await page
+          .getByRole("button", { name: "Add asset", exact: true })
+          .click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
         await expect(
           page.getByRole("heading", { name: "Core portfolio" })
@@ -275,14 +278,25 @@ test.describe("Storybook journey smoke", () => {
         } else {
           await expect(cards).toBeHidden();
           await expect(table).toBeVisible();
+          // The overview table is a compact summary: it leads with value,
+          // weight and drift and leaves quantity and cost basis to the
+          // detailed asset views.
+          for (const header of [
+            "Current value",
+            "Target weight",
+            "Current weight",
+            "Drift",
+          ]) {
+            await expect(
+              table.getByRole("columnheader", { name: header })
+            ).toBeVisible();
+          }
           await expect(
-            table.getByRole("columnheader", {
-              name: /^Quantity(?: owned today)?$/i,
-            })
-          ).toBeVisible();
+            table.getByRole("columnheader", { name: /^Quantity/i })
+          ).toHaveCount(0);
           await expect(
             table.getByRole("columnheader", { name: "Average cost basis" })
-          ).toBeVisible();
+          ).toHaveCount(0);
           await expect(table.locator(".ds-table__asset-ticker")).toHaveCount(5);
           await expect(table.locator(".ds-asset-ticker-chip")).toHaveCount(0);
         }
@@ -397,6 +411,12 @@ test("overview keeps the retired performance chart out of the workspace", async 
   ).toBeVisible();
 });
 
+/**
+ * GIVEN a portfolio in first use with no asset and then with its first asset
+ * WHEN the overview renders each stage
+ * THEN the empty stage shows two placeholder metrics (no cash balance yet) and
+ * no completed setup steps, and the asset stage shows none and two completed.
+ */
 test("first-use overview stages expose placeholders and setup progress", async ({
   page,
 }) => {
@@ -409,7 +429,11 @@ test("first-use overview stages expose placeholders and setup progress", async (
   await page.waitForLoadState("networkidle");
   await expect(
     page.locator('.ds-metric-card[data-placeholder="true"]')
-  ).toHaveCount(3);
+  ).toHaveCount(2);
+  // First use has no cash balance to show, so no placeholder card is offered.
+  await expect(
+    page.locator(".ds-metric-card:visible", { hasText: "Cash balance" })
+  ).toHaveCount(0);
   await expect(
     page.locator('.ds-portfolio-setup__step[data-status="complete"]')
   ).toHaveCount(0);
@@ -955,6 +979,13 @@ test.describe("Invest journey", () => {
   }
 });
 test.describe("latest design-system polish", () => {
+  /**
+   * GIVEN the Add asset overlay open on an asset being edited
+   * WHEN the investor opens the transaction fee editor, saves or dismisses it
+   * THEN one nested fee overlay (dialog on desktop, drawer on mobile) sits above
+   * the parent overlay, dismissal discards unsaved choices and focus returns to
+   * the fee trigger.
+   */
   test("fixed fee configuration uses one nested responsive overlay and restores focus", async ({
     page,
   }, testInfo) => {
@@ -994,12 +1025,20 @@ test.describe("latest design-system polish", () => {
     await feeTrigger.click();
     await page.getByRole("radio", { name: "Fixed" }).click();
 
+    // The story's Add asset overlay stays open as the parent, so exactly one
+    // nested fee overlay is stacked above exactly one parent overlay.
     if (testInfo.project.name === "storybook-mobile") {
       await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(0);
-      await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(1);
+      await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(2);
+      await expect(
+        page.locator(".ds-drawer-popup--nested:visible")
+      ).toHaveCount(1);
     } else {
-      await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(1);
+      await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(2);
       await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(0);
+      await expect(
+        page.locator(".ds-dialog-popup--nested:visible")
+      ).toHaveCount(1);
     }
     await expect(page.locator(".ds-fee-configuration:visible")).toContainText(
       "Maximum impact"
@@ -1234,6 +1273,12 @@ test.describe("Storybook docs and overlay smoke", () => {
   });
 
   for (const storyName of ["Transaction fees", "Remove confirmation"]) {
+    /**
+     * GIVEN the Edit and remove asset story for this stage
+     * WHEN it renders
+     * THEN only the stage's overlay is open (a drawer on mobile fees, which is
+     * exposed as the one dialog) and Escape closes it without a Cancel button.
+     */
     test(`${storyName} opens only its active overlay`, async ({
       page,
     }, testInfo) => {
@@ -1248,8 +1293,11 @@ test.describe("Storybook docs and overlay smoke", () => {
       if (storyName === "Remove confirmation") {
         await expect(page.getByRole("dialog")).toHaveCount(1);
       } else if (testInfo.project.name === "storybook-mobile") {
+        // A drawer is a modal dialog for assistive technology, so the single
+        // exposed dialog must be that drawer rather than a dialog popup.
         await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(1);
-        await expect(page.getByRole("dialog")).toHaveCount(0);
+        await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(0);
+        await expect(page.getByRole("dialog")).toHaveCount(1);
       } else {
         await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(1);
       }
