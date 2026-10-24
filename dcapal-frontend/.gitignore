@@ -6,11 +6,3 @@ dist
 /playwright/.cache/
 /storybook-static/
 
-# design-sync (Storybook -> Claude Design)
-.design-sync/sb-reference/
-.design-sync/learnings/
-.design-sync/.cache/
-.design-sync/dist/
-.design-sync/node_modules
-.ds-sync/
-ds-bundle/
