@@ -376,25 +376,22 @@ pub async fn get_imported_portfolio(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq, derive_more::Display)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 /// Transaction-fee policy exchanged by the REST API.
 ///
 /// Decimal values are serialized as strings so clients do not lose precision
 /// while crossing the JSON boundary.
 pub enum FeeStructure {
-    #[display("ZeroFee")]
     #[serde(rename = "zeroFee")]
     ZeroFee,
 
-    #[display("Fixed")]
     #[serde(rename = "fixed")]
     Fixed {
         #[serde(rename = "feeAmount", with = "rust_decimal::serde::str")]
         fee_amount: Decimal,
     },
 
-    #[display("Variable")]
     #[serde(rename = "variable")]
     Variable {
         #[serde(rename = "feeRate", with = "rust_decimal::serde::str")]

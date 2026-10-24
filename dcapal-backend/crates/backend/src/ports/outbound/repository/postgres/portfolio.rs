@@ -6,12 +6,12 @@ use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
 
-use crate::app::domain::portfolio::{SyncPortfoliosV2Request, SyncPortfoliosV2Response};
+use crate::app::domain::portfolio::{
+    FeeStructure as AppFeeStructure, SyncPortfoliosV2Request, SyncPortfoliosV2Response,
+    TransactionFees,
+};
 use crate::ports::{
-    inbound::rest::{
-        FeeStructure,
-        request::{PortfolioRequest, TransactionFeesRequest},
-    },
+    inbound::rest::request::{PortfolioRequest, TransactionFeesRequest},
     outbound::repository::{
         portfolio::{
             PortfolioAssetOwnership, PortfolioOwnership, PortfolioRepository,
@@ -23,10 +23,8 @@ use crate::ports::{
         },
     },
 };
-#[path = "portfolio_sync_v2.rs"]
-mod portfolio_sync_v2;
-#[path = "portfolio_sync_v2_snapshot.rs"]
-mod portfolio_sync_v2_snapshot;
+mod sync_v2;
+mod sync_v2_snapshot;
 
 /// PostgreSQL persistence for portfolios and their assets.
 #[derive(Clone)]
@@ -43,6 +41,42 @@ struct FeeFields {
     min_fee: Option<Decimal>,
     max_fee: Option<Decimal>,
 }
+impl FeeFields {
+    /// Maps an optional application fee policy to its persisted columns.
+    ///
+    /// An absent policy leaves every fee column empty.
+    fn from_fees(fees: Option<&TransactionFees>) -> Self {
+        match fees {
+            Some(fees) => match fees.fee_structure {
+                AppFeeStructure::ZeroFee => Self {
+                    max_fee_impact: fees.max_fee_impact,
+                    fee_type: Some(fees.fee_structure.to_string()),
+                    ..Default::default()
+                },
+                AppFeeStructure::Fixed { fee_amount } => Self {
+                    max_fee_impact: fees.max_fee_impact,
+                    fee_type: Some(fees.fee_structure.to_string()),
+                    fee_amount: Some(fee_amount),
+                    ..Default::default()
+                },
+                AppFeeStructure::Variable {
+                    fee_rate,
+                    min_fee,
+                    max_fee,
+                } => Self {
+                    max_fee_impact: fees.max_fee_impact,
+                    fee_type: Some(fees.fee_structure.to_string()),
+                    fee_rate: Some(fee_rate),
+                    min_fee,
+                    max_fee,
+                    ..Default::default()
+                },
+            },
+            None => Self::default(),
+        }
+    }
+}
+
 /// Shared provider metadata returned by the asset-data upsert.
 #[derive(Debug, Clone, sqlx::FromRow)]
 struct AssetData {
@@ -449,33 +483,9 @@ impl SqlxPortfolioRepository {
     }
     fn extract_fee_fields(fees: Option<TransactionFeesRequest>) -> FeeFields {
         match fees {
-            Some(fees) => match fees.fee_structure {
-                FeeStructure::ZeroFee => FeeFields {
-                    max_fee_impact: fees.max_fee_impact,
-                    fee_type: Some(fees.fee_structure.to_string()),
-                    ..Default::default()
-                },
-                FeeStructure::Fixed { fee_amount } => FeeFields {
-                    max_fee_impact: fees.max_fee_impact,
-                    fee_type: Some(fees.fee_structure.to_string()),
-                    fee_amount: Some(fee_amount),
-                    ..Default::default()
-                },
-                FeeStructure::Variable {
-                    fee_rate,
-                    min_fee,
-                    max_fee,
-                } => FeeFields {
-                    max_fee_impact: fees.max_fee_impact,
-                    fee_type: Some(fees.fee_structure.to_string()),
-                    fee_rate: Some(fee_rate),
-                    min_fee: Some(min_fee),
-                    max_fee,
-                    ..Default::default()
-                },
-            },
+            Some(fees) => FeeFields::from_fees(Some(&TransactionFees::from(fees))),
             None => FeeFields {
-                fee_type: Some(FeeStructure::ZeroFee.to_string()),
+                fee_type: Some(AppFeeStructure::ZeroFee.to_string()),
                 ..Default::default()
             },
         }
@@ -657,6 +667,6 @@ impl PortfolioRepository for SqlxPortfolioRepository {
         user_id: Uuid,
         request: SyncPortfoliosV2Request,
     ) -> Result<SyncPortfoliosV2Response> {
-        portfolio_sync_v2::sync(self, user_id, request).await
+        sync_v2::sync(self, user_id, request).await
     }
 }

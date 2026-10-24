@@ -163,18 +163,23 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                     provider: asset.provider.as_legacy_name().to_string(),
                     qty: asset.quantity,
                     target_weight: asset.target_weight,
-                    // Keep the latest price and cost basis distinct. A v2 aggregate without
-                    // either value cannot be represented by the required v1 fields.
-                    price: asset.manual_price.ok_or_else(|| {
-                        DcaError::Generic(
-                            "v1 Portfolio Asset response requires a manual price.".to_string(),
-                        )
-                    })?,
-                    average_buy_price: asset.average_buy_price.ok_or_else(|| {
-                        DcaError::Generic(
-                            "v1 Portfolio Asset response requires a price basis.".to_string(),
-                        )
-                    })?,
+                    // v2 makes both values optional; v1 requires both, so each stands in
+                    // for the other and only an asset with neither cannot be projected.
+                    price: asset
+                        .manual_price
+                        .or(asset.average_buy_price)
+                        .ok_or_else(|| {
+                            DcaError::Generic(
+                                "v1 Portfolio Asset response requires a manual price.".to_string(),
+                            )
+                        })?,
+                    average_buy_price: asset.average_buy_price.or(asset.manual_price).ok_or_else(
+                        || {
+                            DcaError::Generic(
+                                "v1 Portfolio Asset response requires a price basis.".to_string(),
+                            )
+                        },
+                    )?,
                     fees,
                 })
             })
@@ -341,34 +346,25 @@ mod test {
         assert_eq!(serialized["assets"][0]["averageBuyPrice"], "90.0");
         assert_eq!(serialized["fees"]["feeStructure"]["feeAmount"], "2.95");
 
-        // GIVEN a v2 asset with no manual override but an average purchase price,
-        // WHEN it is projected through v1, THEN conversion fails because the
-        // legacy current-price field cannot be filled from a cost basis.
+        // GIVEN a v2 asset with only one of manual price and average buy price,
+        // WHEN it is projected through v1, THEN the present value fills both
+        // required legacy fields so v1 sync keeps working.
         let mut missing_manual_price = asset_model.clone();
         missing_manual_price.manual_price = None;
-        let error =
+        let response =
             PortfolioResponse::try_from((portfolio_model.clone(), vec![missing_manual_price]))
-                .expect_err("a cost basis must not be projected as the current price");
-        assert!(matches!(
-            error,
-            DcaError::Generic(message) if message == "v1 Portfolio Asset response requires a manual price."
-        ));
+                .expect("a missing manual price falls back to the cost basis");
+        assert_eq!(response.assets[0].price, dec!(90.0));
 
-        // GIVEN a v2 asset with a current price but no cost basis, WHEN it is
-        // projected through v1, THEN conversion also fails rather than using
-        // the current price as historical cost.
         let mut missing_average_price = asset_model.clone();
         missing_average_price.average_buy_price = None;
-        let error =
+        let response =
             PortfolioResponse::try_from((portfolio_model.clone(), vec![missing_average_price]))
-                .expect_err("a current price must not be projected as cost basis");
-        assert!(matches!(
-            error,
-            DcaError::Generic(message) if message == "v1 Portfolio Asset response requires a price basis."
-        ));
+                .expect("a missing cost basis falls back to the manual price");
+        assert_eq!(response.assets[0].average_buy_price, dec!(100.0));
 
         // GIVEN a v2 asset with no cost basis, WHEN it is projected through v1,
-        // THEN conversion still fails rather than inventing a value.
+        // THEN conversion fails rather than inventing a value.
         let mut missing_all_prices = asset_model;
         missing_all_prices.manual_price = None;
         missing_all_prices.average_buy_price = None;

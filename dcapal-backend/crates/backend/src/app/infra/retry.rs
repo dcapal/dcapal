@@ -2,8 +2,6 @@
 
 use std::{future::Future, time::Duration};
 
-use backoff::{ExponentialBackoffBuilder, future::retry};
-
 /// Maximum number of times a synchronisation operation may be attempted.
 pub const SYNC_MAX_ATTEMPTS: usize = 3;
 
@@ -22,34 +20,20 @@ pub async fn retry_sync<T, E, Operation, OperationFuture, ShouldRetry>(
 where
     Operation: FnMut() -> OperationFuture,
     OperationFuture: Future<Output = Result<T, E>>,
-    ShouldRetry: Fn(&E) -> bool + Clone,
-    E: Send + 'static,
+    ShouldRetry: Fn(&E) -> bool,
 {
-    let backoff = ExponentialBackoffBuilder::new()
-        .with_initial_interval(SYNC_INITIAL_INTERVAL)
-        .with_multiplier(2.0)
-        .with_max_interval(SYNC_MAX_INTERVAL)
-        .with_randomization_factor(0.0)
-        .with_max_elapsed_time(None)
-        .build();
-    let mut attempts = 0;
-
-    retry(backoff, || {
-        attempts += 1;
-        let attempt = attempts;
-        let operation_result = operation();
-        let should_retry = should_retry.clone();
-        async move {
-            match operation_result.await {
-                Ok(value) => Ok(value),
-                Err(error) if attempt < SYNC_MAX_ATTEMPTS && should_retry(&error) => {
-                    Err(backoff::Error::transient(error))
-                }
-                Err(error) => Err(backoff::Error::permanent(error)),
+    let mut attempt = 1;
+    let mut delay = SYNC_INITIAL_INTERVAL;
+    loop {
+        match operation().await {
+            Err(error) if attempt < SYNC_MAX_ATTEMPTS && should_retry(&error) => {
+                tokio::time::sleep(delay).await;
+                delay = (delay * 2).min(SYNC_MAX_INTERVAL);
+                attempt += 1;
             }
+            result => return result,
         }
-    })
-    .await
+    }
 }
 
 #[cfg(test)]

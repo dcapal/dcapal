@@ -1,4 +1,3 @@
-use derive_more::Display;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use utoipa::{
@@ -9,8 +8,7 @@ use uuid::Uuid;
 
 use crate::app::{commands::sync_portfolios_v2::ValidationError, domain::portfolio as app};
 
-#[path = "sync_portfolio_v2_conversion.rs"]
-mod sync_portfolio_v2_conversion;
+mod conversion;
 
 /// Versioned full-aggregate synchronization request.
 #[derive(Debug, Deserialize, ToSchema, Clone)]
@@ -137,20 +135,17 @@ pub struct TransactionFeesV2Request {
 }
 
 /// Fee policy shape used by the v2 aggregate.
-#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Copy, PartialEq, Eq, Display)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Copy, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum FeeStructureV2 {
-    #[display("ZeroFee")]
     #[serde(rename = "zeroFee")]
     ZeroFee,
-    #[display("Fixed")]
     #[serde(rename = "fixed")]
     Fixed {
         #[serde(rename = "feeAmount", with = "rust_decimal::serde::str")]
         #[schema(value_type = String)]
         fee_amount: Decimal,
     },
-    #[display("Variable")]
     #[serde(rename = "variable")]
     Variable {
         #[serde(rename = "feeRate", with = "rust_decimal::serde::str")]
@@ -398,6 +393,8 @@ mod tests {
 
     #[test]
     fn v2_decimals_are_strings_on_the_wire() {
+        // GIVEN a v2 request whose decimals are JSON strings, WHEN it is decoded,
+        // THEN the exact decimal values and null overrides are preserved.
         let request = serde_json::json!({
             "schemaVersion": 2,
             "portfolios": [{
@@ -432,6 +429,8 @@ mod tests {
 
     #[test]
     fn v2_fee_policy_uses_camel_case_and_rejects_irrelevant_fields() {
+        // GIVEN variable and fixed fee policies, WHEN they are decoded and
+        // encoded, THEN camelCase keys are used and fields foreign to the type are rejected.
         // GIVEN v2 fee policies use the canonical JSON names, WHEN they are
         // parsed and serialized, THEN optional bounds round-trip and fields
         // from another policy kind are rejected.
@@ -451,6 +450,8 @@ mod tests {
 
     #[test]
     fn wire_conversion_reports_typed_field_errors() {
+        // GIVEN a wire request with an unknown asset class, WHEN it is converted
+        // to the application type, THEN the error names the nested field path.
         // GIVEN a decoded request with an unknown Asset Class, WHEN the REST
         // DTO is converted to application data, THEN conversion fails with
         // the nested field location instead of leaking a wire type inward.

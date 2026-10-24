@@ -14,7 +14,7 @@ use crate::ports::outbound::repository::postgres::types::{
     AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
 };
 
-use super::{FeeFields, PortfolioRow};
+use super::PortfolioRow;
 
 /// A row from the complete v2 synchronization snapshot.
 #[derive(Debug, sqlx::FromRow)]
@@ -139,37 +139,6 @@ pub(super) fn v2_mode(mode: AppAllocationMode) -> DbAllocationMode {
 
 fn asset_class_rank(class: AppAssetClass) -> i16 {
     i16::from(db_asset_class(class))
-}
-
-pub(super) fn v2_fee_fields(fees: Option<&TransactionFees>) -> FeeFields {
-    match fees {
-        Some(fees) => match fees.fee_structure {
-            AppFeeStructure::ZeroFee => FeeFields {
-                max_fee_impact: fees.max_fee_impact,
-                fee_type: Some(fees.fee_structure.to_string()),
-                ..Default::default()
-            },
-            AppFeeStructure::Fixed { fee_amount } => FeeFields {
-                max_fee_impact: fees.max_fee_impact,
-                fee_type: Some(fees.fee_structure.to_string()),
-                fee_amount: Some(fee_amount),
-                ..Default::default()
-            },
-            AppFeeStructure::Variable {
-                fee_rate,
-                min_fee,
-                max_fee,
-            } => FeeFields {
-                max_fee_impact: fees.max_fee_impact,
-                fee_type: Some(fees.fee_structure.to_string()),
-                fee_rate: Some(fee_rate),
-                min_fee,
-                max_fee,
-                ..Default::default()
-            },
-        },
-        None => FeeFields::default(),
-    }
 }
 
 fn v2_fee_response(

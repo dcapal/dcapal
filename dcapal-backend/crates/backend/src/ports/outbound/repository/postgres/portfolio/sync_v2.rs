@@ -16,7 +16,9 @@ use crate::ports::outbound::repository::postgres::types::{
     Provider as DbProvider,
 };
 
-use super::{AssetData, PortfolioAssetRecord, SqlxPortfolioRepository, portfolio_sync_v2_snapshot};
+use super::{
+    AssetData, FeeFields, PortfolioAssetRecord, SqlxPortfolioRepository, sync_v2_snapshot,
+};
 
 /// Reconciles one validated Portfolio aggregate inside the caller's transaction.
 async fn upsert_v2_portfolio_tx(
@@ -54,8 +56,8 @@ async fn upsert_v2_portfolio_tx(
         }
     }
 
-    let mode = portfolio_sync_v2_snapshot::v2_mode(portfolio_request.allocation_mode);
-    let fee_fields = portfolio_sync_v2_snapshot::v2_fee_fields(portfolio_request.fees.as_ref());
+    let mode = sync_v2_snapshot::v2_mode(portfolio_request.allocation_mode);
+    let fee_fields = FeeFields::from_fees(portfolio_request.fees.as_ref());
     let persisted_portfolio = if existing.is_some() {
         query_as::<_, PortfolioRow>(
             "UPDATE portfolios
@@ -169,8 +171,8 @@ async fn upsert_v2_portfolio_tx(
     let mut resolved_shared_assets = Vec::with_capacity(portfolio_request.assets.len());
     let mut relationship_ids = Vec::with_capacity(portfolio_request.assets.len());
     for asset in &portfolio_request.assets {
-        let provider = portfolio_sync_v2_snapshot::db_provider(asset.asset.provider.clone())?;
-        let asset_class = portfolio_sync_v2_snapshot::db_asset_class(asset.asset.asset_class);
+        let provider = sync_v2_snapshot::db_provider(asset.asset.provider.clone())?;
+        let asset_class = sync_v2_snapshot::db_asset_class(asset.asset.asset_class);
         let shared_asset = SqlxPortfolioRepository::upsert_asset_data(
             tx,
             &AssetData::candidate(
@@ -263,7 +265,7 @@ async fn upsert_v2_portfolio_tx(
         let shared_asset = resolved_shared_assets[index].clone();
         let requested_override = asset
             .asset_class_override
-            .map(portfolio_sync_v2_snapshot::db_asset_class)
+            .map(sync_v2_snapshot::db_asset_class)
             .filter(|class| *class != shared_asset.asset_class)
             .map(i16::from);
         let relationship_id = relationship_ids[index];
@@ -274,7 +276,7 @@ async fn upsert_v2_portfolio_tx(
                 relative_targets.get(&asset.id).copied().unwrap_or_default()
             }
         };
-        let fee_fields = portfolio_sync_v2_snapshot::v2_fee_fields(asset.fees.as_ref());
+        let fee_fields = FeeFields::from_fees(asset.fees.as_ref());
         let now = Utc::now();
 
         let relationship = if existing_by_id.contains_key(&relationship_id) {
@@ -351,8 +353,8 @@ async fn upsert_v2_portfolio_tx(
         .bind(now)
         .fetch_one(&mut **tx)
         .await?;
-        updated_assets.push(portfolio_sync_v2_snapshot::v2_asset_response(
-            portfolio_sync_v2_snapshot::V2AssetResponseInput {
+        updated_assets.push(sync_v2_snapshot::v2_asset_response(
+            sync_v2_snapshot::V2AssetResponseInput {
                 asset_id: relationship.id,
                 symbol: shared_asset.symbol,
                 name: shared_asset.name,
@@ -395,29 +397,23 @@ async fn upsert_v2_portfolio_tx(
                  RETURNING asset_class, target_weight",
             )
             .bind(portfolio_request.id)
-            .bind(i16::from(portfolio_sync_v2_snapshot::db_asset_class(
+            .bind(i16::from(sync_v2_snapshot::db_asset_class(
                 target.asset_class,
             )))
             .bind(target.target_weight)
             .fetch_one(&mut **tx)
             .await?;
             class_targets.push(StrategicAssetClassTargetV2 {
-                asset_class: portfolio_sync_v2_snapshot::app_asset_class(
+                asset_class: sync_v2_snapshot::app_asset_class(
                     DbAssetClass::try_from(asset_class).map_err(|_| {
-                        portfolio_sync_v2_snapshot::corrupt_data(
-                            "inserted Strategic Asset Class is invalid",
-                        )
+                        sync_v2_snapshot::corrupt_data("inserted Strategic Asset Class is invalid")
                     })?,
                 ),
                 target_weight,
             });
         }
     }
-    portfolio_sync_v2_snapshot::v2_portfolio_response(
-        persisted_portfolio,
-        updated_assets,
-        class_targets,
-    )
+    sync_v2_snapshot::v2_portfolio_response(persisted_portfolio, updated_assets, class_targets)
 }
 
 /// Executes a complete v2 synchronization in one serializable transaction.
@@ -432,7 +428,7 @@ pub(super) async fn sync(
         .await?;
 
     // Lock and load one complete snapshot before resolving incoming records.
-    let current_snapshot = portfolio_sync_v2_snapshot::load(&mut tx, user_id).await?;
+    let current_snapshot = sync_v2_snapshot::load(&mut tx, user_id).await?;
     let current_by_id: HashMap<Uuid, (_, PortfolioV2)> = current_snapshot
         .iter()
         .cloned()

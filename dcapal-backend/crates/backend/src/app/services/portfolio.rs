@@ -201,10 +201,7 @@ impl PortfolioService {
 
         match response {
             Ok(response) => Ok(response),
-            Err(error)
-                if error.is_retryable_concurrency()
-                    || matches!(error, PortfolioRepositoryError::OwnershipConflict(_)) =>
-            {
+            Err(error) if error.is_retryable_concurrency() => {
                 Err(PortfolioServiceError::Conflict(error))
             }
             Err(error) => Err(PortfolioServiceError::from(error)),
