@@ -25,6 +25,13 @@ export interface TopNavigationProps {
   onMenuClick?: () => void;
   mobileMenuContent?: React.ReactNode;
   showMenu?: boolean;
+  /** Controlled open state of the navigation menu; pair it with `onMenuOpenChange`. */
+  menuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
+  /** Title of the navigation menu drawer. */
+  menuTitle?: string;
+  /** Layout-only hook for the menu button. */
+  menuButtonClassName?: string;
 }
 
 export function TopNavigation({
@@ -38,8 +45,17 @@ export function TopNavigation({
   onMenuClick,
   mobileMenuContent,
   showMenu = true,
+  menuOpen: controlledMenuOpen,
+  onMenuOpenChange,
+  menuTitle = "Navigation",
+  menuButtonClassName,
 }: TopNavigationProps) {
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [uncontrolledMenuOpen, setUncontrolledMenuOpen] = React.useState(false);
+  const menuOpen = controlledMenuOpen ?? uncontrolledMenuOpen;
+  const setMenuOpen = (open: boolean) => {
+    setUncontrolledMenuOpen(open);
+    onMenuOpenChange?.(open);
+  };
   const shouldShowPortfolioSelector =
     showPortfolioSelector ?? portfolioOptions.length > 0;
   const initials = userName
@@ -106,7 +122,7 @@ export function TopNavigation({
           <IconButton
             label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
             variant="ghost"
-            className="ds-top-nav__menu"
+            className={cn("ds-top-nav__menu", menuButtonClassName)}
             aria-expanded={menuOpen}
             onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
           >
@@ -119,7 +135,7 @@ export function TopNavigation({
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetContent className="ds-top-nav__drawer">
               <div className="ds-top-nav__drawer-header">
-                <SheetTitle>Navigation</SheetTitle>
+                <SheetTitle>{menuTitle}</SheetTitle>
                 <SheetClose
                   render={
                     <IconButton label="Close navigation menu" variant="ghost">

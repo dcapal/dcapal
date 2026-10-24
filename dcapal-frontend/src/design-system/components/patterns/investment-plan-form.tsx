@@ -18,10 +18,12 @@ import {
   SegmentedControl,
   Skeleton,
 } from "../ui";
-import { DriftRowList } from "./drift-overview";
+import { DriftClassGroupList, DriftRowList } from "./drift-overview";
+import { classTotalDriftPp, groupDriftByClass } from "./invest-classes";
 import { canContinue } from "./invest-plan";
 import { formatPoints } from "./invest-format";
 import type {
+  AllocationMode,
   DriftSnapshot,
   InvestmentPlan,
   InvestmentStrategy,
@@ -154,6 +156,8 @@ export interface InvestmentPlanFormProps {
   onUseSuggested?: () => void;
   /** Where the Portfolio stands today, shown beside the form. */
   drift: DriftSnapshot;
+  /** Allocation mode: Strategic lists asset classes with their assets nested. Defaults to simple. */
+  mode?: AllocationMode;
   /** The parsed budget, or null when nothing valid was typed. */
   amount: number | null;
   /** Fee policy summary and editor configuration. */
@@ -200,6 +204,7 @@ export function InvestmentPlanForm({
   suggested,
   onUseSuggested,
   drift,
+  mode = "simple",
   amount,
   commissions,
   feesOpen,
@@ -219,13 +224,26 @@ export function InvestmentPlanForm({
   const copy = strategyCopy[plan.strategy];
   const { summary, ...feeProps } = commissions;
   const rebalancing = plan.strategy === "rebalance";
-  const above = drift.rows.filter((row) => row.driftPp > 0);
-  const below = drift.rows.filter((row) => row.driftPp < 0);
-  const tickerOf = (row: {
-    assetClass: string;
-    name: string;
-    ticker: string;
-  }) => (row.assetClass === "cash" ? row.name : row.ticker);
+  const strategic = mode === "strategic";
+  const classGroups = strategic ? groupDriftByClass(drift.rows) : [];
+  const above = strategic
+    ? classGroups.filter((group) => group.driftPp > 0)
+    : drift.rows.filter((row) => row.driftPp > 0);
+  const below = strategic
+    ? classGroups.filter((group) => group.driftPp < 0)
+    : drift.rows.filter((row) => row.driftPp < 0);
+  const totalDrift = strategic
+    ? classTotalDriftPp(classGroups)
+    : drift.totalDriftPp;
+  const tickerOf = (
+    item:
+      { assetClass: string; name: string; ticker: string } | { label: string }
+  ) =>
+    "label" in item
+      ? item.label
+      : item.assetClass === "cash"
+        ? item.name
+        : item.ticker;
 
   return (
     <div className="ds-plan-form ds-invest-flow">
@@ -311,8 +329,8 @@ export function InvestmentPlanForm({
           <CardHeader>
             <div className="ds-plan-form__today-heading">
               <CardTitle>Where you are today</CardTitle>
-              <Badge variant={drift.totalDriftPp > 0 ? "warning" : "success"}>
-                {formatPoints(drift.totalDriftPp)} drift
+              <Badge variant={totalDrift > 0 ? "warning" : "success"}>
+                {formatPoints(totalDrift)} drift
               </Badge>
             </div>
             <CardDescription>
@@ -320,11 +338,19 @@ export function InvestmentPlanForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="ds-plan-form__today-body">
-            <DriftRowList
-              rows={drift.rows}
-              density="compact"
-              label="Assets compared with their targets"
-            />
+            {strategic ? (
+              <DriftClassGroupList
+                rows={drift.rows}
+                density="compact"
+                label="Asset classes and assets compared with their targets"
+              />
+            ) : (
+              <DriftRowList
+                rows={drift.rows}
+                density="compact"
+                label="Assets compared with their targets"
+              />
+            )}
             {rebalancing ? (
               <Alert variant="warning">
                 <TriangleAlert aria-hidden size={16} />
@@ -338,9 +364,9 @@ export function InvestmentPlanForm({
               <Alert variant="info">
                 <Info aria-hidden size={16} />
                 <p className="ds-card__description">
-                  With add money, assets above target (
-                  {above.map(tickerOf).join(", ")}) keep their units. Only{" "}
-                  {joinTickers(below.map(tickerOf))} are candidates to buy.
+                  With add money, {strategic ? "classes" : "assets"} above
+                  target ({above.map(tickerOf).join(", ")}) keep their units.
+                  Only {joinTickers(below.map(tickerOf))} are candidates to buy.
                 </p>
               </Alert>
             )}

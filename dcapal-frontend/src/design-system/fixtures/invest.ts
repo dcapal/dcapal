@@ -1,7 +1,12 @@
 import {
+  classDriftBeforeAfter,
+  groupAllocationAfterByClass,
+} from "../components/patterns/invest-classes";
+import {
   createDriftSnapshot,
   totalDriftPp,
 } from "../components/patterns/invest-plan";
+import type { TargetDefinition } from "../components/patterns/invest-targets";
 import type {
   AllocationAfterRow,
   DriftRowModel,
@@ -261,6 +266,7 @@ function buildResult(
       id,
       name: asset(id).name,
       ticker: asset(id).ticker,
+      assetClass: asset(id).assetClass,
       quantityBefore: holdings[id].quantity,
       quantityAfter: holdings[id].quantity + delta,
     })),
@@ -279,6 +285,75 @@ export const addMoneyResult: InvestmentResultModel = buildResult(
 export const rebalanceResult: InvestmentResultModel = buildResult(
   rebalanceProposal,
   rebalanceDeltas
+);
+
+/**
+ * Strategic allocation variant of a proposal. The solve is the same, because
+ * the absolute targets are the same: only the figures that summarise it change
+ * to class level, so Total drift is measured on asset-class weights.
+ */
+function strategicProposal(
+  proposal: InvestmentProposalModel
+): InvestmentProposalModel {
+  const { before, after } = classDriftBeforeAfter(proposal.allocationAfter);
+  const classCount = new Set(
+    proposal.transactions.map((transaction) => transaction.assetClass)
+  ).size;
+  const [drift, transactions, ...rest] = proposal.metrics;
+  return {
+    ...proposal,
+    metrics: [
+      {
+        ...drift,
+        value: `${formatPp(before)} → ${formatPp(after)}`,
+        context: "Class level, before and after",
+      },
+      {
+        ...transactions,
+        context: `${transactions.context} · across ${classCount} ${
+          classCount === 1 ? "class" : "classes"
+        }`,
+      },
+      ...rest,
+    ],
+    driftBefore: before,
+    driftAfter: after,
+  };
+}
+
+/** Allocation of EUR 1,000 of new money, measured on asset classes. */
+export const addMoneyProposalStrategic = strategicProposal(addMoneyProposal);
+
+/** Rebalancing with no new money, measured on asset classes. */
+export const rebalanceProposalStrategic = strategicProposal(rebalanceProposal);
+
+function strategicResult(
+  result: InvestmentResultModel,
+  proposal: InvestmentProposalModel
+): InvestmentResultModel {
+  return {
+    ...result,
+    driftNow: proposal.driftAfter,
+    classes: groupAllocationAfterByClass(proposal.allocationAfter).map(
+      (group) => ({
+        assetClass: group.assetClass,
+        weightNow: group.weightAfter,
+        targetWeight: group.targetWeight,
+      })
+    ),
+  };
+}
+
+/** Summary after applying the Add money proposal in Strategic allocation. */
+export const addMoneyResultStrategic = strategicResult(
+  addMoneyResult,
+  addMoneyProposalStrategic
+);
+
+/** Summary after applying the Rebalancing proposal in Strategic allocation. */
+export const rebalanceResultStrategic = strategicResult(
+  rebalanceResult,
+  rebalanceProposalStrategic
 );
 
 /** Suggested investment amount hint, in each of its three states. */
@@ -397,18 +472,58 @@ export const feesTooHighPlan: InvestmentPlan = {
   amount: 150,
 };
 
-/** Target weights that total 95% and so cannot be solved. */
-export const blockedTargetTotal = 95;
+/** Complete target weights of the scenario, per allocation mode. */
+export const investTargets: Record<"simple" | "strategic", TargetDefinition> = {
+  simple: {
+    mode: "simple",
+    assets: assetIds.map((id) => ({
+      id,
+      assetClass: asset(id).assetClass,
+      weight: targets[id],
+    })),
+  },
+  strategic: {
+    mode: "strategic",
+    classTargets: { equities: 65, bonds: 25, cash: 10 },
+    assets: assetIds.map((id) => {
+      const assetClass = asset(id).assetClass;
+      const classTarget = assetIds
+        .filter((other) => asset(other).assetClass === assetClass)
+        .reduce((sum, other) => sum + targets[other], 0);
+      return { id, assetClass, weight: (targets[id] / classTarget) * 100 };
+    }),
+  },
+};
+
+/**
+ * Incomplete target weights that cannot be solved. Simple: the absolute
+ * weights total 95%. Strategic: the class targets total 95% and the equity
+ * shares total about 97.8%.
+ */
+export const blockedInvestTargets: Record<
+  "simple" | "strategic",
+  TargetDefinition
+> = {
+  simple: {
+    ...investTargets.simple,
+    assets: investTargets.simple.assets.map((entry) =>
+      entry.id === "cash" ? { ...entry, weight: 5 } : entry
+    ),
+  },
+  strategic: {
+    ...investTargets.strategic,
+    classTargets: { equities: 65, bonds: 25, cash: 5 },
+    assets: investTargets.strategic.assets.map((entry) =>
+      entry.id === "vwce" ? { ...entry, weight: 44 } : entry
+    ),
+  },
+};
 
 /** Copy for each proposal state that has no transactions to show. */
 export const proposalStateMessages: Record<
-  Exclude<ProposalState, "ready" | "loading">,
+  Exclude<ProposalState, "ready" | "loading" | "blocked">,
   { title: string; description: string }
 > = {
-  blocked: {
-    title: "Target weights must total 100%",
-    description: `Your target weights total ${blockedTargetTotal}%. Adjust them in the portfolio settings, then try again.`,
-  },
   "needs-amount": {
     title: "Nothing to invest yet",
     description:

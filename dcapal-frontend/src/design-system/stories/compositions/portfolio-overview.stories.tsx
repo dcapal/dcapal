@@ -14,6 +14,10 @@ const meta = {
       control: { type: "select" },
       options: ["populated", "empty"],
     },
+    allocationMethod: {
+      control: { type: "select" },
+      options: ["simple", "strategic"],
+    },
     firstUseStage: {
       control: { type: "select" },
       options: ["empty", "name", "asset", "weights"],
@@ -57,6 +61,37 @@ export const FirstUseAssetAddedMobile: Story = {
 };
 
 export const PopulatedMobile: Story = {
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
+};
+
+/** Strategic: class rows with an Edit {Class} button; the table has no mode switch. */
+export const PortfolioOverviewStrategic: Story = {
+  args: { allocationMethod: "strategic" },
+  tags: ["!autodocs"],
+};
+export const PortfolioOverviewStrategicMobile: Story = {
+  args: { allocationMethod: "strategic" },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
+};
+/** The Edit Equities dialog is open over the Strategic overview. */
+export const EditClassDialog: Story = {
+  args: { allocationMethod: "strategic", defaultEditClass: "equities" },
+  tags: ["!autodocs"],
+};
+export const EditClassDialogMobile: Story = {
+  args: { allocationMethod: "strategic", defaultEditClass: "equities" },
   tags: ["!autodocs"],
   globals: {
     viewport: {

@@ -14,17 +14,18 @@ const meta = {
       control: { type: "select" },
       options: ["idle", "success", "error"],
     },
-    view: {
+    allocationMethod: {
       control: { type: "select" },
-      options: ["settings", "strategic"],
+      options: ["simple", "strategic"],
     },
   },
 } satisfies Meta<typeof PortfolioSettingsComposition>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const AllocationMethod: Story = {};
-export const AllocationMethodMobile: Story = {
+/** The Simple allocation method is saved; Strategic is one click away. */
+export const SettingsSimple: Story = {};
+export const SettingsSimpleMobile: Story = {
   tags: ["!autodocs"],
   globals: {
     viewport: {
@@ -33,15 +34,58 @@ export const AllocationMethodMobile: Story = {
     },
   },
 };
+/** Strategic is saved: a note points to the Portfolio page for weights. */
+export const SettingsStrategic: Story = {
+  args: { allocationMethod: "strategic" },
+  tags: ["!autodocs"],
+};
+export const SettingsStrategicMobile: Story = {
+  args: { allocationMethod: "strategic" },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
+};
+/** Simple is saved; used by the radio card and fee control tests. */
 export const AllocationMethodOpen: Story = {
   tags: ["!autodocs"],
 };
-export const StrategicAllocation: Story = {
-  args: { view: "strategic" },
+/** Saving a move to Strategic opens the dialog with every class weight set. */
+export const SetClassWeights: Story = {
+  args: { initialSelection: "strategic", classWeightsOpen: true },
   tags: ["!autodocs"],
 };
-export const StrategicAllocationMobile: Story = {
-  args: { view: "strategic" },
+export const SetClassWeightsMobile: Story = {
+  args: { initialSelection: "strategic", classWeightsOpen: true },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
+};
+/** Class weights that total 95%: Save stays enabled and a note explains. */
+export const SetClassWeightsUnbalanced: Story = {
+  args: {
+    initialSelection: "strategic",
+    classWeightsOpen: true,
+    classWeightsInitial: {
+      equities: 60,
+      bonds: 25,
+      cash: 10,
+      crypto: 0,
+      commodities: 0,
+      other: 0,
+    },
+  },
+  tags: ["!autodocs"],
+};
+export const SetClassWeightsUnbalancedMobile: Story = {
+  args: SetClassWeightsUnbalanced.args,
   tags: ["!autodocs"],
   globals: {
     viewport: {

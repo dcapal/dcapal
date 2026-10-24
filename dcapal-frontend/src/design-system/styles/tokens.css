@@ -142,12 +142,6 @@
   --dcapal-foundation-swatch-height: 3rem;
   --dcapal-chart-skeleton-height: 5rem;
   --dcapal-input-suffix-width: 3.5rem;
-  --dcapal-strategic-label-min-width: 8rem;
-  --dcapal-strategic-target-min-width: 6rem;
-  --dcapal-strategic-band-min-width: 7rem;
-  --dcapal-strategic-label-mobile-min-width: 5.5rem;
-  --dcapal-strategic-target-mobile-min-width: 4.5rem;
-  --dcapal-strategic-band-mobile-min-width: 5.5rem;
   --dcapal-round: 50%;
   --dcapal-table-row-height: 3rem;
   --dcapal-table-min-width: 64rem;
@@ -159,8 +153,8 @@
   --dcapal-fab-size: 3.5rem;
   /* Height of the bottom action bar shown on small screens by invest steps. */
   --dcapal-sticky-action-bar-height: 4.5rem;
-  --dcapal-fab-action-width: 9rem;
   --dcapal-asset-ticker-chip-gap: var(--dcapal-space-2);
+  --dcapal-z-sticky-bar: 15;
   --dcapal-z-fab: 20;
   --dcapal-z-overlay-backdrop: 40;
   --dcapal-z-overlay: 41;
@@ -177,6 +171,7 @@
     0 3px 8px oklch(25% 0.035 255 / 0.03);
   --dcapal-elevation-overlay: 0 14px 36px oklch(25% 0.035 255 / 0.16),
     0 4px 10px oklch(25% 0.035 255 / 0.06);
+  --dcapal-elevation-sticky-edge: -8px 0 8px -8px oklch(25% 0.035 255 / 0.2);
 
   --dcapal-page-width: 78rem;
   --dcapal-settings-width: 56rem;

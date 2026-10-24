@@ -23,7 +23,7 @@ import {
 } from "../ui";
 import { X } from "lucide-react";
 
-const MOBILE_QUERY = "(max-width: 48rem)";
+const MOBILE_QUERY = "(max-width: 47.99rem)";
 
 /** Fee choices used by portfolio and asset fee controls. */
 export type TransactionFeePolicy = "portfolio" | "zero" | "fixed" | "variable";

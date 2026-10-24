@@ -1,31 +1,30 @@
 import * as React from "react";
+import { ArrowLeft, Check, FilePlus2, PieChart, Plus } from "lucide-react";
 import {
-  Check,
-  ChevronRight,
-  ArrowLeft,
-  FilePlus2,
-  PieChart,
-  Plus,
-  X,
-} from "lucide-react";
-import {
+  AssetTickerChip,
   Button,
-  Card,
-  CardContent,
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerTitle,
   Input,
+  InputWithSuffix,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  IconButton,
 } from "../ui";
 import { FormField } from "./form-field";
+import {
+  popularSetupAssets,
+  searchSetupAssets,
+  setupAssetOptions,
+  setupWizardSteps,
+  checkSetupWeight,
+  type SetupAssetOption,
+} from "./portfolio-setup-wizard";
+import {
+  usePortfolioSetup,
+  type PortfolioSetup,
+  type PortfolioSetupContinueDetails,
+} from "./use-portfolio-setup";
 import { cn } from "../../lib/cn";
 
 export type PortfolioSetupStepStatus = "complete" | "current" | "upcoming";
@@ -37,35 +36,6 @@ export interface PortfolioSetupStep {
   description: string;
   status: PortfolioSetupStepStatus;
   icon?: React.ReactNode;
-}
-
-/** Values submitted when the name and currency step is completed. */
-export interface PortfolioSetupNameDetails {
-  stepId: "name";
-  name: string;
-  currency: string;
-}
-
-/** Values submitted when the first asset step is completed. */
-export interface PortfolioSetupAssetDetails {
-  stepId: "asset";
-  assetQuery: string;
-}
-
-/** Values submitted when the target weights step is completed. */
-export interface PortfolioSetupWeightsDetails {
-  stepId: "weights";
-  targetWeight: string;
-}
-
-export type PortfolioSetupContinueDetails =
-  | PortfolioSetupNameDetails
-  | PortfolioSetupAssetDetails
-  | PortfolioSetupWeightsDetails;
-
-export interface PortfolioSetupChecklistProps {
-  steps?: ReadonlyArray<PortfolioSetupStep>;
-  onStepSelect?: (step: PortfolioSetupStep) => void;
 }
 
 /** Shared first-use step definitions used by the index and setup page. */
@@ -93,90 +63,67 @@ export const portfolioSetupSteps: PortfolioSetupStep[] = [
   },
 ];
 
-function getStepIndex(
-  stepId: PortfolioSetupStepId,
-  steps: ReadonlyArray<PortfolioSetupStep> = portfolioSetupSteps
-) {
-  return Math.max(
-    0,
-    steps.findIndex((step) => step.id === stepId)
+const currencyOptions = [
+  { value: "EUR", label: "EUR · Euro" },
+  { value: "USD", label: "USD · US dollar" },
+  { value: "GBP", label: "GBP · Pound sterling" },
+  { value: "CHF", label: "CHF · Swiss franc" },
+] as const;
+
+/** One selectable asset: a ticker chip, its name and a check when chosen. */
+function SetupAssetPick({
+  asset,
+  selected,
+  onSelect,
+}: {
+  asset: SetupAssetOption;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="ds-setup-wizard__pick"
+      aria-pressed={selected}
+      onClick={onSelect}
+    >
+      <AssetTickerChip ticker={asset.ticker} />
+      <span className="ds-setup-wizard__pick-name">{asset.name}</span>
+      {selected ? <Check aria-hidden /> : null}
+    </button>
   );
 }
 
-/** Actionable first-use checklist that can resume the current setup step. */
-export function PortfolioSetupChecklist({
-  steps = portfolioSetupSteps,
-  onStepSelect,
-}: PortfolioSetupChecklistProps) {
+function SetupNameFields({ setup }: { setup: PortfolioSetup }) {
   return (
-    <section className="ds-portfolio-setup" aria-labelledby="setup-title">
-      <div className="ds-portfolio-setup__heading">
-        <h2 id="setup-title">Set up your portfolio</h2>
-        <p>Complete the steps below to get started.</p>
-      </div>
-      <div className="ds-portfolio-setup__list">
-        {steps.map((step) => (
-          <button
-            type="button"
-            className="ds-portfolio-setup__step"
-            key={step.id}
-            data-status={step.status}
-            onClick={() => onStepSelect?.(step)}
-            disabled={!onStepSelect || step.status === "upcoming"}
-          >
-            <span className="ds-portfolio-setup__step-icon" aria-hidden>
-              {step.status === "complete" ? <Check /> : step.icon}
-            </span>
-            <span className="ds-portfolio-setup__step-copy">
-              <strong>{step.title}</strong>
-              <span>{step.description}</span>
-            </span>
-            <ChevronRight
-              aria-hidden
-              className="ds-portfolio-setup__step-arrow"
-            />
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-interface PortfolioSetupFieldsProps {
-  name: string;
-  onNameChange: (name: string) => void;
-  currency: string;
-  onCurrencyChange: (currency: string) => void;
-}
-
-/** Shared name and base-currency controls for the inline and sheet forms. */
-function PortfolioSetupFields({
-  name,
-  onNameChange,
-  currency,
-  onCurrencyChange,
-}: PortfolioSetupFieldsProps) {
-  return (
-    <div className="ds-portfolio-setup-sheet__fields">
+    <div className="ds-setup-wizard__fields ds-setup-wizard__fields--name">
       <FormField label="Portfolio name">
         <Input
-          value={name}
+          value={setup.values.name}
           placeholder="e.g. Long-term Growth"
-          onChange={(event) => onNameChange(event.target.value)}
+          autoComplete="off"
+          onChange={(event) => setup.update({ name: event.target.value })}
         />
       </FormField>
       <FormField label="Base currency">
         <Select
-          value={currency}
-          onValueChange={(value) => onCurrencyChange(value ?? "")}
+          value={setup.values.currency}
+          onValueChange={(value) => setup.update({ currency: value ?? "" })}
         >
           <SelectTrigger aria-label="Base currency">
-            <SelectValue placeholder="Select currency" />
+            <SelectValue>
+              {(value) =>
+                currencyOptions.find((option) => option.value === value)
+                  ?.label ?? "Select currency"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="EUR">EUR · Euro</SelectItem>
-            <SelectItem value="USD">USD · US dollar</SelectItem>
-            <SelectItem value="GBP">GBP · Pound sterling</SelectItem>
+            {currencyOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </FormField>
@@ -184,245 +131,238 @@ function PortfolioSetupFields({
   );
 }
 
-export interface PortfolioSetupFormProps {
-  className?: string;
-  initialName?: string;
-  initialCurrency?: string;
-  onContinue?: (details: PortfolioSetupContinueDetails) => void;
-}
-
-/** Inline first step of the portfolio wizard for the setup page. */
-export function PortfolioSetupForm({
-  className,
-  initialName = "",
-  initialCurrency = "",
-  onContinue,
-}: PortfolioSetupFormProps) {
-  const [name, setName] = React.useState(initialName);
-  const [currency, setCurrency] = React.useState(initialCurrency);
-
-  React.useEffect(() => {
-    setName(initialName);
-    setCurrency(initialCurrency);
-  }, [initialCurrency, initialName]);
-
+function SetupAssetFields({ setup }: { setup: PortfolioSetup }) {
+  const query = setup.values.assetQuery;
+  const searching = query.trim().length > 0;
+  const results = searchSetupAssets(query);
+  const choose = (asset: SetupAssetOption) =>
+    setup.update({ assetId: asset.id });
   return (
-    <div className={cn("ds-portfolio-setup-form", className)}>
-      <PortfolioSetupFields
-        name={name}
-        onNameChange={setName}
-        currency={currency}
-        onCurrencyChange={setCurrency}
-      />
-      <Button
-        className="ds-portfolio-setup-sheet__continue"
-        disabled={!name.trim() || !currency}
-        onClick={() =>
-          onContinue?.({ stepId: "name", name: name.trim(), currency })
-        }
-      >
-        Continue
-      </Button>
+    <div className="ds-setup-wizard__fields">
+      <FormField label="Search an asset">
+        <Input
+          type="search"
+          value={query}
+          placeholder="Ticker or name"
+          autoComplete="off"
+          onChange={(event) => setup.update({ assetQuery: event.target.value })}
+        />
+      </FormField>
+      {searching ? (
+        <section
+          className="ds-setup-wizard__picks"
+          aria-label="Asset search results"
+        >
+          {results.length > 0 ? (
+            results.map((asset) => (
+              <SetupAssetPick
+                key={asset.id}
+                asset={asset}
+                selected={asset.id === setup.values.assetId}
+                onSelect={() => choose(asset)}
+              />
+            ))
+          ) : (
+            <p className="ds-setup-wizard__empty">
+              No asset matches &ldquo;{query.trim()}&rdquo;.
+            </p>
+          )}
+        </section>
+      ) : (
+        <section
+          className="ds-setup-wizard__picks-group"
+          aria-labelledby="setup-wizard-popular"
+        >
+          <p id="setup-wizard-popular" className="ds-setup-wizard__hint">
+            Or start from a popular pick
+          </p>
+          <div className="ds-setup-wizard__picks">
+            {popularSetupAssets.map((asset) => (
+              <SetupAssetPick
+                key={asset.id}
+                asset={asset}
+                selected={asset.id === setup.values.assetId}
+                onSelect={() => choose(asset)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-export interface PortfolioSetupSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onContinue?: (details: PortfolioSetupContinueDetails) => void;
-  step?: PortfolioSetupStep;
-  steps?: ReadonlyArray<PortfolioSetupStep>;
-  initialName?: string;
-  initialCurrency?: string;
-  initialAssetQuery?: string;
-  initialTargetWeight?: string;
+function SetupWeightFields({ setup }: { setup: PortfolioSetup }) {
+  const strategic = setup.allocationMode === "strategic";
+  const asset =
+    setupAssetOptions.find((option) => option.id === setup.values.assetId) ??
+    setupAssetOptions[0];
+  const check = checkSetupWeight(setup.values.weight, setup.allocationMode);
+  return (
+    <div className="ds-setup-wizard__fields">
+      <div className="ds-setup-wizard__chosen">
+        <AssetTickerChip ticker={asset.ticker} />
+        <span className="ds-setup-wizard__pick-name">{asset.name}</span>
+      </div>
+      <FormField
+        label={strategic ? "Asset class weight" : "Target weight"}
+        description={
+          strategic
+            ? "Share of the whole portfolio for this asset's class. You can set the asset's share of the class later from its edit dialog."
+            : "Share of the whole portfolio you want this asset to be."
+        }
+        error={check.valid ? undefined : check.message}
+      >
+        <InputWithSuffix
+          value={setup.values.weight}
+          inputMode="decimal"
+          suffix="%"
+          placeholder="e.g. 100"
+          onChange={(event) => setup.update({ weight: event.target.value })}
+        />
+      </FormField>
+      <p className="ds-setup-wizard__valid" role="status">
+        {check.valid ? check.message : ""}
+      </p>
+    </div>
+  );
 }
 
-/** Focused mobile-first setup surface backed by the shared Base UI drawer. */
-export function PortfolioSetupSheet({
-  open,
-  onOpenChange,
-  onContinue,
-  step = portfolioSetupSteps[0],
-  steps = portfolioSetupSteps,
-  initialName = "",
-  initialCurrency = "",
-  initialAssetQuery = "",
-  initialTargetWeight = "",
-}: PortfolioSetupSheetProps) {
-  const [name, setName] = React.useState(initialName);
-  const [currency, setCurrency] = React.useState(initialCurrency);
-  const [assetQuery, setAssetQuery] = React.useState("");
-  const [targetWeight, setTargetWeight] = React.useState("");
+export interface PortfolioSetupWizardProps {
+  /** State and moves of the wizard, from `usePortfolioSetup`. */
+  setup: PortfolioSetup;
+  className?: string;
+}
 
+/**
+ * The first-use "Set up your portfolio" card. A segmented progress bar names
+ * the steps (reached steps can be reopened), the left side says what the step
+ * is for and the right side holds its real form with Back and Continue.
+ * Finishing the last step removes the card, so the page shows only the
+ * portfolio itself. On phones it is the same pattern in a single column.
+ */
+export function PortfolioSetupWizard({
+  setup,
+  className,
+}: PortfolioSetupWizardProps) {
+  const titleId = React.useId();
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const firstRender = React.useRef(true);
+  const steps = setupWizardSteps(setup.allocationMode);
+  const copy = steps[setup.stepIndex];
+
+  // Moves focus to the new step so keyboard and screen-reader users follow it.
   React.useEffect(() => {
-    if (open) {
-      setName(initialName);
-      setCurrency(initialCurrency);
-      setAssetQuery(initialAssetQuery);
-      setTargetWeight(initialTargetWeight);
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
     }
-  }, [
-    initialAssetQuery,
-    initialCurrency,
-    initialName,
-    initialTargetWeight,
-    open,
-    step.id,
-  ]);
+    headingRef.current?.focus({ preventScroll: true });
+  }, [setup.stepIndex]);
 
-  const canContinue =
-    step.status !== "upcoming" &&
-    (step.id === "name"
-      ? Boolean(name.trim() && currency)
-      : step.id === "asset"
-        ? Boolean(assetQuery.trim())
-        : Boolean(targetWeight.trim()));
+  if (setup.done) return null;
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="ds-portfolio-setup-sheet">
-        <div className="ds-portfolio-setup-sheet__header">
-          <div>
-            <span className="ds-portfolio-setup-sheet__step-count">
-              Step {getStepIndex(step.id, steps) + 1} of {steps.length}
-            </span>
-            <DrawerTitle>
-              {step.id === "name" ? "New portfolio" : step.title}
-            </DrawerTitle>
-            <DrawerDescription>{step.description}</DrawerDescription>
-          </div>
-          <DrawerClose
-            render={
-              <IconButton label="Close new portfolio" variant="ghost">
-                <X aria-hidden />
-              </IconButton>
-            }
-          />
+    <section
+      className={cn("ds-setup-wizard", className)}
+      aria-labelledby={titleId}
+    >
+      <div className="ds-setup-wizard__top">
+        <h2 id={titleId}>Set up your portfolio</h2>
+        <span>
+          Step {setup.stepIndex + 1} of {steps.length} · about a minute
+        </span>
+      </div>
+      <ol className="ds-setup-wizard__steps" aria-label="Setup steps">
+        {steps.map((step, index) => {
+          const state =
+            index === setup.stepIndex
+              ? "current"
+              : index < setup.completedCount
+                ? "complete"
+                : "upcoming";
+          return (
+            <li key={step.id}>
+              <button
+                type="button"
+                className="ds-setup-wizard__segment"
+                data-state={state}
+                aria-current={state === "current" ? "step" : undefined}
+                disabled={index !== setup.stepIndex && !setup.canVisit(index)}
+                onClick={() => setup.goTo(index)}
+              >
+                <span aria-hidden className="ds-setup-wizard__bar" />
+                <span className="ds-setup-wizard__segment-label">
+                  <span aria-hidden className="ds-setup-wizard__dot">
+                    {state === "complete" ? <Check /> : index + 1}
+                  </span>
+                  <span>{step.label}</span>
+                  {state === "complete" ? (
+                    <span className="ds-sr-only">, completed</span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="ds-setup-wizard__body">
+        <div className="ds-setup-wizard__intro">
+          <h3 ref={headingRef} tabIndex={-1}>
+            {copy.heading}
+          </h3>
+          <p>{copy.reason}</p>
         </div>
-        {step.id === "name" ? (
-          <PortfolioSetupFields
-            name={name}
-            onNameChange={setName}
-            currency={currency}
-            onCurrencyChange={setCurrency}
-          />
-        ) : (
-          <div className="ds-portfolio-setup-sheet__fields">
-            {step.id === "asset" ? (
-              <FormField label="First asset">
-                <Input
-                  value={assetQuery}
-                  placeholder="Search by name or ticker"
-                  onChange={(event) => setAssetQuery(event.target.value)}
-                />
-              </FormField>
-            ) : (
-              <FormField label="Target weight">
-                <Input
-                  value={targetWeight}
-                  inputMode="decimal"
-                  placeholder="e.g. 60"
-                  onChange={(event) => setTargetWeight(event.target.value)}
-                />
-              </FormField>
-            )}
-          </div>
-        )}
-        <Button
-          className="ds-portfolio-setup-sheet__continue"
-          disabled={!canContinue}
-          onClick={() => {
-            if (step.status === "upcoming") return;
-            if (step.id === "name") {
-              onContinue?.({
-                stepId: "name",
-                name: name.trim(),
-                currency,
-              });
-            } else if (step.id === "asset") {
-              onContinue?.({ stepId: "asset", assetQuery: assetQuery.trim() });
-            } else {
-              onContinue?.({
-                stepId: "weights",
-                targetWeight: targetWeight.trim(),
-              });
-            }
+        <form
+          className="ds-setup-wizard__form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            setup.next();
           }}
         >
-          Continue
-        </Button>
-      </DrawerContent>
-    </Drawer>
+          {setup.stepId === "name" ? <SetupNameFields setup={setup} /> : null}
+          {setup.stepId === "asset" ? <SetupAssetFields setup={setup} /> : null}
+          {setup.stepId === "weights" ? (
+            <SetupWeightFields setup={setup} />
+          ) : null}
+          <div className="ds-setup-wizard__actions">
+            {setup.stepIndex > 0 ? (
+              <Button variant="ghost" type="button" onClick={setup.back}>
+                Back
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Button type="submit" disabled={!setup.canContinue}>
+              {setup.isLastStep ? "Finish setup" : "Continue"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </section>
   );
 }
 
 export interface PortfolioSetupPageProps {
   onBack?: () => void;
   backHref?: string;
-  onStepSelect?: (step: PortfolioSetupStep) => void;
+  /** Called when the investor reopens a step from the progress bar. */
+  onStepSelect?: (stepId: PortfolioSetupStepId) => void;
+  /** Called with each step's values as the investor continues. */
   onContinue?: (details: PortfolioSetupContinueDetails) => void;
 }
 
-/** Full first-use setup page combining the inline step and resumable checklist. */
+/** Full-page "New portfolio" setup: the three-step wizard under a heading. */
 export function PortfolioSetupPage({
   onBack,
   backHref = "/allocate",
   onStepSelect,
   onContinue,
 }: PortfolioSetupPageProps) {
-  const [steps, setSteps] = React.useState<PortfolioSetupStep[]>(() =>
-    portfolioSetupSteps.map((step) => ({ ...step }))
-  );
-  const [open, setOpen] = React.useState(false);
-  const [activeStep, setActiveStep] = React.useState(
-    () => portfolioSetupSteps[0]
-  );
-  const [setupValues, setSetupValues] = React.useState({
-    name: "",
-    currency: "",
-    assetQuery: "",
-    targetWeight: "",
-  });
-
-  const handleContinue = (details: PortfolioSetupContinueDetails) => {
-    setSetupValues((currentValues) =>
-      details.stepId === "name"
-        ? { ...currentValues, name: details.name, currency: details.currency }
-        : details.stepId === "asset"
-          ? { ...currentValues, assetQuery: details.assetQuery }
-          : { ...currentValues, targetWeight: details.targetWeight }
-    );
-    const currentIndex = steps.findIndex((step) => step.id === activeStep.id);
-    const nextStep = steps[currentIndex + 1];
-
-    setSteps((currentSteps) =>
-      currentSteps.map((step, index) => ({
-        ...step,
-        status:
-          index <= currentIndex
-            ? "complete"
-            : index === currentIndex + 1
-              ? "current"
-              : "upcoming",
-      }))
-    );
-    onContinue?.(details);
-
-    if (nextStep) {
-      setActiveStep(nextStep);
-      setOpen(true);
-    } else {
-      setOpen(false);
-    }
-  };
-
+  const setup = usePortfolioSetup({ onContinue, onStepSelect });
   return (
-    <div
-      className="ds-portfolio-setup-page"
-      data-sheet-open={open || undefined}
-    >
+    <div className="ds-portfolio-setup-page">
       <a
         className="ds-portfolio-setup-page__back"
         href={backHref}
@@ -436,42 +376,13 @@ export function PortfolioSetupPage({
         <ArrowLeft aria-hidden />
         My portfolios
       </a>
-      {steps[0]?.status === "complete" ? null : (
-        <Card className="ds-portfolio-setup-page__form-card">
-          <CardContent>
-            <span className="ds-portfolio-setup-sheet__step-count">
-              Step 1 of 3
-            </span>
-            <h1>New portfolio</h1>
-            <p>Give your portfolio a name and choose your base currency.</p>
-            <PortfolioSetupForm
-              initialName={setupValues.name}
-              initialCurrency={setupValues.currency}
-              onContinue={handleContinue}
-            />
-          </CardContent>
-        </Card>
-      )}
-      <PortfolioSetupChecklist
-        steps={steps}
-        onStepSelect={(step) => {
-          if (step.status === "upcoming") return;
-          setActiveStep(step);
-          onStepSelect?.(step);
-          setOpen(true);
-        }}
-      />
-      <PortfolioSetupSheet
-        open={open}
-        onOpenChange={setOpen}
-        step={activeStep}
-        steps={steps}
-        initialName={setupValues.name}
-        initialCurrency={setupValues.currency}
-        initialAssetQuery={setupValues.assetQuery}
-        initialTargetWeight={setupValues.targetWeight}
-        onContinue={handleContinue}
-      />
+      <h1 className="ds-portfolio-setup-page__title">New portfolio</h1>
+      <PortfolioSetupWizard setup={setup} />
+      {setup.done ? (
+        <p role="status" className="ds-portfolio-setup-page__done">
+          {setup.values.name.trim()} is ready.
+        </p>
+      ) : null}
     </div>
   );
 }

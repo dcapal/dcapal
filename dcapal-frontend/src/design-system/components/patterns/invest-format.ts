@@ -32,3 +32,8 @@ export function formatDeviation(value: number): string {
 export function formatFeeImpact(value: number): string {
   return `${value.toFixed(2)}%`;
 }
+
+/** Formats a target weight, dropping the decimal when it is whole, such as `65%`. */
+export function formatTargetWeight(value: number): string {
+  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
+}

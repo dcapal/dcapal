@@ -4,6 +4,7 @@ import { Button, Card, CardContent } from "../../components/ui";
 import {
   AllocationAfterList,
   AllocationBar,
+  checkTargetTotals,
   DriftOverview,
   InvestmentPathActions,
   InvestmentPlanForm,
@@ -14,6 +15,7 @@ import {
   PortfolioWorkspace,
   ProposedTransactionCollection,
   StickyActionBar,
+  targetTotalsMessage,
   type InvestmentPlan,
   type ProposalState,
   type SuggestedAmountState,
@@ -29,6 +31,7 @@ import {
   onTargetDrift,
   priceTooHighPlan,
   priceTooHighProposal,
+  blockedInvestTargets,
   proposalStateMessages,
   rebalancePlan,
   rebalanceProposal,
@@ -49,7 +52,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const mobile = { viewport: { defaultViewport: "mobile" } } as const;
+const mobile = { viewport: { value: "mobile", isRotated: false } } as const;
 const commissionSummary = "Portfolio default, €1 per transaction";
 
 /* AllocationBar */
@@ -90,7 +93,7 @@ export const DriftOverviewDesktop: Story = {};
 
 /** On a phone the metrics pair up and each row stacks its bar under its name. */
 export const DriftOverviewMobile: Story = {
-  parameters: mobile,
+  globals: mobile,
 };
 
 export const DriftOverviewOnTarget: Story = {
@@ -196,7 +199,7 @@ export const PlanFormRebalance: Story = {
 };
 
 export const PlanFormAddMoneyMobile: Story = {
-  parameters: mobile,
+  globals: mobile,
   render: () => (
     <PlanFormDemo
       initialPlan={addMoneyPlan}
@@ -268,7 +271,7 @@ export const ProposedTransactionsFeeRejected: Story = {
 };
 
 export const ProposedTransactionsMobile: Story = {
-  parameters: mobile,
+  globals: mobile,
   render: () => (
     <div className="dcapal-theme">
       <ProposedTransactionCollection
@@ -329,7 +332,11 @@ function ProposalDemo({ state, strategy }: ProposalDemoProps) {
   const message =
     state === "ready" || state === "loading"
       ? undefined
-      : proposalStateMessages[state];
+      : state === "blocked"
+        ? (targetTotalsMessage(
+            checkTargetTotals(blockedInvestTargets.simple)
+          ) ?? undefined)
+        : proposalStateMessages[state];
 
   return (
     <div className="dcapal-theme">
@@ -354,12 +361,12 @@ export const ProposalRebalance: Story = {
 };
 
 export const ProposalAddMoneyMobile: Story = {
-  parameters: mobile,
+  globals: mobile,
   render: () => <ProposalDemo state="ready" strategy="add-money" />,
 };
 
 export const ProposalRebalanceMobile: Story = {
-  parameters: mobile,
+  globals: mobile,
   render: () => <ProposalDemo state="ready" strategy="rebalance" />,
   tags: ["!autodocs"],
 };
@@ -419,7 +426,7 @@ export const ResultRebalance: Story = {
 };
 
 export const ResultMobile: Story = {
-  parameters: mobile,
+  globals: mobile,
   render: () => (
     <div className="dcapal-theme">
       <InvestmentResult result={addMoneyResult} />
@@ -434,7 +441,7 @@ export const ResultMobile: Story = {
  * navigation button sits above it instead of overlapping.
  */
 export const StickyActionBarWithNavigationButton: Story = {
-  parameters: mobile,
+  globals: mobile,
   render: () => (
     <PortfolioWorkspace portfolioName="Core portfolio" selectedItem="invest">
       <PageHeader title="Plan your investment" />
