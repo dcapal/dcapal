@@ -58,6 +58,8 @@ DATABASE_URL ?= $(TIMESCALE_DATABASE_URL)
 
 .PHONY: help supabase-up supabase-down render-local-config render-container-config bootstrap-local local-up local-up-ui local-down local-docker-up local-docker-up-ui local-docker-down local-reset local-doctor local-observability-up local-observability-down backend-db-up backend-db-down backend-db-check backend-migrate test-backend docker-dev-up docker-dev-down docker-local-build docker-local-up docker-local-down dev-up dev-down export-openapi
 
+.PHONY: storybook
+
 ## Show this help message
 help:
 	@echo "Available targets:"
@@ -96,6 +98,10 @@ build-optimizer: ## Build optimizer-wasm
 ## Prepare local development dependencies
 bootstrap-local: ## Prepare local development dependencies
 	LOCAL_ENV_FILE="$(LOCAL_ENV_FILE)" "$(LOCAL_STACK_SCRIPT)" bootstrap
+
+## Prepare dependencies and start Storybook in the browser
+storybook: bootstrap-local ## Prepare dependencies and start Storybook on port 6006
+	pnpm --filter @dcapal/frontend storybook
 
 ## Build frontend
 build-frontend: ## Build frontend

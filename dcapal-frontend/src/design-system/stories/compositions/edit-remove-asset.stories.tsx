@@ -19,6 +19,10 @@ const meta = {
       options: ["details", "fees", "remove"],
     },
     open: { control: { type: "boolean" } },
+    allocationMethod: {
+      control: { type: "select" },
+      options: ["simple", "strategic"],
+    },
   },
 } satisfies Meta<typeof EditRemoveAssetComposition>;
 export default meta;
@@ -53,5 +57,26 @@ export const TransactionFeesMobile: Story = {
 };
 export const RemoveConfirmation: Story = {
   args: { state: "remove-confirmation", stage: "remove" },
+  tags: ["!autodocs"],
+};
+
+/** Strategic: the asset dialog edits the share of the class and previews siblings. */
+export const EditAssetStrategic: Story = {
+  args: { open: true, allocationMethod: "strategic" },
+  tags: ["!autodocs"],
+};
+export const EditAssetStrategicMobile: Story = {
+  args: { open: true, allocationMethod: "strategic" },
+  parameters: { viewport: { defaultViewport: "mobile" } },
+  tags: ["!autodocs"],
+};
+/** Simple: the asset dialog keeps the single absolute Target weight field. */
+export const EditAssetSimple: Story = {
+  args: { open: true, allocationMethod: "simple" },
+  tags: ["!autodocs"],
+};
+export const EditAssetSimpleMobile: Story = {
+  args: { open: true, allocationMethod: "simple" },
+  parameters: { viewport: { defaultViewport: "mobile" } },
   tags: ["!autodocs"],
 };

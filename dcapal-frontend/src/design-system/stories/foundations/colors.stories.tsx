@@ -10,13 +10,16 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const swatches = [
-  ["Canvas", "--dcapal-canvas"],
+  ["Canvas · warm ivory", "--dcapal-canvas"],
   ["Surface", "--dcapal-surface"],
-  ["Foreground", "--dcapal-foreground"],
-  ["Primary", "--dcapal-primary"],
-  ["Success", "--dcapal-success"],
+  ["Ink", "--dcapal-foreground"],
+  ["Muted ink", "--dcapal-foreground-muted"],
+  ["Border", "--dcapal-border"],
+  ["Primary action · rust", "--dcapal-primary"],
+  ["Positive", "--dcapal-success"],
   ["Warning", "--dcapal-warning"],
-  ["Destructive", "--dcapal-destructive"],
+  ["Error · destructive", "--dcapal-destructive"],
+  ["Information", "--dcapal-info"],
   ["Equities", "--dcapal-asset-equities"],
   ["Bonds", "--dcapal-asset-bonds"],
   ["Cash", "--dcapal-asset-cash"],

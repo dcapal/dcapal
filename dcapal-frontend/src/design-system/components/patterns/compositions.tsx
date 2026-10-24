@@ -4,23 +4,47 @@ import {
   ArrowRight,
   Check,
   CircleAlert,
+  Compass,
   Info,
-  PartyPopper,
   Pencil,
   Plus,
-  RefreshCw,
   Search,
-  Scale,
   Settings,
-  ShieldCheck,
+  TrendingUp,
+  X,
 } from "lucide-react";
-import { AppShell, TopNavigation } from "./app-shell";
 import { DriftDiagnostic } from "./drift-diagnostic";
-import { FloatingActionMenu } from "./floating-action-menu";
+import { EditAssetClassDialog } from "./edit-asset-class-dialog";
+import { EditPortfolioAssetDialog } from "./edit-portfolio-asset-dialog";
+import type { FloatingActionMenuAction } from "./floating-action-menu";
+import type { AllocationMode } from "./invest-types";
+import { SetClassWeightsDialog } from "./set-class-weights-dialog";
+import { useReturnFocus } from "./use-return-focus";
+import {
+  buildPortfolioAssetSummary,
+  driftState,
+} from "./portfolio-asset-groups";
+import { classTargetsFromAssets } from "./strategic-allocation";
+import { useNarrowViewport } from "./use-narrow-viewport";
+import { usePortfolioAllocation } from "./use-portfolio-allocation";
+import type { ClassWeights } from "./strategic-allocation";
 import { MetricCard } from "./metric-card";
 import { PageHeader } from "./page-header";
-import { PerformanceChart } from "./performance-chart";
 import { PortfolioAssetCollection } from "./portfolio-asset-collection";
+import { PortfolioSetupWizard } from "./portfolio-setup";
+import {
+  emptySetupWizardValues,
+  setupAssetOptions,
+  type SetupWizardStepId,
+} from "./portfolio-setup-wizard";
+import {
+  usePortfolioSetup,
+  type PortfolioSetupContinueDetails,
+} from "./use-portfolio-setup";
+import {
+  PortfolioWorkspace,
+  type PortfolioWorkspaceNavItem,
+} from "./portfolio-workspace";
 import {
   TransactionFeeConfiguration,
   TransactionFeeConfigurationForm,
@@ -32,11 +56,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  Checkbox,
   Dialog,
   DialogCloseButton,
   DialogContent,
@@ -45,6 +64,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerTitle,
   EmptyState,
   Field,
   FieldGroup,
@@ -67,6 +92,7 @@ import {
   formatCurrency,
   portfolioAssets,
   type AssetClass,
+  type PortfolioAsset,
 } from "../../fixtures/portfolio";
 
 type FeePolicy = "portfolio" | "zero" | "fixed" | "variable";
@@ -129,15 +155,151 @@ function FeeConfigurationSummary({
   );
 }
 
-const navigation = (
-  <TopNavigation
-    links={[
-      { label: "Overview", href: "#overview", active: true },
-      { label: "Historical analytics", href: "#history" },
-    ]}
-    onMenuClick={() => undefined}
-  />
-);
+/**
+ * Owns the fee policy and values of one asset together with the nested fee
+ * editor overlay, so every surface that edits an asset shares one behaviour.
+ */
+function useAssetFeeEditor(defaultOverlayOpen = false) {
+  const [policy, setPolicy] = React.useState<FeePolicy>("variable");
+  const [values, setValues] = React.useState<FeeValues>(defaultFeeValues);
+  const [overlayOpen, setOverlayOpen] = React.useState(defaultOverlayOpen);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const summary = (
+    <FeeConfigurationSummary
+      policy={policy}
+      values={values}
+      portfolioValues={defaultFeeValues}
+      onEdit={() => setOverlayOpen(true)}
+      buttonRef={triggerRef}
+    />
+  );
+  const overlay = (
+    <TransactionFeeConfiguration
+      open={overlayOpen}
+      policy={policy}
+      onOpenChange={setOverlayOpen}
+      onPolicyChange={setPolicy}
+      onSave={(next) => {
+        setPolicy(next.policy);
+        setValues({
+          maximumImpact: next.maximumImpact,
+          amount: next.amount,
+          feeRate: next.feeRate,
+          minFee: next.minFee,
+          maxFee: next.maxFee,
+        });
+      }}
+      includePortfolioDefault
+      portfolioDefaults={defaultFeeValues}
+      finalFocus={triggerRef}
+    />
+  );
+  return { summary, overlay, setOverlayOpen };
+}
+
+const compositionPortfolioOptions = [
+  {
+    label: "Core portfolio",
+    value: "core",
+    currentValue: "€124,680.75",
+    dayChange: "+€612.18 (+0.49%)",
+    cashBalance: "€3,842.15",
+    assets: portfolioAssets,
+  },
+  {
+    label: "Long-term growth",
+    value: "growth",
+    currentValue: "€52,340.12",
+    dayChange: "+€342.56 (+0.69%)",
+    cashBalance: "€1,240.20",
+    assets: portfolioAssets.slice(0, 3),
+  },
+  {
+    label: "Emergency fund",
+    value: "emergency",
+    currentValue: "€15,250.00",
+    dayChange: "+€12.50 (+0.08%)",
+    cashBalance: "€1,850.00",
+    assets: portfolioAssets.slice(4),
+  },
+] as const;
+
+type CompositionPortfolio = (typeof compositionPortfolioOptions)[number];
+
+function primaryPortfolioAsset(
+  portfolio: CompositionPortfolio
+): PortfolioAsset {
+  return portfolio.assets[0] ?? portfolioAssets[0];
+}
+
+function portfolioDailyChangeRate(portfolio: CompositionPortfolio) {
+  const match = portfolio.dayChange.match(/\(([+-]?\d+(?:\.\d+)?)%\)/);
+  return match ? Number(match[1]) / 100 : 0;
+}
+
+function firstHoldingDailyChange(
+  asset: PortfolioAsset,
+  portfolio: CompositionPortfolio
+) {
+  return (
+    Math.round(asset.value * portfolioDailyChangeRate(portfolio) * 100) / 100
+  );
+}
+
+/** Selects one of the sample portfolios shared by the journey compositions. */
+export function useCompositionPortfolio() {
+  const [portfolioId, setPortfolioId] = React.useState("core");
+  const portfolio =
+    compositionPortfolioOptions.find(
+      (option) => option.value === portfolioId
+    ) ?? compositionPortfolioOptions[0];
+
+  return { portfolio, setPortfolioId };
+}
+
+/** Shared selected-portfolio shell for every journey composition. */
+export function PortfolioCompositionShell({
+  children,
+  portfolio,
+  onPortfolioChange,
+  selectedItem = "overview",
+  onSelectItem,
+  pageActions,
+}: {
+  children: React.ReactNode;
+  portfolio: CompositionPortfolio;
+  onPortfolioChange: (value: string) => void;
+  selectedItem?: string;
+  onSelectItem?: (item: PortfolioWorkspaceNavItem) => boolean | void;
+  /** Actions of the page, offered through the phone's floating actions menu. */
+  pageActions?: ReadonlyArray<FloatingActionMenuAction>;
+}) {
+  const [activeItem, setActiveItem] = React.useState(selectedItem);
+
+  React.useEffect(() => {
+    setActiveItem(selectedItem);
+  }, [selectedItem]);
+
+  const handleSelectItem = onSelectItem
+    ? (item: PortfolioWorkspaceNavItem) => {
+        setActiveItem(item.id);
+        return onSelectItem(item);
+      }
+    : undefined;
+
+  return (
+    <PortfolioWorkspace
+      portfolioName={portfolio.label}
+      portfolioOptions={compositionPortfolioOptions}
+      onPortfolioChange={onPortfolioChange}
+      selectedItem={activeItem}
+      onSelectItem={handleSelectItem}
+      pageActions={pageActions}
+    >
+      {children}
+    </PortfolioWorkspace>
+  );
+}
 
 const driftBandLabels = {
   default: "Default · ±5 pp",
@@ -146,11 +308,30 @@ const driftBandLabels = {
 } as const;
 
 const transactionFeeLabels = {
-  portfolio: "Portfolio default",
+  portfolio: "Default",
   zero: "Zero",
   fixed: "Fixed",
   variable: "Variable",
 } as const;
+
+export type PortfolioFirstUseStage = "empty" | "name" | "asset" | "weights";
+
+/** Where the setup wizard starts for a first-use stage; "weights" means it is finished. */
+function setupStart(stage: PortfolioFirstUseStage) {
+  const step = stage === "empty" ? 0 : stage === "name" ? 1 : 2;
+  return {
+    initialStep: step,
+    initialDone: stage === "weights",
+    initialValues: {
+      ...emptySetupWizardValues,
+      name: stage === "empty" ? "" : "Starter",
+      assetId:
+        stage === "asset" || stage === "weights"
+          ? setupAssetOptions[0].id
+          : null,
+    },
+  };
+}
 
 function CloseDialogButton() {
   return <DialogCloseButton />;
@@ -158,33 +339,217 @@ function CloseDialogButton() {
 
 export interface PortfolioOverviewCompositionProps {
   state?: "empty" | "populated";
-  /** Optional desktop-only actions rendered beside the page heading. */
+  /** Selected portfolio can be shared with an overlay composition. */
+  portfolioId?: string;
+  /** Updates the selected portfolio when the selector changes. */
+  onPortfolioChange?: (value: string) => void;
+  /** Deterministic first-use stage used by the storyboard journey boards. */
+  firstUseStage?: PortfolioFirstUseStage;
+  /**
+   * Optional desktop-only actions rendered beside the page heading. Phones
+   * reach Add asset and Invest through the floating page-actions menu.
+   */
   headerActions?: React.ReactNode;
   onAddAsset?: () => void;
-  onAllocate?: () => void;
-  onRebalance?: () => void;
+  /** Opens the Invest journey. */
+  onInvest?: () => void;
   onEditAsset?: (assetId: string) => void;
+  /** The Portfolio's allocation method; it fixes the asset table's mode. */
+  allocationMethod?: AllocationMode;
+  /** Opens the Portfolio settings page. */
+  onOpenSettings?: () => void;
+  /** Opens the Edit {Class} dialog on first render (Canvas stories). */
+  defaultEditClass?: AssetClass;
+  /** Opens the asset edit dialog for this asset id on first render (Canvas stories). */
+  defaultEditAssetId?: string;
   onAssetMenu?: (assetId: string) => void;
+  onSetupStepSelect?: (stepId: SetupWizardStepId) => void;
+  onSetupContinue?: (details: PortfolioSetupContinueDetails) => void;
 }
 
 /** The overview hub shown in the portfolio journey boards. */
 export function PortfolioOverviewComposition({
   state = "populated",
+  portfolioId,
+  onPortfolioChange,
+  firstUseStage = "empty",
   headerActions,
   onAddAsset = () => undefined,
-  onAllocate = () => undefined,
-  onRebalance = () => undefined,
+  onInvest = () => undefined,
   onEditAsset = () => undefined,
+  allocationMethod = "simple",
+  onOpenSettings = () => undefined,
+  defaultEditClass,
+  defaultEditAssetId,
   onAssetMenu = () => undefined,
+  onSetupStepSelect,
+  onSetupContinue,
 }: PortfolioOverviewCompositionProps) {
+  const [uncontrolledPortfolioId, setUncontrolledPortfolioId] =
+    React.useState("core");
+  const selectedPortfolioId = portfolioId ?? uncontrolledPortfolioId;
+  const portfolio =
+    compositionPortfolioOptions.find(
+      (option) => option.value === selectedPortfolioId
+    ) ?? compositionPortfolioOptions[0];
+  const handlePortfolioChange = (nextPortfolioId: string) => {
+    setUncontrolledPortfolioId(nextPortfolioId);
+    onPortfolioChange?.(nextPortfolioId);
+  };
+  const allocation = usePortfolioAllocation(portfolioAssets, allocationMethod);
+  const { switchToSimple, switchToStrategic } = allocation;
+  // Switching by prop uses the class targets the current weights imply, so
+  // Simple edits carry over to Strategic.
+  const classTargetsRef = React.useRef(
+    classTargetsFromAssets(allocation.assets)
+  );
+  classTargetsRef.current = classTargetsFromAssets(allocation.assets);
+  const methodRef = React.useRef(allocation.method);
+  methodRef.current = allocation.method;
+  React.useEffect(() => {
+    // Follow the method prop when a story changes it after mount.
+    if (methodRef.current === allocationMethod) return;
+    if (allocationMethod === "simple") switchToSimple();
+    else switchToStrategic(classTargetsRef.current);
+  }, [allocationMethod, switchToSimple, switchToStrategic]);
+  const strategic = allocation.method === "strategic";
+  const portfolioAssetIds = portfolio.assets.map((asset) => asset.id);
+  const portfolioAllocationAssets = allocation.assets.filter((asset) =>
+    portfolioAssetIds.includes(asset.id)
+  );
+  const [editClass, setEditClass] = React.useState<AssetClass | null>(
+    defaultEditClass ?? null
+  );
+  const [editAssetId, setEditAssetId] = React.useState(
+    defaultEditAssetId ?? portfolioAssets[0].id
+  );
+  const [editAssetOpen, setEditAssetOpen] = React.useState(
+    defaultEditAssetId !== undefined
+  );
+  const assetFees = useAssetFeeEditor();
+  const classFocus = useReturnFocus();
+  const assetFocus = useReturnFocus();
+  const editedAsset =
+    allocation.assets.find((asset) => asset.id === editAssetId) ??
+    allocation.assets[0];
+  const headerId = React.useId();
+  const start = setupStart(firstUseStage);
+  const setup = usePortfolioSetup({
+    ...start,
+    allocationMode: allocation.method,
+    onContinue: onSetupContinue,
+    onStepSelect: onSetupStepSelect,
+    onFinish: () => {
+      // The card unmounts, so focus moves to the page heading.
+      window.requestAnimationFrame(() =>
+        document.getElementById(headerId)?.focus()
+      );
+    },
+  });
+
+  const isFirstUse = state === "empty";
+  const hasFirstAsset = !isFirstUse || setup.completedCount >= 2 || setup.done;
+  const firstAsset =
+    allocation.assets.find((asset) => asset.id === setup.values.assetId) ??
+    portfolioAllocationAssets[0];
+  const overviewAssets = isFirstUse
+    ? hasFirstAsset && firstAsset
+      ? [firstAsset]
+      : []
+    : portfolioAllocationAssets;
+  const driftAsset = overviewAssets[0] ?? primaryPortfolioAsset(portfolio);
+  // Strategic describes the largest class gap, matching the class rows below;
+  // Simple describes the first asset.
+  const classGaps = strategic
+    ? buildPortfolioAssetSummary(
+        portfolioAllocationAssets,
+        allocation.allocation
+      ).groups
+    : [];
+  const largestClassGap = classGaps.reduce<(typeof classGaps)[number] | null>(
+    (best, group) =>
+      !best || Math.abs(group.driftPp) > Math.abs(best.driftPp) ? group : best,
+    null
+  );
+  const diagnosticDrift = largestClassGap
+    ? largestClassGap.driftPp
+    : driftAsset.driftPp;
+  const diagnosticState = driftState(diagnosticDrift);
+  const diagnostic = {
+    name: largestClassGap
+      ? largestClassGap.label
+      : assetClassLabels[driftAsset.assetClass],
+    driftPp: diagnosticDrift,
+    status:
+      diagnosticState === "on-target" ? ("within" as const) : diagnosticState,
+  };
+  const firstHolding = overviewAssets[0];
+  const firstHoldingChange = firstHolding
+    ? firstHoldingDailyChange(firstHolding, portfolio)
+    : 0;
+  const firstHoldingChangePercent = portfolioDailyChangeRate(portfolio) * 100;
+  const firstHoldingChangeLabel = firstHolding
+    ? `${firstHoldingChange >= 0 ? "+" : "−"}${formatCurrency(
+        Math.abs(firstHoldingChange),
+        firstHolding.currency
+      )} (${firstHoldingChangePercent >= 0 ? "+" : ""}${firstHoldingChangePercent.toFixed(2)}%)`
+    : "—";
+
+  // The table follows the Portfolio's allocation method; it has no mode switch.
+  const collectionProps = {
+    mode: allocation.method,
+    showModeToggle: false,
+    targets: strategic ? allocation.allocation : undefined,
+    onEditClass: strategic
+      ? (assetClass: AssetClass) => {
+          classFocus.remember();
+          setEditClass(assetClass);
+        }
+      : undefined,
+    onEdit: (asset: PortfolioAsset) => {
+      assetFocus.remember();
+      setEditAssetId(asset.id);
+      setEditAssetOpen(true);
+      onEditAsset(asset.id);
+    },
+    onMenu: (asset: PortfolioAsset) => onAssetMenu(asset.id),
+  };
+
   return (
-    <AppShell navigation={navigation}>
+    <PortfolioCompositionShell
+      portfolio={portfolio}
+      onPortfolioChange={handlePortfolioChange}
+      selectedItem="overview"
+      onSelectItem={(item) => {
+        if (item.id === "invest") {
+          onInvest();
+          return true;
+        }
+        return false;
+      }}
+      pageActions={[
+        {
+          label: "Add asset",
+          icon: <Plus aria-hidden />,
+          primary: true,
+          onClick: onAddAsset,
+        },
+        {
+          label: "Invest",
+          icon: <TrendingUp aria-hidden />,
+          onClick: onInvest,
+        },
+      ]}
+    >
       <PageHeader
+        id={headerId}
+        tabIndex={-1}
         className="ds-page-header--overview"
-        title="Core portfolio"
+        title={portfolio.label}
         description={
           <span className="ds-overview-meta">
-            As of 2 Aug 2026 <span aria-hidden>·</span> <Badge>Simple</Badge>
+            As of 2 Aug 2026 <span aria-hidden>·</span>{" "}
+            <Badge>{strategic ? "Strategic" : "Simple"}</Badge>
           </span>
         }
         actions={
@@ -195,16 +560,17 @@ export function PortfolioOverviewComposition({
                   <Button variant="ghost" onClick={onAddAsset}>
                     Add asset
                   </Button>
-                  <Button variant="ghost" onClick={onAllocate}>
-                    Allocate
-                  </Button>
-                  <Button variant="ghost" onClick={onRebalance}>
-                    Rebalance
+                  <Button variant="ghost" onClick={onInvest}>
+                    Invest
                   </Button>
                 </>
               )}
             </div>
-            <IconButton label="Open portfolio settings" variant="ghost">
+            <IconButton
+              label="Open portfolio settings"
+              variant="ghost"
+              onClick={onOpenSettings}
+            >
               <Settings size={18} aria-hidden />
             </IconButton>
           </div>
@@ -216,93 +582,145 @@ export function PortfolioOverviewComposition({
             density="compact"
             metric={{
               label: "Current value",
-              value: "€124,680.75",
-              context: "As of 2 Aug 2026",
+              value: hasFirstAsset
+                ? isFirstUse && firstHolding
+                  ? formatCurrency(firstHolding.value, firstHolding.currency)
+                  : portfolio.currentValue
+                : "—",
+              context: hasFirstAsset
+                ? isFirstUse
+                  ? "Value of your first holding"
+                  : "As of 2 Aug 2026"
+                : "Add an asset to see your portfolio value",
             }}
+            placeholder={!hasFirstAsset}
           />
           <MetricCard
             density="compact"
             metric={{
               label: "Day change",
-              value: "+€612.18 (+0.49%)",
-              context: "Since previous close",
-              trend: "positive",
+              value: hasFirstAsset
+                ? isFirstUse
+                  ? firstHoldingChangeLabel
+                  : portfolio.dayChange
+                : "—",
+              context: hasFirstAsset
+                ? isFirstUse
+                  ? "Since previous close · fixture estimate"
+                  : "Since previous close"
+                : "Available after your first asset",
+              trend: hasFirstAsset
+                ? isFirstUse
+                  ? firstHoldingChange < 0
+                    ? "negative"
+                    : firstHoldingChange > 0
+                      ? "positive"
+                      : "neutral"
+                  : "positive"
+                : undefined,
             }}
+            placeholder={!hasFirstAsset}
           />
-          <MetricCard
-            density="compact"
-            metric={{
-              label: "Cash balance",
-              value: "€3,842.15",
-              context: "Available to invest",
-            }}
-          />
+          {!isFirstUse ? (
+            <MetricCard
+              density="compact"
+              metric={{
+                label: "Cash balance",
+                value: portfolio.cashBalance,
+                context: "Available to invest",
+              }}
+            />
+          ) : null}
         </div>
         <Card className="ds-overview-mobile-summary">
           <CardContent>
             <span className="ds-metric-card__label">Current value</span>
             <strong className="ds-overview-mobile-summary__value">
-              €124,680.75
+              {hasFirstAsset
+                ? isFirstUse && firstHolding
+                  ? formatCurrency(firstHolding.value, firstHolding.currency)
+                  : portfolio.currentValue
+                : "—"}
             </strong>
             <span className="ds-overview-mobile-summary__change">
-              +€612.18 (+0.49%) <span>Today</span>
+              {hasFirstAsset
+                ? isFirstUse
+                  ? firstHoldingChangeLabel
+                  : portfolio.dayChange
+                : "Add an asset to see change"}
             </span>
-            <div className="ds-overview-mobile-summary__cash">
-              <span>Cash balance</span>
-              <strong>€3,842.15</strong>
-            </div>
+            {!isFirstUse ? (
+              <div className="ds-overview-mobile-summary__cash">
+                <span>Cash balance</span>
+                <strong>{portfolio.cashBalance}</strong>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
-      <PerformanceChart state={state === "empty" ? "empty" : "ready"} />
       {state === "empty" ? (
-        <EmptyState
-          title="Your portfolio is ready for its first asset"
-          description="Add an investment to start tracking value and allocation."
-          action={<Button onClick={onAddAsset}>Add your first asset</Button>}
-        />
+        <>
+          <PortfolioSetupWizard setup={setup} />
+          {hasFirstAsset ? (
+            <PortfolioAssetCollection
+              assets={overviewAssets}
+              presentation="overview"
+              {...collectionProps}
+            />
+          ) : null}
+        </>
       ) : (
         <>
           <DriftDiagnostic
-            assetName="Equities"
-            driftPp={4.8}
-            status="over"
+            assetName={diagnostic.name}
+            driftPp={diagnostic.driftPp}
+            status={diagnostic.status}
             onReview={() => undefined}
           />
           <PortfolioAssetCollection
-            assets={portfolioAssets}
-            onEdit={(asset) => onEditAsset(asset.id)}
-            onMenu={(asset) => onAssetMenu(asset.id)}
+            assets={overviewAssets}
+            presentation="overview"
+            {...collectionProps}
           />
-          <div className="ds-overview-mobile-fab">
-            <FloatingActionMenu
-              actions={[
-                {
-                  label: "Add asset",
-                  icon: <Plus aria-hidden />,
-                  onClick: onAddAsset,
-                },
-                {
-                  label: "Allocate",
-                  icon: <Scale aria-hidden />,
-                  onClick: onAllocate,
-                },
-                {
-                  label: "Rebalance",
-                  icon: <RefreshCw aria-hidden />,
-                  onClick: onRebalance,
-                },
-                {
-                  label: "Edit portfolio",
-                  icon: <Settings aria-hidden />,
-                  onClick: () => undefined,
-                },
-              ]}
-            />
-          </div>
         </>
       )}
-    </AppShell>
+      <EditAssetClassDialog
+        open={editClass !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditClass(null);
+        }}
+        assetClass={editClass ?? "equities"}
+        finalFocus={classFocus.ref}
+        assets={portfolioAllocationAssets}
+        allocation={allocation.allocation}
+        onSave={(weight) => {
+          if (editClass) allocation.setClassWeight(editClass, weight);
+        }}
+      />
+      {editedAsset ? (
+        <EditPortfolioAssetDialog
+          open={editAssetOpen}
+          onOpenChange={setEditAssetOpen}
+          asset={editedAsset}
+          assets={portfolioAllocationAssets}
+          finalFocus={assetFocus.ref}
+          method={allocation.method}
+          allocation={allocation.allocation}
+          feeSummary={assetFees.summary}
+          onSave={(weight) => {
+            if (weight.method === "strategic") {
+              allocation.setAssetShare(editedAsset.id, weight.share);
+            } else {
+              allocation.setAbsoluteWeight(
+                editedAsset.id,
+                weight.absoluteWeight
+              );
+            }
+          }}
+        />
+      ) : null}
+      {assetFees.overlay}
+    </PortfolioCompositionShell>
   );
 }
 
@@ -317,6 +735,13 @@ export type AddAssetState =
 
 export interface AddAssetCompositionProps {
   state?: AddAssetState;
+  /** Opened by default only for focused interactive state stories. */
+  open?: boolean;
+  /**
+   * The Portfolio's allocation method. Simple asks for an absolute target
+   * weight; Strategic asks for the asset's share of its class.
+   */
+  allocationMethod?: AllocationMode;
 }
 
 const searchResults = [
@@ -325,24 +750,14 @@ const searchResults = [
   portfolioAssets[2],
 ];
 
-const strategicAssetClasses: ReadonlyArray<{
-  key: AssetClass;
-  target: number;
-}> = [
-  { key: "equities", target: 60 },
-  { key: "bonds", target: 25 },
-  { key: "cash", target: 10 },
-  { key: "crypto", target: 5 },
-  { key: "commodities", target: 0 },
-  { key: "other", target: 0 },
-];
-
 function SearchResultCard({
   asset,
   selected = false,
+  onSelect,
 }: {
   asset: (typeof portfolioAssets)[number];
   selected?: boolean;
+  onSelect?: () => void;
 }) {
   return (
     <Button
@@ -350,6 +765,7 @@ function SearchResultCard({
       variant={selected ? "secondary" : "outline"}
       className="ds-search-result"
       pressed={selected}
+      onClick={onSelect}
     >
       <span className="ds-search-result__copy">
         <AssetTickerChip ticker={asset.ticker} />
@@ -366,211 +782,342 @@ function SearchResultCard({
 /** Add-asset search and configuration stages used by the Storybook journey. */
 export function AddAssetComposition({
   state = "entry",
+  open = state !== "entry",
+  allocationMethod = "simple",
 }: AddAssetCompositionProps) {
-  const isEdit = state === "edit";
-  const isSearchResults = state === "search-results";
-  const [dialogOpen, setDialogOpen] = React.useState(state !== "entry");
+  const [portfolioId, setPortfolioId] = React.useState("core");
+  const portfolio =
+    compositionPortfolioOptions.find(
+      (option) => option.value === portfolioId
+    ) ?? compositionPortfolioOptions[0];
+  const [searchState, setSearchState] = React.useState<AddAssetState>(state);
+  const [overlayOpen, setOverlayOpen] = React.useState(open);
+  const isMobile = useNarrowViewport();
+  const [searchValue, setSearchValue] = React.useState(
+    state === "search-results" ? "VW" : ""
+  );
+  const [selectedAssetId, setSelectedAssetId] = React.useState<string | null>(
+    state === "edit" ? (portfolio.assets[0]?.id ?? portfolioAssets[0].id) : null
+  );
   const [feePolicy, setFeePolicy] = React.useState<FeePolicy>("portfolio");
   const [feeValues, setFeeValues] = React.useState<FeeValues>(defaultFeeValues);
   const [feeOverlayOpen, setFeeOverlayOpen] = React.useState(false);
   const feeTriggerRef = React.useRef<HTMLButtonElement>(null);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const portfolioAsset =
+    portfolio.assets.find((asset) => asset.id === selectedAssetId) ??
+    portfolioAssets.find((asset) => asset.id === selectedAssetId) ??
+    primaryPortfolioAsset(portfolio);
+  const isEdit = searchState === "edit" || selectedAssetId !== null;
+  const classTargetFor = (assetClass: AssetClass) =>
+    portfolioAssets
+      .filter((asset) => asset.assetClass === assetClass)
+      .reduce((sum, asset) => sum + asset.targetWeight, 0) || 100;
+  const showResults = searchState === "search-results";
 
   React.useEffect(() => {
-    setDialogOpen(state !== "entry");
+    setSearchState(state);
+    setSearchValue(state === "search-results" ? "VW" : "");
+    setSelectedAssetId(
+      state === "edit"
+        ? (portfolio.assets[0]?.id ?? portfolioAssets[0].id)
+        : null
+    );
   }, [state]);
+
+  React.useEffect(() => {
+    setOverlayOpen(open);
+  }, [open]);
+
+  const handleOverlayOpenChange = (nextOpen: boolean) => {
+    setOverlayOpen(nextOpen);
+    if (!nextOpen) {
+      setSelectedAssetId(null);
+      setSearchState("entry");
+      setSearchValue("");
+    }
+  };
+
+  const openAddAsset = () => {
+    setSelectedAssetId(null);
+    setSearchState("entry");
+    setSearchValue("");
+    setOverlayOpen(true);
+  };
 
   const handleFeePolicyChange = (nextPolicy: FeePolicy) => {
     setFeePolicy(nextPolicy);
   };
 
-  return (
-    <AppShell navigation={navigation}>
-      <PageHeader title="Core portfolio" />
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <PortfolioAssetCollection
-          assets={portfolioAssets.slice(0, 2)}
-          headerActions={
-            <DialogTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  className="ds-add-asset-header-action"
+  const handleSearch = (value: string) => {
+    setSearchValue(value);
+    setSearchState(value.trim() ? "search-results" : "entry");
+    setSelectedAssetId(null);
+  };
+
+  const handleSelectResult = (assetId: string) => {
+    setSelectedAssetId(assetId);
+    setSearchState("edit");
+  };
+
+  const searchPane = (
+    <section
+      className="ds-add-asset-overlay__search"
+      aria-label="Search assets"
+    >
+      <div className="ds-add-asset-page__search-heading">
+        <h2>Find an asset</h2>
+        <p>Search by name or ticker, then review it before adding.</p>
+      </div>
+      <Field>
+        <FieldLabel htmlFor="asset-search">Search by name or ticker</FieldLabel>
+        <div className="ds-input-with-icon">
+          <Search size={16} aria-hidden />
+          <Input
+            ref={searchInputRef}
+            id="asset-search"
+            value={searchValue}
+            onChange={(event) => handleSearch(event.target.value)}
+            placeholder="Search ETFs and more"
+          />
+        </div>
+      </Field>
+      {searchState === "loading" ? (
+        <div
+          aria-label="Searching assets"
+          role="status"
+          className="ds-story-stack"
+        >
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
+        </div>
+      ) : null}
+      {showResults ? (
+        <section
+          className="ds-search-results"
+          aria-label="Asset search results"
+        >
+          {searchResults.map((asset) => (
+            <SearchResultCard
+              key={asset.id}
+              asset={asset}
+              selected={asset.id === selectedAssetId}
+              onSelect={() => handleSelectResult(asset.id)}
+            />
+          ))}
+        </section>
+      ) : null}
+      {searchState === "empty" ? (
+        <EmptyState
+          title="No assets found"
+          description="Try a different name or ticker."
+        />
+      ) : null}
+      {searchState === "error" ? (
+        <Alert variant="destructive">
+          <CircleAlert size={18} aria-hidden />
+          <div>
+            <strong>Search could not be completed</strong>
+            <p>Try again or check your connection.</p>
+          </div>
+        </Alert>
+      ) : null}
+      {searchState === "unpriced" ? (
+        <Card className="ds-search-result-card">
+          <CardContent>
+            <AssetTickerChip ticker="VWCE.DE" />
+            <p className="ds-description ds-allocation-note">
+              Vanguard FTSE All-World UCITS ETF
+            </p>
+            <Badge variant="warning">Price unavailable</Badge>
+          </CardContent>
+        </Card>
+      ) : null}
+    </section>
+  );
+
+  const assetPreview = (
+    <section
+      className="ds-add-asset-overlay__details"
+      aria-label={isEdit ? "Asset details" : "Asset preview"}
+    >
+      {isEdit ? (
+        <>
+          <div className="ds-add-asset-overlay__asset-heading">
+            <div>
+              <p className="ds-eyebrow">Selected asset</p>
+              <h2>{portfolioAsset.name}</h2>
+              <p>{formatAssetClass(portfolioAsset)}</p>
+            </div>
+            <AssetTickerChip ticker={portfolioAsset.ticker} />
+          </div>
+          <Separator />
+          <FieldGroup>
+            <Field orientation="inline">
+              <FieldLabel htmlFor="asset-quantity">Quantity</FieldLabel>
+              <Input
+                id="asset-quantity"
+                defaultValue={String(portfolioAsset.quantity)}
+                inputMode="decimal"
+              />
+            </Field>
+            <Field orientation="inline">
+              <FieldLabel htmlFor="asset-basis">Basis cost / PMC</FieldLabel>
+              <InputWithSuffix
+                id="asset-basis"
+                defaultValue={
+                  portfolioAsset.averageCostBasis?.toFixed(2) ?? "0.00"
+                }
+                inputMode="decimal"
+                suffix={portfolioAsset.currency ?? "EUR"}
+              />
+            </Field>
+            {allocationMethod === "strategic" ? (
+              <Field orientation="inline">
+                <FieldLabel htmlFor="asset-target">
+                  Share of {assetClassLabels[portfolioAsset.assetClass]}
+                </FieldLabel>
+                <InputWithSuffix
+                  id="asset-target"
+                  defaultValue={String(
+                    Number(
+                      (
+                        (portfolioAsset.targetWeight /
+                          classTargetFor(portfolioAsset.assetClass)) *
+                        100
+                      ).toFixed(1)
+                    )
+                  )}
+                  inputMode="decimal"
+                  suffix="%"
                 />
-              }
+              </Field>
+            ) : (
+              <Field orientation="inline">
+                <FieldLabel htmlFor="asset-target">Target weight</FieldLabel>
+                <InputWithSuffix
+                  id="asset-target"
+                  defaultValue={String(portfolioAsset.targetWeight)}
+                  inputMode="decimal"
+                  suffix="%"
+                />
+              </Field>
+            )}
+            <Field>
+              <FieldLabel>Drift band</FieldLabel>
+              <Select defaultValue="default">
+                <SelectTrigger>
+                  <SelectValue>
+                    {(value) =>
+                      driftBandLabels[value as keyof typeof driftBandLabels] ??
+                      String(value ?? "")
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default · ±5 pp</SelectItem>
+                  <SelectItem value="tight">Tight · ±2 pp</SelectItem>
+                  <SelectItem value="wide">Wide · ±10 pp</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel>Transaction fees</FieldLabel>
+              <FeeConfigurationSummary
+                policy={feePolicy}
+                values={feeValues}
+                portfolioValues={defaultFeeValues}
+                onEdit={() => setFeeOverlayOpen(true)}
+                buttonRef={feeTriggerRef}
+              />
+            </Field>
+          </FieldGroup>
+          <div className="ds-add-asset-overlay__actions">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedAssetId(null);
+                setSearchState("search-results");
+              }}
+            >
+              Choose another asset
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedAssetId(null);
+                setSearchState("entry");
+                setSearchValue("");
+                setOverlayOpen(false);
+              }}
             >
               Add asset
-            </DialogTrigger>
-          }
+            </Button>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          title="Select an asset"
+          description="Choose a search result to review its price and set your target weight."
         />
-        <FloatingActionMenu
-          className="ds-add-asset-mobile-fab"
-          label="Open add asset actions"
-          actions={[
-            {
-              label: "Add asset",
-              icon: <Plus aria-hidden />,
-              onClick: () => setDialogOpen(true),
-            },
-          ]}
-        />
-        <DialogContent
-          className="ds-add-asset-dialog"
-          initialFocus={isEdit ? true : searchInputRef}
-        >
-          <DialogHeader>
-            <div>
-              <DialogTitle>{isEdit ? "Add VWCE.DE" : "Add asset"}</DialogTitle>
-              <DialogDescription>
-                {isEdit
-                  ? "Configure this asset before adding it to your portfolio."
-                  : "Search by name or ticker."}
-              </DialogDescription>
-            </div>
-            <CloseDialogButton />
-          </DialogHeader>
-          <FieldGroup>
-            {!isEdit ? (
-              <Field>
-                <FieldLabel htmlFor="asset-search">
-                  Search by name or ticker
-                </FieldLabel>
-                <div className="ds-input-with-icon">
-                  <Search size={16} aria-hidden />
-                  <Input
-                    ref={searchInputRef}
-                    id="asset-search"
-                    defaultValue={state === "entry" ? "" : "VW"}
-                    placeholder="Search ETFs and more"
-                  />
-                </div>
-              </Field>
-            ) : null}
-            {state === "loading" ? (
-              <div
-                aria-label="Searching assets"
-                role="status"
-                className="ds-story-stack"
-              >
-                <Skeleton />
-                <Skeleton />
-                <Skeleton />
+      )}
+    </section>
+  );
+
+  return (
+    <>
+      <PortfolioOverviewComposition
+        state="populated"
+        portfolioId={portfolioId}
+        onPortfolioChange={setPortfolioId}
+        onAddAsset={openAddAsset}
+        allocationMethod={allocationMethod}
+      />
+      {isMobile ? (
+        <Drawer open={overlayOpen} onOpenChange={handleOverlayOpenChange}>
+          <DrawerContent className="ds-add-asset-drawer">
+            <div className="ds-add-asset-overlay__header">
+              <div>
+                <DrawerTitle>Add an asset</DrawerTitle>
+                <DrawerDescription>
+                  Search for an investment to add to {portfolio.label}.
+                </DrawerDescription>
               </div>
-            ) : null}
-            {isSearchResults ? (
-              <div
-                className="ds-search-results"
-                aria-label="Asset search results"
-              >
-                {searchResults.map((asset) => (
-                  <SearchResultCard key={asset.id} asset={asset} />
-                ))}
-              </div>
-            ) : null}
-            {state === "empty" ? (
-              <EmptyState
-                title="No assets found"
-                description="Try a different name or ticker."
+              <DrawerClose
+                render={
+                  <IconButton label="Close add asset" variant="ghost">
+                    <X aria-hidden />
+                  </IconButton>
+                }
               />
-            ) : null}
-            {state === "error" ? (
-              <Alert variant="destructive">
-                <CircleAlert size={18} aria-hidden />
+            </div>
+            <div className="ds-add-asset-overlay__body">
+              {searchPane}
+              {isEdit ? assetPreview : null}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={overlayOpen} onOpenChange={handleOverlayOpenChange}>
+          <DialogContent className="ds-add-asset-dialog">
+            <DialogHeader>
+              <div className="ds-add-asset-overlay__header">
                 <div>
-                  <strong>Search could not be completed</strong>
-                  <p>Try again or check your connection.</p>
+                  <DialogTitle>Add an asset</DialogTitle>
+                  <DialogDescription>
+                    Search for an investment to add to {portfolio.label}.
+                  </DialogDescription>
                 </div>
-              </Alert>
-            ) : null}
-            {state === "unpriced" ? (
-              <Card className="ds-search-result-card">
-                <CardContent>
-                  <AssetTickerChip ticker="VWCE.DE" />
-                  <p className="ds-description ds-allocation-note">
-                    Vanguard FTSE All-World UCITS ETF
-                  </p>
-                  <Badge variant="warning">Price unavailable</Badge>
-                </CardContent>
-              </Card>
-            ) : null}
-            {isEdit ? (
-              <>
-                <div className="ds-asset-dialog-identity">
-                  <span
-                    className="ds-asset-card__dot ds-asset-card__dot--equities"
-                    aria-hidden
-                  />
-                  <div>
-                    <strong>Vanguard FTSE All-World UCITS ETF</strong>
-                    <span>Equities · Global</span>
-                  </div>
-                  <AssetTickerChip ticker="VWCE.DE" />
-                </div>
-                <Field orientation="inline">
-                  <FieldLabel htmlFor="asset-quantity">Quantity</FieldLabel>
-                  <Input
-                    id="asset-quantity"
-                    defaultValue="0"
-                    inputMode="decimal"
-                  />
-                </Field>
-                <Field orientation="inline">
-                  <FieldLabel htmlFor="asset-basis">
-                    Basis cost / PMC
-                  </FieldLabel>
-                  <InputWithSuffix
-                    id="asset-basis"
-                    defaultValue="0.00"
-                    inputMode="decimal"
-                    suffix="EUR"
-                  />
-                </Field>
-                <Field orientation="inline">
-                  <FieldLabel htmlFor="asset-target">Target weight</FieldLabel>
-                  <InputWithSuffix
-                    id="asset-target"
-                    defaultValue="0"
-                    inputMode="decimal"
-                    suffix="%"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>Drift band</FieldLabel>
-                  <Select defaultValue="default">
-                    <SelectTrigger>
-                      <SelectValue>
-                        {(value) =>
-                          driftBandLabels[
-                            value as keyof typeof driftBandLabels
-                          ] ?? String(value ?? "")
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default">Default · ±5 pp</SelectItem>
-                      <SelectItem value="tight">Tight · ±2 pp</SelectItem>
-                      <SelectItem value="wide">Wide · ±10 pp</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <FieldLabel>Transaction fees</FieldLabel>
-                  <FeeConfigurationSummary
-                    policy={feePolicy}
-                    values={feeValues}
-                    portfolioValues={defaultFeeValues}
-                    onEdit={() => setFeeOverlayOpen(true)}
-                    buttonRef={feeTriggerRef}
-                  />
-                </Field>
-              </>
-            ) : null}
-          </FieldGroup>
-          <DialogFooter>
-            {isEdit ? <Button>Save asset</Button> : null}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                <DialogCloseButton />
+              </div>
+            </DialogHeader>
+            <div className="ds-add-asset-overlay__body">
+              {searchPane}
+              {isEdit ? assetPreview : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       <TransactionFeeConfiguration
         open={feeOverlayOpen}
         policy={feePolicy}
@@ -590,7 +1137,7 @@ export function AddAssetComposition({
         portfolioDefaults={defaultFeeValues}
         finalFocus={feeTriggerRef}
       />
-    </AppShell>
+    </>
   );
 }
 
@@ -600,17 +1147,29 @@ export interface EditRemoveAssetCompositionProps {
   state?: "editing" | "saved" | "error" | "remove-confirmation";
   stage?: EditAssetStage;
   open?: boolean;
+  /**
+   * The Portfolio's allocation method. Simple edits one absolute target
+   * weight and lists only the edited asset; Strategic edits the asset's share
+   * of its class and lists the whole portfolio so the class is complete.
+   */
+  allocationMethod?: AllocationMode;
 }
 
 function RemoveAssetDialog({
+  asset,
   defaultOpen = false,
+  open,
+  onOpenChange,
   includeTrigger = false,
 }: {
+  asset: PortfolioAsset;
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   includeTrigger?: boolean;
 }) {
   return (
-    <Dialog defaultOpen={defaultOpen}>
+    <Dialog open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       {includeTrigger ? (
         <DialogTrigger
           render={<Button variant="destructive">Remove asset</Button>}
@@ -622,11 +1181,14 @@ function RemoveAssetDialog({
             <div className="ds-remove-dialog__icon" aria-hidden>
               <CircleAlert size={28} />
             </div>
-            <DialogTitle>Remove VWCE from this portfolio?</DialogTitle>
+            <DialogTitle>
+              Remove {asset.ticker} from this portfolio?
+            </DialogTitle>
             <DialogDescription>
-              This asset has a target weight of 30.0% and a current holding
-              value of €3,522.77. All holding data, allocation, and historical
-              performance will be removed.
+              This asset has a target weight of {asset.targetWeight.toFixed(1)}%
+              and a current holding value of{" "}
+              {formatCurrency(asset.value, asset.currency)}. All holding data,
+              allocation, and historical performance will be removed.
             </DialogDescription>
           </div>
           <CloseDialogButton />
@@ -644,486 +1206,345 @@ export function EditRemoveAssetComposition({
   state = "editing",
   stage = state === "remove-confirmation" ? "remove" : "details",
   open = false,
+  allocationMethod = "simple",
 }: EditRemoveAssetCompositionProps) {
+  const { portfolio, setPortfolioId } = useCompositionPortfolio();
+  const allocation = usePortfolioAllocation(portfolioAssets, allocationMethod);
+  const strategic = allocation.method === "strategic";
+  const visibleAssets = allocation.assets.filter((asset) =>
+    portfolio.assets.some((candidate) => candidate.id === asset.id)
+  );
+  const primaryId = primaryPortfolioAsset(portfolio).id;
+  const [editingId, setEditingId] = React.useState(primaryId);
+  const portfolioAsset =
+    allocation.assets.find((asset) => asset.id === editingId) ??
+    allocation.assets[0];
   const showRemove = state === "remove-confirmation" || stage === "remove";
+  const [saved, setSaved] = React.useState(state === "saved");
   const [editOpen, setEditOpen] = React.useState(stage === "details" && open);
-  const [feePolicy, setFeePolicy] = React.useState<FeePolicy>("variable");
-  const [feeValues, setFeeValues] = React.useState<FeeValues>(defaultFeeValues);
-  const [feeOverlayOpen, setFeeOverlayOpen] = React.useState(stage === "fees");
-  const feeTriggerRef = React.useRef<HTMLButtonElement>(null);
-  const editOriginRef = React.useRef<HTMLElement | null>(null);
+  const [removeOpen, setRemoveOpen] = React.useState(
+    state === "remove-confirmation" || stage === "remove"
+  );
+  const fees = useAssetFeeEditor(stage === "fees");
+  const { setOverlayOpen: setFeeOverlayOpen } = fees;
+  const editFocus = useReturnFocus();
+  const portfolioAllocationAssets = allocation.assets.filter((asset) =>
+    portfolio.assets.some((candidate) => candidate.id === asset.id)
+  );
   React.useEffect(() => {
     setEditOpen(stage === "details" && open);
     setFeeOverlayOpen(stage === "fees");
-  }, [open, stage]);
+    setRemoveOpen(state === "remove-confirmation" || stage === "remove");
+  }, [open, stage, state, setFeeOverlayOpen]);
 
   const handleEditOpenChange = (nextOpen: boolean) => {
     setEditOpen(nextOpen);
-    if (!nextOpen) {
-      window.requestAnimationFrame(() => editOriginRef.current?.focus());
-    }
   };
 
-  const openEditDialog = () => {
-    editOriginRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+  const openEditDialog = (assetId: string) => {
+    editFocus.remember();
+    setEditingId(assetId);
     setEditOpen(true);
   };
   return (
-    <AppShell navigation={navigation}>
-      <PageHeader title="Core portfolio" />
-      {state === "saved" ? (
-        <Alert variant="success">
+    <PortfolioCompositionShell
+      portfolio={portfolio}
+      onPortfolioChange={setPortfolioId}
+      selectedItem="overview"
+    >
+      <PageHeader title={portfolio.label} />
+      {state === "saved" || saved ? (
+        <Alert variant="success" className="ds-edit-remove-asset__save-alert">
           <Check size={18} aria-hidden />
           <strong>Asset changes saved</strong>
         </Alert>
       ) : null}
       {state === "error" ? (
-        <Alert variant="destructive">
+        <Alert
+          variant="destructive"
+          className="ds-edit-remove-asset__save-alert"
+        >
           <CircleAlert size={18} aria-hidden />
           <strong>Could not save asset changes</strong>
         </Alert>
       ) : null}
       <PortfolioAssetCollection
-        assets={[portfolioAssets[0]]}
-        onEdit={openEditDialog}
+        assets={strategic ? visibleAssets : [portfolioAsset]}
+        mode={allocation.method}
+        showModeToggle={false}
+        targets={strategic ? allocation.allocation : undefined}
+        onEdit={(asset) => openEditDialog(asset.id)}
       />
-      <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
-        <DialogContent className="ds-edit-asset-dialog">
-          <DialogHeader>
-            <div>
-              <DialogTitle>Edit VWCE</DialogTitle>
-              <DialogDescription>
-                Review and edit asset details.
-              </DialogDescription>
-            </div>
-            <CloseDialogButton />
-          </DialogHeader>
-          <div className="ds-asset-dialog-identity">
-            <span
-              className="ds-asset-card__dot ds-asset-card__dot--equities"
-              aria-hidden
-            />
-            <div>
-              <strong>Vanguard FTSE All-World</strong>
-              <span>Equities · Global</span>
-            </div>
-            <AssetTickerChip ticker="VWCE" />
-          </div>
-          <Separator />
-          <FieldGroup>
-            <Field orientation="inline">
-              <FieldLabel htmlFor="edit-quantity">Quantity</FieldLabel>
-              <Input id="edit-quantity" defaultValue="28.43" />
-            </Field>
-            <Field orientation="inline">
-              <FieldLabel htmlFor="edit-basis">Basis cost / PMC</FieldLabel>
-              <InputWithSuffix
-                id="edit-basis"
-                defaultValue="97.37"
-                suffix="EUR"
-              />
-            </Field>
-            <Field orientation="inline">
-              <FieldLabel htmlFor="edit-target">Target weight</FieldLabel>
-              <InputWithSuffix
-                id="edit-target"
-                defaultValue="30.0"
-                suffix="%"
-              />
-            </Field>
-            <Field orientation="inline">
-              <FieldLabel>Current weight</FieldLabel>
-              <span className="ds-value-readonly">34.8%</span>
-            </Field>
-            <Field orientation="inline">
-              <FieldLabel>Drift</FieldLabel>
-              <span className="ds-value-readonly ds-status-warning">
-                +4.8 pp
-              </span>
-            </Field>
-            <Field>
-              <FieldLabel>Transaction fees</FieldLabel>
-              <FeeConfigurationSummary
-                policy={feePolicy}
-                values={feeValues}
-                portfolioValues={defaultFeeValues}
-                onEdit={() => setFeeOverlayOpen(true)}
-                buttonRef={feeTriggerRef}
-              />
-            </Field>
-          </FieldGroup>
-          <DialogFooter className="ds-dialog-footer--stacked-mobile">
-            <Button>Save changes</Button>
-            <Button variant="destructive" type="button">
-              Remove asset
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <TransactionFeeConfiguration
-        open={feeOverlayOpen}
-        policy={feePolicy}
-        onOpenChange={setFeeOverlayOpen}
-        onPolicyChange={setFeePolicy}
-        onSave={(values) => {
-          setFeePolicy(values.policy);
-          setFeeValues({
-            maximumImpact: values.maximumImpact,
-            amount: values.amount,
-            feeRate: values.feeRate,
-            minFee: values.minFee,
-            maxFee: values.maxFee,
-          });
+      <EditPortfolioAssetDialog
+        open={editOpen}
+        onOpenChange={handleEditOpenChange}
+        asset={portfolioAsset}
+        assets={portfolioAllocationAssets}
+        finalFocus={editFocus.ref}
+        method={allocation.method}
+        allocation={allocation.allocation}
+        feeSummary={fees.summary}
+        onRemove={() => setRemoveOpen(true)}
+        onSave={(weight) => {
+          if (weight.method === "strategic") {
+            allocation.setAssetShare(portfolioAsset.id, weight.share);
+          } else {
+            allocation.setAbsoluteWeight(
+              portfolioAsset.id,
+              weight.absoluteWeight
+            );
+          }
+          setSaved(true);
         }}
-        includePortfolioDefault
-        portfolioDefaults={defaultFeeValues}
-        finalFocus={feeTriggerRef}
       />
-      {showRemove ? <RemoveAssetDialog defaultOpen /> : null}
-    </AppShell>
+      {fees.overlay}
+      <RemoveAssetDialog
+        asset={portfolioAsset}
+        defaultOpen={showRemove}
+        open={removeOpen}
+        onOpenChange={setRemoveOpen}
+      />
+    </PortfolioCompositionShell>
   );
 }
 
 export interface PortfolioSettingsCompositionProps {
   saveState?: "idle" | "success" | "error";
-  view?: "settings" | "strategic";
-  open?: boolean;
+  /** The Portfolio's saved allocation method when the page opens. */
+  allocationMethod?: AllocationMode;
+  /** The method card selected when the page opens; defaults to the saved method. */
+  initialSelection?: AllocationMode;
+  /** Opens the Set your asset class weights dialog on first render (Canvas stories). */
+  classWeightsOpen?: boolean;
+  /** Class weights the dialog opens with; defaults to the weights implied by the asset targets. */
+  classWeightsInitial?: ClassWeights;
+  /** Returns to the Portfolio page. */
+  onGoToPortfolio?: () => void;
 }
 
-/** Settings and strategic allocation configuration stages. */
+const driftBandOptions = ["±2 pp", "±5 pp", "±10 pp"] as const;
+
+/**
+ * Portfolio settings: the allocation method, one Portfolio-wide drift band and
+ * the transaction fees. Moving to Strategic opens the dialog that sets every
+ * asset class weight at once; the method only changes when that dialog is saved.
+ */
 export function PortfolioSettingsComposition({
   saveState = "idle",
-  view = "settings",
-  open = false,
+  allocationMethod = "simple",
+  initialSelection,
+  classWeightsOpen = false,
+  classWeightsInitial,
+  onGoToPortfolio = () => undefined,
 }: PortfolioSettingsCompositionProps) {
-  const [method, setMethod] = React.useState<"simple" | "strategic">("simple");
+  const { portfolio, setPortfolioId } = useCompositionPortfolio();
+  const allocation = usePortfolioAllocation(portfolioAssets, allocationMethod);
+  const [selected, setSelected] = React.useState<AllocationMode>(
+    initialSelection ?? allocationMethod
+  );
+  const [weightsOpen, setWeightsOpen] = React.useState(classWeightsOpen);
+  const [localSaveState, setLocalSaveState] = React.useState<"success" | null>(
+    null
+  );
   const [settingsFeePolicy, setSettingsFeePolicy] = React.useState<
     "zero" | "fixed" | "variable"
   >("zero");
   const [settingsFeeValues, setSettingsFeeValues] =
     React.useState<FeeValues>(defaultFeeValues);
-  const strategic = view === "strategic";
+  const [driftBand, setDriftBand] = React.useState<string>("±5 pp");
+  React.useEffect(() => setWeightsOpen(classWeightsOpen), [classWeightsOpen]);
+  const visibleSaveState = localSaveState ?? saveState;
+  const weightsFocus = useReturnFocus();
+  const classWeightsSavedRef = React.useRef(false);
+
+  const handleSave = () => {
+    if (selected === "strategic" && allocation.method === "simple") {
+      weightsFocus.remember();
+      setWeightsOpen(true);
+      return;
+    }
+    if (selected === "simple" && allocation.method === "strategic") {
+      allocation.switchToSimple();
+    }
+    setLocalSaveState("success");
+  };
 
   return (
-    <AppShell navigation={navigation}>
-      <PageHeader title="Core portfolio" />
-      {saveState === "success" ? (
+    <PortfolioCompositionShell
+      portfolio={portfolio}
+      onPortfolioChange={setPortfolioId}
+      selectedItem="settings"
+      pageActions={[
+        {
+          label: "Save changes",
+          icon: <Check aria-hidden />,
+          primary: true,
+          onClick: handleSave,
+        },
+        ...(allocation.method === "strategic"
+          ? [
+              {
+                label: "Review strategic allocation",
+                icon: <Compass aria-hidden />,
+                onClick: onGoToPortfolio,
+              },
+            ]
+          : []),
+      ]}
+    >
+      <PageHeader
+        className="ds-settings-page__header"
+        title="Portfolio settings"
+        description={`Configure how ${portfolio.label} is built and how allocation suggestions work.`}
+        actions={
+          <Button variant="outline" onClick={onGoToPortfolio}>
+            <ArrowLeft size={16} aria-hidden /> Back to {portfolio.label}
+          </Button>
+        }
+      />
+      {visibleSaveState === "success" ? (
         <Alert variant="success">
           <Check size={18} aria-hidden />
           <strong>Portfolio settings saved</strong>
         </Alert>
       ) : null}
-      {saveState === "error" ? (
+      {visibleSaveState === "error" ? (
         <Alert variant="destructive">
           <CircleAlert size={18} aria-hidden />
           <strong>Could not save portfolio settings</strong>
         </Alert>
       ) : null}
-      <Dialog defaultOpen={open}>
-        <DialogTrigger
-          render={<Button variant="outline">Portfolio settings</Button>}
-        />
-        <DialogContent
-          className={strategic ? "ds-strategic-dialog" : "ds-settings-dialog"}
-        >
-          <DialogHeader>
-            <div>
-              <DialogTitle>
-                {strategic ? "Strategic allocation" : "Portfolio settings"}
-              </DialogTitle>
-              <DialogDescription>
-                {strategic
-                  ? "Set target weights and drift bands for each asset class."
-                  : "Configure how this portfolio is built and how allocation suggestions work."}
-              </DialogDescription>
+      <Card className="ds-settings-page">
+        <CardContent>
+          <FieldGroup>
+            <div className="ds-field">
+              <RadioCardGroup
+                label="Allocation method"
+                value={selected}
+                onValueChange={(value) => setSelected(value as AllocationMode)}
+                options={[
+                  {
+                    value: "simple",
+                    title: "Simple",
+                    description:
+                      "One target weight per asset. Weights across all assets total 100%.",
+                  },
+                  {
+                    value: "strategic",
+                    title: "Strategic",
+                    description:
+                      "Targets per asset class, then each asset's share inside its class.",
+                  },
+                ]}
+              />
+              {selected === "strategic" && allocation.method === "strategic" ? (
+                <Alert variant="info">
+                  <Info size={18} aria-hidden />
+                  <span>
+                    Class weights and asset shares are edited from the Portfolio
+                    page. Use the edit icon on a class row.{" "}
+                    <Button variant="link" onClick={onGoToPortfolio}>
+                      Go to Portfolio
+                    </Button>
+                  </span>
+                </Alert>
+              ) : null}
+              {selected === "strategic" && allocation.method === "simple" ? (
+                <Alert variant="info">
+                  <Info size={18} aria-hidden />
+                  <span>
+                    Saving opens a dialog to set all class weights at once.
+                    Later edits happen on the Portfolio page.
+                  </span>
+                </Alert>
+              ) : null}
+              {selected === "simple" && allocation.method === "strategic" ? (
+                <Alert variant="info">
+                  <Info size={18} aria-hidden />
+                  <span>
+                    Switching to Simple keeps each asset&apos;s current absolute
+                    weight (class target × share) as its target. You can switch
+                    back at any time.
+                  </span>
+                </Alert>
+              ) : null}
             </div>
-            <CloseDialogButton />
-          </DialogHeader>
-          {strategic ? (
-            <div className="ds-strategic-allocation">
-              <div className="ds-strategic-allocation__header">
-                <span>Asset class</span>
-                <span>Target weight</span>
-                <span>Drift band</span>
-              </div>
-              {strategicAssetClasses.map(({ key: assetClass, target }) => (
-                <div className="ds-strategic-allocation__row" key={assetClass}>
-                  <strong>
-                    <span
-                      className={`ds-asset-card__dot ds-asset-card__dot--${assetClass}`}
-                      aria-hidden
-                    />
-                    {assetClassLabels[assetClass]}
-                  </strong>
-                  <div className="ds-strategic-allocation__field">
-                    <span className="ds-strategic-allocation__field-label">
-                      Target weight
-                    </span>
-                    <InputWithSuffix
-                      aria-label={`${assetClassLabels[assetClass]} target weight`}
-                      defaultValue={`${target}`}
-                      suffix="%"
-                    />
-                  </div>
-                  <div className="ds-strategic-allocation__field">
-                    <span className="ds-strategic-allocation__field-label">
-                      Drift band
-                    </span>
-                    <Select defaultValue="±5 pp">
-                      <SelectTrigger
-                        aria-label={`${assetClassLabels[assetClass]} drift band`}
-                      >
-                        <SelectValue>
-                          {(value) => String(value ?? "")}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="±2 pp">±2 pp</SelectItem>
-                        <SelectItem value="±5 pp">±5 pp</SelectItem>
-                        <SelectItem value="±10 pp">±10 pp</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ))}
-              <Alert variant="info">
-                <Info size={18} aria-hidden />
-                <span>
-                  Asset weights inside each class are configured in the asset
-                  editor.
-                </span>
-              </Alert>
-              <Button variant="link">
-                View guidance <ArrowRight size={14} aria-hidden />
-              </Button>
-            </div>
-          ) : (
-            <FieldGroup>
-              <div className="ds-field">
-                <RadioCardGroup
-                  label="Allocation method"
-                  value={method}
-                  onValueChange={(value) =>
-                    setMethod(value as "simple" | "strategic")
-                  }
-                  options={[
-                    {
-                      value: "simple",
-                      title: "Simple",
-                      description:
-                        "Use absolute target weights for each asset.",
-                    },
-                    {
-                      value: "strategic",
-                      title: "Strategic",
-                      description:
-                        "Use asset-class targets with relative weights inside each class.",
-                    },
-                  ]}
-                />
-              </div>
-              <Field>
-                <FieldLabel>Portfolio-level transaction fees</FieldLabel>
-                <TransactionFeeConfigurationForm
-                  policy={settingsFeePolicy}
-                  onPolicyChange={(value) =>
-                    setSettingsFeePolicy(value as "zero" | "fixed" | "variable")
-                  }
-                  {...settingsFeeValues}
-                  onMaximumImpactChange={(maximumImpact) =>
-                    setSettingsFeeValues((current) => ({
-                      ...current,
-                      maximumImpact,
-                    }))
-                  }
-                  onAmountChange={(amount) =>
-                    setSettingsFeeValues((current) => ({ ...current, amount }))
-                  }
-                  onFeeRateChange={(feeRate) =>
-                    setSettingsFeeValues((current) => ({ ...current, feeRate }))
-                  }
-                  onMinFeeChange={(minFee) =>
-                    setSettingsFeeValues((current) => ({ ...current, minFee }))
-                  }
-                  onMaxFeeChange={(maxFee) =>
-                    setSettingsFeeValues((current) => ({ ...current, maxFee }))
-                  }
-                  idPrefix="portfolio-fee"
-                />
-              </Field>
-            </FieldGroup>
-          )}
-          <DialogFooter>
-            <Button>
-              {strategic ? "Save strategic allocation" : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </AppShell>
-  );
-}
-
-export interface AllocateCompositionProps {
-  state?: "options" | "result";
-  mode?: "allocate" | "rebalance";
-}
-
-function AllocationOption({
-  checked,
-  children,
-  description,
-}: {
-  checked?: boolean;
-  children: React.ReactNode;
-  description: string;
-}) {
-  return (
-    <label className="ds-story-option ds-allocation-option">
-      <Checkbox defaultChecked={checked} />
-      <span>
-        <strong>{children}</strong>
-        <small>{description}</small>
-      </span>
-    </label>
-  );
-}
-
-/** Allocation and rebalance options plus the deterministic review result. */
-export function AllocateComposition({
-  state = "options",
-  mode = "allocate",
-}: AllocateCompositionProps) {
-  const isResult = state === "result";
-  const actionLabel = mode === "rebalance" ? "Rebalance" : "Allocate";
-  return (
-    <AppShell navigation={navigation}>
-      <div className="ds-allocation-layout">
-        <h1 className="ds-sr-only">Allocate and rebalance</h1>
-        {!isResult ? (
-          <Card className="ds-allocation-panel">
-            <CardHeader>
-              <Badge variant="primary">You came from: {actionLabel}</Badge>
-              <CardTitle>How much do you want to allocate?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="allocation-amount">
-                    Investment budget
-                  </FieldLabel>
-                  <InputWithSuffix
-                    id="allocation-amount"
-                    inputMode="decimal"
-                    defaultValue="1,000"
-                    suffix="EUR"
-                  />
-                  <p className="ds-description ds-allocation-note">
-                    <ShieldCheck size={14} aria-hidden /> Your target allocation
-                    is already set
-                  </p>
-                </Field>
-                <AllocationOption
-                  checked
-                  description="Use buy-only recommendations where possible, preserving existing holdings."
-                >
-                  Tax-efficient algorithm
-                </AllocationOption>
-                <AllocationOption
-                  checked
-                  description="Use all available liquidity, even if it means using fractional quantities."
-                >
-                  Allocate the full budget
-                </AllocationOption>
-                <AllocationOption description="Suggest buying fractional quantities where supported.">
-                  Use fractional quantities
-                </AllocationOption>
-              </FieldGroup>
-            </CardContent>
-            <CardFooter className="ds-allocation-footer ds-allocation-options__footer">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft size={16} aria-hidden /> Back
-              </Button>
-              <Button>
-                {actionLabel} budget <ArrowRight size={16} aria-hidden />
-              </Button>
-            </CardFooter>
-          </Card>
-        ) : (
-          <div className="ds-allocation-result">
-            <Card className="ds-allocation-panel">
-              <CardHeader>
-                <span className="ds-result-icon" aria-hidden>
-                  <PartyPopper size={24} strokeWidth={1.8} />
-                </span>
-                <CardTitle>Your allocation is ready</CardTitle>
-                <CardDescription>Review and confirm the plan.</CardDescription>
-              </CardHeader>
-              <CardContent className="ds-story-stack">
-                <Card className="ds-review-card">
-                  <CardHeader>
-                    <CardTitle>Buy 6 VWCE.DE @ €162.96</CardTitle>
-                    <CardDescription>
-                      Vanguard FTSE All-World UCITS ETF
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <dl className="ds-review-list">
-                      <div className="ds-review-row">
-                        <dt>Amount</dt>
-                        <dd>
-                          <strong>€2,607.36</strong>
-                          <span className="ds-status-success">+€977.76</span>
-                        </dd>
-                      </div>
-                      <div className="ds-review-row">
-                        <dt>Weight</dt>
-                        <dd>
-                          <strong>100.0%</strong>
-                          <span className="ds-status-success">+70.0 pp</span>
-                        </dd>
-                      </div>
-                      <div className="ds-review-row">
-                        <dt>Commission charged</dt>
-                        <dd>
-                          <strong>€0.00</strong>
-                        </dd>
-                      </div>
-                      <div className="ds-review-row">
-                        <dt>Fee impact</dt>
-                        <dd>
-                          <strong>0.0%</strong>
-                        </dd>
-                      </div>
-                    </dl>
-                  </CardContent>
-                </Card>
-                <Card className="ds-review-card">
-                  <CardHeader>
-                    <CardTitle>
-                      Unallocated cash <Badge variant="success">+€22.24</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="ds-description">
-                      This remaining budget is kept aside for next time.
-                    </p>
-                  </CardContent>
-                </Card>
-              </CardContent>
-              <CardFooter className="ds-allocation-footer">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft size={16} aria-hidden /> Back to portfolio
-                </Button>
-                <Button>Update portfolio</Button>
-              </CardFooter>
-            </Card>
+            <Field>
+              <FieldLabel>Drift band</FieldLabel>
+              <p className="ds-description">
+                One range for the whole portfolio. Drift inside it counts as on
+                target.
+              </p>
+              <Select
+                value={driftBand}
+                onValueChange={(value) => setDriftBand(String(value))}
+              >
+                <SelectTrigger aria-label="Drift band">
+                  <SelectValue>{(value) => String(value ?? "")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {driftBandOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel>Portfolio-level transaction fees</FieldLabel>
+              <TransactionFeeConfigurationForm
+                policy={settingsFeePolicy}
+                onPolicyChange={(value) =>
+                  setSettingsFeePolicy(value as "zero" | "fixed" | "variable")
+                }
+                {...settingsFeeValues}
+                onMaximumImpactChange={(maximumImpact) =>
+                  setSettingsFeeValues((current) => ({
+                    ...current,
+                    maximumImpact,
+                  }))
+                }
+                onAmountChange={(amount) =>
+                  setSettingsFeeValues((current) => ({ ...current, amount }))
+                }
+                onFeeRateChange={(feeRate) =>
+                  setSettingsFeeValues((current) => ({ ...current, feeRate }))
+                }
+                onMinFeeChange={(minFee) =>
+                  setSettingsFeeValues((current) => ({ ...current, minFee }))
+                }
+                onMaxFeeChange={(maxFee) =>
+                  setSettingsFeeValues((current) => ({ ...current, maxFee }))
+                }
+                idPrefix="portfolio-fee"
+              />
+            </Field>
+          </FieldGroup>
+          <div className="ds-settings-page__footer">
+            <Button onClick={handleSave}>Save changes</Button>
           </div>
-        )}
-      </div>
-    </AppShell>
+        </CardContent>
+      </Card>
+      <SetClassWeightsDialog
+        open={weightsOpen}
+        onOpenChange={(next) => {
+          setWeightsOpen(next);
+          // Leaving the dialog without saving keeps the saved method.
+          if (!next && !classWeightsSavedRef.current) setSelected("simple");
+          if (!next) classWeightsSavedRef.current = false;
+        }}
+        assets={allocation.assets}
+        shares={allocation.sharesOnSwitch}
+        finalFocus={weightsFocus.ref}
+        initialWeights={classWeightsInitial}
+        onSave={(weights) => {
+          classWeightsSavedRef.current = true;
+          allocation.switchToStrategic(weights);
+          setSelected("strategic");
+          setLocalSaveState("success");
+        }}
+      />
+    </PortfolioCompositionShell>
   );
 }

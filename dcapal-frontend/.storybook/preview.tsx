@@ -22,7 +22,7 @@ const preview: Preview = {
           value: "var(--dcapal-canvas)",
         },
         {
-          name: "Dark chrome",
+          name: "Ink surface",
           value: "var(--dcapal-chrome)",
         },
       ],
@@ -39,6 +39,14 @@ const preview: Preview = {
         mobile: {
           name: "Mobile",
           styles: { width: "390px", height: "844px" },
+        },
+        compact: {
+          name: "Compact desktop",
+          styles: { width: "1024px", height: "768px" },
+        },
+        laptop: {
+          name: "Laptop",
+          styles: { width: "1180px", height: "820px" },
         },
         desktop: {
           name: "Desktop",

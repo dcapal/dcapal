@@ -12,7 +12,7 @@ _Avoid_: Account, order, strategic allocation, when referring to the asset colle
 The investor-facing summary of a Portfolio's current value, performance,
 holdings, target comparison, and available next actions. It is the main place
 to understand the selected Portfolio and choose whether to manage assets,
-review guidance, allocate, or rebalance.
+review guidance, or invest.
 _Avoid_: Dashboard, account overview, when referring to the Portfolio summary
 
 **Drift diagnostic**:
@@ -135,6 +135,12 @@ _Avoid_: Financial advice, automatic recommendation
 An immutable DcaPal-owned identifier for the exact formula and rate policy used by an Allocation Framework. The MVP uses `the-bull-v1`; any change to its meaning requires a new version.
 _Avoid_: Source article version, last-updated date, live rate version
 
+**Total drift**:
+The overall distance of current weights from Target weights, in percentage
+points. It is the share of the Portfolio that would have to move to reach the
+targets.
+_Avoid_: Drift band, when referring to a measurement rather than a threshold
+
 **Drift band**:
 An optional Portfolio-wide range around each target weight used to decide whether to surface drift or recommend rebalancing. It is expressed in percentage points; a missing value disables drift diagnostics. Asset- and Asset Class-specific overrides are not part of this MVP.
 _Avoid_: Confidence band, when referring to a rebalancing threshold
@@ -157,16 +163,24 @@ _Avoid_: MWR, money-weighted return
 New money or liquidity available for the current allocation. It is separate from the portfolio's current value.
 _Avoid_: Portfolio value, balance
 
+**Invest**:
+The next action that opens the drift view and lets the investor choose between an Allocation (Add money) and a Rebalancing. It is one journey, not two separate entry points.
+_Avoid_: Allocate, Rebalance, as separate entry points
+
 **Allocation**:
 A buy-only recommendation for distributing the investment budget among Portfolio Assets to move projected weights towards target weights. It may include unallocated cash and is not an executed trade.
-_Avoid_: Order, transaction, full rebalancing
+_Avoid_: Order, transaction, when naming the whole recommendation; full rebalancing
+
+**Proposed transaction**:
+One recommended buy or sell of a Portfolio Asset within an Allocation or Rebalancing. It is not an executed trade.
+_Avoid_: Order, trade
 
 **Rebalancing**:
 Changing existing holdings to restore target weights. It may sell eligible overweight Portfolio Assets and use their proceeds, together with the investment budget, to buy underweight assets. A buy-only allocation can improve balance without being a full rebalancing.
 _Avoid_: Allocation, when sales are part of the intended action
 
 **Buy-only mode**:
-An allocation rule that can increase or preserve existing holdings but cannot sell them. The product presents this as “Tax Efficient”; that label describes the reason for the rule, not the rule itself.
+An allocation rule that can increase or preserve existing holdings but cannot sell them. The product presents it as the Add money path; “Tax Efficient” appears only as explanatory copy there and describes the reason for the rule, not the rule itself.
 _Avoid_: Tax optimisation, automatic tax advice
 
 **Unit rule**:
@@ -200,7 +214,7 @@ The actual date range of observations available for a Historical price series. I
 _Avoid_: Historical depth, when referring to the data that exists rather than the range requested
 
 **Transaction fee policy**:
-A rule used to estimate the cost of buying a portfolio asset during an allocation. It can be zero, fixed, or variable, and may include a maximum fee impact.
+A rule used to estimate the cost of buying a portfolio asset in a Proposed transaction, in an Allocation or a Rebalancing. It can be zero, fixed, or variable, and may include a maximum fee impact. DcaPal does not estimate the cost of sales.
 _Avoid_: Fee, when the policy and its constraints are meant
 
 **Asset fee override**:
@@ -208,7 +222,7 @@ A transaction fee policy that applies to one portfolio asset instead of the port
 _Avoid_: Portfolio fee, when the asset-specific policy is meant
 
 **Maximum fee impact**:
-The largest fee, as a percentage of an allocation, that the investor accepts when considering a purchase.
+The largest fee, as a percentage of a proposed buy, that the investor accepts when considering a purchase.
 _Avoid_: Maximum fee amount
 
 **Price provider**:

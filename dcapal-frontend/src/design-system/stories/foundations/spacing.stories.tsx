@@ -9,7 +9,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const FourPixelScale: Story = {
+export const CompactScale: Story = {
   render: () => (
     <div className="dcapal-theme ds-foundation-spacing">
       {["1", "2", "3", "4", "6", "8", "12"].map((space) => (
