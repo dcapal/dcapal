@@ -4,8 +4,8 @@ import {
   Compass,
   Home,
   Menu,
-  Repeat2,
   Settings2,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { IconButton, Sheet, SheetClose, SheetContent, SheetTitle } from "../ui";
@@ -56,16 +56,10 @@ const defaultGroups: PortfolioWorkspaceNavGroup[] = [
     label: "Actions",
     items: [
       {
-        id: "allocate",
-        label: "Allocate",
-        icon: <Compass aria-hidden />,
-        href: "/allocate?section=allocate",
-      },
-      {
-        id: "rebalance",
-        label: "Rebalance",
-        icon: <Repeat2 aria-hidden />,
-        href: "/allocate?section=rebalance",
+        id: "invest",
+        label: "Invest",
+        icon: <TrendingUp aria-hidden />,
+        href: "/invest",
       },
     ],
   },

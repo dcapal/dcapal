@@ -1,6 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { formatCurrency } from "../src/design-system/fixtures/portfolio";
+import {
+  addMoneyProposal,
+  addMoneyResult,
+  rebalanceProposal,
+  suggestedAmountStates,
+} from "../src/design-system/fixtures/invest";
+import { formatPoints } from "../src/design-system/components/patterns/invest-format";
 
 /**
  * GIVEN a representative journey story at a mobile or desktop viewport,
@@ -13,7 +21,7 @@ const journeys = [
   "add asset",
   "edit and remove asset",
   "portfolio settings",
-  "allocate and rebalance",
+  "invest",
 ];
 
 type StoryIndexEntry = {
@@ -202,7 +210,10 @@ test.describe("Storybook journey smoke", () => {
           page.getByRole("region", { name: "Asset search results" })
         ).toBeVisible();
         await page.getByRole("button", { name: /VWCE/ }).click();
-        await page.getByRole("button", { name: "Add asset" }).click();
+        // Exact match: the mobile drawer's "Close add asset" button must not count.
+        await page
+          .getByRole("button", { name: "Add asset", exact: true })
+          .click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
         await expect(
           page.getByRole("heading", { name: "Core portfolio" })
@@ -267,14 +278,25 @@ test.describe("Storybook journey smoke", () => {
         } else {
           await expect(cards).toBeHidden();
           await expect(table).toBeVisible();
+          // The overview table is a compact summary: it leads with value,
+          // weight and drift and leaves quantity and cost basis to the
+          // detailed asset views.
+          for (const header of [
+            "Current value",
+            "Target weight",
+            "Current weight",
+            "Drift",
+          ]) {
+            await expect(
+              table.getByRole("columnheader", { name: header })
+            ).toBeVisible();
+          }
           await expect(
-            table.getByRole("columnheader", {
-              name: /^Quantity(?: owned today)?$/i,
-            })
-          ).toBeVisible();
+            table.getByRole("columnheader", { name: /^Quantity/i })
+          ).toHaveCount(0);
           await expect(
             table.getByRole("columnheader", { name: "Average cost basis" })
-          ).toBeVisible();
+          ).toHaveCount(0);
           await expect(table.locator(".ds-table__asset-ticker")).toHaveCount(5);
           await expect(table.locator(".ds-asset-ticker-chip")).toHaveCount(0);
         }
@@ -315,16 +337,15 @@ test.describe("Storybook journey smoke", () => {
         await expect(page.getByRole("dialog")).toHaveCount(0);
       }
 
-      if (journey === "allocate and rebalance") {
-        await page.getByRole("button", { name: /Allocate budget/ }).click();
+      if (journey === "invest") {
+        await page.getByRole("button", { name: "Add money" }).click();
+        await page.getByRole("button", { name: "Continue" }).click();
         await expect(
-          page.getByRole("heading", { name: "Your allocation is ready" })
+          page.getByRole("button", { name: "Update portfolio" })
         ).toBeVisible();
-        await page.getByRole("button", { name: "Back to options" }).click();
+        await page.getByRole("button", { name: "Back to rules" }).click();
         await expect(
-          page.getByRole("heading", {
-            name: "How much do you want to allocate?",
-          })
+          page.getByRole("button", { name: "Continue" })
         ).toBeVisible();
       }
 
@@ -390,6 +411,12 @@ test("overview keeps the retired performance chart out of the workspace", async 
   ).toBeVisible();
 });
 
+/**
+ * GIVEN a portfolio in first use with no asset and then with its first asset
+ * WHEN the overview renders each stage
+ * THEN the empty stage shows two placeholder metrics (no cash balance yet) and
+ * no completed setup steps, and the asset stage shows none and two completed.
+ */
 test("first-use overview stages expose placeholders and setup progress", async ({
   page,
 }) => {
@@ -402,7 +429,11 @@ test("first-use overview stages expose placeholders and setup progress", async (
   await page.waitForLoadState("networkidle");
   await expect(
     page.locator('.ds-metric-card[data-placeholder="true"]')
-  ).toHaveCount(3);
+  ).toHaveCount(2);
+  // First use has no cash balance to show, so no placeholder card is offered.
+  await expect(
+    page.locator(".ds-metric-card:visible", { hasText: "Cash balance" })
+  ).toHaveCount(0);
   await expect(
     page.locator('.ds-portfolio-setup__step[data-status="complete"]')
   ).toHaveCount(0);
@@ -531,257 +562,430 @@ test("strategic allocation exposes human-readable drift labels", async ({
   expect(driftLabels.join(" ")).not.toContain("five");
 });
 
-test("allocation review exposes amount, fees, weight, and signed deltas", async ({
-  page,
-}) => {
+const INVEST_TITLE = "Compositions / Invest";
+
+/** Opens an Invest composition story, using the mobile sibling on the phone project. */
+async function openInvest(
+  page: Page,
+  name: string,
+  options: { mobileVariant?: boolean } = {}
+) {
+  const mobile = options.mobileVariant ?? false;
   const storyId = await findStory(
     page,
-    "Compositions / Allocate and rebalance",
-    "Allocation Result"
+    INVEST_TITLE,
+    mobile ? `${name} Mobile` : name
   );
   await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
   await page.waitForLoadState("networkidle");
+}
 
-  for (const label of [
-    "Amount",
-    "Weight after allocation",
-    "Commission estimate",
-    "Estimated first-year fee impact",
-  ]) {
-    await expect(page.getByText(label, { exact: true })).toBeVisible();
-  }
-  await expect(page.getByText("Buy 195 AGGH", { exact: true })).toBeVisible();
-  await expect(page.getByText("€998.40", { exact: true })).toBeVisible();
-  await expect(page.getByText("10.2%", { exact: true })).toBeVisible();
-  await expect(page.getByText("+8.3 pp", { exact: true })).toBeVisible();
-  await expect(page.getByText("€1.00", { exact: true })).toBeVisible();
-  await expect(page.getByText("€0.18", { exact: true })).toBeVisible();
-  await expect(page.getByText("€0.60", { exact: true })).toBeVisible();
-  await expect(page.getByText("€3,842.75", { exact: true })).toBeVisible();
-});
+/** The first rendered match of an exact text, ignoring responsive duplicates that are hidden. */
+function visibleText(page: Page, text: string): Locator {
+  return page.getByText(text, { exact: true }).locator("visible=true").first();
+}
 
-// GIVEN the displayed holdings and a €1,000 contribution, WHEN the buy-only
-// rebalance review is rendered, THEN purchases, fees, and cash reconcile.
-test("rebalance review reconciles buy-only trades and cash", async ({
-  page,
-}) => {
-  const storyId = await findStory(
-    page,
-    "Compositions / Allocate and rebalance",
-    "Rebalance Result"
-  );
-  await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
-  await page.waitForLoadState("networkidle");
-
-  await expect(page.getByText("Sell", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Buy", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("€747.52", { exact: true })).toBeVisible();
-  await expect(page.getByText("€188.70", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("Cash balance after", { exact: true })
-  ).toBeVisible();
-  await expect(page.getByText("€3,903.93", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("Unallocated budget", { exact: true })
-  ).toBeVisible();
-  await expect(page.getByText("€61.78", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText(
-      /€1,000.00 budget · €936.22 invested · €2.00 estimated commission/
-    )
-  ).toBeVisible();
-});
-
-// GIVEN a rebalance journey at either viewport, WHEN the investor reviews the
-// proposed changes, THEN weight comparison and estimated transactions are clear
-// and they can return to the options before confirming.
-test("rebalance options progress to a responsive review and return", async ({
-  page,
-}, testInfo) => {
-  const mobile = testInfo.project.name === "storybook-mobile";
-  const storyId = await findStory(
-    page,
-    "Compositions / Allocate and rebalance",
-    mobile ? "Rebalance Options Mobile" : "Rebalance Options"
-  );
-  await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
-  await page.waitForLoadState("networkidle");
-
-  await expect(
-    page.getByRole("heading", { name: "Rebalance to your target allocation" })
-  ).toBeVisible();
-  await expect(page.getByLabel("Amount to invest")).toHaveValue("1,000");
-  await expect(
-    page.getByText("No existing assets will be sold.", { exact: false })
-  ).toBeVisible();
-  if (mobile) {
-    const primaryButton = await page
-      .getByRole("button", { name: "Review rebalance" })
-      .boundingBox();
-    const navigationFab = await page
-      .locator(".ds-portfolio-workspace__navigation-fab")
-      .boundingBox();
-    expect(primaryButton).not.toBeNull();
-    expect(navigationFab).not.toBeNull();
-    const overlaps =
-      primaryButton!.x < navigationFab!.x + navigationFab!.width &&
-      primaryButton!.x + primaryButton!.width > navigationFab!.x &&
-      primaryButton!.y < navigationFab!.y + navigationFab!.height &&
-      primaryButton!.y + primaryButton!.height > navigationFab!.y;
-    expect(overlaps).toBe(false);
-  }
-  await page.getByRole("button", { name: "Review rebalance" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "Review your rebalance" })
-  ).toBeVisible();
-  await expect(
-    page.getByRole("table", { name: "Rebalance weight comparison" })
-  ).toBeVisible();
-  await expect(
-    page.getByText("Proposed purchases", { exact: true })
-  ).toBeVisible();
-  await expect(
-    page.getByText("Quantity", { exact: true }).first()
-  ).toBeVisible();
-  await expect(
-    page.getByText("Commission estimate", { exact: true }).first()
-  ).toBeVisible();
-
-  if (mobile) {
-    await expect(
-      page.getByRole("button", { name: "Back to options" })
-    ).toBeVisible();
-    const documentWidth = await page
-      .locator("body")
-      .evaluate((node) => node.scrollWidth);
-    const viewportWidth = await page.evaluate(() => window.innerWidth);
-    expect(documentWidth).toBeLessThanOrEqual(viewportWidth);
-  }
-  await page.getByRole("button", { name: "Back to options" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Rebalance to your target allocation" })
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: "Review rebalance" }).click();
-  await page.getByRole("button", { name: "Confirm rebalance" }).click();
-  await expect(
-    page.getByRole("status").getByText("Rebalance confirmed", { exact: true })
-  ).toBeVisible();
-
-  if (mobile) {
-    const primaryButton = await page
-      .getByRole("button", { name: "Rebalance confirmed" })
-      .boundingBox();
-    const navigationFab = await page
-      .locator(".ds-portfolio-workspace__navigation-fab")
-      .boundingBox();
-    expect(primaryButton).not.toBeNull();
-    expect(navigationFab).not.toBeNull();
-    const overlaps =
-      primaryButton!.x < navigationFab!.x + navigationFab!.width &&
-      primaryButton!.x + primaryButton!.width > navigationFab!.x &&
-      primaryButton!.y < navigationFab!.y + navigationFab!.height &&
-      primaryButton!.y + primaryButton!.height > navigationFab!.y;
-    expect(overlaps).toBe(false);
-  }
-
-  await page
-    .getByRole("button", { name: /Select portfolio, current portfolio/ })
-    .click();
-  await page.getByRole("menuitem", { name: "Long-term growth" }).click();
-  await expect(
-    page.getByRole("status").getByText("Rebalance confirmed", { exact: true })
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Confirm rebalance" })
-  ).toBeEnabled();
-});
-
-// GIVEN buy-only is disabled and a larger budget is entered, WHEN the investor
-// reviews the rebalance, THEN overweight assets can be sold and the resulting
-// cash summary describes the combined purchases and sales.
-test("rebalance review supports sell-capable trades when buy-only is disabled", async ({
-  page,
-}) => {
-  const storyId = await findStory(
-    page,
-    "Compositions / Allocate and rebalance",
-    "Rebalance Options"
-  );
-  await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
-  await page.waitForLoadState("networkidle");
-
-  await page.getByLabel("Amount to invest").fill("500");
-  await page.getByRole("checkbox", { name: /Buy only/ }).uncheck();
-  await page.getByRole("button", { name: "Review rebalance" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "Proposed transactions" })
-  ).toBeVisible();
-  await expect(page.getByText("Sell", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("Cash after rebalance", { exact: true })
-  ).toBeVisible();
-  await expect(page.getByText("€1,091.87", { exact: true })).toBeVisible();
-});
-
-// GIVEN an editable allocation budget, WHEN it is raised to €2,000, THEN the
-// whole-unit purchase, commission, and cash remainder reflect the entered value.
-test("allocation preview recalculates for the entered investment budget", async ({
-  page,
-}) => {
-  const storyId = await findStory(
-    page,
-    "Compositions / Allocate and rebalance",
-    "Allocation options"
-  );
-  await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
-  await page.waitForLoadState("networkidle");
-  await page.getByLabel("Amount to invest").fill("2,000");
-  await page.getByRole("button", { name: "Allocate budget" }).click();
-
-  await expect(
-    page.getByText("Buy 390 AGGH @ €5.12", { exact: true })
-  ).toBeVisible();
-  await expect(page.getByText("€1,996.80", { exact: true })).toBeVisible();
-  await expect(page.getByText("€2.20", { exact: true })).toBeVisible();
-});
-
-// GIVEN a new-budget allocation, WHEN its result is reviewed on mobile, THEN
-// the proposal remains stacked and buy-only, with costs and remaining cash.
-test("allocation result remains readable on mobile without selling holdings", async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "storybook-mobile",
-    "The stacked allocation result is a mobile-only contract."
-  );
-  const storyId = await findStory(
-    page,
-    "Compositions / Allocate and rebalance",
-    "Allocation Result Mobile"
-  );
-  await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
-  await page.waitForLoadState("networkidle");
-
-  await expect(
-    page.getByRole("heading", { name: "Your allocation is ready" })
-  ).toBeVisible();
-  await expect(
-    page.getByText("Commission estimate", { exact: true })
-  ).toBeVisible();
-  await expect(
-    page.getByText("Unallocated cash", { exact: false })
-  ).toBeVisible();
+async function expectNoHorizontalOverflow(page: Page) {
   const documentWidth = await page
     .locator("body")
     .evaluate((node) => node.scrollWidth);
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   expect(documentWidth).toBeLessThanOrEqual(viewportWidth);
-});
+}
 
+async function overlaps(first: Locator, second: Locator) {
+  const a = await first.boundingBox();
+  const b = await second.boundingBox();
+  expect(a).not.toBeNull();
+  expect(b).not.toBeNull();
+  return (
+    a!.x < b!.x + b!.width &&
+    a!.x + a!.width > b!.x &&
+    a!.y < b!.y + b!.height &&
+    a!.y + a!.height > b!.y
+  );
+}
+
+test.describe("Invest journey", () => {
+  // GIVEN the Invest journey on its drift view, WHEN the investor adds money,
+  // keeps their amount while switching path, continues to the proposal, goes
+  // back to the rules and updates the portfolio, THEN each step shows the
+  // fixture figures, the amount survives going back, and an updated summary
+  // lists the changed quantities.
+  test("drift leads through plan and proposal to an updated portfolio", async ({
+    page,
+  }, testInfo) => {
+    await openInvest(page, "Drift overview", {
+      mobileVariant: testInfo.project.name === "storybook-mobile",
+    });
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Invest" })
+    ).toBeVisible();
+    await expect(
+      visibleText(page, formatPoints(addMoneyProposal.driftBefore))
+    ).toBeVisible();
+
+    // The path actions sit in the page header, outside the comparison card.
+    const paths = page
+      .getByRole("group", { name: "Investment paths" })
+      .locator("visible=true");
+    await expect(
+      paths.getByRole("button", { name: "Rebalance" })
+    ).toBeVisible();
+    await expect(page.locator(".ds-path-card")).toHaveCount(0);
+    await paths.getByRole("button", { name: "Add money" }).click();
+    const amount = page.getByLabel("Amount to invest");
+    await expect(amount).toBeVisible();
+
+    // The path switch lives inside the Budget and rules card.
+    await expect(
+      page
+        .locator(".ds-plan-form__rules")
+        .getByRole("radiogroup", { name: "Investment path" })
+    ).toBeVisible();
+
+    // Switching path keeps what was typed.
+    await amount.fill("750");
+    await page.getByRole("radio", { name: "Rebalance" }).click();
+    await expect(page.getByLabel("New money to add (optional)")).toHaveValue(
+      "750"
+    );
+    await page.getByRole("radio", { name: "Add money" }).click();
+    await expect(amount).toHaveValue("750");
+
+    const suggested = suggestedAmountStates.amount;
+    if (suggested.status !== "amount") throw new Error("fixture changed");
+    await page.getByRole("button", { name: "Use suggested" }).click();
+    await expect(amount).toHaveValue(String(suggested.amount));
+
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(
+      page.getByRole("status", { name: "Calculating your proposal" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Update portfolio" })
+    ).toBeVisible();
+    for (const transaction of addMoneyProposal.transactions) {
+      await expect(
+        visibleText(page, formatCurrency(transaction.amount))
+      ).toBeVisible();
+    }
+    await expect(page.getByText(/Funded by/)).toContainText(
+      formatCurrency(addMoneyProposal.fundedBy?.newMoney ?? 0)
+    );
+
+    // Going back to the rules keeps the amount.
+    await page.getByRole("button", { name: "Back to rules" }).click();
+    await expect(amount).toHaveValue(String(suggested.amount));
+
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Update portfolio" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Portfolio updated" })
+    ).toBeVisible();
+    for (const change of addMoneyResult.changes) {
+      await expect(visibleText(page, change.ticker)).toBeVisible();
+    }
+
+    await page.getByRole("button", { name: "Back to portfolio" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Current vs target" })
+    ).toBeVisible();
+  });
+
+  // GIVEN the Rebalance proposal, WHEN it is reviewed, THEN overweight assets
+  // are sold, the funding note names the sale proceeds and cash used, sale
+  // commissions are said not to be estimated, and no Buy only option exists on
+  // the Rebalance plan.
+  test("rebalance sells overweight assets and offers no buy-only toggle", async ({
+    page,
+  }) => {
+    await openInvest(page, "Plan rebalance");
+    await expect(page.getByRole("checkbox", { name: /Buy only/i })).toHaveCount(
+      0
+    );
+    await expect(page.getByLabel("New money to add (optional)")).toBeVisible();
+
+    await openInvest(page, "Proposal rebalance");
+    const sells = rebalanceProposal.transactions.filter(
+      (transaction) => transaction.action === "sell"
+    );
+    expect(sells.length).toBeGreaterThan(0);
+    await expect(visibleText(page, "Sell")).toBeVisible();
+    for (const sell of sells) {
+      await expect(visibleText(page, sell.ticker)).toBeVisible();
+    }
+    const fundedBy = rebalanceProposal.fundedBy;
+    expect(fundedBy).not.toBeNull();
+    const note = page.getByText(/Funded by/);
+    await expect(note).toContainText(
+      formatCurrency(fundedBy?.saleProceeds ?? 0)
+    );
+    await expect(note).toContainText(formatCurrency(fundedBy?.cashUsed ?? 0));
+    await expect(note).toContainText("Sale commissions are not estimated.");
+  });
+
+  // GIVEN the plan step, WHEN the investor types negative or non-numeric
+  // input, THEN only the digits are kept, and WHEN they accept the suggested
+  // amount, THEN the field is filled with it.
+  test("plan ignores invalid input and fills the suggested amount", async ({
+    page,
+  }) => {
+    await openInvest(page, "Plan add money");
+    const amount = page.getByLabel("Amount to invest");
+    const suggested = suggestedAmountStates.amount;
+    if (suggested.status !== "amount") throw new Error("fixture changed");
+
+    await amount.fill("-5abc00");
+    await expect(amount).toHaveValue("500");
+    await amount.fill("abc");
+    await expect(amount).toHaveValue("");
+
+    await page.getByRole("button", { name: "Use suggested" }).click();
+    await expect(amount).toHaveValue(String(suggested.amount));
+    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  });
+
+  // GIVEN the plan step, WHEN the investor opens the commissions editor and
+  // presses Escape, THEN it closes and focus returns to the Edit button.
+  test("commissions editor closes with Escape and restores focus", async ({
+    page,
+  }) => {
+    await openInvest(page, "Plan add money");
+    const edit = page.getByRole("button", { name: "Edit commissions" });
+    await edit.click();
+    await expect(page.locator(".ds-fee-configuration:visible")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".ds-fee-configuration:visible")).toHaveCount(0);
+    await expect(edit).toBeFocused();
+
+    // The Canvas story opens the same editor immediately.
+    await openInvest(page, "Commissions dialog");
+    await expect(page.locator(".ds-fee-configuration:visible")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".ds-fee-configuration:visible")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Edit commissions" })
+    ).toBeFocused();
+  });
+
+  // GIVEN the drift view on a phone, WHEN it first loads, THEN the Add money and
+  // Rebalance buttons are inside the first viewport without scrolling and the
+  // Portfolio value is not broken across lines.
+  test("mobile drift shows its path actions without scrolling", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "storybook-mobile",
+      "The first-viewport contract is mobile-only."
+    );
+    await openInvest(page, "Drift overview", { mobileVariant: true });
+    const viewport = page.viewportSize();
+    for (const name of ["Add money", "Rebalance"]) {
+      const box = await page.getByRole("button", { name }).boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+    }
+    await expectNoHorizontalOverflow(page);
+  });
+
+  // GIVEN the drift metric strip, WHEN it renders at any width, THEN each
+  // figure stays on one line.
+  test("drift metric values never wrap mid-number", async ({
+    page,
+  }, testInfo) => {
+    await openInvest(page, "Drift overview", {
+      mobileVariant: testInfo.project.name === "storybook-mobile",
+    });
+    const values = page.locator(
+      ".ds-metric-strip .ds-metric-card__value:visible"
+    );
+    expect(await values.count()).toBeGreaterThan(0);
+    for (const value of await values.all()) {
+      const lines = await value.evaluate((node) => {
+        const lineHeight = parseFloat(getComputedStyle(node).lineHeight);
+        return Math.round(node.getBoundingClientRect().height / lineHeight);
+      });
+      expect(lines).toBe(1);
+    }
+  });
+
+  // GIVEN the drift, plan and proposal screens beside the portfolio sidebar,
+  // WHEN the viewport is 1024 or 1180 pixels wide, THEN the page does not
+  // scroll sideways, no metric value is clipped by its card, the plan's path
+  // switch spans the card content, and the drift screen shows Add money
+  // (primary) and Rebalance (secondary) outside any card, in the first viewport.
+  for (const width of [1024, 1180]) {
+    test(`invest screens fit the main column at ${width}px`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(
+        testInfo.project.name === "storybook-mobile",
+        "Mid-width desktop layouts are not exercised on the phone project."
+      );
+      await page.setViewportSize({ width, height: 800 });
+
+      const screens = [
+        "Drift overview",
+        "Plan add money",
+        "Proposal add money",
+        "Proposal rebalance",
+      ];
+      for (const story of screens) {
+        await openInvest(page, story);
+        await expectNoHorizontalOverflow(page);
+        const clipped = await page
+          .locator(".ds-metric-card__value:visible")
+          .evaluateAll((nodes) =>
+            nodes
+              .filter((node) => node.scrollWidth > node.clientWidth)
+              .map((node) => node.textContent)
+          );
+        expect(clipped, `${story} at ${width}px clips metric values`).toEqual(
+          []
+        );
+      }
+
+      await openInvest(page, "Plan add money");
+      const strategy = page.getByRole("radiogroup", {
+        name: "Investment path",
+      });
+      const content = page
+        .locator(".ds-plan-form__rules .ds-card__content")
+        .first();
+      const switchBox = await strategy.boundingBox();
+      const contentBox = await content.boundingBox();
+      expect(switchBox).not.toBeNull();
+      expect(contentBox).not.toBeNull();
+      expect(switchBox!.width).toBeGreaterThanOrEqual(contentBox!.width - 48);
+
+      await openInvest(page, "Drift overview");
+      const addMoney = page.getByRole("button", { name: "Add money" });
+      const rebalance = page.getByRole("button", { name: "Rebalance" });
+      await expect(addMoney).toHaveClass(/ds-button--primary/);
+      await expect(rebalance).toHaveClass(/ds-button--secondary/);
+      for (const button of [addMoney, rebalance]) {
+        expect(await button.evaluate((node) => node.closest(".ds-card"))).toBe(
+          null
+        );
+        const box = await button.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+      }
+    });
+  }
+
+  // GIVEN each Invest step on a phone, WHEN it is shown, THEN nothing scrolls
+  // sideways, the pinned action bar does not overlap the navigation button,
+  // and the primary action is reachable above both.
+  test("mobile steps keep actions reachable without overlap", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "storybook-mobile",
+      "The pinned action bar is a mobile-only contract."
+    );
+    const steps = [
+      { story: "Drift overview", primary: "Add money" },
+      { story: "Plan add money", primary: "Continue" },
+      { story: "Proposal add money", primary: "Update portfolio" },
+      { story: "Proposal rebalance", primary: "Update portfolio" },
+      { story: "Updated", primary: "Back to portfolio" },
+    ];
+    for (const step of steps) {
+      await openInvest(page, step.story, { mobileVariant: true });
+      await expectNoHorizontalOverflow(page);
+
+      const primary = page.getByRole("button", { name: step.primary });
+      await primary.scrollIntoViewIfNeeded();
+      await expect(primary).toBeVisible();
+      const box = await primary.boundingBox();
+      const viewport = page.viewportSize();
+      expect(box).not.toBeNull();
+      expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+
+      const bar = page.locator(".ds-sticky-action-bar:visible");
+      if ((await bar.count()) > 0) {
+        const position = await bar.evaluate(
+          (node) => window.getComputedStyle(node).position
+        );
+        expect(position).toBe("fixed");
+        const fab = page.locator(".ds-portfolio-workspace__navigation-fab");
+        expect(await overlaps(bar, fab)).toBe(false);
+        expect(await overlaps(primary, fab)).toBe(false);
+        // Nothing sits on top of the primary action.
+        const covered = await primary.evaluate((node) => {
+          const rect = node.getBoundingClientRect();
+          const top = document.elementFromPoint(
+            rect.x + rect.width / 2,
+            rect.y + rect.height / 2
+          );
+          return !node.contains(top);
+        });
+        expect(covered).toBe(false);
+      }
+    }
+  });
+
+  // GIVEN the plan step on a desktop screen, WHEN it is shown, THEN the
+  // actions sit in the page flow instead of being pinned to the screen edge.
+  test("desktop keeps step actions in the page flow", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "storybook-mobile",
+      "Pinning to the screen edge is the mobile behaviour."
+    );
+    await openInvest(page, "Plan add money");
+    const bar = page.locator(".ds-sticky-action-bar:visible");
+    await expect(bar).toHaveCount(1);
+    const position = await bar.evaluate(
+      (node) => window.getComputedStyle(node).position
+    );
+    expect(position).not.toBe("fixed");
+  });
+
+  // GIVEN each edge state of the proposal, WHEN it is shown, THEN it explains
+  // why there is nothing to approve and offers a way forward.
+  for (const edge of [
+    { story: "Proposal blocked", title: "Target weights must total 100%" },
+    { story: "Proposal needs amount", title: "Nothing to invest yet" },
+    {
+      story: "Proposal on target",
+      title: "You already reached your target allocation",
+    },
+    { story: "Proposal fees too high", title: "Transaction fees are too high" },
+    {
+      story: "Proposal price too high",
+      title: "Your amount is too small for whole units",
+    },
+    {
+      story: "Proposal error",
+      title: "We could not calculate your transactions",
+    },
+  ]) {
+    test(`${edge.story.toLowerCase()} explains the state`, async ({ page }) => {
+      await openInvest(page, edge.story);
+      await expect(visibleText(page, edge.title)).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Update portfolio" })
+      ).toHaveCount(0);
+      await expect(
+        page.locator(".ds-sticky-action-bar:visible").getByRole("button")
+      ).not.toHaveCount(0);
+    });
+  }
+});
 test.describe("latest design-system polish", () => {
+  /**
+   * GIVEN the Add asset overlay open on an asset being edited
+   * WHEN the investor opens the transaction fee editor, saves or dismisses it
+   * THEN one nested fee overlay (dialog on desktop, drawer on mobile) sits above
+   * the parent overlay, dismissal discards unsaved choices and focus returns to
+   * the fee trigger.
+   */
   test("fixed fee configuration uses one nested responsive overlay and restores focus", async ({
     page,
   }, testInfo) => {
@@ -821,12 +1025,20 @@ test.describe("latest design-system polish", () => {
     await feeTrigger.click();
     await page.getByRole("radio", { name: "Fixed" }).click();
 
+    // The story's Add asset overlay stays open as the parent, so exactly one
+    // nested fee overlay is stacked above exactly one parent overlay.
     if (testInfo.project.name === "storybook-mobile") {
       await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(0);
-      await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(1);
+      await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(2);
+      await expect(
+        page.locator(".ds-drawer-popup--nested:visible")
+      ).toHaveCount(1);
     } else {
-      await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(1);
+      await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(2);
       await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(0);
+      await expect(
+        page.locator(".ds-dialog-popup--nested:visible")
+      ).toHaveCount(1);
     }
     await expect(page.locator(".ds-fee-configuration:visible")).toContainText(
       "Maximum impact"
@@ -870,54 +1082,6 @@ test.describe("latest design-system polish", () => {
     await expect(page.locator(".ds-fee-summary:visible")).toContainText(
       "Fixed"
     );
-  });
-
-  test("allocation footers adapt navigation and action layout to mobile", async ({
-    page,
-  }, testInfo) => {
-    const mobile = testInfo.project.name === "storybook-mobile";
-    const optionsId = await findStory(
-      page,
-      "Compositions / Allocate and rebalance",
-      "Allocation options"
-    );
-    await page.goto(`/iframe.html?id=${encodeURIComponent(optionsId)}`);
-    await page.waitForLoadState("networkidle");
-    const optionsFooter = page.locator(".ds-allocation-footer:visible");
-    await expect(optionsFooter).toHaveCount(1);
-    const optionsButtons = optionsFooter.getByRole("button");
-    if (mobile) {
-      await expect(optionsButtons).toHaveCount(1);
-      await expect(optionsButtons.first()).not.toHaveClass(/ds-button--ghost/);
-    } else {
-      await expect(optionsButtons).toHaveCount(2);
-      await expect(optionsButtons.first()).toHaveClass(/ds-button--ghost/);
-      const optionsLayout = await optionsButtons.evaluateAll((buttons) =>
-        buttons.map((button) => button.getBoundingClientRect().x)
-      );
-      expect(optionsLayout[0]).toBeLessThan(optionsLayout[1]);
-    }
-
-    const resultId = await findStory(
-      page,
-      "Compositions / Allocate and rebalance",
-      "Allocation result"
-    );
-    await page.goto(`/iframe.html?id=${encodeURIComponent(resultId)}`);
-    await page.waitForLoadState("networkidle");
-    const resultFooter = page.locator(".ds-allocation-footer:visible");
-    const resultButtons = resultFooter.getByRole("button");
-    if (mobile) {
-      await expect(resultButtons).toHaveCount(1);
-      await expect(resultButtons.first()).not.toHaveClass(/ds-button--ghost/);
-    } else {
-      await expect(resultButtons).toHaveCount(2);
-      await expect(resultButtons.first()).toHaveClass(/ds-button--ghost/);
-      const resultLayout = await resultButtons.evaluateAll((buttons) =>
-        buttons.map((button) => button.getBoundingClientRect().x)
-      );
-      expect(resultLayout[0]).toBeLessThan(resultLayout[1]);
-    }
   });
 
   test("strategic mobile rows expose independent target and drift labels", async ({
@@ -1099,7 +1263,7 @@ test.describe("Storybook docs and overlay smoke", () => {
       "Compositions / Add asset",
       "Compositions / Edit and remove asset",
       "Compositions / Portfolio settings",
-      "Compositions / Allocate and rebalance",
+      "Compositions / Invest",
     ] as const;
 
     for (const title of docsStories) {
@@ -1109,6 +1273,12 @@ test.describe("Storybook docs and overlay smoke", () => {
   });
 
   for (const storyName of ["Transaction fees", "Remove confirmation"]) {
+    /**
+     * GIVEN the Edit and remove asset story for this stage
+     * WHEN it renders
+     * THEN only the stage's overlay is open (a drawer on mobile fees, which is
+     * exposed as the one dialog) and Escape closes it without a Cancel button.
+     */
     test(`${storyName} opens only its active overlay`, async ({
       page,
     }, testInfo) => {
@@ -1123,8 +1293,11 @@ test.describe("Storybook docs and overlay smoke", () => {
       if (storyName === "Remove confirmation") {
         await expect(page.getByRole("dialog")).toHaveCount(1);
       } else if (testInfo.project.name === "storybook-mobile") {
+        // A drawer is a modal dialog for assistive technology, so the single
+        // exposed dialog must be that drawer rather than a dialog popup.
         await expect(page.locator(".ds-drawer-popup:visible")).toHaveCount(1);
-        await expect(page.getByRole("dialog")).toHaveCount(0);
+        await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(0);
+        await expect(page.getByRole("dialog")).toHaveCount(1);
       } else {
         await expect(page.locator(".ds-dialog-popup:visible")).toHaveCount(1);
       }

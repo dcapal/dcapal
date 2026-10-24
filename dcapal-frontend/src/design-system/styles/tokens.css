@@ -157,9 +157,9 @@
   --dcapal-chart-height: 11rem;
   --dcapal-chart-height-mobile: 9rem;
   --dcapal-fab-size: 3.5rem;
+  /* Height of the bottom action bar shown on small screens by invest steps. */
+  --dcapal-sticky-action-bar-height: 4.5rem;
   --dcapal-fab-action-width: 9rem;
-  --dcapal-allocation-footer-padding: var(--dcapal-card-content-padding);
-  --dcapal-allocation-footer-padding-compact: var(--dcapal-card-content-padding-compact);
   --dcapal-asset-ticker-chip-gap: var(--dcapal-space-2);
   --dcapal-z-fab: 20;
   --dcapal-z-overlay-backdrop: 40;

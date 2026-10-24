@@ -115,7 +115,20 @@ Organize stories under these groups:
 - `UI` for reusable primitives;
 - `Patterns` for domain-shaped reusable components;
 - `Compositions` for portfolio overview, add asset, edit/remove asset,
-  portfolio settings, and allocate/rebalance journeys.
+  portfolio settings, and the Invest journey (drift, plan, proposal, result).
+
+The Invest composition (`Compositions / Invest`) is a fixture-driven demo of
+the `Patterns / Invest` components: `DriftOverview`, `InvestmentPlanForm`,
+`InvestmentProposal` (every proposal state), and `InvestmentResult`. Portfolio
+navigation has one Invest entry; Add money and Rebalance are paths inside the
+journey, offered as a primary Add money and a secondary Rebalance button
+(`InvestmentPathActions`) in the page header, outside the `DriftOverview` card,
+and switched with a full-width segmented control across the plan's Budget and
+rules card. Invest layouts respond to the width of their own container (CSS
+container queries), not the viewport, because the portfolio sidebar narrows the
+main column; only the pinned mobile action bar follows the viewport. Metric
+values may wrap at a "→" but never inside a figure; copy says "transactions", never "orders". Its figures are static,
+so the optimizer is not needed to run Storybook.
 
 Stories should use deterministic data and typed CSF metadata. Show the light
 theme by default and include dark-shell examples where navigation or overlay
