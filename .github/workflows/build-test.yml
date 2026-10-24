@@ -25,8 +25,8 @@ jobs:
     name: check:fmt:backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: false
           rustflags: ""
@@ -42,8 +42,8 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: true
           cache-shared-key: rust-sccache
@@ -52,7 +52,7 @@ jobs:
           rustflags: ""
           components: clippy
       - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Toolchain info
         run: |
           cargo --version --verbose
@@ -73,8 +73,8 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: true
           cache-shared-key: rust-sccache
@@ -82,7 +82,7 @@ jobs:
           cache-targets: false
           rustflags: ""
       - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Start backend database
         run: make backend-db-up
 
@@ -104,8 +104,8 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: true
           cache-shared-key: rust-sccache
@@ -113,7 +113,7 @@ jobs:
           cache-targets: false
           rustflags: ""
       - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Generate OpenAPI spec
         run: make export-openapi
 
@@ -130,8 +130,8 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: true
           cache-shared-key: rust-sccache
@@ -140,7 +140,7 @@ jobs:
           rustflags: ""
           components: clippy, rustfmt
       - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Toolchain info
         run: |
           cargo --version --verbose
@@ -163,8 +163,8 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: true
           cache-shared-key: rust-sccache
@@ -172,7 +172,7 @@ jobs:
           cache-targets: false
           rustflags: ""
       - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
@@ -196,7 +196,7 @@ jobs:
         run: ${SCCACHE_PATH} --show-stats
 
       - name: Archive dcapal-optimizer-wasm pkg
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -206,9 +206,9 @@ jobs:
     runs-on: ubuntu-slim
     needs: optimizer-build-test
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: pnpm
@@ -216,7 +216,7 @@ jobs:
 
       # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -232,9 +232,9 @@ jobs:
     runs-on: ubuntu-slim
     needs: optimizer-build-test
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: pnpm
@@ -242,7 +242,7 @@ jobs:
 
       # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -258,9 +258,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: optimizer-build-test
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: pnpm
@@ -268,7 +268,7 @@ jobs:
 
       # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -296,11 +296,11 @@ jobs:
           - lane: other-browsers
             collect_coverage: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: pnpm
@@ -308,7 +308,7 @@ jobs:
 
       # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -318,7 +318,7 @@ jobs:
 
       # Version the browser cache so Playwright upgrades invalidate old binaries.
       - name: Cache Playwright browsers
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
@@ -344,14 +344,14 @@ jobs:
         if: ${{ matrix.collect_coverage }}
         run: pnpm frontend:coverage:report
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ always() && !matrix.collect_coverage }}
         with:
           name: playwright-report-other-browsers
           path: dcapal-frontend/playwright-report/
           retention-days: 30
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ always() && matrix.collect_coverage }}
         with:
           name: frontend-coverage-report
@@ -364,9 +364,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: optimizer-build-test
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: pnpm
@@ -374,7 +374,7 @@ jobs:
 
       # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -384,7 +384,7 @@ jobs:
 
       # Version the browser cache so Playwright upgrades invalidate old binaries.
       - name: Cache Playwright browsers
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
@@ -397,7 +397,7 @@ jobs:
       - name: Run Storybook regression tests
         run: pnpm --filter @dcapal/frontend storybook:test
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: playwright-report-storybook
@@ -421,9 +421,9 @@ jobs:
       SMOKE_PORTFOLIO_ID: 11111111-1111-4111-8111-111111111111
       SMOKE_PORTFOLIO_NAME: Smoke portfolio
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: pnpm
@@ -431,7 +431,7 @@ jobs:
 
       # The generated package is a local dependency and must exist before pnpm install.
       - name: Download dcapal-optimizer-wasm pkg
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dcapal-optimizer-wasm-pkg
           path: dcapal-optimizer-wasm/pkg
@@ -441,7 +441,7 @@ jobs:
 
       # The full-stack smoke uses one Chromium project; the deterministic frontend job owns the browser matrix.
       - name: Cache Playwright Chromium
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-ms-playwright-v1-${{ hashFiles('pnpm-lock.yaml') }}
@@ -453,7 +453,7 @@ jobs:
 
       # Supabase setup-cli installs the pinned package through npm.
       - name: Cache Supabase CLI npm packages
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.npm
           key: ${{ runner.os }}-supabase-cli-${{ env.SUPABASE_VERSION }}
@@ -461,21 +461,21 @@ jobs:
             ${{ runner.os }}-supabase-cli-
 
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v3
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: ${{ env.SUPABASE_VERSION }}
 
       - name: Set up Docker Buildx
         id: setup-buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Export GitHub Actions cache environment
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: rust-docker-cache
         with:
           path: ${{ runner.temp }}/docker-rust-cache
@@ -483,7 +483,7 @@ jobs:
           restore-keys: |
             ubuntu-docker-sccache-rust-
 
-      - uses: reproducible-containers/buildkit-cache-dance@v3
+      - uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723 # v3.4.0
         with:
           builder: ${{ steps.setup-buildx.outputs.name }}
           cache-dir: ${{ runner.temp }}/docker-rust-cache
@@ -491,7 +491,7 @@ jobs:
           skip-extraction: ${{ steps.rust-docker-cache.outputs.cache-hit }}
 
       - name: Build dcapal-backend image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./dcapal-backend/docker/Dockerfile.ci
@@ -596,7 +596,7 @@ jobs:
       - name: Assert Timescale smoke data
         run: dcapal-backend/scripts/assert-smoke-data.sh
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: playwright-report-smoke
