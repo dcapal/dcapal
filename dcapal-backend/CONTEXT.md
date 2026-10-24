@@ -79,6 +79,10 @@ _Avoid_: Saved portfolio; portfolio synchronization
 A bidirectional exchange of a user's saved portfolios between the client and backend. A later client version updates the saved portfolio, while a later server version is returned to the client; synchronization also reports saved portfolio deletions and does not execute trades.
 _Avoid_: Trade synchronization; portfolio import
 
+**Asset reference**:
+A provider (`yf` or `kraken`) and an upper-case symbol identifying an asset. The v2 synchronization contract carries assets only as references; the backend resolves their shared metadata from the shared asset directory or the provider, and a Portfolio Asset is identified by its Portfolio and asset reference (see ADR 0005).
+_Avoid_: Portfolio Asset ID in the v2 contract; client-supplied asset metadata
+
 **Allocation mode**:
 The Portfolio-wide choice between Simple targeting, which uses absolute Portfolio Asset targets, and Strategic targeting, which uses Asset Class targets and relative Portfolio Asset targets.
 _Avoid_: Allocation kind; per-asset mode

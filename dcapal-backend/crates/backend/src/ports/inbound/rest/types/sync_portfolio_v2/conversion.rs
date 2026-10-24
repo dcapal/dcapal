@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::domain::asset::AssetRef;
 
 impl From<V2ConversionError> for V2ValidationError {
     fn from(error: V2ConversionError) -> Self {
@@ -126,28 +127,18 @@ impl TryFrom<PortfolioAssetV2Request> for app::PortfolioAssetV2 {
     type Error = V2ConversionError;
 
     fn try_from(asset: PortfolioAssetV2Request) -> Result<Self, Self::Error> {
-        let provider = app::Provider::parse(&asset.asset.provider).unwrap_or_else(|| {
-            app::Provider::Unsupported(asset.asset.provider.trim().to_ascii_lowercase())
-        });
-        let unsupported_provider = matches!(provider, app::Provider::Unsupported(_));
-        let shared_asset = app::SharedAssetV2::try_from(asset.asset)?;
-        let asset_class_override = match asset.aclass_override {
-            Some(value) => match app::AssetClass::parse(&value) {
-                Some(class) => Some(class),
-                None if unsupported_provider => None,
-                None => {
-                    return Err(V2ConversionError::field(
-                        "aclassOverride",
-                        KNOWN_ASSET_CLASS_MESSAGE,
-                    ));
-                }
-            },
-            None => None,
-        };
+        let reference = AssetRef::try_from(asset.asset).map_err(|error| error.prepend("asset"))?;
+        let asset_class_override = asset
+            .aclass_override
+            .map(|value| {
+                app::AssetClass::parse(&value).ok_or_else(|| {
+                    V2ConversionError::field("aclassOverride", KNOWN_ASSET_CLASS_MESSAGE)
+                })
+            })
+            .transpose()?;
 
         Ok(Self {
-            id: asset.id,
-            asset: shared_asset,
+            asset: reference,
             asset_class_override,
             quantity: asset.quantity,
             target_weight: asset.target_weight,
@@ -158,25 +149,25 @@ impl TryFrom<PortfolioAssetV2Request> for app::PortfolioAssetV2 {
     }
 }
 
-impl TryFrom<SharedAssetV2Request> for app::SharedAssetV2 {
+impl TryFrom<AssetRefV2> for AssetRef {
     type Error = V2ConversionError;
 
-    fn try_from(asset: SharedAssetV2Request) -> Result<Self, Self::Error> {
-        let provider = app::Provider::parse(&asset.provider).unwrap_or_else(|| {
-            app::Provider::Unsupported(asset.provider.trim().to_ascii_lowercase())
-        });
-        let asset_class = app::AssetClass::parse(&asset.aclass)
-            .or_else(|| {
-                matches!(provider, app::Provider::Unsupported(_)).then_some(app::AssetClass::Other)
-            })
-            .ok_or_else(|| V2ConversionError::field("asset.aclass", ASSET_CLASS_ENUM_MESSAGE))?;
+    fn try_from(reference: AssetRefV2) -> Result<Self, Self::Error> {
+        let provider = app::Provider::parse(&reference.provider)
+            .ok_or_else(|| V2ConversionError::field("provider", KNOWN_PROVIDER_MESSAGE))?;
         Ok(Self {
             provider,
-            symbol: asset.symbol,
-            name: asset.name,
-            currency: asset.currency,
-            asset_class,
+            symbol: reference.symbol,
         })
+    }
+}
+
+impl From<AssetRef> for AssetRefV2 {
+    fn from(reference: AssetRef) -> Self {
+        Self {
+            provider: reference.provider.as_str().to_string(),
+            symbol: reference.symbol,
+        }
     }
 }
 
@@ -192,14 +183,17 @@ impl TryFrom<StrategicAllocationV2Request> for app::StrategicAllocationV2 {
                 Err(error) => errors.extend(error.prepend(&format!("assetClassTargets[{index}]"))),
             }
         }
+        let mut asset_targets = Vec::with_capacity(allocation.asset_targets.len());
+        for (index, target) in allocation.asset_targets.into_iter().enumerate() {
+            match app::StrategicAssetTargetV2::try_from(target) {
+                Ok(target) => asset_targets.push(target),
+                Err(error) => errors.extend(error.prepend(&format!("assetTargets[{index}]"))),
+            }
+        }
         if errors.errors.is_empty() {
             Ok(Self {
                 asset_class_targets,
-                asset_targets: allocation
-                    .asset_targets
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
+                asset_targets,
             })
         } else {
             Err(errors)
@@ -219,12 +213,14 @@ impl TryFrom<StrategicAssetClassTargetV2Request> for app::StrategicAssetClassTar
     }
 }
 
-impl From<StrategicAssetTargetV2Request> for app::StrategicAssetTargetV2 {
-    fn from(target: StrategicAssetTargetV2Request) -> Self {
-        Self {
-            portfolio_asset_id: target.portfolio_asset_id,
+impl TryFrom<StrategicAssetTargetV2Request> for app::StrategicAssetTargetV2 {
+    type Error = V2ConversionError;
+
+    fn try_from(target: StrategicAssetTargetV2Request) -> Result<Self, Self::Error> {
+        Ok(Self {
+            asset: AssetRef::try_from(target.asset).map_err(|error| error.prepend("asset"))?,
             relative_target_weight: target.relative_target_weight,
-        }
+        })
     }
 }
 
@@ -296,7 +292,6 @@ impl From<app::AllocationMode> for AllocationModeWire {
 impl From<app::PortfolioAssetV2> for PortfolioAssetV2Response {
     fn from(asset: app::PortfolioAssetV2) -> Self {
         Self {
-            id: asset.id,
             asset: asset.asset.into(),
             aclass_override: asset
                 .asset_class_override
@@ -306,18 +301,6 @@ impl From<app::PortfolioAssetV2> for PortfolioAssetV2Response {
             manual_price: asset.manual_price,
             average_buy_price: asset.average_buy_price,
             fees: asset.fees.map(Into::into),
-        }
-    }
-}
-
-impl From<app::SharedAssetV2> for SharedAssetV2Response {
-    fn from(asset: app::SharedAssetV2) -> Self {
-        Self {
-            provider: asset.provider.as_str().to_string(),
-            symbol: asset.symbol,
-            name: asset.name,
-            currency: asset.currency,
-            aclass: asset.asset_class.as_str().to_string(),
         }
     }
 }
@@ -351,7 +334,7 @@ impl From<app::StrategicAssetClassTargetV2> for StrategicAssetClassTargetV2Respo
 impl From<app::StrategicAssetTargetV2> for StrategicAssetTargetV2Response {
     fn from(target: app::StrategicAssetTargetV2) -> Self {
         Self {
-            portfolio_asset_id: target.portfolio_asset_id,
+            asset: target.asset.into(),
             relative_target_weight: target.relative_target_weight,
         }
     }

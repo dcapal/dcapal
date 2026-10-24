@@ -167,16 +167,20 @@ impl DcaServer {
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
+        let asset_service = Arc::new(AssetService::new(
+            repos.asset.clone(),
+            Arc::new(ProviderRoutedAssetProvider::new(
+                providers.yahoo.clone(),
+                Arc::new(KrakenAssetProvider::new(repos.mkt_data.clone())),
+            )),
+        ));
         let services = Services {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
-            portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
-            asset: Arc::new(AssetService::new(
-                repos.asset.clone(),
-                Arc::new(ProviderRoutedAssetProvider::new(
-                    providers.yahoo.clone(),
-                    Arc::new(KrakenAssetProvider::new(repos.mkt_data.clone())),
-                )),
+            portfolio: Arc::new(PortfolioService::new(
+                repos.portfolio.clone(),
+                asset_service.clone(),
             )),
+            asset: asset_service,
         };
 
         let (api_routes, openapi) = rest::build_openapi_router();

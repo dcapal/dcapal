@@ -13,10 +13,7 @@ use crate::app::domain::portfolio::{
 use crate::ports::{
     inbound::rest::request::{PortfolioRequest, TransactionFeesRequest},
     outbound::repository::{
-        portfolio::{
-            PortfolioAssetOwnership, PortfolioOwnership, PortfolioRepository,
-            PortfolioRepositoryError, Result,
-        },
+        portfolio::{PortfolioRepository, PortfolioRepositoryError, Result},
         postgres::types::{
             AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, PortfolioAssetRow,
             PortfolioRow, Provider as DbProvider,
@@ -493,46 +490,19 @@ impl SqlxPortfolioRepository {
 }
 #[async_trait]
 impl PortfolioRepository for SqlxPortfolioRepository {
-    async fn find_owners(
-        &self,
-        portfolio_ids: &[Uuid],
-        portfolio_asset_ids: &[Uuid],
-    ) -> Result<PortfolioOwnership> {
-        let mut ownership = PortfolioOwnership::default();
-        if !portfolio_ids.is_empty() {
-            let owners = query_as::<_, (Uuid, Uuid)>(
-                "SELECT id, user_id
-                 FROM portfolios
-                 WHERE id = ANY($1)",
-            )
-            .bind(portfolio_ids.to_vec())
-            .fetch_all(&self.pool)
-            .await?;
-            ownership.portfolios.extend(owners);
+    async fn find_owners(&self, portfolio_ids: &[Uuid]) -> Result<HashMap<Uuid, Uuid>> {
+        if portfolio_ids.is_empty() {
+            return Ok(HashMap::new());
         }
-        if !portfolio_asset_ids.is_empty() {
-            let owners = query_as::<_, (Uuid, Uuid, Uuid)>(
-                "SELECT pa.id, p.user_id, pa.portfolio_id
-                 FROM portfolio_asset AS pa
-                 JOIN portfolios AS p ON p.id = pa.portfolio_id
-                 WHERE pa.id = ANY($1)",
-            )
-            .bind(portfolio_asset_ids.to_vec())
-            .fetch_all(&self.pool)
-            .await?;
-            ownership.portfolio_assets.extend(owners.into_iter().map(
-                |(asset_id, user_id, portfolio_id)| {
-                    (
-                        asset_id,
-                        PortfolioAssetOwnership {
-                            user_id,
-                            portfolio_id,
-                        },
-                    )
-                },
-            ));
-        }
-        Ok(ownership)
+        let owners = query_as::<_, (Uuid, Uuid)>(
+            "SELECT id, user_id
+             FROM portfolios
+             WHERE id = ANY($1)",
+        )
+        .bind(portfolio_ids.to_vec())
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(owners.into_iter().collect())
     }
 
     async fn get_user_portfolios_with_assets(

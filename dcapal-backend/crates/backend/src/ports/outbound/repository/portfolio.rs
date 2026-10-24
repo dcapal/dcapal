@@ -22,6 +22,8 @@ pub enum PortfolioRepositoryError {
     CannotUpdate,
     #[error("v2 portfolio ownership violation for {0:?}")]
     OwnershipConflict(OwnershipConflict),
+    #[error("v2 synchronization references an asset that was not onboarded: {0}")]
+    AssetNotOnboarded(String),
     #[error("v2 portfolio synchronization is not supported by this repository")]
     UnsupportedV2,
     #[error("stored portfolio data is corrupt: {0}")]
@@ -37,31 +39,10 @@ pub enum PortfolioRepositoryError {
 pub enum OwnershipConflict {
     /// A Portfolio row belongs to another user or is unavailable for update.
     Portfolio { id: Uuid },
-    /// A Portfolio Asset relationship belongs to another Portfolio.
-    PortfolioAsset { id: Uuid },
 }
 
 /// The result type exposed by the portfolio persistence port.
 pub type Result<T> = std::result::Result<T, PortfolioRepositoryError>;
-
-/// Existing Portfolio and Portfolio Asset ownership facts resolved for a
-/// synchronization command. Missing identifiers are intentionally omitted.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct PortfolioOwnership {
-    /// Owners keyed by Portfolio identifier.
-    pub portfolios: HashMap<Uuid, Uuid>,
-    /// Owners and containing Portfolios keyed by relationship identifier.
-    pub portfolio_assets: HashMap<Uuid, PortfolioAssetOwnership>,
-}
-
-/// Ownership facts for one Portfolio Asset relationship.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PortfolioAssetOwnership {
-    /// User who owns the containing Portfolio.
-    pub user_id: Uuid,
-    /// Portfolio that contains the relationship.
-    pub portfolio_id: Uuid,
-}
 
 impl PortfolioRepositoryError {
     /// Returns whether PostgreSQL reported a retryable concurrency conflict.
@@ -78,15 +59,12 @@ impl PortfolioRepositoryError {
 #[async_trait]
 #[cfg_attr(test, mockall::automock)]
 pub trait PortfolioRepository: Send + Sync {
-    /// Returns the owners of existing Portfolio and Portfolio Asset IDs.
+    /// Returns the owning user of every existing Portfolio among `portfolio_ids`.
     ///
-    /// Missing identifiers are omitted so commands can distinguish new
-    /// aggregates and tombstones from ownership violations.
-    async fn find_owners(
-        &self,
-        portfolio_ids: &[Uuid],
-        portfolio_asset_ids: &[Uuid],
-    ) -> Result<PortfolioOwnership>;
+    /// Soft-deleted Portfolios are included. Missing identifiers are omitted so
+    /// commands can distinguish new aggregates and tombstones from ownership
+    /// violations.
+    async fn find_owners(&self, portfolio_ids: &[Uuid]) -> Result<HashMap<Uuid, Uuid>>;
 
     /// Returns all portfolios owned by a user together with their assets.
     async fn get_user_portfolios_with_assets(

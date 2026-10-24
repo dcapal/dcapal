@@ -313,6 +313,7 @@ mod tests {
         assert!(sync["responses"].get("403").is_some());
         assert!(sync["responses"].get("409").is_some());
         assert!(sync["responses"].get("500").is_some());
+        assert!(sync["responses"].get("502").is_some());
 
         let request = &openapi["components"]["schemas"]["PortfolioAssetV2Request"];
         assert_eq!(request["properties"]["quantity"]["type"], "string");
@@ -324,7 +325,7 @@ mod tests {
                 .any(|value| value == "null")
         );
         assert_enum_contains(
-            &openapi["components"]["schemas"]["SharedAssetV2Response"]["properties"]["provider"],
+            &openapi["components"]["schemas"]["AssetRefV2"]["properties"]["provider"],
             &["yf", "kraken"],
         );
         assert_eq!(
@@ -365,7 +366,7 @@ mod tests {
         assert!(response["properties"].get("assets").is_some());
         assert!(response["properties"].get("notFound").is_some());
         assert_enum_contains(
-            &openapi["components"]["schemas"]["AssetRefV2Response"]["properties"]["provider"],
+            &openapi["components"]["schemas"]["AssetRefV2"]["properties"]["provider"],
             &["yf", "kraken"],
         );
     }

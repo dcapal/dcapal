@@ -58,25 +58,21 @@ impl AllocationModeWire {
     }
 }
 
-/// Shared Provider metadata carried inside a Portfolio Asset.
-#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+/// Reference to a provider-listed asset; shared metadata is resolved server-side.
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct SharedAssetV2Request {
+pub struct AssetRefV2 {
     #[schema(schema_with = v2_provider_schema)]
     pub provider: String,
+    /// Provider symbol; stored trimmed and upper-cased.
     pub symbol: String,
-    pub name: String,
-    pub currency: String,
-    #[schema(schema_with = v2_asset_class_schema)]
-    pub aclass: String,
 }
 
-/// Portfolio-specific holding and allocation values.
+/// Portfolio-specific holding and allocation values for one referenced asset.
 #[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetV2Request {
-    pub id: Uuid,
-    pub asset: SharedAssetV2Request,
+    pub asset: AssetRefV2,
     #[serde(default)]
     #[schema(schema_with = v2_optional_asset_class_schema)]
     pub aclass_override: Option<String>,
@@ -118,7 +114,7 @@ pub struct StrategicAssetClassTargetV2Request {
 #[derive(Debug, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StrategicAssetTargetV2Request {
-    pub portfolio_asset_id: Uuid,
+    pub asset: AssetRefV2,
     #[serde(with = "rust_decimal::serde::str")]
     #[schema(value_type = String)]
     pub relative_target_weight: Decimal,
@@ -192,8 +188,7 @@ pub struct PortfolioV2Response {
 #[derive(Debug, Serialize, ToSchema, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioAssetV2Response {
-    pub id: Uuid,
-    pub asset: SharedAssetV2Response,
+    pub asset: AssetRefV2,
     #[schema(schema_with = v2_optional_asset_class_schema)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aclass_override: Option<String>,
@@ -221,19 +216,6 @@ pub struct PortfolioAssetV2Response {
     pub fees: Option<TransactionFeesV2Response>,
 }
 
-/// Shared asset metadata returned by v2.
-#[derive(Debug, Serialize, ToSchema, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct SharedAssetV2Response {
-    #[schema(schema_with = v2_provider_schema)]
-    pub provider: String,
-    pub symbol: String,
-    pub name: String,
-    pub currency: String,
-    #[schema(schema_with = v2_asset_class_schema)]
-    pub aclass: String,
-}
-
 /// Strategic targets returned by v2.
 #[derive(Debug, Serialize, ToSchema, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -257,7 +239,7 @@ pub struct StrategicAssetClassTargetV2Response {
 #[derive(Debug, Serialize, ToSchema, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StrategicAssetTargetV2Response {
-    pub portfolio_asset_id: Uuid,
+    pub asset: AssetRefV2,
     #[serde(with = "rust_decimal::serde::str")]
     #[schema(value_type = String)]
     pub relative_target_weight: Decimal,
@@ -302,9 +284,8 @@ pub struct V2ValidationError {
 
 const VALIDATION_CODE: &str = "validation_error";
 const VALIDATION_MESSAGE: &str = "The Portfolio aggregate is invalid.";
-const ASSET_CLASS_ENUM_MESSAGE: &str =
-    "must be one of equity, bond, cash, crypto, commodity, other";
 const KNOWN_ASSET_CLASS_MESSAGE: &str = "must be a known Asset Class";
+const KNOWN_PROVIDER_MESSAGE: &str = "must be one of yf, kraken";
 
 /// A fallible conversion failure at the REST-to-application boundary.
 #[derive(Debug, thiserror::Error)]
@@ -393,7 +374,9 @@ mod tests {
 
     #[test]
     fn v2_decimals_are_strings_on_the_wire() {
-        // GIVEN a v2 request whose decimals are JSON strings, WHEN it is decoded,
+        // GIVEN a v2 request whose assets are bare references and whose decimals are
+        // JSON strings,
+        // WHEN it is decoded,
         // THEN the exact decimal values and null overrides are preserved.
         let request = serde_json::json!({
             "schemaVersion": 2,
@@ -405,8 +388,7 @@ mod tests {
                 "driftBand": "1.25",
                 "fees": null,
                 "assets": [{
-                    "id": Uuid::nil(),
-                    "asset": {"provider": "yf", "symbol": "VWCE", "name": "ETF", "currency": "EUR", "aclass": "equity"},
+                    "asset": {"provider": "yf", "symbol": "VWCE"},
                     "aclassOverride": null,
                     "quantity": "1.20",
                     "targetWeight": "100.00",
@@ -424,15 +406,15 @@ mod tests {
         assert_eq!(parsed.schema_version, 2);
         assert_eq!(parsed.portfolios[0].assets[0].quantity, dec!(1.20));
         assert_eq!(parsed.portfolios[0].assets[0].aclass_override, None);
+        assert_eq!(parsed.portfolios[0].assets[0].asset.symbol, "VWCE");
         assert_eq!(parsed.portfolios[0].drift_band, Some(dec!(1.25)));
     }
 
     #[test]
     fn v2_fee_policy_uses_camel_case_and_rejects_irrelevant_fields() {
-        // GIVEN variable and fixed fee policies, WHEN they are decoded and
-        // encoded, THEN camelCase keys are used and fields foreign to the type are rejected.
-        // GIVEN v2 fee policies use the canonical JSON names, WHEN they are
-        // parsed and serialized, THEN optional bounds round-trip and fields
+        // GIVEN variable and fixed fee policies,
+        // WHEN they are decoded and encoded,
+        // THEN camelCase keys are used, optional bounds round-trip, and fields
         // from another policy kind are rejected.
         let variable: TransactionFeesV2Request = serde_json::from_value(serde_json::json!({
             "feeStructure": {"type": "variable", "feeRate": "0.19"}
@@ -448,73 +430,75 @@ mod tests {
         assert!(invalid.is_err());
     }
 
-    #[test]
-    fn wire_conversion_reports_typed_field_errors() {
-        // GIVEN a wire request with an unknown asset class, WHEN it is converted
-        // to the application type, THEN the error names the nested field path.
-        // GIVEN a decoded request with an unknown Asset Class, WHEN the REST
-        // DTO is converted to application data, THEN conversion fails with
-        // the nested field location instead of leaking a wire type inward.
-        let mut request: SyncPortfoliosV2Request = serde_json::from_value(serde_json::json!({
+    fn request_with_asset(asset: serde_json::Value) -> SyncPortfoliosV2Request {
+        serde_json::from_value(serde_json::json!({
             "schemaVersion": 2,
             "portfolios": [{
                 "id": Uuid::nil(),
                 "name": "Draft",
                 "quoteCurrency": "EUR",
-                "allocationMode": "simple",
+                "allocationMode": "strategic",
                 "fees": null,
                 "assets": [{
-                    "id": Uuid::nil(),
-                    "asset": {"provider": "yf", "symbol": "VWCE", "name": "ETF", "currency": "EUR", "aclass": "equity"},
+                    "asset": asset,
                     "quantity": "1",
-                    "targetWeight": "100",
                     "fees": null
                 }],
-                "strategicAllocation": null,
+                "strategicAllocation": {
+                    "assetClassTargets": [],
+                    "assetTargets": [{
+                        "asset": {"provider": "kraken", "symbol": "BTC"},
+                        "relativeTargetWeight": "100"
+                    }]
+                },
                 "lastUpdatedAt": "2026-01-01T00:00:00Z"
             }],
             "deletedPortfolios": []
         }))
-        .expect("wire request should decode");
-        request.portfolios[0].assets[0].asset.aclass = "unknown".to_string();
+        .expect("wire request should decode")
+    }
+
+    #[test]
+    fn wire_conversion_rejects_unknown_providers_at_their_field() {
+        // GIVEN assets and Strategic targets that name an unsupported provider,
+        // WHEN the wire request is converted,
+        // THEN each is a validation error at its own nested provider path.
+        let mut request =
+            request_with_asset(serde_json::json!({"provider": "ibkr", "symbol": "SPY"}));
+        request.portfolios[0]
+            .strategic_allocation
+            .as_mut()
+            .unwrap()
+            .asset_targets[0]
+            .asset
+            .provider = "nasdaq".to_string();
+
+        let error = app::SyncPortfoliosV2Request::try_from(request)
+            .expect_err("unknown providers should fail conversion");
+        let fields: Vec<_> = error.errors.iter().map(|e| e.field.as_str()).collect();
+        assert_eq!(
+            fields,
+            [
+                "portfolios[0].assets[0].asset.provider",
+                "portfolios[0].strategicAllocation.assetTargets[0].asset.provider"
+            ]
+        );
+    }
+
+    #[test]
+    fn wire_conversion_reports_unknown_override_classes() {
+        // GIVEN an asset whose aclassOverride is not a known Asset Class,
+        // WHEN the wire request is converted,
+        // THEN the error names the nested override field.
+        let mut request =
+            request_with_asset(serde_json::json!({"provider": "yf", "symbol": "VWCE"}));
+        request.portfolios[0].assets[0].aclass_override = Some("unknown".to_string());
 
         let error = app::SyncPortfoliosV2Request::try_from(request)
             .expect_err("unknown class should fail conversion");
         assert_eq!(
             error.errors[0].field,
-            "portfolios[0].assets[0].asset.aclass"
+            "portfolios[0].assets[0].aclassOverride"
         );
-    }
-
-    #[test]
-    fn unsupported_provider_assets_can_be_filtered_before_semantic_validation() {
-        // GIVEN an unsupported Provider Asset with fields that only the
-        // synchronization command can validate, WHEN the wire DTO is
-        // converted, THEN it remains representable so the command can drop
-        // it and its dependent data without rejecting the whole aggregate.
-        let asset = PortfolioAssetV2Request {
-            id: Uuid::now_v7(),
-            asset: SharedAssetV2Request {
-                provider: "ibkr".to_string(),
-                symbol: String::new(),
-                name: String::new(),
-                currency: String::new(),
-                aclass: "not-a-class".to_string(),
-            },
-            aclass_override: Some("not-a-class".to_string()),
-            quantity: Decimal::NEGATIVE_ONE,
-            target_weight: Some(Decimal::from(101)),
-            manual_price: Some(Decimal::ZERO),
-            average_buy_price: None,
-            fees: None,
-        };
-
-        let converted = app::PortfolioAssetV2::try_from(asset).expect("unsupported asset");
-        assert!(matches!(
-            converted.asset.provider,
-            app::Provider::Unsupported(_)
-        ));
-        assert_eq!(converted.asset.asset_class, app::AssetClass::Other);
-        assert_eq!(converted.asset_class_override, None);
     }
 }

@@ -33,6 +33,7 @@ use super::{
         (status = 400, description = "Invalid Portfolio aggregate", body = V2ErrorResponse),
         (status = 403, description = "Portfolio ownership violation", body = V2ErrorResponse),
         (status = 409, description = "Serialization conflict", body = V2ErrorResponse),
+        (status = 502, description = "Asset provider unavailable", body = V2ErrorResponse),
         (status = 500, description = "Portfolio synchronization failure", body = V2ErrorResponse)
     )
 )]
@@ -44,10 +45,14 @@ pub async fn sync_portfolios(
     info!("Syncing v2 portfolios for user_id: {}.", claims.sub);
     let request = AppSyncPortfoliosV2Request::try_from(request)
         .map_err(|error| V2HttpError::Validation(error.into()))?;
-    let command =
-        SyncPortfoliosV2Command::try_new(claims.sub, request, ctx.repos.portfolio.as_ref())
-            .await
-            .map_err(V2HttpError::from)?;
+    let command = SyncPortfoliosV2Command::try_new(
+        claims.sub,
+        request,
+        ctx.repos.portfolio.as_ref(),
+        ctx.services.asset.as_ref(),
+    )
+    .await
+    .map_err(V2HttpError::from)?;
     let response = ctx
         .services
         .portfolio

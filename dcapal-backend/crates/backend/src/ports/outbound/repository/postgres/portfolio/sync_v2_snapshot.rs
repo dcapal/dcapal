@@ -2,11 +2,14 @@ use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query_as};
 use uuid::Uuid;
 
-use crate::app::domain::portfolio::{
-    AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
-    FeeStructure as AppFeeStructure, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
-    SharedAssetV2, StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
-    TransactionFees,
+use crate::app::domain::{
+    asset::AssetRef,
+    portfolio::{
+        AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
+        FeeStructure as AppFeeStructure, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
+        StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
+        TransactionFees,
+    },
 };
 use crate::ports::outbound::repository::portfolio::PortfolioRepositoryError;
 use crate::ports::outbound::repository::portfolio::Result;
@@ -39,10 +42,7 @@ pub(super) struct V2SnapshotRow {
     pub(super) portfolio_max_fee: Option<Decimal>,
     pub(super) asset_id: Option<Uuid>,
     pub(super) asset_symbol: Option<String>,
-    pub(super) asset_name: Option<String>,
-    pub(super) asset_class: Option<i16>,
     pub(super) asset_class_override: Option<i16>,
-    pub(super) asset_currency: Option<String>,
     pub(super) asset_provider: Option<i16>,
     pub(super) asset_quantity: Option<Decimal>,
     pub(super) asset_target_weight: Option<Decimal>,
@@ -63,14 +63,10 @@ pub(super) struct V2AssetWithWeight {
     pub(super) target_weight: Decimal,
 }
 
+/// Persisted Portfolio Asset values from which a v2 asset response is built.
 pub(super) struct V2AssetResponseInput {
-    pub(super) asset_id: Uuid,
-    pub(super) symbol: String,
-    pub(super) name: String,
-    pub(super) asset_class: DbAssetClass,
+    pub(super) asset: AssetRef,
     pub(super) asset_class_override: Option<i16>,
-    pub(super) currency: String,
-    pub(super) provider: DbProvider,
     pub(super) quantity: Decimal,
     pub(super) target_weight: Decimal,
     pub(super) manual_price: Option<Decimal>,
@@ -249,14 +245,7 @@ pub(super) fn v2_asset_response(input: V2AssetResponseInput) -> Result<V2AssetWi
     )?;
     Ok(V2AssetWithWeight {
         asset: PortfolioAssetV2 {
-            id: input.asset_id,
-            asset: SharedAssetV2 {
-                provider: app_provider(input.provider),
-                symbol: input.symbol,
-                name: input.name,
-                currency: input.currency,
-                asset_class: app_asset_class(input.asset_class),
-            },
+            asset: input.asset,
             asset_class_override,
             quantity: input.quantity,
             target_weight: None,
@@ -273,7 +262,10 @@ pub(super) fn v2_portfolio_response(
     mut assets: Vec<V2AssetWithWeight>,
     mut class_targets: Vec<StrategicAssetClassTargetV2>,
 ) -> Result<PortfolioV2> {
-    assets.sort_by_key(|asset| asset.asset.id);
+    assets.sort_by(|a, b| {
+        (a.asset.asset.provider.as_str(), &a.asset.asset.symbol)
+            .cmp(&(b.asset.asset.provider.as_str(), &b.asset.asset.symbol))
+    });
     class_targets.sort_by_key(|target| asset_class_rank(target.asset_class));
     let allocation_mode = match portfolio.allocation_mode {
         DbAllocationMode::Simple => AppAllocationMode::Simple,
@@ -300,7 +292,7 @@ pub(super) fn v2_portfolio_response(
                     assets
                         .iter()
                         .map(|asset| StrategicAssetTargetV2 {
-                            portfolio_asset_id: asset.asset.id,
+                            asset: asset.asset.asset.clone(),
                             relative_target_weight: asset.target_weight,
                         })
                         .collect()
@@ -389,31 +381,16 @@ fn v2_snapshot_portfolios(rows: Vec<V2SnapshotRow>) -> Result<Vec<PortfolioV2>> 
                 let symbol = row
                     .asset_symbol
                     .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset symbol"))?;
-                let name = row
-                    .asset_name
-                    .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset name"))?;
-                let asset_class =
-                    DbAssetClass::try_from(row.asset_class.ok_or_else(|| {
-                        corrupt_data("Portfolio snapshot is missing an Asset Class")
-                    })?)
-                    .map_err(|_| {
-                        corrupt_data("Portfolio snapshot contains an invalid Asset Class")
-                    })?;
-                let currency = row.asset_currency.ok_or_else(|| {
-                    corrupt_data("Portfolio snapshot is missing an Asset currency")
-                })?;
                 let provider = DbProvider::try_from(row.asset_provider.ok_or_else(|| {
                     corrupt_data("Portfolio snapshot is missing an Asset provider")
                 })?)
                 .map_err(|_| corrupt_data("Portfolio snapshot contains an invalid Provider"))?;
                 assets.push(v2_asset_response(V2AssetResponseInput {
-                    asset_id,
-                    symbol,
-                    name,
-                    asset_class,
+                    asset: AssetRef {
+                        provider: app_provider(provider),
+                        symbol,
+                    },
                     asset_class_override: row.asset_class_override,
-                    currency,
-                    provider,
                     quantity: row.asset_quantity.ok_or_else(|| {
                         corrupt_data("Portfolio snapshot is missing an Asset quantity")
                     })?,
@@ -462,10 +439,7 @@ fn v2_snapshot_portfolios(rows: Vec<V2SnapshotRow>) -> Result<Vec<PortfolioV2>> 
 
 fn has_partial_asset_data(row: &V2SnapshotRow) -> bool {
     row.asset_symbol.is_some()
-        || row.asset_name.is_some()
-        || row.asset_class.is_some()
         || row.asset_class_override.is_some()
-        || row.asset_currency.is_some()
         || row.asset_provider.is_some()
         || row.asset_quantity.is_some()
         || row.asset_target_weight.is_some()
@@ -498,10 +472,9 @@ pub(super) async fn load(
                 p.fee_type AS portfolio_fee_type, p.fee_amount AS portfolio_fee_amount,
                 p.fee_rate AS portfolio_fee_rate, p.min_fee AS portfolio_min_fee,
                 p.max_fee AS portfolio_max_fee,
-                pa.id AS asset_id, ad.symbol AS asset_symbol, ad.name AS asset_name,
-                ad.asset_class AS asset_class,
+                pa.id AS asset_id, ad.symbol AS asset_symbol,
                 pa.asset_class_override AS asset_class_override,
-                ad.currency AS asset_currency, ad.provider AS asset_provider,
+                ad.provider AS asset_provider,
                 pa.quantity AS asset_quantity, paa.weight AS asset_target_weight,
                 pa.manual_price AS asset_manual_price,
                 pa.max_fee_impact AS asset_max_fee_impact, pa.fee_type AS asset_fee_type,

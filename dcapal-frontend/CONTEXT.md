@@ -36,8 +36,8 @@ An asset included in a portfolio, with portfolio-specific data such as quantity 
 _Avoid_: Position
 
 **Portfolio Asset synchronization identity**:
-The v2 synchronization contract sends the Portfolio Asset relationship ID as a UUIDv7. Portfolio IDs keep their existing identity policy, and the v1 synchronization contract does not expose relationship IDs. A future v2 adapter must create and preserve UUIDv7 relationship IDs when it builds the request; existing Portfolio ID generation remains unchanged.
-_Avoid_: UUIDv4 Portfolio Asset ID in a v2 request
+The v2 synchronization contract is reference-only: an asset is identified by its provider and symbol, and relationship IDs are not exposed. The frontend has not adopted v2 yet; v1 remains in use (backend ADR 0005).
+_Avoid_: Client-generated Portfolio Asset ID in a v2 request
 
 **Holding**:
 The part of a portfolio asset that the investor already owns, described by its quantity and current value.

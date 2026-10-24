@@ -40,8 +40,8 @@ one Portfolio, and rewrites both table identities with PostgreSQL 18
 
 The current v1 synchronization payload remains unchanged: it is a legacy flat
 projection that returns the effective class and existing provider/class
-aliases. The v2 synchronization contract is out of scope for this decision
-and remains owned by issue #773.
+aliases. The v2 synchronization contract is out of scope for this decision;
+it is described by [ADR 0005](0005-reference-only-asset-sync.md).
 
 ## Consequences
 

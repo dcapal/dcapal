@@ -10,6 +10,7 @@ use crate::{
         },
         domain::portfolio::SyncPortfoliosV2Response,
         infra::retry::retry_sync,
+        services::asset::{AssetService, AssetServiceError},
     },
     error::DcaError,
     ports::{
@@ -39,6 +40,8 @@ pub enum PortfolioServiceError {
     Ownership { location: OwnershipLocation },
     #[error("portfolio synchronization conflict")]
     Conflict(#[source] PortfolioRepositoryError),
+    #[error("referenced assets could not be onboarded")]
+    Asset(#[source] AssetServiceError),
 }
 
 impl From<PortfolioRepositoryError> for PortfolioServiceError {
@@ -57,6 +60,12 @@ impl From<SyncPortfoliosV2CommandError> for PortfolioServiceError {
             SyncPortfoliosV2CommandError::Validation(error) => Self::Validation(error),
             SyncPortfoliosV2CommandError::Ownership(location) => Self::Ownership { location },
             SyncPortfoliosV2CommandError::Repository(error) => Self::Repository(error),
+            SyncPortfoliosV2CommandError::ProviderUnavailable(error) => {
+                Self::Asset(AssetServiceError::ProviderUnavailable(error))
+            }
+            SyncPortfoliosV2CommandError::Directory(error) => {
+                Self::Asset(AssetServiceError::Directory(error))
+            }
         }
     }
 }
@@ -82,13 +91,19 @@ impl From<PortfolioServiceError> for DcaError {
 /// Coordinates bidirectional portfolio synchronization between clients and storage.
 pub struct PortfolioService {
     portfolio_repository: Arc<dyn PortfolioRepository>,
+    assets: Arc<AssetService>,
 }
 
 impl PortfolioService {
-    /// Creates a portfolio service using the supplied persistence port.
-    pub fn new(portfolio_repository: Arc<dyn PortfolioRepository>) -> Self {
+    /// Creates a portfolio service using the supplied persistence port and the
+    /// asset service that onboards assets referenced by v2 synchronization.
+    pub fn new(
+        portfolio_repository: Arc<dyn PortfolioRepository>,
+        assets: Arc<AssetService>,
+    ) -> Self {
         Self {
             portfolio_repository,
+            assets,
         }
     }
 
@@ -192,6 +207,12 @@ impl PortfolioService {
         command: SyncPortfoliosV2Command,
     ) -> std::result::Result<SyncPortfoliosV2Response, PortfolioServiceError> {
         let user_id = command.user_id();
+        // Shared asset rows are stored before the transaction opens so that no
+        // provider or directory round trip happens while rows are locked.
+        self.assets
+            .onboard(command.assets())
+            .await
+            .map_err(PortfolioServiceError::Asset)?;
         let request = command.into_request();
         let response = retry_sync(
             || self.portfolio_repository.sync_v2(user_id, request.clone()),
@@ -250,14 +271,20 @@ mod tests {
 
     use super::*;
     use crate::app::commands::sync_portfolios_v2::SyncPortfoliosV2Command;
-    use crate::app::domain::portfolio::{
-        AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider, SharedAssetV2,
-        SyncPortfoliosV2Request, SyncPortfoliosV2Response,
+    use crate::app::domain::{
+        asset::{AssetRef, ResolvedAsset},
+        portfolio::{
+            AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider,
+            SyncPortfoliosV2Request, SyncPortfoliosV2Response,
+        },
     };
     use crate::ports::inbound::rest::request::PortfolioAssetRequest;
     use crate::ports::outbound::repository::{
-        portfolio::{PortfolioOwnership, PortfolioRepository},
+        portfolio::PortfolioRepository,
         postgres::types::{PortfolioAssetRow, PortfolioRow},
+    };
+    use crate::ports::outbound::{
+        adapter::MockAssetProvider, repository::asset::MockAssetDirectory,
     };
 
     #[test]
@@ -314,32 +341,83 @@ mod tests {
         assert!(normalized.portfolios[0].assets.is_empty());
     }
 
+    /// Asset service for tests that never touch assets; any call panics the mocks.
+    fn unused_assets() -> Arc<AssetService> {
+        Arc::new(AssetService::new(
+            Arc::new(MockAssetDirectory::new()),
+            Arc::new(MockAssetProvider::new()),
+        ))
+    }
+
+    fn resolved_vwce() -> ResolvedAsset {
+        ResolvedAsset {
+            provider: Provider::YF,
+            symbol: "VWCE".to_string(),
+            name: "Asset".to_string(),
+            currency: "EUR".to_string(),
+            asset_class: AssetClass::Equity,
+        }
+    }
+
+    /// Asset service whose directory already knows VWCE and records every
+    /// onboarding call as `"onboard"` in `log`.
+    fn logging_assets(log: &Arc<Mutex<Vec<&'static str>>>) -> Arc<AssetService> {
+        let mut directory = MockAssetDirectory::new();
+        directory
+            .expect_find_by_refs()
+            .returning(|_| Ok(vec![resolved_vwce()]));
+        let onboard_log = log.clone();
+        directory
+            .expect_insert_missing()
+            .times(1)
+            .returning(move |assets| {
+                assert_eq!(assets, [resolved_vwce()]);
+                onboard_log.lock().unwrap().push("onboard");
+                Ok(())
+            });
+        Arc::new(AssetService::new(
+            Arc::new(directory),
+            Arc::new(MockAssetProvider::new()),
+        ))
+    }
+
     #[tokio::test]
-    async fn v2_serialization_failure_retries_twice_then_succeeds() {
-        // GIVEN a v2 sync that encounters two serialization failures, WHEN the
-        // service retries it, THEN the third total attempt succeeds.
-        let repository = Arc::new(RetryRepository::new(2, "40001"));
+    async fn v2_onboards_assets_once_before_the_retried_transaction() {
+        // GIVEN a v2 sync whose repository fails twice with serialization
+        // conflicts before succeeding,
+        // WHEN the service synchronizes it,
+        // THEN assets are onboarded exactly once, before the first attempt, and the
+        // transaction is retried without onboarding again.
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let repository = Arc::new(RetryRepository::new(2, "40001").with_log(log.clone()));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let assets = logging_assets(&log);
+        let service = PortfolioService::new(repository.clone(), assets.clone());
 
         service
-            .sync_portfolios_v2(valid_v2_command(repository.as_ref()).await)
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref(), &assets).await)
             .await
             .expect("third v2 attempt should succeed");
 
         assert_eq!(attempts.load(Ordering::Relaxed), 3);
+        assert_eq!(
+            *log.lock().unwrap(),
+            ["onboard", "sync_v2", "sync_v2", "sync_v2"]
+        );
     }
 
     #[tokio::test]
     async fn v2_retry_exhaustion_returns_conflict() {
         // GIVEN a v2 sync that keeps failing with serialization failures, WHEN
         // all attempts are exhausted, THEN the service returns Conflict.
+        let log = Arc::new(Mutex::new(Vec::new()));
         let repository = Arc::new(RetryRepository::new(3, "40001"));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let assets = logging_assets(&log);
+        let service = PortfolioService::new(repository.clone(), assets.clone());
 
         let error = service
-            .sync_portfolios_v2(valid_v2_command(repository.as_ref()).await)
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref(), &assets).await)
             .await
             .expect_err("retry exhaustion should return a conflict");
 
@@ -352,12 +430,14 @@ mod tests {
         // GIVEN a v2 sync that fails with a non-concurrency database error,
         // WHEN the service executes it, THEN it returns the repository error
         // after one total attempt.
+        let log = Arc::new(Mutex::new(Vec::new()));
         let repository = Arc::new(RetryRepository::new(3, "23505"));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let assets = logging_assets(&log);
+        let service = PortfolioService::new(repository.clone(), assets.clone());
 
         let error = service
-            .sync_portfolios_v2(valid_v2_command(repository.as_ref()).await)
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref(), &assets).await)
             .await
             .expect_err("permanent v2 failure should fail immediately");
 
@@ -366,12 +446,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn v2_onboarding_failure_skips_the_transaction() {
+        // GIVEN a directory that fails while onboarding assets,
+        // WHEN the service synchronizes a v2 aggregate,
+        // THEN it fails with an asset error and never opens the repository transaction.
+        let repository = Arc::new(RetryRepository::new(0, "23505"));
+        let attempts = &repository.upsert_attempts;
+        let mut directory = MockAssetDirectory::new();
+        directory
+            .expect_find_by_refs()
+            .returning(|_| Ok(vec![resolved_vwce()]));
+        directory.expect_insert_missing().returning(|_| {
+            Err(
+                crate::ports::outbound::repository::asset::AssetDirectoryError::CorruptData(
+                    "boom".to_string(),
+                ),
+            )
+        });
+        let assets = Arc::new(AssetService::new(
+            Arc::new(directory),
+            Arc::new(MockAssetProvider::new()),
+        ));
+        let service = PortfolioService::new(repository.clone(), assets.clone());
+
+        let error = service
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref(), &assets).await)
+            .await
+            .expect_err("onboarding failure should abort");
+
+        assert_eq!(attempts.load(Ordering::Relaxed), 0);
+        assert!(matches!(error, PortfolioServiceError::Asset(_)));
+    }
+
+    #[tokio::test]
     async fn serialization_failure_retries_twice_then_succeeds() {
         // GIVEN a sync that encounters two serialization failures, WHEN the service retries it,
         // THEN the third total attempt succeeds.
         let repository = Arc::new(RetryRepository::new(2, "40001"));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let service = PortfolioService::new(repository.clone(), unused_assets());
 
         service
             .sync_portfolios(Uuid::new_v4(), valid_request())
@@ -399,7 +512,7 @@ mod tests {
             average_buy_price: Decimal::ONE,
             fees: None,
         });
-        let service = PortfolioService::new(repository.clone());
+        let service = PortfolioService::new(repository.clone(), unused_assets());
 
         service
             .sync_portfolios(Uuid::new_v4(), request)
@@ -424,7 +537,7 @@ mod tests {
         let repository = Arc::new(RetryRepository::new(0, "23505"));
         let mut request = valid_request();
         request.portfolios[0].assets[0].provider = "IBKR".to_string();
-        let service = PortfolioService::new(repository.clone());
+        let service = PortfolioService::new(repository.clone(), unused_assets());
 
         service
             .sync_portfolios(Uuid::new_v4(), request)
@@ -446,7 +559,7 @@ mod tests {
         // THEN it performs another complete attempt and succeeds.
         let repository = Arc::new(RetryRepository::new(1, "40P01"));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let service = PortfolioService::new(repository.clone(), unused_assets());
 
         service
             .sync_portfolios(Uuid::new_v4(), valid_request())
@@ -462,7 +575,7 @@ mod tests {
         // THEN the service returns the final repository error after three total attempts.
         let repository = Arc::new(RetryRepository::new(3, "40001"));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let service = PortfolioService::new(repository.clone(), unused_assets());
 
         let error = service
             .sync_portfolios(Uuid::new_v4(), valid_request())
@@ -484,7 +597,7 @@ mod tests {
         // THEN it fails immediately without another attempt.
         let repository = Arc::new(RetryRepository::new(3, "23505"));
         let attempts = &repository.upsert_attempts;
-        let service = PortfolioService::new(repository.clone());
+        let service = PortfolioService::new(repository.clone(), unused_assets());
 
         let error = service
             .sync_portfolios(Uuid::new_v4(), valid_request())
@@ -495,7 +608,10 @@ mod tests {
         assert!(!error.is_retryable_concurrency());
     }
 
-    async fn valid_v2_command(repository: &dyn PortfolioRepository) -> SyncPortfoliosV2Command {
+    async fn valid_v2_command(
+        repository: &dyn PortfolioRepository,
+        assets: &AssetService,
+    ) -> SyncPortfoliosV2Command {
         SyncPortfoliosV2Command::try_new(
             Uuid::nil(),
             SyncPortfoliosV2Request {
@@ -508,14 +624,7 @@ mod tests {
                     drift_band: None,
                     fees: None,
                     assets: vec![PortfolioAssetV2 {
-                        id: Uuid::now_v7(),
-                        asset: SharedAssetV2 {
-                            provider: Provider::YF,
-                            symbol: "VWCE".to_string(),
-                            name: "Asset".to_string(),
-                            currency: "EUR".to_string(),
-                            asset_class: AssetClass::Equity,
-                        },
+                        asset: AssetRef::new(Provider::YF, "VWCE"),
                         asset_class_override: None,
                         quantity: Decimal::ONE,
                         target_weight: Some(Decimal::from(100)),
@@ -529,6 +638,7 @@ mod tests {
                 deleted_portfolios: Vec::new(),
             },
             repository,
+            assets,
         )
         .await
         .expect("v2 fixture should be valid")
@@ -571,6 +681,8 @@ mod tests {
         error_code: &'static str,
         upsert_attempts: AtomicUsize,
         last_upserted_portfolio: Mutex<Option<PortfolioRequest>>,
+        /// Optional shared event log; each v2 attempt appends `"sync_v2"`.
+        log: Option<Arc<Mutex<Vec<&'static str>>>>,
     }
 
     impl RetryRepository {
@@ -580,7 +692,13 @@ mod tests {
                 error_code,
                 upsert_attempts: AtomicUsize::new(0),
                 last_upserted_portfolio: Mutex::new(None),
+                log: None,
             }
+        }
+
+        fn with_log(mut self, log: Arc<Mutex<Vec<&'static str>>>) -> Self {
+            self.log = Some(log);
+            self
         }
     }
 
@@ -589,9 +707,10 @@ mod tests {
         async fn find_owners(
             &self,
             _portfolio_ids: &[Uuid],
-            _portfolio_asset_ids: &[Uuid],
-        ) -> crate::ports::outbound::repository::portfolio::Result<PortfolioOwnership> {
-            Ok(PortfolioOwnership::default())
+        ) -> crate::ports::outbound::repository::portfolio::Result<
+            std::collections::HashMap<Uuid, Uuid>,
+        > {
+            Ok(std::collections::HashMap::new())
         }
 
         async fn get_user_portfolios_with_assets(
@@ -661,6 +780,9 @@ mod tests {
             request: SyncPortfoliosV2Request,
         ) -> crate::ports::outbound::repository::portfolio::Result<SyncPortfoliosV2Response>
         {
+            if let Some(log) = &self.log {
+                log.lock().unwrap().push("sync_v2");
+            }
             let attempt = self.upsert_attempts.fetch_add(1, Ordering::Relaxed) + 1;
             if attempt <= self.failures_before_success {
                 return Err(PortfolioRepositoryError::Database(sqlx::Error::Database(

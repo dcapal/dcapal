@@ -56,8 +56,8 @@
           }
         ]
       },
-      "AssetRefV2Response": {
-        "description": "Reference to an asset that is not in the backend cache.",
+      "AssetRefV2": {
+        "description": "Reference to a provider-listed asset; shared metadata is resolved server-side.",
         "properties": {
           "provider": {
             "enum": [
@@ -67,6 +67,7 @@
             "type": "string"
           },
           "symbol": {
+            "description": "Provider symbol; stored trimmed and upper-cased.",
             "type": "string"
           }
         },
@@ -261,13 +262,13 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/SharedAssetV2Response"
+              "$ref": "#/components/schemas/ResolvedAssetV2Response"
             },
             "type": "array"
           },
           "notFound": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefV2Response"
+              "$ref": "#/components/schemas/AssetRefV2"
             },
             "type": "array"
           }
@@ -433,7 +434,7 @@
         "type": "object"
       },
       "PortfolioAssetV2Request": {
-        "description": "Portfolio-specific holding and allocation values.",
+        "description": "Portfolio-specific holding and allocation values for one referenced asset.",
         "properties": {
           "aclassOverride": {
             "enum": [
@@ -451,7 +452,7 @@
             ]
           },
           "asset": {
-            "$ref": "#/components/schemas/SharedAssetV2Request"
+            "$ref": "#/components/schemas/AssetRefV2"
           },
           "averageBuyPrice": {
             "type": [
@@ -468,10 +469,6 @@
                 "$ref": "#/components/schemas/TransactionFeesV2Request"
               }
             ]
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string"
           },
           "manualPrice": {
             "type": [
@@ -490,7 +487,6 @@
           }
         },
         "required": [
-          "id",
           "asset",
           "quantity"
         ],
@@ -515,7 +511,7 @@
             ]
           },
           "asset": {
-            "$ref": "#/components/schemas/SharedAssetV2Response"
+            "$ref": "#/components/schemas/AssetRefV2"
           },
           "averageBuyPrice": {
             "type": [
@@ -532,10 +528,6 @@
                 "$ref": "#/components/schemas/TransactionFeesV2Response"
               }
             ]
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string"
           },
           "manualPrice": {
             "type": [
@@ -554,7 +546,6 @@
           }
         },
         "required": [
-          "id",
           "asset",
           "quantity"
         ],
@@ -797,48 +788,8 @@
         ],
         "type": "object"
       },
-      "SharedAssetV2Request": {
-        "description": "Shared Provider metadata carried inside a Portfolio Asset.",
-        "properties": {
-          "aclass": {
-            "enum": [
-              "equity",
-              "bond",
-              "cash",
-              "crypto",
-              "commodity",
-              "other"
-            ],
-            "type": "string"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "provider": {
-            "enum": [
-              "yf",
-              "kraken"
-            ],
-            "type": "string"
-          },
-          "symbol": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "provider",
-          "symbol",
-          "name",
-          "currency",
-          "aclass"
-        ],
-        "type": "object"
-      },
-      "SharedAssetV2Response": {
-        "description": "Shared asset metadata returned by v2.",
+      "ResolvedAssetV2Response": {
+        "description": "Shared metadata of one cached asset returned by the lookup.",
         "properties": {
           "aclass": {
             "enum": [
@@ -972,16 +923,15 @@
       "StrategicAssetTargetV2Request": {
         "description": "A relative target for one Portfolio Asset inside its effective class.",
         "properties": {
-          "portfolioAssetId": {
-            "format": "uuid",
-            "type": "string"
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2"
           },
           "relativeTargetWeight": {
             "type": "string"
           }
         },
         "required": [
-          "portfolioAssetId",
+          "asset",
           "relativeTargetWeight"
         ],
         "type": "object"
@@ -989,16 +939,15 @@
       "StrategicAssetTargetV2Response": {
         "description": "One persisted relative Portfolio Asset target returned by v2.",
         "properties": {
-          "portfolioAssetId": {
-            "format": "uuid",
-            "type": "string"
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2"
           },
           "relativeTargetWeight": {
             "type": "string"
           }
         },
         "required": [
-          "portfolioAssetId",
+          "asset",
           "relativeTargetWeight"
         ],
         "type": "object"
@@ -2077,6 +2026,16 @@
               }
             },
             "description": "Portfolio synchronization failure"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Asset provider unavailable"
           }
         },
         "summary": "Applies a complete v2 Portfolio aggregate synchronization."

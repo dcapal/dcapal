@@ -79,8 +79,13 @@ impl AssetService {
         let known = self.directory.find_by_refs(&distinct).await?;
         let (mut resolved, missing) = split_known(&distinct, known);
 
-        let lookups = stream::iter(&missing)
-            .map(|reference| async move { (reference, self.provider.lookup(reference).await) })
+        // Owned references keep the lookup futures free of borrowed closure
+        // arguments, which would make them unusable inside Axum handlers.
+        let lookups = stream::iter(missing)
+            .map(|reference| async move {
+                let outcome = self.provider.lookup(&reference).await;
+                (reference, outcome)
+            })
             .buffer_unordered(PROVIDER_CONCURRENCY)
             .collect::<Vec<_>>()
             .await;
@@ -91,7 +96,7 @@ impl AssetService {
         for (reference, outcome) in lookups {
             match outcome {
                 Ok(Some(asset)) => found.push(asset),
-                Ok(None) => unresolved.push(reference.clone()),
+                Ok(None) => unresolved.push(reference),
                 Err(error) => outage = outage.or(Some(error)),
             }
         }

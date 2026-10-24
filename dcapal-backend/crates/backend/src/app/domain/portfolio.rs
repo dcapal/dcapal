@@ -2,7 +2,7 @@ use derive_more::Display;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crate::DateTime;
+use crate::{DateTime, app::domain::asset::AssetRef};
 
 /// Provider supported by the Portfolio aggregate.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
@@ -11,11 +11,11 @@ pub enum Provider {
     YF,
     /// Kraken.
     Kraken,
-    /// A provider that is not supported by this synchronization contract.
+    /// A provider identifier that no adapter supports.
     ///
-    /// The REST adapter retains these values long enough for the command to
-    /// remove the unsupported asset and any dependent Strategic target while
-    /// preserving the submitted array indexes for diagnostics.
+    /// The v2 REST boundary rejects such identifiers as validation errors, so
+    /// this variant never reaches the v2 command; outbound adapters keep it
+    /// as a defensive failure case.
     #[display("Unsupported({_0})")]
     Unsupported(String),
 }
@@ -97,21 +97,13 @@ pub enum AllocationMode {
     Strategic,
 }
 
-/// Shared provider-bound metadata carried by a Portfolio Asset.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SharedAssetV2 {
-    pub provider: Provider,
-    pub symbol: String,
-    pub name: String,
-    pub currency: String,
-    pub asset_class: AssetClass,
-}
-
-/// Portfolio-specific holding, fee, and allocation values.
+/// Portfolio-specific holding, fee, and allocation values for one referenced asset.
+///
+/// The relationship is identified by `(Portfolio, asset)`; shared asset
+/// metadata is never carried by the aggregate.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortfolioAssetV2 {
-    pub id: Uuid,
-    pub asset: SharedAssetV2,
+    pub asset: AssetRef,
     pub asset_class_override: Option<AssetClass>,
     pub quantity: Decimal,
     pub target_weight: Option<Decimal>,
@@ -137,7 +129,7 @@ pub struct StrategicAssetClassTargetV2 {
 /// A relative target for one Portfolio Asset.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StrategicAssetTargetV2 {
-    pub portfolio_asset_id: Uuid,
+    pub asset: AssetRef,
     pub relative_target_weight: Decimal,
 }
 

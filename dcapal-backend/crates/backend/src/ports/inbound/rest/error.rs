@@ -27,8 +27,6 @@ const INTERNAL_CODE: &str = "internal_error";
 const INTERNAL_MESSAGE: &str = "The Portfolio could not be synchronized.";
 const LOOKUP_INVALID_MESSAGE: &str = "The asset lookup request is invalid.";
 const ASSET_INTERNAL_MESSAGE: &str = "The assets could not be resolved.";
-const UNRESOLVED_ASSET_CODE: &str = "unresolved_asset";
-const UNRESOLVED_ASSET_MESSAGE: &str = "Some assets are unknown to their provider.";
 const PROVIDER_UNAVAILABLE_CODE: &str = "provider_unavailable";
 const PROVIDER_UNAVAILABLE_MESSAGE: &str =
     "An asset provider is unavailable; retry the request later.";
@@ -72,6 +70,39 @@ impl From<SyncPortfoliosV2CommandError> for V2HttpError {
     }
 }
 
+/// Maps an asset-service failure to its response.
+///
+/// `Unresolved` is reported with real field paths by the sync command, so it
+/// only reaches here if a caller bypassed that mapping, which is a server bug.
+fn asset_failure(error: &AssetServiceError) -> (StatusCode, V2ErrorResponse) {
+    match error {
+        AssetServiceError::ProviderUnavailable(_) => provider_unavailable(),
+        AssetServiceError::Directory(_) | AssetServiceError::Unresolved(_) => asset_internal(),
+    }
+}
+
+fn provider_unavailable() -> (StatusCode, V2ErrorResponse) {
+    (
+        StatusCode::BAD_GATEWAY,
+        V2ErrorResponse {
+            code: PROVIDER_UNAVAILABLE_CODE.to_string(),
+            message: PROVIDER_UNAVAILABLE_MESSAGE.to_string(),
+            errors: Vec::new(),
+        },
+    )
+}
+
+fn asset_internal() -> (StatusCode, V2ErrorResponse) {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        V2ErrorResponse {
+            code: INTERNAL_CODE.to_string(),
+            message: ASSET_INTERNAL_MESSAGE.to_string(),
+            errors: Vec::new(),
+        },
+    )
+}
+
 impl IntoResponse for V2HttpError {
     fn into_response(self) -> Response {
         let (status, body) = match self {
@@ -91,6 +122,11 @@ impl IntoResponse for V2HttpError {
                     }],
                 },
             ),
+            Self::Command(SyncPortfoliosV2CommandError::ProviderUnavailable(_)) => {
+                provider_unavailable()
+            }
+            Self::Command(SyncPortfoliosV2CommandError::Directory(_)) => asset_internal(),
+            Self::Service(PortfolioServiceError::Asset(error)) => asset_failure(&error),
             Self::Command(SyncPortfoliosV2CommandError::Repository(_)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 V2ErrorResponse {
@@ -155,40 +191,7 @@ impl IntoResponse for V2HttpError {
                     },
                 )
             }
-            Self::Asset(AssetServiceError::Unresolved(refs)) => (
-                StatusCode::BAD_REQUEST,
-                V2ErrorResponse {
-                    code: UNRESOLVED_ASSET_CODE.to_string(),
-                    message: UNRESOLVED_ASSET_MESSAGE.to_string(),
-                    errors: refs
-                        .into_iter()
-                        .map(|r| V2FieldError {
-                            field: "asset".to_string(),
-                            message: format!(
-                                "{}:{} is not a known asset",
-                                r.provider.as_str(),
-                                r.symbol
-                            ),
-                        })
-                        .collect(),
-                },
-            ),
-            Self::Asset(AssetServiceError::ProviderUnavailable(_)) => (
-                StatusCode::BAD_GATEWAY,
-                V2ErrorResponse {
-                    code: PROVIDER_UNAVAILABLE_CODE.to_string(),
-                    message: PROVIDER_UNAVAILABLE_MESSAGE.to_string(),
-                    errors: Vec::new(),
-                },
-            ),
-            Self::Asset(AssetServiceError::Directory(_)) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                V2ErrorResponse {
-                    code: INTERNAL_CODE.to_string(),
-                    message: ASSET_INTERNAL_MESSAGE.to_string(),
-                    errors: Vec::new(),
-                },
-            ),
+            Self::Asset(error) => asset_failure(&error),
             Self::Service(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 V2ErrorResponse {
@@ -266,36 +269,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn asset_service_failures_keep_distinct_statuses() {
-        // GIVEN unresolved assets, a provider outage and a directory failure,
-        // WHEN each is adapted, THEN they map to 400, 502 and 500 with distinct codes.
-        use crate::app::domain::{asset::AssetRef, portfolio::Provider};
+    async fn asset_failures_keep_distinct_statuses() {
+        // GIVEN a provider outage and a directory failure, raised either by the
+        // sync command, by onboarding, or by the lookup endpoint,
+        // WHEN each is adapted,
+        // THEN outages are 502 provider_unavailable and directory failures are 500.
         use crate::ports::outbound::{
             adapter::AssetProviderError, repository::asset::AssetDirectoryError,
         };
 
-        let (status, body) =
-            response_body(V2HttpError::Asset(AssetServiceError::Unresolved(vec![
-                AssetRef::new(Provider::YF, "nope"),
-            ])))
-            .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(body["code"], UNRESOLVED_ASSET_CODE);
-        assert_eq!(body["errors"][0]["message"], "yf:NOPE is not a known asset");
+        let outages = [
+            V2HttpError::Command(SyncPortfoliosV2CommandError::ProviderUnavailable(
+                AssetProviderError::Malformed("x".into()),
+            )),
+            V2HttpError::Service(PortfolioServiceError::Asset(
+                AssetServiceError::ProviderUnavailable(AssetProviderError::Malformed("x".into())),
+            )),
+            V2HttpError::Asset(AssetServiceError::ProviderUnavailable(
+                AssetProviderError::Malformed("x".into()),
+            )),
+        ];
+        for outage in outages {
+            let (status, body) = response_body(outage).await;
+            assert_eq!(status, StatusCode::BAD_GATEWAY);
+            assert_eq!(body["code"], PROVIDER_UNAVAILABLE_CODE);
+        }
 
-        let (status, body) = response_body(V2HttpError::Asset(
-            AssetServiceError::ProviderUnavailable(AssetProviderError::Malformed("x".into())),
-        ))
-        .await;
-        assert_eq!(status, StatusCode::BAD_GATEWAY);
-        assert_eq!(body["code"], PROVIDER_UNAVAILABLE_CODE);
-
-        let (status, body) = response_body(V2HttpError::Asset(AssetServiceError::Directory(
-            AssetDirectoryError::CorruptData("x".into()),
-        )))
-        .await;
-        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(body["code"], INTERNAL_CODE);
+        let failures = [
+            V2HttpError::Command(SyncPortfoliosV2CommandError::Directory(
+                AssetDirectoryError::CorruptData("x".into()),
+            )),
+            V2HttpError::Asset(AssetServiceError::Directory(
+                AssetDirectoryError::CorruptData("x".into()),
+            )),
+        ];
+        for failure in failures {
+            let (status, body) = response_body(failure).await;
+            assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+            assert_eq!(body["code"], INTERNAL_CODE);
+        }
     }
 
     #[tokio::test]
@@ -320,13 +332,12 @@ mod tests {
 
     #[tokio::test]
     async fn ownership_errors_include_the_offending_field_path() {
-        // GIVEN a repository ownership error with a nested field path, WHEN
-        // the v2 HTTP boundary converts it, THEN it returns 403 and preserves
-        // that path in the structured error body.
+        // GIVEN an ownership error for the second submitted Portfolio, WHEN the
+        // v2 HTTP boundary converts it, THEN it returns 403 and preserves that
+        // path in the structured error body.
         let response = V2HttpError::Service(PortfolioServiceError::Ownership {
-            location: crate::app::commands::sync_portfolios_v2::OwnershipLocation::PortfolioAsset {
-                portfolio_index: 1,
-                asset_index: 0,
+            location: crate::app::commands::sync_portfolios_v2::OwnershipLocation::Portfolio {
+                index: 1,
             },
         })
         .into_response();
@@ -338,6 +349,6 @@ mod tests {
         let body: serde_json::Value =
             serde_json::from_slice(&body).expect("structured ownership response");
         assert_eq!(body["code"], "ownership_error");
-        assert_eq!(body["errors"][0]["field"], "portfolios[1].assets[0].id");
+        assert_eq!(body["errors"][0]["field"], "portfolios[1].id");
     }
 }
