@@ -1,18 +1,27 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use chrono::Utc;
-use dcapal_backend::app::services::portfolio::PortfolioService;
+use dcapal_backend::app::commands::sync_portfolios_v2::SyncPortfoliosV2Command;
+use dcapal_backend::app::domain::asset::{AssetRef, MetadataSource, ResolvedAsset};
+use dcapal_backend::app::domain::portfolio::{
+    AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
+    StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
+    SyncPortfoliosV2Request,
+};
+use dcapal_backend::app::services::{asset::AssetService, portfolio::PortfolioService};
 use dcapal_backend::ports::{
     inbound::rest::{
         FeeStructure,
         request::{PortfolioAssetRequest, PortfolioRequest, SyncPortfoliosRequest},
     },
     outbound::repository::{
-        portfolio::{PortfolioRepository, PortfolioRepositoryError},
-        postgres::{SqlxPortfolioRepository, types::Provider},
+        asset::AssetDirectory,
+        portfolio::{OwnershipConflict, PortfolioRepository, PortfolioRepositoryError},
+        postgres::{SqlxAssetDirectory, SqlxPortfolioRepository, types::Provider},
     },
 };
-use rust_decimal::dec;
+use rust_decimal::{Decimal, dec};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -57,6 +66,91 @@ fn portfolio_request(assets: Vec<PortfolioAssetRequest>) -> PortfolioRequest {
         assets,
         last_updated_at: Utc::now(),
     }
+}
+
+const FIXTURE_VWCE_RELATIONSHIP: Uuid = Uuid::from_u128(0x00000000000070008000000000000011);
+const FIXTURE_CASH_RELATIONSHIP: Uuid = Uuid::from_u128(0x00000000000070008000000000000012);
+
+fn v2_ref(symbol: &str) -> AssetRef {
+    AssetRef::new(AppProvider::YF, symbol)
+}
+
+fn v2_asset(symbol: &str) -> PortfolioAssetV2 {
+    PortfolioAssetV2 {
+        asset: v2_ref(symbol),
+        asset_class_override: None,
+        quantity: dec!(2.125),
+        target_weight: None,
+        manual_price: Some(dec!(120.10)),
+        average_buy_price: Some(dec!(110.05)),
+        fees: None,
+    }
+}
+
+/// A Simple-mode aggregate for `PORTFOLIO_ID` that is newer than the fixture row.
+fn v2_simple_request(assets: Vec<(PortfolioAssetV2, Decimal)>) -> SyncPortfoliosV2Request {
+    SyncPortfoliosV2Request {
+        schema_version: 2,
+        portfolios: vec![PortfolioV2 {
+            id: PORTFOLIO_ID,
+            name: "Synced portfolio".to_string(),
+            quote_currency: "EUR".to_string(),
+            allocation_mode: AllocationMode::Simple,
+            drift_band: None,
+            fees: None,
+            assets: assets
+                .into_iter()
+                .map(|(asset, weight)| PortfolioAssetV2 {
+                    target_weight: Some(weight),
+                    ..asset
+                })
+                .collect(),
+            strategic_allocation: None,
+            last_updated_at: Utc::now(),
+        }],
+        deleted_portfolios: Vec::new(),
+    }
+}
+
+/// Stores a YF asset in the shared directory, as the service does before a sync.
+async fn onboard(pool: &PgPool, symbol: &str) -> Result<(), Box<dyn std::error::Error>> {
+    SqlxAssetDirectory::new(pool.clone())
+        .upsert_resolved(&[ResolvedAsset {
+            provider: AppProvider::YF,
+            symbol: symbol.to_string(),
+            name: format!("{symbol} asset"),
+            currency: "EUR".to_string(),
+            asset_class: AssetClass::Equity,
+        }])
+        .await?;
+    Ok(())
+}
+
+/// Provider stub that knows exactly one symbol, `NEWCO`.
+struct NewcoProvider;
+
+#[async_trait]
+impl dcapal_backend::ports::outbound::adapter::AssetProvider for NewcoProvider {
+    async fn lookup(
+        &self,
+        asset: &AssetRef,
+    ) -> Result<Option<ResolvedAsset>, dcapal_backend::ports::outbound::adapter::AssetProviderError>
+    {
+        Ok((asset.symbol == "NEWCO").then(|| ResolvedAsset {
+            provider: asset.provider.clone(),
+            symbol: asset.symbol.clone(),
+            name: "New company".to_string(),
+            currency: "USD".to_string(),
+            asset_class: AssetClass::Equity,
+        }))
+    }
+}
+
+fn asset_service(pool: &PgPool) -> Arc<AssetService> {
+    Arc::new(AssetService::new(
+        Arc::new(SqlxAssetDirectory::new(pool.clone())),
+        Arc::new(NewcoProvider),
+    ))
 }
 
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
@@ -137,6 +231,76 @@ async fn rejects_invalid_asset_class_codes_from_storage(
         "column decode should retain the enum conversion cause"
     );
 
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn rejects_corrupt_v2_snapshot_fee_data(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a persisted v2 fee policy with a missing required amount, WHEN a
+    // synchronization snapshot is loaded, THEN corruption is returned instead
+    // of silently dropping the fee policy.
+    sqlx::query(
+        "UPDATE portfolio_asset
+         SET fee_type = 'Fixed', fee_amount = NULL
+         WHERE id = '00000000-0000-7000-8000-000000000012'",
+    )
+    .execute(&pool)
+    .await?;
+
+    let error = SqlxPortfolioRepository::new(pool)
+        .sync_v2(
+            USER_ID,
+            &SyncPortfoliosV2Request {
+                schema_version: 2,
+                portfolios: Vec::new(),
+                deleted_portfolios: Vec::new(),
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        PortfolioRepositoryError::CorruptData(message)
+            if message.contains("missing feeAmount")
+    ));
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn rejects_corrupt_v2_snapshot_asset_override(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a persisted Portfolio Asset with an unknown Asset Class override,
+    // WHEN a synchronization snapshot is loaded, THEN corruption is returned
+    // instead of treating the override as null.
+    sqlx::query(
+        "UPDATE portfolio_asset
+         SET asset_class_override = 99
+         WHERE id = '00000000-0000-7000-8000-000000000012'",
+    )
+    .execute(&pool)
+    .await?;
+
+    let error = SqlxPortfolioRepository::new(pool)
+        .sync_v2(
+            USER_ID,
+            &SyncPortfoliosV2Request {
+                schema_version: 2,
+                portfolios: Vec::new(),
+                deleted_portfolios: Vec::new(),
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        PortfolioRepositoryError::CorruptData(message)
+            if message.contains("invalid aclassOverride")
+    ));
     Ok(())
 }
 
@@ -229,6 +393,33 @@ async fn ownership_is_required_for_upsert_and_delete(
 }
 
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn find_owners_includes_soft_deleted_rows_and_omits_unknown_ids(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN an existing soft-deleted Portfolio plus an unknown identifier,
+    // WHEN ownership is preflighted,
+    // THEN the existing owner is returned and the unknown ID stays absent for
+    // creation or tombstones.
+    sqlx::query("UPDATE portfolios SET deleted = TRUE WHERE id = $1")
+        .bind(PORTFOLIO_ID)
+        .execute(&pool)
+        .await?;
+
+    let repository = SqlxPortfolioRepository::new(pool);
+    let owners = repository
+        .find_owners(&[
+            PORTFOLIO_ID,
+            Uuid::from_u128(0x10000000000000000000000000000099),
+        ])
+        .await?;
+
+    assert_eq!(owners.get(&PORTFOLIO_ID), Some(&USER_ID));
+    assert_eq!(owners.len(), 1);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn soft_delete_updates_an_owned_portfolio(
     pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -269,24 +460,27 @@ async fn reuses_shared_asset_metadata_but_creates_a_new_relationship(
     assert_eq!(shared_id.get_version_num(), 7);
 
     let shared_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM assets_data WHERE provider = 2 AND symbol = 'VWCE'",
+        "SELECT COUNT(*) FROM assets_data WHERE provider = $1 AND symbol = 'VWCE'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
     let relationship_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)
          FROM portfolio_asset AS pa
          JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-         WHERE ad.provider = 2 AND ad.symbol = 'VWCE'",
+         WHERE ad.provider = $1 AND ad.symbol = 'VWCE'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
     let distinct_shared_ids: i64 = sqlx::query_scalar(
         "SELECT COUNT(DISTINCT assets_data_id)
          FROM portfolio_asset AS pa
          JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-         WHERE ad.provider = 2 AND ad.symbol = 'VWCE'",
+         WHERE ad.provider = $1 AND ad.symbol = 'VWCE'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
 
@@ -294,6 +488,28 @@ async fn reuses_shared_asset_metadata_but_creates_a_new_relationship(
     assert_eq!(relationship_count, 2);
     assert_eq!(distinct_shared_ids, 1);
 
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v1_upsert_creates_client_supplied_shared_assets(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a v1 Portfolio carrying client-chosen metadata for a new asset,
+    // WHEN the v1 upsert path stores it,
+    // THEN the shared row exists with the client-supplied provenance, so v2
+    // later verifies it against the provider before trusting it.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    repository
+        .upsert(USER_ID, portfolio_request(vec![asset("V1ONLY")]))
+        .await?;
+
+    let source: i16 =
+        sqlx::query_scalar("SELECT metadata_source FROM assets_data WHERE symbol = 'V1ONLY'")
+            .fetch_one(&pool)
+            .await?;
+
+    assert_eq!(source, i16::from(MetadataSource::ClientSupplied));
     Ok(())
 }
 
@@ -400,9 +616,10 @@ async fn concurrent_syncs_reuse_shared_data_without_duplicate_relationships(
     // GIVEN two Portfolios are synchronized concurrently with the same asset,
     // WHEN serializable transactions race on shared metadata, THEN retries leave
     // one shared record and one relationship per Portfolio.
-    let service = Arc::new(PortfolioService::new(Arc::new(
-        SqlxPortfolioRepository::new(pool.clone()),
-    )));
+    let service = Arc::new(PortfolioService::new(
+        Arc::new(SqlxPortfolioRepository::new(pool.clone())),
+        asset_service(&pool),
+    ));
 
     let mut first = portfolio_request(vec![asset("CONCURRENT")]);
     first.id = Uuid::from_u128(0x10000000000000000000000000000011);
@@ -431,16 +648,18 @@ async fn concurrent_syncs_reuse_shared_data_without_duplicate_relationships(
     second_result?;
 
     let shared_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM assets_data WHERE provider = 2 AND symbol = 'CONCURRENT'",
+        "SELECT COUNT(*) FROM assets_data WHERE provider = $1 AND symbol = 'CONCURRENT'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
     let relationship_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)
          FROM portfolio_asset AS pa
          JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-         WHERE ad.provider = 2 AND ad.symbol = 'CONCURRENT'",
+         WHERE ad.provider = $1 AND ad.symbol = 'CONCURRENT'",
     )
+    .bind(i16::from(Provider::YF))
     .fetch_one(&pool)
     .await?;
 
@@ -476,7 +695,431 @@ async fn provider_is_part_of_shared_asset_identity(
     .bind(PORTFOLIO_ID)
     .fetch_all(&pool)
     .await?;
-    assert_eq!(identities, vec![(1, "BTC".into()), (2, "BTC".into())]);
+    assert_eq!(
+        identities,
+        vec![
+            (i16::from(Provider::Kraken), "BTC".into()),
+            (i16::from(Provider::YF), "BTC".into())
+        ]
+    );
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_persists_strategic_descendants_and_exact_decimals(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a valid Strategic v2 aggregate, WHEN it is synchronized, THEN the
+    // Portfolio mode, class targets, relative targets, and decimal source
+    // values survive the round trip through canonical storage.
+    let first = v2_asset("VWCE");
+    let second = v2_asset("CASH");
+    let request = SyncPortfoliosV2Request {
+        schema_version: 2,
+        portfolios: vec![PortfolioV2 {
+            id: PORTFOLIO_ID,
+            name: "Strategic portfolio".to_string(),
+            quote_currency: "EUR".to_string(),
+            allocation_mode: AllocationMode::Strategic,
+            drift_band: Some(dec!(1.25)),
+            fees: None,
+            assets: vec![first, second],
+            strategic_allocation: Some(StrategicAllocationV2 {
+                asset_class_targets: vec![
+                    StrategicAssetClassTargetV2 {
+                        asset_class: AssetClass::Equity,
+                        target_weight: dec!(60.00),
+                    },
+                    StrategicAssetClassTargetV2 {
+                        asset_class: AssetClass::Cash,
+                        target_weight: dec!(40.00),
+                    },
+                ],
+                asset_targets: vec![
+                    StrategicAssetTargetV2 {
+                        asset: v2_ref("VWCE"),
+                        relative_target_weight: dec!(100.00),
+                    },
+                    StrategicAssetTargetV2 {
+                        asset: v2_ref("CASH"),
+                        relative_target_weight: dec!(100.00),
+                    },
+                ],
+            }),
+            last_updated_at: Utc::now(),
+        }],
+        deleted_portfolios: Vec::new(),
+    };
+
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let response = repository.sync_v2(USER_ID, &request).await?;
+
+    let portfolio = &response.updated_portfolios[0];
+    assert_eq!(portfolio.allocation_mode, AllocationMode::Strategic);
+    assert_eq!(portfolio.drift_band, Some(dec!(1.25)));
+    assert_eq!(portfolio.assets[0].quantity, dec!(2.125));
+    assert_eq!(portfolio.assets[0].manual_price, Some(dec!(120.10)));
+    assert!(portfolio.assets[0].target_weight.is_none());
+    let strategic = portfolio
+        .strategic_allocation
+        .as_ref()
+        .expect("strategic allocation");
+    assert_eq!(strategic.asset_class_targets.len(), 2);
+    assert_eq!(strategic.asset_class_targets[0].target_weight, dec!(60.00));
+    assert_eq!(
+        strategic.asset_targets[0].relative_target_weight,
+        dec!(100.00)
+    );
+    let serialized = serde_json::to_value(
+        dcapal_backend::ports::inbound::rest::types::sync_portfolio_v2::PortfolioV2Response::from(
+            portfolio.clone(),
+        ),
+    )?;
+    assert_eq!(serialized["driftBand"], "1.25");
+    assert_eq!(serialized["assets"][0]["quantity"], "2.125");
+    assert_eq!(serialized["assets"][0]["manualPrice"], "120.10");
+
+    let stored_weights: Vec<Decimal> = sqlx::query_scalar(
+        "SELECT weight
+         FROM portfolio_asset_allocation
+         WHERE portfolio_id = $1
+         ORDER BY portfolio_asset_id",
+    )
+    .bind(PORTFOLIO_ID)
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(stored_weights, vec![dec!(100.00), dec!(100.00)]);
+
+    let legacy_target_column: Option<String> = sqlx::query_scalar(
+        "SELECT column_name
+         FROM information_schema.columns
+         WHERE table_name = 'portfolio_asset' AND column_name = 'target_weight'",
+    )
+    .fetch_optional(&pool)
+    .await?;
+    assert_eq!(legacy_target_column, None);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_reuses_relationships_by_portfolio_and_asset(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a Portfolio already holding VWCE and CASH with stored allocation rows,
+    // WHEN a newer aggregate lists the same assets (in the other order) with new
+    // quantities and weights,
+    // THEN the existing relationship rows are updated in place, keeping their
+    // identifiers, and their allocation rows carry the new weights.
+    let mut vwce = v2_asset("VWCE");
+    vwce.quantity = dec!(7);
+    let cash = v2_asset("CASH");
+    let request = v2_simple_request(vec![(cash, dec!(25)), (vwce, dec!(75))]);
+
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let response = repository.sync_v2(USER_ID, &request).await?;
+    assert_eq!(response.updated_portfolios[0].assets.len(), 2);
+
+    let stored: Vec<(Uuid, String, Decimal, Decimal)> = sqlx::query_as(
+        "SELECT pa.id, ad.symbol, pa.quantity, paa.weight
+         FROM portfolio_asset AS pa
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         JOIN portfolio_asset_allocation AS paa
+           ON paa.portfolio_id = pa.portfolio_id AND paa.portfolio_asset_id = pa.id
+         WHERE pa.portfolio_id = $1
+         ORDER BY ad.symbol",
+    )
+    .bind(PORTFOLIO_ID)
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(
+        stored,
+        vec![
+            (
+                FIXTURE_CASH_RELATIONSHIP,
+                "CASH".to_string(),
+                dec!(2.125),
+                dec!(25)
+            ),
+            (
+                FIXTURE_VWCE_RELATIONSHIP,
+                "VWCE".to_string(),
+                dec!(7),
+                dec!(75)
+            ),
+        ]
+    );
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_deletes_relationships_for_dropped_assets(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a Portfolio holding VWCE and CASH,
+    // WHEN a newer aggregate lists only VWCE,
+    // THEN the CASH relationship and its allocation row are deleted while the
+    // shared CASH asset record stays in the directory.
+    let request = v2_simple_request(vec![(v2_asset("VWCE"), dec!(100))]);
+
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let response = repository.sync_v2(USER_ID, &request).await?;
+    assert_eq!(response.updated_portfolios[0].assets.len(), 1);
+
+    let relationships: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM portfolio_asset WHERE portfolio_id = $1")
+            .bind(PORTFOLIO_ID)
+            .fetch_all(&pool)
+            .await?;
+    assert_eq!(relationships, vec![FIXTURE_VWCE_RELATIONSHIP]);
+    let allocations: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM portfolio_asset_allocation WHERE portfolio_asset_id = $1",
+    )
+    .bind(FIXTURE_CASH_RELATIONSHIP)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(allocations, 0);
+    let shared: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_data WHERE symbol = 'CASH'")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(shared, 1);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_switching_an_asset_is_a_delete_and_an_insert(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a Portfolio holding VWCE and CASH,
+    // WHEN a newer aggregate replaces CASH with another asset,
+    // THEN VWCE keeps its relationship, the CASH relationship is gone, and the
+    // replacement gets a new UUIDv7 relationship with its own allocation row.
+    onboard(&pool, "SWITCHED").await?;
+    let request = v2_simple_request(vec![
+        (v2_asset("VWCE"), dec!(60)),
+        (v2_asset("SWITCHED"), dec!(40)),
+    ]);
+
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    repository.sync_v2(USER_ID, &request).await?;
+
+    let stored: Vec<(Uuid, String, Decimal)> = sqlx::query_as(
+        "SELECT pa.id, ad.symbol, paa.weight
+         FROM portfolio_asset AS pa
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         JOIN portfolio_asset_allocation AS paa
+           ON paa.portfolio_id = pa.portfolio_id AND paa.portfolio_asset_id = pa.id
+         WHERE pa.portfolio_id = $1
+         ORDER BY ad.symbol",
+    )
+    .bind(PORTFOLIO_ID)
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(stored.len(), 2);
+    assert_eq!(stored[0].1, "SWITCHED");
+    assert_eq!(stored[0].2, dec!(40));
+    assert_eq!(stored[0].0.get_version_num(), 7);
+    assert_ne!(stored[0].0, FIXTURE_CASH_RELATIONSHIP);
+    assert_eq!(
+        stored[1],
+        (FIXTURE_VWCE_RELATIONSHIP, "VWCE".to_string(), dec!(60))
+    );
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_stores_class_overrides_verbatim_and_hides_relationship_ids(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN VWCE (stored as equity) submitted with an equity override,
+    // WHEN the aggregate is synchronized and serialized,
+    // THEN the override is returned as submitted (no normalisation against the
+    // shared class) and the wire asset exposes only provider and symbol.
+    let mut vwce = v2_asset("VWCE");
+    vwce.asset_class_override = Some(AssetClass::Equity);
+    let request = v2_simple_request(vec![(vwce, dec!(100))]);
+
+    let repository = SqlxPortfolioRepository::new(pool);
+    let response = repository.sync_v2(USER_ID, &request).await?;
+
+    let portfolio = response.updated_portfolios[0].clone();
+    assert_eq!(
+        portfolio.assets[0].asset_class_override,
+        Some(AssetClass::Equity)
+    );
+    let wire = serde_json::to_value(
+        dcapal_backend::ports::inbound::rest::types::sync_portfolio_v2::PortfolioV2Response::from(
+            portfolio,
+        ),
+    )?;
+    assert_eq!(
+        wire["assets"][0]["asset"],
+        serde_json::json!({"provider": "yf", "symbol": "VWCE"})
+    );
+    assert!(wire["assets"][0].get("id").is_none());
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_service_onboards_unknown_assets_before_persisting(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN an asset the directory lacks but its provider knows,
+    // WHEN the command resolves it and the service synchronizes the aggregate,
+    // THEN the shared record is created and the Portfolio references it.
+    let repository = Arc::new(SqlxPortfolioRepository::new(pool.clone()));
+    let assets = asset_service(&pool);
+    let service = PortfolioService::new(repository.clone(), assets.clone());
+    let request = v2_simple_request(vec![(v2_asset("newco"), dec!(100))]);
+
+    let command =
+        SyncPortfoliosV2Command::try_new(USER_ID, request, repository.as_ref(), &assets).await?;
+    let response = service.sync_portfolios_v2(command).await?;
+
+    assert_eq!(
+        response.updated_portfolios[0].assets[0].asset,
+        v2_ref("NEWCO")
+    );
+    let stored: (String, String) = sqlx::query_as(
+        "SELECT ad.name, ad.currency
+         FROM portfolio_asset AS pa
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         WHERE pa.portfolio_id = $1 AND ad.symbol = 'NEWCO'",
+    )
+    .bind(PORTFOLIO_ID)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(stored, ("New company".to_string(), "USD".to_string()));
+    let source: i16 =
+        sqlx::query_scalar("SELECT metadata_source FROM assets_data WHERE symbol = 'NEWCO'")
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(source, i16::from(MetadataSource::ProviderConfirmed));
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_rejects_a_portfolio_owned_by_another_user(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN an existing Portfolio owned by another user, WHEN v2 sync submits
+    // a newer aggregate for its ID, THEN the repository rejects the write and
+    // leaves the canonical row unchanged.
+    let request = SyncPortfoliosV2Request {
+        schema_version: 2,
+        portfolios: vec![PortfolioV2 {
+            id: PORTFOLIO_ID,
+            name: "Should not update".to_string(),
+            quote_currency: "USD".to_string(),
+            allocation_mode: AllocationMode::Simple,
+            drift_band: None,
+            fees: None,
+            assets: Vec::new(),
+            strategic_allocation: None,
+            last_updated_at: Utc::now(),
+        }],
+        deleted_portfolios: Vec::new(),
+    };
+
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    assert!(matches!(
+        repository.sync_v2(
+            OTHER_USER_ID,
+            &request,
+        ).await,
+        Err(PortfolioRepositoryError::OwnershipConflict(OwnershipConflict::Portfolio { id }))
+            if id == PORTFOLIO_ID
+    ));
+
+    let name: String = sqlx::query_scalar("SELECT name FROM portfolios WHERE id = $1")
+        .bind(PORTFOLIO_ID)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(name, "Existing portfolio");
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_keeps_unknown_deletions_as_terminal_tombstones(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a deletion for an ID that is not stored yet, WHEN v2 synchronization
+    // acknowledges it, THEN a user-owned tombstone prevents a later stale
+    // aggregate from recreating that Portfolio.
+    let tombstone_id = Uuid::from_u128(0x10000000000000000000000000000031);
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let deletion = SyncPortfoliosV2Request {
+        schema_version: 2,
+        portfolios: Vec::new(),
+        deleted_portfolios: vec![tombstone_id],
+    };
+
+    let response = repository.sync_v2(USER_ID, &deletion).await?;
+    assert_eq!(response.deleted_portfolios, vec![tombstone_id]);
+
+    let tombstone: (Uuid, bool) =
+        sqlx::query_as("SELECT user_id, deleted FROM portfolios WHERE id = $1")
+            .bind(tombstone_id)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(tombstone, (USER_ID, true));
+
+    let stale = SyncPortfoliosV2Request {
+        schema_version: 2,
+        portfolios: vec![PortfolioV2 {
+            id: tombstone_id,
+            name: "Stale copy".to_string(),
+            quote_currency: "EUR".to_string(),
+            allocation_mode: AllocationMode::Simple,
+            drift_band: None,
+            fees: None,
+            assets: Vec::new(),
+            strategic_allocation: None,
+            last_updated_at: Utc::now(),
+        }],
+        deleted_portfolios: Vec::new(),
+    };
+    let stale_response = repository.sync_v2(USER_ID, &stale).await?;
+    assert_eq!(stale_response.deleted_portfolios, vec![tombstone_id]);
+
+    let name: String = sqlx::query_scalar("SELECT name FROM portfolios WHERE id = $1")
+        .bind(tombstone_id)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(name, "");
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v2_sync_rolls_back_parent_when_an_asset_was_not_onboarded(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a new aggregate referencing an asset missing from the directory,
+    // WHEN the repository cannot find its shared record after writing the parent,
+    // THEN the sync fails and the parent row is rolled back.
+    let portfolio_id = Uuid::from_u128(0x10000000000000000000000000000021);
+    let mut request = v2_simple_request(vec![(v2_asset("GHOST"), dec!(100))]);
+    request.portfolios[0].id = portfolio_id;
+
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    assert!(matches!(
+        repository.sync_v2(USER_ID, &request).await,
+        Err(PortfolioRepositoryError::AssetNotOnboarded(_))
+    ));
+
+    let portfolio_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM portfolios WHERE id = $1")
+        .bind(portfolio_id)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(portfolio_count, 0);
 
     Ok(())
 }

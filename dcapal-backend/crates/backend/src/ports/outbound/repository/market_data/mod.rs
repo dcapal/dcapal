@@ -31,6 +31,21 @@ impl MarketDataRepository {
         Asset::load_by_type(kind, &mut redis).await
     }
 
+    /// Tells whether the catalog holds at least one crypto or fiat asset.
+    ///
+    /// Only the per-kind indexes are probed, so no asset is loaded and the
+    /// check stops at the first non-empty kind.
+    pub async fn has_assets(&self) -> Result<bool> {
+        let mut redis = self.redis.get().await?;
+
+        for kind in [AssetKind::Crypto, AssetKind::Fiat] {
+            if Asset::exists_by_type(kind, &mut redis).await? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub async fn store_asset(&self, asset: &Asset) -> Result<()> {
         let mut redis = self.redis.get().await?;
 

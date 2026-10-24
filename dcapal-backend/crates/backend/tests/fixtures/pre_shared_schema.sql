@@ -9,19 +9,6 @@ CREATE TABLE users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE seaql_migrations (
-    version BIGINT NOT NULL PRIMARY KEY,
-    applied_at BIGINT NOT NULL,
-    migration_type VARCHAR NOT NULL
-);
-
-INSERT INTO seaql_migrations (version, applied_at, migration_type)
-VALUES
-    (20250131084915, 1738313355, 'up'),
-    (20250201132150, 1738416110, 'up'),
-    (20250201132246, 1738416166, 'up'),
-    (20250207000000, 1738886400, 'up');
-
 CREATE TABLE portfolios (
     id UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,

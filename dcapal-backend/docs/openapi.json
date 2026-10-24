@@ -1,6 +1,14 @@
 {
   "components": {
     "schemas": {
+      "AllocationModeWire": {
+        "description": "The two mutually exclusive Portfolio allocation modes.",
+        "enum": [
+          "simple",
+          "strategic"
+        ],
+        "type": "string"
+      },
       "Asset": {
         "description": "A supported asset, either a cryptocurrency or a fiat currency.",
         "oneOf": [
@@ -47,6 +55,27 @@
             ]
           }
         ]
+      },
+      "AssetRefV2": {
+        "description": "Reference to a provider-listed asset; shared metadata is resolved server-side.",
+        "properties": {
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "symbol": {
+            "description": "Provider symbol; stored trimmed and upper-cased.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "symbol"
+        ],
+        "type": "object"
       },
       "Crypto": {
         "description": "A cryptocurrency identified by its provider id and display symbol.",
@@ -129,6 +158,73 @@
           }
         ]
       },
+      "FeeStructureV2": {
+        "description": "Fee policy shape used by the v2 aggregate.",
+        "oneOf": [
+          {
+            "properties": {
+              "type": {
+                "enum": [
+                  "zeroFee"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "feeAmount": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "fixed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "feeAmount",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "feeRate": {
+                "type": "string"
+              },
+              "maxFee": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "minFee": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "enum": [
+                  "variable"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "feeRate",
+              "type"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Fiat": {
         "description": "A fiat currency identified by its provider id and display symbol.",
         "properties": {
@@ -158,6 +254,28 @@
         "required": [
           "id",
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "LookupAssetsV2Response": {
+        "description": "Cached metadata of the looked-up assets and the references that are not cached.",
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedAssetV2Response"
+            },
+            "type": "array"
+          },
+          "notFound": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefV2"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assets",
+          "notFound"
         ],
         "type": "object"
       },
@@ -315,6 +433,124 @@
         ],
         "type": "object"
       },
+      "PortfolioAssetV2Request": {
+        "description": "Portfolio-specific holding and allocation values for one referenced asset.",
+        "properties": {
+          "aclassOverride": {
+            "enum": [
+              "equity",
+              "bond",
+              "cash",
+              "crypto",
+              "commodity",
+              "other",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2"
+          },
+          "averageBuyPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesV2Request"
+              }
+            ]
+          },
+          "manualPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "targetWeight": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "asset",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "PortfolioAssetV2Response": {
+        "description": "Canonical Portfolio Asset returned by v2 synchronization.",
+        "properties": {
+          "aclassOverride": {
+            "enum": [
+              "equity",
+              "bond",
+              "cash",
+              "crypto",
+              "commodity",
+              "other",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2"
+          },
+          "averageBuyPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesV2Response"
+              }
+            ]
+          },
+          "manualPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "targetWeight": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "asset",
+          "quantity"
+        ],
+        "type": "object"
+      },
       "PortfolioRequest": {
         "description": "A portfolio submitted as part of an authenticated synchronization.",
         "properties": {
@@ -407,6 +643,132 @@
         ],
         "type": "object"
       },
+      "PortfolioV2Request": {
+        "description": "A complete saved Portfolio aggregate exchanged by the v2 sync endpoint.",
+        "properties": {
+          "allocationMode": {
+            "$ref": "#/components/schemas/AllocationModeWire"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAssetV2Request"
+            },
+            "type": "array"
+          },
+          "driftBand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesV2Request"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lastUpdatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "strategicAllocation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StrategicAllocationV2Request"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quoteCurrency",
+          "allocationMode",
+          "assets",
+          "lastUpdatedAt"
+        ],
+        "type": "object"
+      },
+      "PortfolioV2Response": {
+        "description": "Canonical Portfolio returned by v2 synchronization.",
+        "properties": {
+          "allocationMode": {
+            "$ref": "#/components/schemas/AllocationModeWire"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAssetV2Response"
+            },
+            "type": "array"
+          },
+          "driftBand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fees": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransactionFeesV2Response"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lastUpdatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quoteCurrency": {
+            "type": "string"
+          },
+          "strategicAllocation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StrategicAllocationV2Response"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "quoteCurrency",
+          "allocationMode",
+          "assets",
+          "lastUpdatedAt"
+        ],
+        "type": "object"
+      },
       "Price": {
         "description": "A price and the timestamp at which it was observed.",
         "properties": {
@@ -423,6 +785,170 @@
         "required": [
           "price",
           "ts"
+        ],
+        "type": "object"
+      },
+      "ResolvedAssetV2Response": {
+        "description": "Shared metadata of one cached asset returned by the lookup.",
+        "properties": {
+          "aclass": {
+            "enum": [
+              "equity",
+              "bond",
+              "cash",
+              "crypto",
+              "commodity",
+              "other"
+            ],
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "symbol",
+          "name",
+          "currency",
+          "aclass"
+        ],
+        "type": "object"
+      },
+      "StrategicAllocationV2Request": {
+        "description": "Strategic class and relative Portfolio Asset targets.",
+        "properties": {
+          "assetClassTargets": {
+            "items": {
+              "$ref": "#/components/schemas/StrategicAssetClassTargetV2Request"
+            },
+            "type": "array"
+          },
+          "assetTargets": {
+            "items": {
+              "$ref": "#/components/schemas/StrategicAssetTargetV2Request"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetClassTargets",
+          "assetTargets"
+        ],
+        "type": "object"
+      },
+      "StrategicAllocationV2Response": {
+        "description": "Strategic targets returned by v2.",
+        "properties": {
+          "assetClassTargets": {
+            "items": {
+              "$ref": "#/components/schemas/StrategicAssetClassTargetV2Response"
+            },
+            "type": "array"
+          },
+          "assetTargets": {
+            "items": {
+              "$ref": "#/components/schemas/StrategicAssetTargetV2Response"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assetClassTargets",
+          "assetTargets"
+        ],
+        "type": "object"
+      },
+      "StrategicAssetClassTargetV2Request": {
+        "description": "An absolute target for one Asset Class.",
+        "properties": {
+          "assetClass": {
+            "enum": [
+              "equity",
+              "bond",
+              "cash",
+              "crypto",
+              "commodity",
+              "other"
+            ],
+            "type": "string"
+          },
+          "targetWeight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetClass",
+          "targetWeight"
+        ],
+        "type": "object"
+      },
+      "StrategicAssetClassTargetV2Response": {
+        "description": "One persisted Strategic Asset Class target returned by v2.",
+        "properties": {
+          "assetClass": {
+            "enum": [
+              "equity",
+              "bond",
+              "cash",
+              "crypto",
+              "commodity",
+              "other"
+            ],
+            "type": "string"
+          },
+          "targetWeight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetClass",
+          "targetWeight"
+        ],
+        "type": "object"
+      },
+      "StrategicAssetTargetV2Request": {
+        "description": "A relative target for one Portfolio Asset inside its effective class.",
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2"
+          },
+          "relativeTargetWeight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset",
+          "relativeTargetWeight"
+        ],
+        "type": "object"
+      },
+      "StrategicAssetTargetV2Response": {
+        "description": "One persisted relative Portfolio Asset target returned by v2.",
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2"
+          },
+          "relativeTargetWeight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset",
+          "relativeTargetWeight"
         ],
         "type": "object"
       },
@@ -477,6 +1003,63 @@
         ],
         "type": "object"
       },
+      "SyncPortfoliosV2Request": {
+        "description": "Versioned full-aggregate synchronization request.",
+        "properties": {
+          "deletedPortfolios": {
+            "description": "Portfolio tombstones requested by the client.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "portfolios": {
+            "description": "Complete Portfolio aggregates to compare with server state.",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioV2Request"
+            },
+            "type": "array"
+          },
+          "schemaVersion": {
+            "enum": [
+              2
+            ],
+            "maximum": 2,
+            "minimum": 2,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "portfolios",
+          "deletedPortfolios"
+        ],
+        "type": "object"
+      },
+      "SyncPortfoliosV2Response": {
+        "description": "Canonical aggregate synchronization response.",
+        "properties": {
+          "deletedPortfolios": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedPortfolios": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioV2Response"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "updatedPortfolios",
+          "deletedPortfolios"
+        ],
+        "type": "object"
+      },
       "TransactionFeesRequest": {
         "description": "Portfolio- or asset-level transaction-fee settings.",
         "properties": {
@@ -512,6 +1095,81 @@
         },
         "required": [
           "feeStructure"
+        ],
+        "type": "object"
+      },
+      "TransactionFeesV2Request": {
+        "description": "Portfolio- or asset-level transaction fees in the v2 contract.",
+        "properties": {
+          "feeStructure": {
+            "$ref": "#/components/schemas/FeeStructureV2"
+          },
+          "maxFeeImpact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "feeStructure"
+        ],
+        "type": "object"
+      },
+      "TransactionFeesV2Response": {
+        "description": "v2 fee settings returned by the API.",
+        "properties": {
+          "feeStructure": {
+            "$ref": "#/components/schemas/FeeStructureV2"
+          },
+          "maxFeeImpact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "feeStructure"
+        ],
+        "type": "object"
+      },
+      "V2ErrorResponse": {
+        "description": "Structured v2 error response.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/V2FieldError"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "errors"
+        ],
+        "type": "object"
+      },
+      "V2FieldError": {
+        "description": "One readable v2 validation issue.",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
         ],
         "type": "object"
       },
@@ -1150,6 +1808,67 @@
         "summary": "Returns a stored shared portfolio or a not-found response when it expired."
       }
     },
+    "/markets/v2/assets/lookup": {
+      "get": {
+        "operationId": "lookup_assets_v2",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`. Repeat the parameter for several assets (1 to 20 per call).",
+            "in": "query",
+            "name": "asset",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupAssetsV2Response"
+                }
+              }
+            },
+            "description": "Cached assets and unknown references"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid asset references"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Asset lookup failure"
+          }
+        },
+        "summary": "Reads the cached metadata of up to 20 assets without contacting providers."
+      }
+    },
     "/price/{asset}": {
       "get": {
         "operationId": "get_price",
@@ -1231,6 +1950,95 @@
           }
         },
         "summary": "Applies authenticated local portfolio changes and returns the server state."
+      }
+    },
+    "/v2/sync/portfolios": {
+      "post": {
+        "operationId": "sync_portfolios_v2",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPortfoliosV2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPortfoliosV2Response"
+                }
+              }
+            },
+            "description": "Portfolios synchronized"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid Portfolio aggregate"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio ownership violation"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Serialization conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio synchronization failure"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Asset provider unavailable"
+          }
+        },
+        "summary": "Applies a complete v2 Portfolio aggregate synchronization."
       }
     }
   }

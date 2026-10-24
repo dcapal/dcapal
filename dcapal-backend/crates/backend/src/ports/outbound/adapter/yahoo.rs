@@ -1,14 +1,20 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
+use async_trait::async_trait;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use tracing::{debug, error, warn};
 
+use super::asset_provider::{AssetProvider, AssetProviderError};
 use crate::{
     DateTime,
-    app::domain::entity::{Market, OHLCFrequency},
+    app::domain::{
+        asset::{AssetRef, ResolvedAsset},
+        entity::{Market, OHLCFrequency},
+        portfolio::{AssetClass, Provider},
+    },
     error::{DcaError, Result},
 };
 
@@ -147,6 +153,329 @@ impl YahooProvider {
                 StatusCode::BAD_GATEWAY.into_response()
             }
         }
+    }
+}
+
+const CHART_BASE_URL: &str = "https://query1.finance.yahoo.com/v8/finance/chart/";
+
+/// Upper bound on one Yahoo asset lookup, so a stalled request cannot hold a
+/// synchronization open.
+const LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[async_trait]
+impl AssetProvider for YahooProvider {
+    /// Resolves an asset from the `meta` block of a one-day Yahoo chart.
+    async fn lookup(
+        &self,
+        asset: &AssetRef,
+    ) -> std::result::Result<Option<ResolvedAsset>, AssetProviderError> {
+        let url = lookup_url(&asset.symbol)?;
+        let response = self
+            .http
+            .get(url.as_str())
+            .timeout(LOOKUP_TIMEOUT)
+            .send()
+            .await
+            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+        let status = response.status().as_u16();
+        let body = response
+            .bytes()
+            .await
+            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+
+        parse_lookup_response(asset, status, &body)
+    }
+}
+
+/// Builds the chart URL for a symbol, percent-encoding it as a path segment.
+fn lookup_url(symbol: &str) -> std::result::Result<url::Url, AssetProviderError> {
+    let mut url = url::Url::parse(CHART_BASE_URL)
+        .map_err(|e| AssetProviderError::Malformed(e.to_string()))?;
+    url.path_segments_mut()
+        .map_err(|_| AssetProviderError::Malformed("chart URL cannot be a base".to_string()))?
+        .pop_if_empty()
+        .push(symbol);
+    url.query_pairs_mut()
+        .append_pair("range", "1d")
+        .append_pair("interval", "1d");
+    Ok(url)
+}
+
+/// Turns a Yahoo chart reply into the metadata of the requested asset.
+///
+/// HTTP 400, 404 and 422, or a `Not Found` chart error, mean Yahoo does not
+/// list the symbol or rejects it. Any other non-success status (including 429
+/// and 5xx), undecodable body, or `meta` lacking a currency or name is a
+/// provider failure. The currency is kept exactly as Yahoo returns it (trimmed
+/// only) because case is significant: `GBp` denotes pence while `GBP` denotes
+/// pounds. The requested symbol, not the one
+/// echoed by Yahoo, is the asset key so aliases stay addressable.
+///
+/// `instrumentType` maps conservatively: EQUITY, ETF and MUTUALFUND are
+/// equity; CRYPTOCURRENCY is crypto; CURRENCY is cash; everything else
+/// (INDEX, FUTURE, OPTION, ...) is other, since Yahoo does not distinguish
+/// bond or commodity funds.
+fn parse_lookup_response(
+    reference: &AssetRef,
+    status: u16,
+    body: &[u8],
+) -> std::result::Result<Option<ResolvedAsset>, AssetProviderError> {
+    if matches!(status, 400 | 404 | 422) {
+        return Ok(None);
+    }
+    if !(200..300).contains(&status) {
+        return Err(AssetProviderError::Unavailable(
+            format!("Yahoo answered with HTTP status {status}").into(),
+        ));
+    }
+
+    let response: lookup::Response = serde_json::from_slice(body)
+        .map_err(|e| AssetProviderError::Malformed(format!("undecodable chart body: {e}")))?;
+
+    if let Some(error) = response.chart.error {
+        return if error.code.eq_ignore_ascii_case("not found") {
+            Ok(None)
+        } else {
+            Err(AssetProviderError::Malformed(format!(
+                "chart error {}: {}",
+                error.code,
+                error.description.unwrap_or_default()
+            )))
+        };
+    }
+
+    let meta = response
+        .chart
+        .result
+        .and_then(|results| results.into_iter().next())
+        .map(|result| result.meta)
+        .ok_or_else(|| AssetProviderError::Malformed("empty chart.result".to_string()))?;
+
+    let currency = non_blank(meta.currency)
+        .ok_or_else(|| AssetProviderError::Malformed("missing meta.currency".to_string()))?;
+    let name = non_blank(meta.long_name)
+        .or_else(|| non_blank(meta.short_name))
+        .ok_or_else(|| AssetProviderError::Malformed("missing meta.longName".to_string()))?;
+
+    Ok(Some(ResolvedAsset {
+        provider: Provider::YF,
+        symbol: reference.symbol.clone(),
+        name,
+        currency,
+        asset_class: asset_class_of(meta.instrument_type.as_deref()),
+    }))
+}
+
+fn non_blank(value: Option<String>) -> Option<String> {
+    value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn asset_class_of(instrument_type: Option<&str>) -> AssetClass {
+    match instrument_type
+        .map(|t| t.trim().to_ascii_uppercase())
+        .as_deref()
+    {
+        Some("EQUITY" | "ETF" | "MUTUALFUND") => AssetClass::Equity,
+        Some("CRYPTOCURRENCY") => AssetClass::Crypto,
+        Some("CURRENCY") => AssetClass::Cash,
+        _ => AssetClass::Other,
+    }
+}
+
+mod lookup {
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    pub struct Response {
+        pub chart: Chart,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct Chart {
+        pub result: Option<Vec<ChartResult>>,
+        pub error: Option<ChartError>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct ChartError {
+        pub code: String,
+        pub description: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct ChartResult {
+        pub meta: Meta,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Meta {
+        pub currency: Option<String>,
+        pub long_name: Option<String>,
+        pub short_name: Option<String>,
+        pub instrument_type: Option<String>,
+    }
+}
+
+#[cfg(test)]
+mod lookup_tests {
+    use super::*;
+
+    fn reference(symbol: &str) -> AssetRef {
+        AssetRef::new(Provider::YF, symbol)
+    }
+
+    fn chart_body(meta: &str) -> String {
+        format!(
+            r#"{{"chart":{{"result":[{{"meta":{meta},"timestamp":[1],"indicators":{{"quote":[{{}}]}}}}],"error":null}}}}"#
+        )
+    }
+
+    #[test]
+    fn resolves_etf_in_euro() {
+        // GIVEN a Yahoo chart reply for the VWCE.DE ETF quoted in EUR,
+        // WHEN the reply is parsed, THEN the asset is equity with the long name and EUR.
+        let body = chart_body(
+            r#"{"currency":"EUR","symbol":"VWCE.DE","instrumentType":"ETF","longName":"Vanguard FTSE All-World UCITS ETF USD Accumulation","shortName":"VANGUARD FTSE ALL-WLD U.ETF"}"#,
+        );
+
+        let asset = parse_lookup_response(&reference("vwce.de"), 200, body.as_bytes())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(asset.symbol, "VWCE.DE");
+        assert_eq!(asset.currency, "EUR");
+        assert_eq!(asset.asset_class, AssetClass::Equity);
+        assert_eq!(
+            asset.name,
+            "Vanguard FTSE All-World UCITS ETF USD Accumulation"
+        );
+    }
+
+    #[test]
+    fn resolves_equity_falling_back_to_short_name() {
+        // GIVEN a Yahoo chart reply for AAPL without a long name,
+        // WHEN the reply is parsed, THEN the short name is used and the class is equity.
+        let body = chart_body(
+            r#"{"currency":"USD","symbol":"AAPL","instrumentType":"EQUITY","shortName":"Apple Inc."}"#,
+        );
+
+        let asset = parse_lookup_response(&reference("AAPL"), 200, body.as_bytes())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(asset.name, "Apple Inc.");
+        assert_eq!(asset.currency, "USD");
+        assert_eq!(asset.asset_class, AssetClass::Equity);
+    }
+
+    #[test]
+    fn keeps_the_currency_case_so_pence_codes_survive() {
+        // GIVEN a Yahoo chart reply for a London listing quoted in pence ("GBp"),
+        // WHEN the reply is parsed,
+        // THEN the currency stays "GBp" instead of becoming pounds ("GBP").
+        let body = chart_body(
+            r#"{"currency":" GBp ","symbol":"VOD.L","instrumentType":"EQUITY","longName":"Vodafone"}"#,
+        );
+
+        let asset = parse_lookup_response(&reference("VOD.L"), 200, body.as_bytes())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(asset.currency, "GBp");
+    }
+
+    #[test]
+    fn resolves_cryptocurrency() {
+        // GIVEN a Yahoo chart reply for BTC-USD, WHEN it is parsed,
+        // THEN the asset is crypto quoted in USD.
+        let body = chart_body(
+            r#"{"currency":"USD","symbol":"BTC-USD","instrumentType":"CRYPTOCURRENCY","longName":"Bitcoin USD"}"#,
+        );
+
+        let asset = parse_lookup_response(&reference("BTC-USD"), 200, body.as_bytes())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(asset.asset_class, AssetClass::Crypto);
+        assert_eq!(asset.currency, "USD");
+    }
+
+    #[test]
+    fn maps_instrument_types_conservatively() {
+        // GIVEN assorted Yahoo instrument types, WHEN they are mapped,
+        // THEN only the documented ones leave the Other class.
+        for (kind, class) in [
+            (Some("MUTUALFUND"), AssetClass::Equity),
+            (Some("CURRENCY"), AssetClass::Cash),
+            (Some("INDEX"), AssetClass::Other),
+            (Some("FUTURE"), AssetClass::Other),
+            (None, AssetClass::Other),
+        ] {
+            assert_eq!(asset_class_of(kind), class, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn not_found_body_is_an_unknown_ticker() {
+        // GIVEN Yahoo's 400/404/422 replies for a delisted, unknown or rejected symbol,
+        // WHEN it is parsed, THEN the symbol is reported as unknown, not as a failure.
+        let body = r#"{"chart":{"result":null,"error":{"code":"Not Found","description":"No data found, symbol may be delisted"}}}"#;
+
+        for status in [400, 404, 422] {
+            assert_eq!(
+                parse_lookup_response(&reference("NOPE"), status, body.as_bytes()).unwrap(),
+                None,
+                "status {status}"
+            );
+        }
+        assert_eq!(
+            parse_lookup_response(&reference("NOPE"), 200, body.as_bytes()).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn failures_are_provider_errors() {
+        // GIVEN a 429/5xx/other status, an undecodable body, and a reply lacking currency,
+        // WHEN each is parsed, THEN each is a provider error rather than an unknown ticker.
+        for status in [429, 500, 503, 401] {
+            assert!(
+                matches!(
+                    parse_lookup_response(&reference("X"), status, b""),
+                    Err(AssetProviderError::Unavailable(_))
+                ),
+                "status {status}"
+            );
+        }
+        assert!(matches!(
+            parse_lookup_response(&reference("X"), 200, b"<html>"),
+            Err(AssetProviderError::Malformed(_))
+        ));
+        let no_currency = chart_body(r#"{"symbol":"X","instrumentType":"EQUITY","longName":"X"}"#);
+        assert!(matches!(
+            parse_lookup_response(&reference("X"), 200, no_currency.as_bytes()),
+            Err(AssetProviderError::Malformed(_))
+        ));
+        let no_name = chart_body(r#"{"currency":"USD","symbol":"X","instrumentType":"EQUITY"}"#);
+        assert!(matches!(
+            parse_lookup_response(&reference("X"), 200, no_name.as_bytes()),
+            Err(AssetProviderError::Malformed(_))
+        ));
+    }
+
+    #[test]
+    fn symbol_is_percent_encoded_in_the_url() {
+        // GIVEN a symbol containing reserved URL characters,
+        // WHEN the lookup URL is built, THEN the symbol stays one encoded path segment.
+        let url = lookup_url("A/B?C").unwrap();
+
+        assert_eq!(
+            url.as_str(),
+            "https://query1.finance.yahoo.com/v8/finance/chart/A%2FB%3FC?range=1d&interval=1d"
+        );
     }
 }
 

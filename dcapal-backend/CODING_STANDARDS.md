@@ -20,6 +20,14 @@ This standard applies to new and modified code. Existing code may still be on
 an older path; this document does not require a broad migration when adding
 these files.
 
+Rust conventions: keep application seams typed rather than passing REST DTOs
+or storage strings; use `thiserror` for error types, `derive_more` for small
+mechanical trait implementations, and `mockall` in test-only dependencies for
+outbound-port mocks. Use RAII guards for scoped path/stack mutation. Bind all
+SQL values, including enum discriminants, instead of embedding numeric or
+string literals. Treat applied migration files and checksums as immutable;
+add forward migrations and use fixtures that model supported production states.
+
 ### REST handlers adapt HTTP
 
 Keep an Axum handler as a short orchestration boundary. It should:

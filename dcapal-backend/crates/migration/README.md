@@ -18,9 +18,10 @@ The shared asset migration creates `assets_data` records, and the following
 identity migration rewrites Portfolio Asset relationship IDs with PostgreSQL
 18 `uuidv7()`. They must run on PostgreSQL 18 or newer.
 
-The SQLx runner records its history in `_sqlx_migrations`. It does not modify
-the existing SeaORM `seaql_migrations` table. The historical up migrations are
-idempotent so they can adopt tables already created in production.
+The SQLx runner records its history in `_sqlx_migrations`. Historical
+migrations are retained as applied and are not rewritten; schema changes are
+introduced by new forward migrations. Development-only down migrations are
+provided only where a test or local reset needs them.
 
 Migration files are added manually with a numeric timestamp prefix and paired
 `.up.sql` and `.down.sql` files. Down migrations are for local development and
