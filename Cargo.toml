@@ -30,11 +30,13 @@ anyhow = "1.0.104"
 async-trait = "0.1.91"
 axum = { version = "0.8.9", features = ["macros"] }
 axum-extra = { version = "0.12.6", features = ["typed-header"] }
+backoff = { version = "0.4.0", default-features = false, features = ["tokio"] }
 config = "0.15.25"
 console_error_panic_hook = { version = "0.1.7" }
 const_format = "0.2.36"
 chrono = { version = "0.4.45", features = ["serde"] }
 deadpool-redis = { version = "0.23.0", features = ["serde"] }
+derive_more = { version = "2.0.1", features = ["display"] }
 env_logger = "0.11.11"
 failsafe = "1.3.0"
 futures = "0.3.33"
@@ -49,6 +51,7 @@ lazy_static = "1.5.0"
 log = "0.4.33"
 metrics = "0.24.6"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["http-listener"] }
+mockall = "0.13.1"
 num_enum = "0.7.4"
 parking_lot = "0.12.5"
 rand = "0.10.2"

@@ -20,6 +20,10 @@ _Avoid_: Holding, when referring to the instrument itself
 An asset included in a portfolio, with portfolio-specific data such as quantity held, market price, target weight, and an optional asset fee override.
 _Avoid_: Position
 
+**Portfolio Asset synchronization identity**:
+The v2 synchronization contract sends the Portfolio Asset relationship ID as a UUIDv7. Portfolio IDs keep their existing identity policy, and the v1 synchronization contract does not expose relationship IDs. A future v2 adapter must create and preserve UUIDv7 relationship IDs when it builds the request; existing Portfolio ID generation remains unchanged.
+_Avoid_: UUIDv4 Portfolio Asset ID in a v2 request
+
 **Holding**:
 The part of a portfolio asset that the investor already owns, described by its quantity and current value.
 _Avoid_: Target allocation

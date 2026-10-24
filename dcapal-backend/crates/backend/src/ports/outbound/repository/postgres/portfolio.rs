@@ -6,16 +6,27 @@ use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
 
+use crate::app::domain::portfolio::{SyncPortfoliosV2Request, SyncPortfoliosV2Response};
 use crate::ports::{
     inbound::rest::{
         FeeStructure,
         request::{PortfolioRequest, TransactionFeesRequest},
     },
     outbound::repository::{
-        portfolio::{PortfolioRepository, PortfolioRepositoryError, Result},
-        postgres::types::{AssetClass, PortfolioAssetRow, PortfolioRow, Provider},
+        portfolio::{
+            PortfolioAssetOwnership, PortfolioOwnership, PortfolioRepository,
+            PortfolioRepositoryError, Result,
+        },
+        postgres::types::{
+            AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, PortfolioAssetRow,
+            PortfolioRow, Provider as DbProvider,
+        },
     },
 };
+#[path = "portfolio_sync_v2.rs"]
+mod portfolio_sync_v2;
+#[path = "portfolio_sync_v2_snapshot.rs"]
+mod portfolio_sync_v2_snapshot;
 
 /// PostgreSQL persistence for portfolios and their assets.
 #[derive(Clone)]
@@ -32,22 +43,20 @@ struct FeeFields {
     min_fee: Option<Decimal>,
     max_fee: Option<Decimal>,
 }
-
 /// Shared provider metadata returned by the asset-data upsert.
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow)]
 struct AssetData {
     id: Uuid,
     symbol: String,
     name: String,
     #[sqlx(try_from = "i16")]
-    asset_class: AssetClass,
+    asset_class: DbAssetClass,
     currency: String,
     #[sqlx(try_from = "i16")]
-    provider: Provider,
+    provider: DbProvider,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
-
 /// Portfolio-specific values returned by relationship writes.
 #[derive(Debug, sqlx::FromRow)]
 struct PortfolioAssetRecord {
@@ -56,7 +65,6 @@ struct PortfolioAssetRecord {
     assets_data_id: Uuid,
     asset_class_override: Option<i16>,
     quantity: Decimal,
-    target_weight: Decimal,
     manual_price: Option<Decimal>,
     max_fee_impact: Option<Decimal>,
     fee_type: Option<String>,
@@ -68,7 +76,6 @@ struct PortfolioAssetRecord {
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
-
 struct PortfolioAssetInput {
     asset_data: AssetData,
     quantity: Decimal,
@@ -77,7 +84,6 @@ struct PortfolioAssetInput {
     average_buy_price: Option<Decimal>,
     fees: Option<TransactionFeesRequest>,
 }
-
 struct PortfolioInput {
     id: Uuid,
     name: String,
@@ -85,14 +91,13 @@ struct PortfolioInput {
     fees: Option<TransactionFeesRequest>,
     last_updated_at: crate::DateTime,
 }
-
 impl AssetData {
     fn candidate(
         symbol: String,
         name: String,
-        asset_class: AssetClass,
+        asset_class: DbAssetClass,
         currency: String,
-        provider: Provider,
+        provider: DbProvider,
     ) -> Self {
         let now = Utc::now();
         Self {
@@ -107,12 +112,11 @@ impl AssetData {
         }
     }
 }
-
 impl PortfolioAssetRecord {
     fn candidate(
         portfolio_id: Uuid,
         assets_data_id: Uuid,
-        asset_class_override: Option<AssetClass>,
+        asset_class_override: Option<DbAssetClass>,
         asset: &PortfolioAssetInput,
         fee_fields: &FeeFields,
     ) -> Self {
@@ -123,7 +127,6 @@ impl PortfolioAssetRecord {
             assets_data_id,
             asset_class_override: asset_class_override.map(i16::from),
             quantity: asset.quantity,
-            target_weight: asset.target_weight,
             manual_price: asset.manual_price,
             max_fee_impact: fee_fields.max_fee_impact,
             fee_type: fee_fields.fee_type.clone(),
@@ -137,10 +140,10 @@ impl PortfolioAssetRecord {
         }
     }
 }
-
 fn combine_asset_rows(
     asset_data: AssetData,
     relationship: PortfolioAssetRecord,
+    target_weight: Decimal,
 ) -> PortfolioAssetRow {
     PortfolioAssetRow {
         id: relationship.id,
@@ -153,7 +156,7 @@ fn combine_asset_rows(
         currency: asset_data.currency,
         provider: asset_data.provider,
         quantity: relationship.quantity,
-        target_weight: relationship.target_weight,
+        target_weight,
         manual_price: relationship.manual_price,
         max_fee_impact: relationship.max_fee_impact,
         fee_type: relationship.fee_type,
@@ -166,13 +169,11 @@ fn combine_asset_rows(
         updated_at: relationship.updated_at,
     }
 }
-
 impl SqlxPortfolioRepository {
     /// Creates a portfolio repository backed by the provided PostgreSQL pool.
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self { pool }
     }
-
     async fn upsert_asset_data(
         tx: &mut Transaction<'_, Postgres>,
         asset_data: &AssetData,
@@ -208,12 +209,15 @@ impl SqlxPortfolioRepository {
             "SELECT pa.id, pa.portfolio_id, pa.assets_data_id,
                     ad.symbol, ad.name, ad.asset_class, pa.asset_class_override,
                     ad.currency, ad.provider,
-                    pa.quantity, pa.target_weight, pa.manual_price,
+                    pa.quantity, COALESCE(paa.weight, 0) AS target_weight, pa.manual_price,
                     pa.max_fee_impact, pa.fee_type, pa.fee_amount,
                     pa.fee_rate, pa.min_fee, pa.max_fee, pa.average_buy_price,
                     pa.created_at, pa.updated_at
              FROM portfolio_asset AS pa
              JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+             LEFT JOIN portfolio_asset_allocation AS paa
+               ON paa.portfolio_id = pa.portfolio_id
+              AND paa.portfolio_asset_id = pa.id
              WHERE pa.portfolio_id = $1
              ORDER BY pa.id
              FOR UPDATE OF pa",
@@ -221,9 +225,7 @@ impl SqlxPortfolioRepository {
         .bind(portfolio_id)
         .fetch_all(&mut **tx)
         .await?;
-
         let mut updated_assets = Vec::with_capacity(assets.len());
-
         for asset in &assets {
             let fee_fields = Self::extract_fee_fields(asset.fees.clone());
             let shared_asset = Self::upsert_asset_data(tx, &asset.asset_data).await?;
@@ -244,13 +246,13 @@ impl SqlxPortfolioRepository {
                 let relationship = query_as::<_, PortfolioAssetRecord>(
                     "UPDATE portfolio_asset
                      SET assets_data_id = $2, asset_class_override = $3,
-                         quantity = $4, target_weight = $5, manual_price = $6,
-                         average_buy_price = $7, max_fee_impact = $8, fee_type = $9,
-                         fee_amount = $10, fee_rate = $11, min_fee = $12, max_fee = $13,
-                         updated_at = $14
+                         quantity = $4, manual_price = $5,
+                         average_buy_price = $6, max_fee_impact = $7, fee_type = $8,
+                         fee_amount = $9, fee_rate = $10, min_fee = $11, max_fee = $12,
+                         updated_at = $13
                      WHERE id = $1
                      RETURNING id, portfolio_id, assets_data_id, asset_class_override,
-                               quantity, target_weight, manual_price, max_fee_impact, fee_type,
+                               quantity, manual_price, max_fee_impact, fee_type,
                                fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
                                created_at, updated_at",
                 )
@@ -258,7 +260,6 @@ impl SqlxPortfolioRepository {
                 .bind(candidate.assets_data_id)
                 .bind(candidate.asset_class_override)
                 .bind(candidate.quantity)
-                .bind(candidate.target_weight)
                 .bind(candidate.manual_price)
                 .bind(candidate.average_buy_price)
                 .bind(candidate.max_fee_impact)
@@ -271,17 +272,31 @@ impl SqlxPortfolioRepository {
                 .fetch_one(&mut **tx)
                 .await?;
 
-                combine_asset_rows(shared_asset, relationship)
+                query(
+                    "INSERT INTO portfolio_asset_allocation
+                       (portfolio_id, portfolio_asset_id, weight, updated_at)
+                       VALUES ($1, $2, $3, $4)
+                       ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
+                       SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
+                )
+                .bind(portfolio_id)
+                .bind(relationship.id)
+                .bind(asset.target_weight)
+                .bind(candidate.updated_at)
+                .execute(&mut **tx)
+                .await?;
+
+                combine_asset_rows(shared_asset, relationship, asset.target_weight)
             } else {
                 let relationship = query_as::<_, PortfolioAssetRecord>(
                     "INSERT INTO portfolio_asset
                          (id, portfolio_id, assets_data_id, asset_class_override,
-                          quantity, target_weight, manual_price, average_buy_price, max_fee_impact,
+                          quantity, manual_price, average_buy_price, max_fee_impact,
                           fee_type, fee_amount, fee_rate, min_fee, max_fee,
                           created_at, updated_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                      RETURNING id, portfolio_id, assets_data_id, asset_class_override,
-                               quantity, target_weight, manual_price, max_fee_impact, fee_type,
+                               quantity, manual_price, max_fee_impact, fee_type,
                                fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
                                created_at, updated_at",
                 )
@@ -290,7 +305,6 @@ impl SqlxPortfolioRepository {
                 .bind(candidate.assets_data_id)
                 .bind(candidate.asset_class_override)
                 .bind(candidate.quantity)
-                .bind(candidate.target_weight)
                 .bind(candidate.manual_price)
                 .bind(candidate.average_buy_price)
                 .bind(candidate.max_fee_impact)
@@ -304,12 +318,25 @@ impl SqlxPortfolioRepository {
                 .fetch_one(&mut **tx)
                 .await?;
 
-                combine_asset_rows(shared_asset, relationship)
+                query(
+                    "INSERT INTO portfolio_asset_allocation
+                       (portfolio_id, portfolio_asset_id, weight, updated_at)
+                       VALUES ($1, $2, $3, $4)
+                       ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
+                       SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
+                )
+                .bind(portfolio_id)
+                .bind(relationship.id)
+                .bind(asset.target_weight)
+                .bind(candidate.updated_at)
+                .execute(&mut **tx)
+                .await?;
+
+                combine_asset_rows(shared_asset, relationship, asset.target_weight)
             };
 
             updated_assets.push(updated);
         }
-
         let current_asset_ids: Vec<Uuid> = updated_assets
             .iter()
             .map(|asset| asset.assets_data_id)
@@ -322,10 +349,8 @@ impl SqlxPortfolioRepository {
                     .await?;
             }
         }
-
         Ok(updated_assets)
     }
-
     #[allow(clippy::too_many_arguments)]
     async fn upsert_portfolio(
         &self,
@@ -340,6 +365,7 @@ impl SqlxPortfolioRepository {
 
         let existing = query_as::<_, PortfolioRow>(
             "SELECT id, user_id, name, currency, deleted, last_updated_at,
+                    allocation_mode, drift_band, strategic_allocation_present,
                     max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                     created_at, updated_at
              FROM portfolios
@@ -349,7 +375,6 @@ impl SqlxPortfolioRepository {
         .bind(portfolio.id)
         .fetch_optional(&mut *tx)
         .await?;
-
         if let Some(existing) = &existing
             && existing.user_id != user_id
         {
@@ -361,10 +386,12 @@ impl SqlxPortfolioRepository {
             query_as::<_, PortfolioRow>(
                 "UPDATE portfolios
                  SET name = $2, currency = $3, last_updated_at = $4,
-                     max_fee_impact = $5, fee_type = $6, fee_amount = $7,
-                     fee_rate = $8, min_fee = $9, max_fee = $10
+                     allocation_mode = $5, strategic_allocation_present = FALSE,
+                     max_fee_impact = $6, fee_type = $7, fee_amount = $8,
+                     fee_rate = $9, min_fee = $10, max_fee = $11
                  WHERE id = $1
                  RETURNING id, user_id, name, currency, deleted, last_updated_at,
+                           allocation_mode, drift_band, strategic_allocation_present,
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
             )
@@ -372,6 +399,7 @@ impl SqlxPortfolioRepository {
             .bind(&portfolio.name)
             .bind(&portfolio.quote_ccy)
             .bind(portfolio.last_updated_at)
+            .bind(i16::from(DbAllocationMode::Simple))
             .bind(fee_fields.max_fee_impact)
             .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
@@ -387,6 +415,7 @@ impl SqlxPortfolioRepository {
                       max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee)
                  VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, $8, $9, $10, $11)
                  RETURNING id, user_id, name, currency, deleted, last_updated_at,
+                           allocation_mode, drift_band, strategic_allocation_present,
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
             )
@@ -407,11 +436,17 @@ impl SqlxPortfolioRepository {
 
         let assets = Self::upsert_assets_transaction(&mut tx, portfolio.id, assets).await?;
 
+        // The legacy endpoint exposes only absolute Portfolio Asset targets;
+        // keep a v2 Strategic state from changing that contract implicitly.
+        query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = $1")
+            .bind(portfolio.id)
+            .execute(&mut *tx)
+            .await?;
+
         // A sync must expose the portfolio and its asset set as one consistent change.
         tx.commit().await?;
         Ok((portfolio, assets))
     }
-
     fn extract_fee_fields(fees: Option<TransactionFeesRequest>) -> FeeFields {
         match fees {
             Some(fees) => match fees.fee_structure {
@@ -446,15 +481,57 @@ impl SqlxPortfolioRepository {
         }
     }
 }
-
 #[async_trait]
 impl PortfolioRepository for SqlxPortfolioRepository {
+    async fn find_owners(
+        &self,
+        portfolio_ids: &[Uuid],
+        portfolio_asset_ids: &[Uuid],
+    ) -> Result<PortfolioOwnership> {
+        let mut ownership = PortfolioOwnership::default();
+        if !portfolio_ids.is_empty() {
+            let owners = query_as::<_, (Uuid, Uuid)>(
+                "SELECT id, user_id
+                 FROM portfolios
+                 WHERE id = ANY($1)",
+            )
+            .bind(portfolio_ids.to_vec())
+            .fetch_all(&self.pool)
+            .await?;
+            ownership.portfolios.extend(owners);
+        }
+        if !portfolio_asset_ids.is_empty() {
+            let owners = query_as::<_, (Uuid, Uuid, Uuid)>(
+                "SELECT pa.id, p.user_id, pa.portfolio_id
+                 FROM portfolio_asset AS pa
+                 JOIN portfolios AS p ON p.id = pa.portfolio_id
+                 WHERE pa.id = ANY($1)",
+            )
+            .bind(portfolio_asset_ids.to_vec())
+            .fetch_all(&self.pool)
+            .await?;
+            ownership.portfolio_assets.extend(owners.into_iter().map(
+                |(asset_id, user_id, portfolio_id)| {
+                    (
+                        asset_id,
+                        PortfolioAssetOwnership {
+                            user_id,
+                            portfolio_id,
+                        },
+                    )
+                },
+            ));
+        }
+        Ok(ownership)
+    }
+
     async fn get_user_portfolios_with_assets(
         &self,
         user_id: Uuid,
     ) -> Result<Vec<(PortfolioRow, Vec<PortfolioAssetRow>)>> {
         let portfolios = query_as::<_, PortfolioRow>(
             "SELECT id, user_id, name, currency, deleted, last_updated_at,
+                    allocation_mode, drift_band, strategic_allocation_present,
                     max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                     created_at, updated_at
              FROM portfolios
@@ -474,16 +551,30 @@ impl PortfolioRepository for SqlxPortfolioRepository {
             "SELECT pa.id, pa.portfolio_id, pa.assets_data_id,
                     ad.symbol, ad.name, ad.asset_class, pa.asset_class_override,
                     ad.currency, ad.provider,
-                    pa.quantity, pa.target_weight, pa.manual_price,
+                    pa.quantity,
+                    CASE WHEN p.allocation_mode = $2
+                         THEN COALESCE(paa.weight, 0)
+                              * COALESCE(class_target.target_weight, 0) / 100
+                         ELSE COALESCE(paa.weight, 0)
+                    END AS target_weight,
+                    pa.manual_price,
                     pa.max_fee_impact, pa.fee_type, pa.fee_amount,
                     pa.fee_rate, pa.min_fee, pa.max_fee, pa.average_buy_price,
                     pa.created_at, pa.updated_at
              FROM portfolio_asset AS pa
+             JOIN portfolios AS p ON p.id = pa.portfolio_id
              JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+             LEFT JOIN portfolio_asset_allocation AS paa
+               ON paa.portfolio_id = pa.portfolio_id
+              AND paa.portfolio_asset_id = pa.id
+             LEFT JOIN strategic_asset_class_targets AS class_target
+               ON class_target.portfolio_id = pa.portfolio_id
+              AND class_target.asset_class = COALESCE(pa.asset_class_override, ad.asset_class)
              WHERE pa.portfolio_id = ANY($1)
              ORDER BY pa.portfolio_id, pa.id",
         )
         .bind(&portfolio_ids)
+        .bind(i16::from(DbAllocationMode::Strategic))
         .fetch_all(&self.pool)
         .await?;
 
@@ -526,10 +617,10 @@ impl PortfolioRepository for SqlxPortfolioRepository {
             .assets
             .into_iter()
             .map(|asset| {
-                let provider = Provider::from_legacy(&asset.provider).ok_or_else(|| {
+                let provider = DbProvider::from_legacy(&asset.provider).ok_or_else(|| {
                     PortfolioRepositoryError::UnsupportedProvider(asset.provider.clone())
                 })?;
-                let asset_class = AssetClass::from_legacy(&asset.aclass);
+                let asset_class = DbAssetClass::from_legacy(&asset.aclass);
                 Ok(PortfolioAssetInput {
                     asset_data: AssetData::candidate(
                         asset.symbol,
@@ -559,5 +650,13 @@ impl PortfolioRepository for SqlxPortfolioRepository {
             assets,
         )
         .await
+    }
+
+    async fn sync_v2(
+        &self,
+        user_id: Uuid,
+        request: SyncPortfoliosV2Request,
+    ) -> Result<SyncPortfoliosV2Response> {
+        portfolio_sync_v2::sync(self, user_id, request).await
     }
 }

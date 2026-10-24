@@ -22,7 +22,7 @@ A crypto or fiat asset known to the market-data catalog and usable as the base o
 _Avoid_: Asset, when the distinction from a portfolio asset matters; portfolio asset
 
 **Portfolio asset**:
-The Portfolio Asset relationship between a saved Portfolio and shared asset metadata. It owns Portfolio-specific data such as quantity held, target weight, manual price, average buy price, fee policy, and an optional Asset Class override. It is Portfolio data, not an entry in the market-data catalog, and it may represent an equity even when no market asset exists for it.
+The Portfolio Asset relationship between a saved Portfolio and shared asset metadata. It owns Portfolio-specific data such as quantity held, manual price, average buy price, fee policy, and an optional Asset Class override. Its target rule is stored in the Portfolio Asset allocation row. It is Portfolio data, not an entry in the market-data catalog, and it may represent an equity even when no market asset exists for it.
 _Avoid_: Market asset; holding, when referring to the complete Portfolio entry
 
 **Shared asset metadata**:
@@ -78,6 +78,22 @@ _Avoid_: Saved portfolio; portfolio synchronization
 **Portfolio synchronization**:
 A bidirectional exchange of a user's saved portfolios between the client and backend. A later client version updates the saved portfolio, while a later server version is returned to the client; synchronization also reports saved portfolio deletions and does not execute trades.
 _Avoid_: Trade synchronization; portfolio import
+
+**Allocation mode**:
+The Portfolio-wide choice between Simple targeting, which uses absolute Portfolio Asset targets, and Strategic targeting, which uses Asset Class targets and relative Portfolio Asset targets.
+_Avoid_: Allocation kind; per-asset mode
+
+**Portfolio Asset allocation**:
+The target rule owned by one Portfolio Asset relationship. In Simple mode its weight is an absolute Portfolio target; in Strategic mode its weight is relative to the Portfolio Asset's effective Asset Class.
+_Avoid_: Holding target, when the target rule is meant
+
+**Strategic Asset Class target**:
+The absolute target weight assigned to one Asset Class within a Portfolio in Strategic allocation mode.
+_Avoid_: Class weight, when the target is persisted data
+
+**Strategic Portfolio Asset target**:
+The relative target weight assigned to one Portfolio Asset within its effective Asset Class in Strategic allocation mode.
+_Avoid_: Absolute target, when referring to the Strategic source value
 
 **Portfolio deletion**:
 Removal of a saved portfolio from a user's set of portfolios, represented to synchronization clients by a deletion marker.

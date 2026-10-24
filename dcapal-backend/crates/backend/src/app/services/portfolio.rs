@@ -1,16 +1,26 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use uuid::Uuid;
 
-use crate::error::DcaError;
-use crate::ports::{
-    inbound::rest::{
-        request::{PortfolioRequest, SyncPortfoliosRequest},
-        response::{PortfolioResponse, SyncPortfoliosResponse},
+use crate::{
+    app::{
+        commands::sync_portfolios_v2::{
+            OwnershipLocation, SyncPortfoliosV2Command, SyncPortfoliosV2CommandError,
+            ValidationError,
+        },
+        domain::portfolio::SyncPortfoliosV2Response,
+        infra::retry::retry_sync,
     },
-    outbound::repository::{
-        portfolio::{PortfolioRepository, PortfolioRepositoryError},
-        postgres::types::{AssetClass, Provider},
+    error::DcaError,
+    ports::{
+        inbound::rest::{
+            request::{PortfolioRequest, SyncPortfoliosRequest},
+            response::{PortfolioResponse, SyncPortfoliosResponse},
+        },
+        outbound::repository::{
+            portfolio::{PortfolioRepository, PortfolioRepositoryError},
+            postgres::types::{AssetClass, Provider},
+        },
     },
 };
 
@@ -23,13 +33,30 @@ pub enum PortfolioServiceError {
     Repository(#[source] PortfolioRepositoryError),
     #[error("portfolio response conversion failed")]
     ResponseConversion(#[source] crate::error::DcaError),
+    #[error("v2 Portfolio validation failed")]
+    Validation(#[source] ValidationError),
+    #[error("v2 Portfolio ownership violation at {location:?}")]
+    Ownership { location: OwnershipLocation },
+    #[error("portfolio synchronization conflict")]
+    Conflict(#[source] PortfolioRepositoryError),
 }
 
 impl From<PortfolioRepositoryError> for PortfolioServiceError {
     fn from(error: PortfolioRepositoryError) -> Self {
         match error {
             error @ PortfolioRepositoryError::CannotUpdate => Self::CannotUpdate(error),
+            error @ PortfolioRepositoryError::OwnershipConflict(_) => Self::CannotUpdate(error),
             error => Self::Repository(error),
+        }
+    }
+}
+
+impl From<SyncPortfoliosV2CommandError> for PortfolioServiceError {
+    fn from(error: SyncPortfoliosV2CommandError) -> Self {
+        match error {
+            SyncPortfoliosV2CommandError::Validation(error) => Self::Validation(error),
+            SyncPortfoliosV2CommandError::Ownership(location) => Self::Ownership { location },
+            SyncPortfoliosV2CommandError::Repository(error) => Self::Repository(error),
         }
     }
 }
@@ -40,6 +67,10 @@ impl From<PortfolioServiceError> for DcaError {
             PortfolioServiceError::CannotUpdate(error) => Self::ValidationFailure {
                 message: "Portfolio cannot be updated".to_string(),
                 source: Box::new(PortfolioServiceError::CannotUpdate(error)),
+            },
+            PortfolioServiceError::Validation(error) => Self::ValidationFailure {
+                message: error.to_string(),
+                source: Box::new(error),
             },
             error => Self::ApplicationFailure {
                 source: Box::new(error),
@@ -52,8 +83,6 @@ impl From<PortfolioServiceError> for DcaError {
 pub struct PortfolioService {
     portfolio_repository: Arc<dyn PortfolioRepository>,
 }
-
-const SYNC_MAX_ATTEMPTS: usize = 3;
 
 impl PortfolioService {
     /// Creates a portfolio service using the supplied persistence port.
@@ -71,26 +100,11 @@ impl PortfolioService {
     ) -> std::result::Result<SyncPortfoliosResponse, PortfolioServiceError> {
         let req = normalize_sync_request(req);
 
-        for attempt in 0..SYNC_MAX_ATTEMPTS {
-            match self.sync_once(user_id, &req).await {
-                Ok(response) => return Ok(response),
-                Err(error)
-                    if error.is_retryable_concurrency() && attempt + 1 < SYNC_MAX_ATTEMPTS =>
-                {
-                    let delay = Duration::from_millis(25 * (1 << attempt));
-                    tracing::warn!(
-                        attempt = attempt + 1,
-                        max_attempts = SYNC_MAX_ATTEMPTS,
-                        delay_ms = delay.as_millis(),
-                        "retrying Portfolio synchronization after a concurrency conflict"
-                    );
-                    tokio::time::sleep(delay).await;
-                }
-                Err(error) => return Err(error),
-            }
-        }
-
-        unreachable!("the synchronization retry loop always returns")
+        retry_sync(
+            || self.sync_once(user_id, &req),
+            PortfolioServiceError::is_retryable_concurrency,
+        )
+        .await
     }
 
     async fn sync_once(
@@ -171,6 +185,31 @@ impl PortfolioService {
             deleted_portfolios,
         })
     }
+
+    /// Atomically synchronizes a validated complete v2 Portfolio aggregate.
+    pub async fn sync_portfolios_v2(
+        &self,
+        command: SyncPortfoliosV2Command,
+    ) -> std::result::Result<SyncPortfoliosV2Response, PortfolioServiceError> {
+        let user_id = command.user_id();
+        let request = command.into_request();
+        let response = retry_sync(
+            || self.portfolio_repository.sync_v2(user_id, request.clone()),
+            PortfolioRepositoryError::is_retryable_concurrency,
+        )
+        .await;
+
+        match response {
+            Ok(response) => Ok(response),
+            Err(error)
+                if error.is_retryable_concurrency()
+                    || matches!(error, PortfolioRepositoryError::OwnershipConflict(_)) =>
+            {
+                Err(PortfolioServiceError::Conflict(error))
+            }
+            Err(error) => Err(PortfolioServiceError::from(error)),
+        }
+    }
 }
 
 impl PortfolioServiceError {
@@ -213,153 +252,16 @@ mod tests {
     use rust_decimal::Decimal;
 
     use super::*;
+    use crate::app::commands::sync_portfolios_v2::SyncPortfoliosV2Command;
+    use crate::app::domain::portfolio::{
+        AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider, SharedAssetV2,
+        SyncPortfoliosV2Request, SyncPortfoliosV2Response,
+    };
     use crate::ports::inbound::rest::request::PortfolioAssetRequest;
     use crate::ports::outbound::repository::{
-        portfolio::PortfolioRepository,
+        portfolio::{PortfolioOwnership, PortfolioRepository},
         postgres::types::{PortfolioAssetRow, PortfolioRow},
     };
-
-    #[derive(Debug)]
-    struct TestDatabaseError {
-        code: &'static str,
-    }
-
-    impl std::fmt::Display for TestDatabaseError {
-        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(formatter, "test database error {}", self.code)
-        }
-    }
-
-    impl StdError for TestDatabaseError {}
-
-    impl sqlx::error::DatabaseError for TestDatabaseError {
-        fn message(&self) -> &str {
-            "test database error"
-        }
-
-        fn code(&self) -> Option<Cow<'_, str>> {
-            Some(Cow::Borrowed(self.code))
-        }
-
-        fn as_error(&self) -> &(dyn StdError + Send + Sync + 'static) {
-            self
-        }
-
-        fn as_error_mut(&mut self) -> &mut (dyn StdError + Send + Sync + 'static) {
-            self
-        }
-
-        fn into_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync + 'static> {
-            self
-        }
-
-        fn kind(&self) -> sqlx::error::ErrorKind {
-            sqlx::error::ErrorKind::Other
-        }
-    }
-
-    struct RetryRepository {
-        failures_before_success: usize,
-        error_code: &'static str,
-        upsert_attempts: AtomicUsize,
-        last_upserted_portfolio: Mutex<Option<PortfolioRequest>>,
-    }
-
-    impl RetryRepository {
-        fn new(failures_before_success: usize, error_code: &'static str) -> Self {
-            Self {
-                failures_before_success,
-                error_code,
-                upsert_attempts: AtomicUsize::new(0),
-                last_upserted_portfolio: Mutex::new(None),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl PortfolioRepository for RetryRepository {
-        async fn get_user_portfolios_with_assets(
-            &self,
-            _user_id: Uuid,
-        ) -> crate::ports::outbound::repository::portfolio::Result<
-            Vec<(PortfolioRow, Vec<PortfolioAssetRow>)>,
-        > {
-            Ok(Vec::new())
-        }
-
-        async fn soft_delete(
-            &self,
-            _user_id: Uuid,
-            _portfolio_id: Uuid,
-        ) -> crate::ports::outbound::repository::portfolio::Result<()> {
-            Ok(())
-        }
-
-        async fn upsert(
-            &self,
-            user_id: Uuid,
-            portfolio: PortfolioRequest,
-        ) -> crate::ports::outbound::repository::portfolio::Result<(
-            PortfolioRow,
-            Vec<PortfolioAssetRow>,
-        )> {
-            *self.last_upserted_portfolio.lock().unwrap() = Some(portfolio.clone());
-            let attempt = self.upsert_attempts.fetch_add(1, Ordering::Relaxed) + 1;
-            if attempt <= self.failures_before_success {
-                return Err(PortfolioRepositoryError::Database(sqlx::Error::Database(
-                    Box::new(TestDatabaseError {
-                        code: self.error_code,
-                    }),
-                )));
-            }
-
-            let now = Utc::now();
-            Ok((
-                PortfolioRow {
-                    id: portfolio.id,
-                    user_id,
-                    name: portfolio.name,
-                    currency: portfolio.quote_ccy,
-                    deleted: false,
-                    last_updated_at: portfolio.last_updated_at,
-                    max_fee_impact: None,
-                    fee_type: None,
-                    fee_amount: None,
-                    fee_rate: None,
-                    min_fee: None,
-                    max_fee: None,
-                    created_at: now,
-                    updated_at: now,
-                },
-                Vec::new(),
-            ))
-        }
-    }
-
-    fn valid_request() -> SyncPortfoliosRequest {
-        SyncPortfoliosRequest {
-            portfolios: vec![PortfolioRequest {
-                id: Uuid::new_v4(),
-                name: "Portfolio".to_string(),
-                quote_ccy: "EUR".to_string(),
-                fees: None,
-                assets: vec![PortfolioAssetRequest {
-                    symbol: "VWCE".to_string(),
-                    name: "Asset".to_string(),
-                    aclass: "EQUITY".to_string(),
-                    base_ccy: "EUR".to_string(),
-                    provider: "YF".to_string(),
-                    qty: Decimal::ONE,
-                    target_weight: Decimal::ONE,
-                    price: Decimal::ONE,
-                    average_buy_price: Decimal::ONE,
-                    fees: None,
-                }],
-                last_updated_at: Utc::now(),
-            }],
-            deleted_portfolios: Vec::new(),
-        }
-    }
 
     #[test]
     fn sync_normalization_maps_aliases_and_drops_unsupported_assets() {
@@ -413,6 +315,57 @@ mod tests {
 
         assert_eq!(normalized.portfolios.len(), 1);
         assert!(normalized.portfolios[0].assets.is_empty());
+    }
+
+    #[tokio::test]
+    async fn v2_serialization_failure_retries_twice_then_succeeds() {
+        // GIVEN a v2 sync that encounters two serialization failures, WHEN the
+        // service retries it, THEN the third total attempt succeeds.
+        let repository = Arc::new(RetryRepository::new(2, "40001"));
+        let attempts = &repository.upsert_attempts;
+        let service = PortfolioService::new(repository.clone());
+
+        service
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref()).await)
+            .await
+            .expect("third v2 attempt should succeed");
+
+        assert_eq!(attempts.load(Ordering::Relaxed), 3);
+    }
+
+    #[tokio::test]
+    async fn v2_retry_exhaustion_returns_conflict() {
+        // GIVEN a v2 sync that keeps failing with serialization failures, WHEN
+        // all attempts are exhausted, THEN the service returns Conflict.
+        let repository = Arc::new(RetryRepository::new(3, "40001"));
+        let attempts = &repository.upsert_attempts;
+        let service = PortfolioService::new(repository.clone());
+
+        let error = service
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref()).await)
+            .await
+            .expect_err("retry exhaustion should return a conflict");
+
+        assert_eq!(attempts.load(Ordering::Relaxed), 3);
+        assert!(matches!(error, PortfolioServiceError::Conflict(_)));
+    }
+
+    #[tokio::test]
+    async fn v2_permanent_failure_is_not_retried() {
+        // GIVEN a v2 sync that fails with a non-concurrency database error,
+        // WHEN the service executes it, THEN it returns the repository error
+        // after one total attempt.
+        let repository = Arc::new(RetryRepository::new(3, "23505"));
+        let attempts = &repository.upsert_attempts;
+        let service = PortfolioService::new(repository.clone());
+
+        let error = service
+            .sync_portfolios_v2(valid_v2_command(repository.as_ref()).await)
+            .await
+            .expect_err("permanent v2 failure should fail immediately");
+
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+        assert!(matches!(error, PortfolioServiceError::Repository(_)));
     }
 
     #[tokio::test]
@@ -543,5 +496,212 @@ mod tests {
 
         assert_eq!(attempts.load(Ordering::Relaxed), 1);
         assert!(!error.is_retryable_concurrency());
+    }
+
+    async fn valid_v2_command(repository: &dyn PortfolioRepository) -> SyncPortfoliosV2Command {
+        SyncPortfoliosV2Command::try_new(
+            Uuid::nil(),
+            SyncPortfoliosV2Request {
+                schema_version: 2,
+                portfolios: vec![PortfolioV2 {
+                    id: Uuid::new_v4(),
+                    name: "Portfolio".to_string(),
+                    quote_currency: "EUR".to_string(),
+                    allocation_mode: AllocationMode::Simple,
+                    drift_band: None,
+                    fees: None,
+                    assets: vec![PortfolioAssetV2 {
+                        id: Uuid::now_v7(),
+                        asset: SharedAssetV2 {
+                            provider: Provider::YF,
+                            symbol: "VWCE".to_string(),
+                            name: "Asset".to_string(),
+                            currency: "EUR".to_string(),
+                            asset_class: AssetClass::Equity,
+                        },
+                        asset_class_override: None,
+                        quantity: Decimal::ONE,
+                        target_weight: Some(Decimal::from(100)),
+                        manual_price: None,
+                        average_buy_price: None,
+                        fees: None,
+                    }],
+                    strategic_allocation: None,
+                    last_updated_at: Utc::now(),
+                }],
+                deleted_portfolios: Vec::new(),
+            },
+            repository,
+        )
+        .await
+        .expect("v2 fixture should be valid")
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("test database error {code}")]
+    struct TestDatabaseError {
+        code: &'static str,
+    }
+
+    impl sqlx::error::DatabaseError for TestDatabaseError {
+        fn message(&self) -> &str {
+            "test database error"
+        }
+
+        fn code(&self) -> Option<Cow<'_, str>> {
+            Some(Cow::Borrowed(self.code))
+        }
+
+        fn as_error(&self) -> &(dyn StdError + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn StdError + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync + 'static> {
+            self
+        }
+
+        fn kind(&self) -> sqlx::error::ErrorKind {
+            sqlx::error::ErrorKind::Other
+        }
+    }
+
+    struct RetryRepository {
+        failures_before_success: usize,
+        error_code: &'static str,
+        upsert_attempts: AtomicUsize,
+        last_upserted_portfolio: Mutex<Option<PortfolioRequest>>,
+    }
+
+    impl RetryRepository {
+        fn new(failures_before_success: usize, error_code: &'static str) -> Self {
+            Self {
+                failures_before_success,
+                error_code,
+                upsert_attempts: AtomicUsize::new(0),
+                last_upserted_portfolio: Mutex::new(None),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl PortfolioRepository for RetryRepository {
+        async fn find_owners(
+            &self,
+            _portfolio_ids: &[Uuid],
+            _portfolio_asset_ids: &[Uuid],
+        ) -> crate::ports::outbound::repository::portfolio::Result<PortfolioOwnership> {
+            Ok(PortfolioOwnership::default())
+        }
+
+        async fn get_user_portfolios_with_assets(
+            &self,
+            _user_id: Uuid,
+        ) -> crate::ports::outbound::repository::portfolio::Result<
+            Vec<(PortfolioRow, Vec<PortfolioAssetRow>)>,
+        > {
+            Ok(Vec::new())
+        }
+
+        async fn soft_delete(
+            &self,
+            _user_id: Uuid,
+            _portfolio_id: Uuid,
+        ) -> crate::ports::outbound::repository::portfolio::Result<()> {
+            Ok(())
+        }
+
+        async fn upsert(
+            &self,
+            user_id: Uuid,
+            portfolio: PortfolioRequest,
+        ) -> crate::ports::outbound::repository::portfolio::Result<(
+            PortfolioRow,
+            Vec<PortfolioAssetRow>,
+        )> {
+            *self.last_upserted_portfolio.lock().unwrap() = Some(portfolio.clone());
+            let attempt = self.upsert_attempts.fetch_add(1, Ordering::Relaxed) + 1;
+            if attempt <= self.failures_before_success {
+                return Err(PortfolioRepositoryError::Database(sqlx::Error::Database(
+                    Box::new(TestDatabaseError {
+                        code: self.error_code,
+                    }),
+                )));
+            }
+
+            let now = Utc::now();
+            Ok((
+                PortfolioRow {
+                    id: portfolio.id,
+                    user_id,
+                    name: portfolio.name,
+                    currency: portfolio.quote_ccy,
+                    deleted: false,
+                    last_updated_at: portfolio.last_updated_at,
+                    allocation_mode:
+                        crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
+                    drift_band: None,
+                    strategic_allocation_present: false,
+                    max_fee_impact: None,
+                    fee_type: None,
+                    fee_amount: None,
+                    fee_rate: None,
+                    min_fee: None,
+                    max_fee: None,
+                    created_at: now,
+                    updated_at: now,
+                },
+                Vec::new(),
+            ))
+        }
+
+        async fn sync_v2(
+            &self,
+            _user_id: Uuid,
+            request: SyncPortfoliosV2Request,
+        ) -> crate::ports::outbound::repository::portfolio::Result<SyncPortfoliosV2Response>
+        {
+            let attempt = self.upsert_attempts.fetch_add(1, Ordering::Relaxed) + 1;
+            if attempt <= self.failures_before_success {
+                return Err(PortfolioRepositoryError::Database(sqlx::Error::Database(
+                    Box::new(TestDatabaseError {
+                        code: self.error_code,
+                    }),
+                )));
+            }
+
+            Ok(SyncPortfoliosV2Response {
+                updated_portfolios: request.portfolios,
+                deleted_portfolios: request.deleted_portfolios,
+            })
+        }
+    }
+
+    fn valid_request() -> SyncPortfoliosRequest {
+        SyncPortfoliosRequest {
+            portfolios: vec![PortfolioRequest {
+                id: Uuid::new_v4(),
+                name: "Portfolio".to_string(),
+                quote_ccy: "EUR".to_string(),
+                fees: None,
+                assets: vec![PortfolioAssetRequest {
+                    symbol: "VWCE".to_string(),
+                    name: "Asset".to_string(),
+                    aclass: "EQUITY".to_string(),
+                    base_ccy: "EUR".to_string(),
+                    provider: "YF".to_string(),
+                    qty: Decimal::ONE,
+                    target_weight: Decimal::ONE,
+                    price: Decimal::ONE,
+                    average_buy_price: Decimal::ONE,
+                    fees: None,
+                }],
+                last_updated_at: Utc::now(),
+            }],
+            deleted_portfolios: Vec::new(),
+        }
     }
 }

@@ -5,6 +5,26 @@ export * from "./gen";
 export type {
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
+  AllocationModeWire,
+  FeeStructureV2,
+  PortfolioAssetV2Request,
+  PortfolioAssetV2Response,
+  PortfolioV2Request,
+  PortfolioV2Response,
+  SharedAssetV2Request,
+  SharedAssetV2Response,
+  StrategicAllocationV2Request,
+  StrategicAllocationV2Response,
+  StrategicAssetClassTargetV2Request,
+  StrategicAssetClassTargetV2Response,
+  StrategicAssetTargetV2Request,
+  StrategicAssetTargetV2Response,
+  SyncPortfoliosV2Request,
+  SyncPortfoliosV2Response,
+  TransactionFeesV2Request,
+  TransactionFeesV2Response,
+  V2ErrorResponse,
+  V2FieldError,
 } from "./gen/model";
 
 /** Hand-written client configuration and error APIs. */

@@ -33,6 +33,9 @@ import type {
   Price,
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
+  SyncPortfoliosV2Request,
+  SyncPortfoliosV2Response,
+  V2ErrorResponse,
   YahooChartResponse,
   YahooSearchResponse
 } from './model';
@@ -49,8 +52,13 @@ import type {
   RequestHandlerOptions
 } from 'msw';
 
+import {
+  AllocationModeWire
+} from './model';
 import type {
+  StrategicAllocationV2Response,
   TransactionFeesResponse,
+  TransactionFeesV2Response,
   YahooChartIndicators,
   YahooChartMeta,
   YahooChartPayload
@@ -1201,6 +1209,123 @@ export const useSyncPortfolios = <TError = globalThis.Error & { info?: void; sta
       return useMutation(getSyncPortfoliosMutationOptions(options), queryClient);
     }
 
+export type syncPortfoliosV2Response200 = {
+  data: SyncPortfoliosV2Response
+  status: 200
+}
+
+export type syncPortfoliosV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type syncPortfoliosV2Response403 = {
+  data: V2ErrorResponse
+  status: 403
+}
+
+export type syncPortfoliosV2Response409 = {
+  data: V2ErrorResponse
+  status: 409
+}
+
+export type syncPortfoliosV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type syncPortfoliosV2ResponseSuccess = (syncPortfoliosV2Response200) & {
+  headers: Headers;
+};
+export type syncPortfoliosV2ResponseError = (syncPortfoliosV2Response400 | syncPortfoliosV2Response403 | syncPortfoliosV2Response409 | syncPortfoliosV2Response500) & {
+  headers: Headers;
+};
+
+export const getSyncPortfoliosV2Url = () => {
+
+
+
+
+  return `/v2/sync/portfolios`
+}
+
+/**
+ * @summary Applies a complete v2 Portfolio aggregate synchronization.
+ */
+export const syncPortfoliosV2 = async (syncPortfoliosV2Request: SyncPortfoliosV2Request, options?: RequestInit): Promise<syncPortfoliosV2ResponseSuccess> => {
+
+  const res = await fetch(getSyncPortfoliosV2Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(syncPortfoliosV2Request)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  if (!res.ok) {
+
+    const err: globalThis.Error & {info?: syncPortfoliosV2ResponseError['data'], status?: number} = new globalThis.Error();
+    const data : syncPortfoliosV2ResponseError['data'] = body ? JSON.parse(body) : {}
+    err.info = data;
+    err.status = res.status;
+    throw err;
+  }
+  const data: syncPortfoliosV2ResponseSuccess['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as syncPortfoliosV2ResponseSuccess
+}
+
+
+
+
+
+export const getSyncPortfoliosV2MutationOptions = <TError = globalThis.Error & { info?: V2ErrorResponse; status?: number },
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPortfoliosV2>>, TError,{data: SyncPortfoliosV2Request}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof syncPortfoliosV2>>, TError,{data: SyncPortfoliosV2Request}, TContext> => {
+
+const mutationKey = ['syncPortfoliosV2'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncPortfoliosV2>>, {data: SyncPortfoliosV2Request}> = (props) => {
+          const {data} = props ?? {};
+
+          return  syncPortfoliosV2(data,fetchOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncPortfoliosV2MutationResult = NonNullable<Awaited<ReturnType<typeof syncPortfoliosV2>>>
+    export type SyncPortfoliosV2MutationBody = SyncPortfoliosV2Request
+    export type SyncPortfoliosV2MutationError = globalThis.Error & { info?: V2ErrorResponse; status?: number }
+
+    /**
+ * @summary Applies a complete v2 Portfolio aggregate synchronization.
+ */
+export const useSyncPortfoliosV2 = <TError = globalThis.Error & { info?: V2ErrorResponse; status?: number },
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPortfoliosV2>>, TError,{data: SyncPortfoliosV2Request}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof syncPortfoliosV2>>,
+        TError,
+        {data: SyncPortfoliosV2Request},
+        TContext
+      > => {
+      return useMutation(getSyncPortfoliosV2MutationOptions(options), queryClient);
+    }
+
 
 export const getRootResponseMock = (): string => (faker.word.sample())
 
@@ -1225,6 +1350,12 @@ export const getGetPriceResponseMock = (overrideResponse: Partial<Extract<Price,
 export const getSyncPortfoliosResponseTransactionFeesResponseMock = (overrideResponse: Partial<TransactionFeesResponse> = {}): TransactionFeesResponse => ({...{feeStructure: faker.helpers.arrayElement([{type: faker.helpers.arrayElement(['zeroFee'] as const)},{feeAmount: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['fixed'] as const)},{feeRate: faker.string.alpha({length: {min: 10, max: 20}}), maxFee: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), minFee: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['variable'] as const)},]), maxFeeImpact: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])}, ...overrideResponse});
 
 export const getSyncPortfoliosResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosResponse, object>> = {}): SyncPortfoliosResponse => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclass: faker.helpers.arrayElement(['EQUITY','BOND','CURRENCY','CRYPTO','COMMODITY','OTHER'] as const), averageBuyPrice: faker.string.alpha({length: {min: 10, max: 20}}), baseCcy: faker.string.alpha({length: {min: 10, max: 20}}), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosResponseTransactionFeesResponseMock()},]), undefined]), name: faker.string.alpha({length: {min: 10, max: 20}}), price: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['DCAPal','YF'] as const), qty: faker.string.alpha({length: {min: 10, max: 20}}), symbol: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.string.alpha({length: {min: 10, max: 20}})})), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosResponseTransactionFeesResponseMock()},]), undefined]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCcy: faker.string.alpha({length: {min: 10, max: 20}})})), ...overrideResponse})
+
+export const getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock = (overrideResponse: Partial<TransactionFeesV2Response> = {}): TransactionFeesV2Response => ({...{feeStructure: faker.helpers.arrayElement([{type: faker.helpers.arrayElement(['zeroFee'] as const)},{feeAmount: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['fixed'] as const)},{feeRate: faker.string.alpha({length: {min: 10, max: 20}}), maxFee: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), minFee: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), type: faker.helpers.arrayElement(['variable'] as const)},]), maxFeeImpact: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])}, ...overrideResponse});
+
+export const getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock = (overrideResponse: Partial<StrategicAllocationV2Response> = {}): StrategicAllocationV2Response => ({...{assetClassTargets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({assetClass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), targetWeight: faker.string.alpha({length: {min: 10, max: 20}})})), assetTargets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({portfolioAssetId: faker.string.uuid(), relativeTargetWeight: faker.string.alpha({length: {min: 10, max: 20}})}))}, ...overrideResponse});
+
+export const getSyncPortfoliosV2ResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosV2Response, object>> = {}): SyncPortfoliosV2Response => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({allocationMode: faker.helpers.arrayElement(Object.values(AllocationModeWire)), assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclassOverride: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), null]), undefined]), asset: {aclass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), currency: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})}, averageBuyPrice: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), undefined]), id: faker.string.uuid(), manualPrice: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), quantity: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])})), driftBand: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), fees: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), undefined]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCurrency: faker.string.alpha({length: {min: 10, max: 20}}), strategicAllocation: faker.helpers.arrayElement([faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock()},]), undefined])})), ...overrideResponse})
 
 
 export const getRootMockHandler = (overrideResponse?: string | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
@@ -1333,6 +1464,18 @@ export const getSyncPortfoliosMockHandler = (overrideResponse?: SyncPortfoliosRe
       })
   }, options)
 }
+
+export const getSyncPortfoliosV2MockHandler = (overrideResponse?: SyncPortfoliosV2Response | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<SyncPortfoliosV2Response> | SyncPortfoliosV2Response), options?: RequestHandlerOptions) => {
+  return http.post('*/v2/sync/portfolios', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getSyncPortfoliosV2ResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getDCAPalAPIsMock = () => [
   getRootMockHandler(),
   getGetAssetsChartMockHandler(),
@@ -1342,5 +1485,6 @@ export const getDCAPalAPIsMock = () => [
   getImportPortfolioMockHandler(),
   getGetImportedPortfolioMockHandler(),
   getGetPriceMockHandler(),
-  getSyncPortfoliosMockHandler()
+  getSyncPortfoliosMockHandler(),
+  getSyncPortfoliosV2MockHandler()
 ]

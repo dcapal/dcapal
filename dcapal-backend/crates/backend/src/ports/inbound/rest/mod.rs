@@ -1,6 +1,6 @@
 //! The [`rest`](self) module implements the REST API of the system
 
-use std::{fmt::Display, time::Duration};
+use std::time::Duration;
 
 use axum::{
     Json, Router,
@@ -31,10 +31,13 @@ use crate::{
     ports::outbound::repository::ImportedPortfolio,
 };
 
+pub mod error;
 pub mod openapi;
 pub mod proxy_types;
 pub mod request;
 pub mod response;
+pub mod sync_portfolio_v2;
+pub mod types;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../../../docs/schema/portfolio/v1/schema.json");
@@ -61,11 +64,16 @@ pub fn build_openapi_router() -> (Router<AppContext>, OpenApi) {
         .routes(routes!(import_portfolio))
         .routes(routes!(get_imported_portfolio))
         .nest("/v1", build_v1_openapi_router())
+        .nest("/v2", build_v2_openapi_router())
         .split_for_parts()
 }
 
 fn build_v1_openapi_router() -> OpenApiRouter<AppContext> {
     OpenApiRouter::new().routes(routes!(request::sync_portfolios))
+}
+
+fn build_v2_openapi_router() -> OpenApiRouter<AppContext> {
+    OpenApiRouter::new().routes(routes!(sync_portfolio_v2::sync_portfolios))
 }
 
 fn base_openapi() -> OpenApi {
@@ -368,22 +376,25 @@ pub async fn get_imported_portfolio(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone, PartialEq, derive_more::Display)]
 #[serde(tag = "type", rename_all = "camelCase")]
 /// Transaction-fee policy exchanged by the REST API.
 ///
 /// Decimal values are serialized as strings so clients do not lose precision
 /// while crossing the JSON boundary.
 pub enum FeeStructure {
+    #[display("ZeroFee")]
     #[serde(rename = "zeroFee")]
     ZeroFee,
 
+    #[display("Fixed")]
     #[serde(rename = "fixed")]
     Fixed {
         #[serde(rename = "feeAmount", with = "rust_decimal::serde::str")]
         fee_amount: Decimal,
     },
 
+    #[display("Variable")]
     #[serde(rename = "variable")]
     Variable {
         #[serde(rename = "feeRate", with = "rust_decimal::serde::str")]
@@ -398,14 +409,4 @@ pub enum FeeStructure {
         )]
         max_fee: Option<Decimal>,
     },
-}
-
-impl Display for FeeStructure {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FeeStructure::ZeroFee => write!(f, "ZeroFee"),
-            FeeStructure::Fixed { .. } => write!(f, "Fixed"),
-            FeeStructure::Variable { .. } => write!(f, "Variable"),
-        }
-    }
 }

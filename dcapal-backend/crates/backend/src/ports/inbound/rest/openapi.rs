@@ -149,6 +149,7 @@ mod tests {
             "/import/portfolio",
             "/import/portfolio/{id}",
             "/v1/sync/portfolios",
+            "/v2/sync/portfolios",
         ] {
             assert!(paths.contains_key(expected), "missing path {expected}");
         }
@@ -294,6 +295,47 @@ mod tests {
         let import = &openapi["paths"]["/import/portfolio"]["post"];
         assert!(import["responses"].get("201").is_some());
         assert!(import["responses"].get("400").is_some());
+    }
+
+    #[test]
+    fn v2_schema_documents_canonical_values_and_error_responses() {
+        // GIVEN the generated v2 OpenAPI document, WHEN its aggregate and
+        // error schemas are inspected, THEN decimal fields are strings,
+        // nullable overrides are explicit, and every public failure status is
+        // represented by the structured error envelope.
+        let (_, openapi) = super::super::build_openapi_router();
+        let openapi = openapi_value(&openapi).expect("serialize openapi");
+
+        let sync = &openapi["paths"]["/v2/sync/portfolios"]["post"];
+        assert!(sync["responses"].get("200").is_some());
+        assert!(sync["responses"].get("400").is_some());
+        assert!(sync["responses"].get("403").is_some());
+        assert!(sync["responses"].get("409").is_some());
+        assert!(sync["responses"].get("500").is_some());
+
+        let request = &openapi["components"]["schemas"]["PortfolioAssetV2Request"];
+        assert_eq!(request["properties"]["quantity"]["type"], "string");
+        assert!(
+            request["properties"]["aclassOverride"]["type"]
+                .as_array()
+                .expect("nullable override type")
+                .iter()
+                .any(|value| value == "null")
+        );
+        assert_enum_contains(
+            &openapi["components"]["schemas"]["SharedAssetV2Response"]["properties"]["provider"],
+            &["yf", "kraken"],
+        );
+        assert_eq!(
+            openapi["components"]["schemas"]["SyncPortfoliosV2Request"]["properties"]["schemaVersion"]
+                ["minimum"],
+            2
+        );
+        assert_eq!(
+            openapi["components"]["schemas"]["SyncPortfoliosV2Request"]["properties"]["schemaVersion"]
+                ["maximum"],
+            2
+        );
     }
 
     fn assert_enum_contains(schema: &Value, expected: &[&str]) {

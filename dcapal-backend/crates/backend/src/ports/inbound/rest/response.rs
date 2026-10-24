@@ -130,18 +130,17 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                                 }
                             }
                             val if val == *"Variable" => {
-                                if let (Some(fee_rate), Some(min_fee)) =
-                                    (asset.fee_rate, asset.min_fee)
-                                {
+                                if let Some(fee_rate) = asset.fee_rate {
                                     FeeStructure::Variable {
                                         fee_rate,
-                                        min_fee,
+                                        // v2 treats an absent lower bound as no minimum;
+                                        // v1 can represent that policy with a zero bound.
+                                        min_fee: asset.min_fee.unwrap_or(Decimal::ZERO),
                                         max_fee: asset.max_fee,
                                     }
                                 } else {
                                     return Err(DcaError::Generic(
-                                        "Variable fee requires fee_rate and min_fee to be Some."
-                                            .to_string(),
+                                        "Variable fee requires fee_rate to be Some.".to_string(),
                                     ));
                                 }
                             }
@@ -164,18 +163,18 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                     provider: asset.provider.as_legacy_name().to_string(),
                     qty: asset.quantity,
                     target_weight: asset.target_weight,
+                    // Keep the latest price and cost basis distinct. A v2 aggregate without
+                    // either value cannot be represented by the required v1 fields.
                     price: asset.manual_price.ok_or_else(|| {
                         DcaError::Generic(
                             "v1 Portfolio Asset response requires a manual price.".to_string(),
                         )
                     })?,
-                    average_buy_price: asset.average_buy_price.or(asset.manual_price).ok_or_else(
-                        || {
-                            DcaError::Generic(
-                                "v1 Portfolio Asset response requires a price basis.".to_string(),
-                            )
-                        },
-                    )?,
+                    average_buy_price: asset.average_buy_price.ok_or_else(|| {
+                        DcaError::Generic(
+                            "v1 Portfolio Asset response requires a price basis.".to_string(),
+                        )
+                    })?,
                     fees,
                 })
             })
@@ -200,18 +199,17 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                             }
                         }
                         val if val == *"Variable" => {
-                            if let (Some(fee_rate), Some(min_fee)) =
-                                (portfolio.fee_rate, portfolio.min_fee)
-                            {
+                            if let Some(fee_rate) = portfolio.fee_rate {
                                 FeeStructure::Variable {
                                     fee_rate,
-                                    min_fee,
+                                    // v2 treats an absent lower bound as no minimum;
+                                    // v1 can represent that policy with a zero bound.
+                                    min_fee: portfolio.min_fee.unwrap_or(Decimal::ZERO),
                                     max_fee: portfolio.max_fee,
                                 }
                             } else {
                                 return Err(DcaError::Generic(
-                                    "Variable fee requires fee_rate and min_fee to be Some."
-                                        .to_string(),
+                                    "Variable fee requires fee_rate to be Some.".to_string(),
                                 ));
                             }
                         }
@@ -266,6 +264,10 @@ mod test {
             currency: String::from("EUR"),
             deleted: false,
             last_updated_at: Utc::now(),
+            allocation_mode:
+                crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
+            drift_band: None,
+            strategic_allocation_present: false,
             max_fee_impact: None,
             fee_type: Some(String::from("Fixed")),
             fee_amount: Some(dec!(2.95)),
@@ -339,15 +341,139 @@ mod test {
         assert_eq!(serialized["assets"][0]["averageBuyPrice"], "90.0");
         assert_eq!(serialized["fees"]["feeStructure"]["feeAmount"], "2.95");
 
-        let mut missing_manual_price = asset_model;
+        // GIVEN a v2 asset with no manual override but an average purchase price,
+        // WHEN it is projected through v1, THEN conversion fails because the
+        // legacy current-price field cannot be filled from a cost basis.
+        let mut missing_manual_price = asset_model.clone();
         missing_manual_price.manual_price = None;
-        let error = PortfolioResponse::try_from((portfolio_model, vec![missing_manual_price]))
+        let error =
+            PortfolioResponse::try_from((portfolio_model.clone(), vec![missing_manual_price]))
+                .expect_err("a cost basis must not be projected as the current price");
+        assert!(matches!(
+            error,
+            DcaError::Generic(message) if message == "v1 Portfolio Asset response requires a manual price."
+        ));
+
+        // GIVEN a v2 asset with a current price but no cost basis, WHEN it is
+        // projected through v1, THEN conversion also fails rather than using
+        // the current price as historical cost.
+        let mut missing_average_price = asset_model.clone();
+        missing_average_price.average_buy_price = None;
+        let error =
+            PortfolioResponse::try_from((portfolio_model.clone(), vec![missing_average_price]))
+                .expect_err("a current price must not be projected as cost basis");
+        assert!(matches!(
+            error,
+            DcaError::Generic(message) if message == "v1 Portfolio Asset response requires a price basis."
+        ));
+
+        // GIVEN a v2 asset with no cost basis, WHEN it is projected through v1,
+        // THEN conversion still fails rather than inventing a value.
+        let mut missing_all_prices = asset_model;
+        missing_all_prices.manual_price = None;
+        missing_all_prices.average_buy_price = None;
+        let error = PortfolioResponse::try_from((portfolio_model, vec![missing_all_prices]))
             .expect_err("missing manual price must fail closed");
 
         assert!(matches!(
             error,
             DcaError::Generic(message)
                 if message == "v1 Portfolio Asset response requires a manual price."
+        ));
+    }
+
+    #[test]
+    fn v1_projection_maps_unbounded_v2_variable_fees_to_zero_minimum() {
+        // GIVEN v2 variable fees with a rate but no minimum bound, WHEN the
+        // aggregate is projected through v1, THEN zero represents the same
+        // no-minimum policy required by the legacy shape.
+        let portfolio_id = Uuid::new_v4();
+        let now = Utc::now();
+        let mut portfolio = PortfolioRow {
+            id: portfolio_id,
+            user_id: Uuid::new_v4(),
+            name: "Portfolio".to_string(),
+            currency: "EUR".to_string(),
+            deleted: false,
+            last_updated_at: now,
+            allocation_mode:
+                crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
+            drift_band: None,
+            strategic_allocation_present: false,
+            max_fee_impact: None,
+            fee_type: Some("Variable".to_string()),
+            fee_amount: None,
+            fee_rate: Some(dec!(0.19)),
+            min_fee: None,
+            max_fee: None,
+            created_at: now,
+            updated_at: now,
+        };
+        let mut asset = PortfolioAssetRow {
+            id: Uuid::new_v4(),
+            symbol: "VWCE".to_string(),
+            portfolio_id,
+            assets_data_id: Uuid::new_v4(),
+            name: "Vanguard FTSE All-World UCITS ETF USD Acc".to_string(),
+            asset_class: AssetClass::Equity,
+            asset_class_override: None,
+            currency: "EUR".to_string(),
+            provider: Provider::YF,
+            quantity: dec!(10),
+            target_weight: dec!(1),
+            manual_price: Some(dec!(100)),
+            max_fee_impact: None,
+            fee_type: Some("Variable".to_string()),
+            fee_amount: None,
+            fee_rate: Some(dec!(0.19)),
+            min_fee: None,
+            max_fee: None,
+            average_buy_price: Some(dec!(90)),
+            created_at: now,
+            updated_at: now,
+        };
+
+        let response = PortfolioResponse::try_from((portfolio.clone(), vec![asset.clone()]))
+            .expect("optional v2 fee bounds should project to v1");
+        assert!(matches!(
+            response.fees,
+            Some(TransactionFeesResponse {
+                fee_structure: FeeStructure::Variable { min_fee, .. },
+                ..
+            }) if min_fee == Decimal::ZERO
+        ));
+        assert!(matches!(
+            response.assets[0].fees,
+            Some(TransactionFeesResponse {
+                fee_structure: FeeStructure::Variable { min_fee, .. },
+                ..
+            }) if min_fee == Decimal::ZERO
+        ));
+        let serialized = serde_json::to_value(&response).expect("v1 response should serialize");
+        assert_eq!(serialized["fees"]["feeStructure"]["minFee"], "0");
+        assert_eq!(
+            serialized["assets"][0]["fees"]["feeStructure"]["minFee"],
+            "0"
+        );
+
+        // Existing explicit v1 bounds remain unchanged by the compatibility mapping.
+        portfolio.min_fee = Some(dec!(2.95));
+        asset.min_fee = Some(dec!(1.25));
+        let response = PortfolioResponse::try_from((portfolio, vec![asset]))
+            .expect("explicit v1 fee bounds should remain valid");
+        assert!(matches!(
+            response.fees,
+            Some(TransactionFeesResponse {
+                fee_structure: FeeStructure::Variable { min_fee, .. },
+                ..
+            }) if min_fee == dec!(2.95)
+        ));
+        assert!(matches!(
+            response.assets[0].fees,
+            Some(TransactionFeesResponse {
+                fee_structure: FeeStructure::Variable { min_fee, .. },
+                ..
+            }) if min_fee == dec!(1.25)
         ));
     }
 
@@ -364,6 +490,10 @@ mod test {
             currency: "EUR".to_string(),
             deleted: false,
             last_updated_at: now,
+            allocation_mode:
+                crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
+            drift_band: None,
+            strategic_allocation_present: false,
             max_fee_impact: None,
             fee_type: None,
             fee_amount: None,

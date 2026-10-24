@@ -12,10 +12,12 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 axum-extra = { workspace = true }
+backoff = { workspace = true }
 config = { workspace = true }
 const_format = { workspace = true }
 chrono = { workspace = true }
 deadpool-redis = { workspace = true }
+derive_more = { workspace = true }
 failsafe = { workspace = true }
 futures = { workspace = true }
 hyper = { workspace = true }
@@ -51,3 +53,4 @@ rquest = { workspace = true }
 
 [dev-dependencies]
 migration = { path = "../migration" }
+mockall = { workspace = true }

@@ -5,23 +5,17 @@ use uuid::Uuid;
 
 #[sqlx::test(
     migrations = false,
-    fixtures("legacy_schema", "legacy_portfolio_assets")
+    fixtures("pre_shared_schema", "pre_shared_portfolio_assets")
 )]
-async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx::Result<()> {
-    // GIVEN a production-shaped SeaORM database with legacy Portfolio Asset rows,
+async fn sqlx_migrations_normalize_a_pre_shared_schema(pool: PgPool) -> sqlx::Result<()> {
+    // GIVEN a production-shaped pre-shared-asset database,
     // WHEN SQLx applies its migrations, THEN the canonical rows are normalized.
     MIGRATOR.run(&pool).await?;
 
     let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(migration_count, 8);
-
-    let seaorm_table: Option<String> =
-        sqlx::query_scalar("SELECT to_regclass('seaql_migrations')::text")
-            .fetch_one(&pool)
-            .await?;
-    assert_eq!(seaorm_table.as_deref(), Some("seaql_migrations"));
+    assert_eq!(migration_count, 9);
 
     let average_buy_price: Option<String> = sqlx::query_scalar(
         "SELECT data_type
@@ -136,9 +130,9 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
 
     let duplicate_insert = sqlx::query(
         "INSERT INTO portfolio_asset (
-             id, portfolio_id, assets_data_id, quantity, target_weight
+             id, portfolio_id, assets_data_id, quantity
          )
-         SELECT $1, portfolio_id, assets_data_id, quantity, target_weight
+         SELECT $1, portfolio_id, assets_data_id, quantity
          FROM portfolio_asset
          WHERE id = $2",
     )
@@ -216,9 +210,85 @@ async fn sqlx_migrations_adopt_the_existing_seaorm_schema(pool: PgPool) -> sqlx:
     Ok(())
 }
 
+#[sqlx::test(migrations = false, fixtures("pre_shared_schema"))]
+async fn out_of_range_legacy_targets_do_not_abort_allocation_migration(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    // GIVEN legacy Portfolio Asset targets include valid and out-of-range
+    // values, WHEN SQLx applies the allocation migration, THEN valid values
+    // retain their exact decimals and invalid values are left unallocated.
+    let user_id = Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap();
+    let portfolio_id = Uuid::parse_str("10000000-0000-0000-0000-000000000002").unwrap();
+    sqlx::query(
+        "INSERT INTO users (id, username, email, role)
+         VALUES ($1, 'allocation-user', 'allocation-user@example.com', 'User')",
+    )
+    .bind(user_id)
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "INSERT INTO portfolios (id, user_id, name, currency)
+         VALUES ($1, $2, 'Allocation portfolio', 'EUR')",
+    )
+    .bind(portfolio_id)
+    .bind(user_id)
+    .execute(&pool)
+    .await?;
+
+    let valid_asset_id = Uuid::parse_str("20000000-0000-0000-0000-000000000020").unwrap();
+    let negative_asset_id = Uuid::parse_str("20000000-0000-0000-0000-000000000021").unwrap();
+    let excessive_asset_id = Uuid::parse_str("20000000-0000-0000-0000-000000000022").unwrap();
+    for (id, symbol, target_weight) in [
+        (valid_asset_id, "VALID", "12.3456789012"),
+        (negative_asset_id, "NEGATIVE", "-1"),
+        (excessive_asset_id, "EXCESSIVE", "100.0000000001"),
+    ] {
+        let target_weight = target_weight.parse::<Decimal>().unwrap();
+        sqlx::query(
+            "INSERT INTO portfolio_asset (
+                 id, symbol, portfolio_id, name, asset_class, currency, provider,
+                 quantity, target_weight, price
+             )
+             VALUES ($1, $2, $3, $2, 'EQUITY', 'EUR', 'YF', 1, $4, 1)",
+        )
+        .bind(id)
+        .bind(symbol)
+        .bind(portfolio_id)
+        .bind(target_weight)
+        .execute(&pool)
+        .await?;
+    }
+
+    MIGRATOR.run(&pool).await?;
+
+    let allocations: Vec<(String, Option<Decimal>)> = sqlx::query_as(
+        "SELECT ad.symbol, paa.weight
+         FROM portfolio_asset AS pa
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         LEFT JOIN portfolio_asset_allocation AS paa
+           ON paa.portfolio_id = pa.portfolio_id
+          AND paa.portfolio_asset_id = pa.id
+         WHERE pa.portfolio_id = $1
+         ORDER BY ad.symbol",
+    )
+    .bind(portfolio_id)
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(
+        allocations,
+        vec![
+            ("EXCESSIVE".into(), None),
+            ("NEGATIVE".into(), None),
+            ("VALID".into(), Some("12.3456789012".parse().unwrap())),
+        ]
+    );
+
+    Ok(())
+}
+
 #[sqlx::test(
     migrations = false,
-    fixtures("legacy_schema", "legacy_portfolio_assets")
+    fixtures("pre_shared_schema", "pre_shared_portfolio_assets")
 )]
 async fn failed_identity_migration_rolls_back_its_changes(pool: PgPool) -> sqlx::Result<()> {
     // GIVEN an unexpected failure while rewriting IDs, WHEN the identity
@@ -278,7 +348,10 @@ async fn failed_identity_migration_rolls_back_its_changes(pool: PgPool) -> sqlx:
     Ok(())
 }
 
-#[sqlx::test(migrations = false, fixtures("legacy_schema", "legacy_shared_assets"))]
+#[sqlx::test(
+    migrations = false,
+    fixtures("pre_shared_schema", "legacy_shared_assets")
+)]
 async fn shared_assets_are_reused_across_portfolios(pool: PgPool) -> sqlx::Result<()> {
     // GIVEN legacy rows for the same provider and symbol in several Portfolios,
     // WHEN the corrective migration runs, THEN it creates one shared asset and
@@ -353,7 +426,10 @@ async fn shared_assets_are_reused_across_portfolios(pool: PgPool) -> sqlx::Resul
     Ok(())
 }
 
-#[sqlx::test(migrations = false, fixtures("legacy_schema", "legacy_shared_assets"))]
+#[sqlx::test(
+    migrations = false,
+    fixtures("pre_shared_schema", "legacy_shared_assets")
+)]
 async fn shared_asset_migration_has_a_development_down_path_and_can_rerun(
     pool: PgPool,
 ) -> sqlx::Result<()> {

@@ -19,9 +19,11 @@ provider and upper-case symbol, enforced by `UNIQUE (provider, symbol)`.
 currency, shared default Asset Class, and timestamps.
 
 Keep `portfolio_asset` as the Portfolio Asset relationship table. A row links
-one Portfolio to one `assets_data` row and owns the quantity, target weight,
-manual price, average buy price, fee fields, timestamps, and nullable
-`asset_class_override`. Enforce `UNIQUE (portfolio_id, assets_data_id)`.
+one Portfolio to one `assets_data` row and owns the quantity, manual price,
+average buy price, fee fields, timestamps, and nullable
+`asset_class_override`. Allocation targets are stored in the unified
+`portfolio_asset_allocation` table described by ADR 0004. Enforce
+`UNIQUE (portfolio_id, assets_data_id)`.
 
 An absent Asset Class override means that the Portfolio inherits the shared
 default. A present override is Portfolio-specific. Portfolio synchronization

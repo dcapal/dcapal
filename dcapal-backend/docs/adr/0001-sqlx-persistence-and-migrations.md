@@ -5,18 +5,17 @@
 
 ## Context
 
-The backend used SeaORM for PostgreSQL repositories and for its standalone
-migration crate. Production already contains the tables created by those
-migrations, so the replacement must not rebuild or delete them. Repository
-tests also need to exercise PostgreSQL constraints and transactions.
+The backend uses SQLx for PostgreSQL repositories and its standalone migration
+crate. Production already contains the tables created by earlier migrations,
+so later changes must not rebuild or delete them. Repository tests also need to
+exercise PostgreSQL constraints and transactions.
 
 ## Decision
 
 Use SQLx 0.9.0 with the stable Rust toolchain. Keep a separate migration crate
-and embed the service-root SQL migrations with `sqlx::migrate!`. Preserve the four existing
-numeric migration versions as reversible `.up.sql` and `.down.sql` files. The
-up files are idempotent so they can run against the existing tables; SQLx uses
-`_sqlx_migrations` and leaves `seaql_migrations` untouched.
+and embed the service-root SQL migrations with `sqlx::migrate!`. Preserve all
+applied numeric migration versions and checksums; add new forward migrations
+for schema changes. SQLx records migration history in `_sqlx_migrations`.
 
 Keep repository contracts in the existing outbound ports. Put PostgreSQL
 implementations and SQLx `FromRow` persistence types below
@@ -26,9 +25,9 @@ fixtures for repository integration tests.
 
 ## Consequences
 
-The backend no longer depends on SeaORM or its migration CLI. Deployments keep
-their current startup order and command form, while local tests require a
-running application PostgreSQL instance. SQLx migrations have a separate
-history, so old SeaORM migration metadata remains visible for compatibility.
+Deployments keep their current startup order and command form, while local
+tests require a running application PostgreSQL instance. Production recovery
+is forward-only from the pre-deployment backup; development down migrations
+are not a production rollback strategy.
 Portfolio asset uniqueness is intentionally not added here; it is tracked
 separately in [issue #714](https://github.com/dcapal/dcapal/issues/714).

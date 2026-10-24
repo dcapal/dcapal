@@ -33,6 +33,9 @@ import type {
   Price,
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
+  SyncPortfoliosV2Request,
+  SyncPortfoliosV2Response,
+  V2ErrorResponse,
   YahooChartResponse,
   YahooSearchResponse
 } from './model';
@@ -1059,4 +1062,107 @@ export const useSyncPortfolios = <TError = void,
         TContext
       > => {
       return useMutation(getSyncPortfoliosMutationOptions(options), queryClient);
+    }
+
+export type syncPortfoliosV2Response200 = {
+  data: SyncPortfoliosV2Response
+  status: 200
+}
+
+export type syncPortfoliosV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type syncPortfoliosV2Response403 = {
+  data: V2ErrorResponse
+  status: 403
+}
+
+export type syncPortfoliosV2Response409 = {
+  data: V2ErrorResponse
+  status: 409
+}
+
+export type syncPortfoliosV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type syncPortfoliosV2ResponseSuccess = (syncPortfoliosV2Response200) & {
+  headers: Headers;
+};
+export type syncPortfoliosV2ResponseError = (syncPortfoliosV2Response400 | syncPortfoliosV2Response403 | syncPortfoliosV2Response409 | syncPortfoliosV2Response500) & {
+  headers: Headers;
+};
+
+export const getSyncPortfoliosV2Url = () => {
+
+
+
+
+  return `/v2/sync/portfolios`
+}
+
+/**
+ * @summary Applies a complete v2 Portfolio aggregate synchronization.
+ */
+export const syncPortfoliosV2 = async (syncPortfoliosV2Request: SyncPortfoliosV2Request, options?: Parameters<typeof apiFetch>[1]): Promise<syncPortfoliosV2ResponseSuccess> => {
+
+  return apiFetch<syncPortfoliosV2ResponseSuccess>(getSyncPortfoliosV2Url(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(syncPortfoliosV2Request)
+  }
+);}
+
+
+
+
+
+export const getSyncPortfoliosV2MutationOptions = <TError = V2ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPortfoliosV2>>, TError,{data: SyncPortfoliosV2Request}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncPortfoliosV2>>, TError,{data: SyncPortfoliosV2Request}, TContext> => {
+
+const mutationKey = ['syncPortfoliosV2'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncPortfoliosV2>>, {data: SyncPortfoliosV2Request}> = (props) => {
+          const {data} = props ?? {};
+
+          return  syncPortfoliosV2(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncPortfoliosV2MutationResult = NonNullable<Awaited<ReturnType<typeof syncPortfoliosV2>>>
+    export type SyncPortfoliosV2MutationBody = SyncPortfoliosV2Request
+    export type SyncPortfoliosV2MutationError = V2ErrorResponse
+
+    /**
+ * @summary Applies a complete v2 Portfolio aggregate synchronization.
+ */
+export const useSyncPortfoliosV2 = <TError = V2ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncPortfoliosV2>>, TError,{data: SyncPortfoliosV2Request}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof syncPortfoliosV2>>,
+        TError,
+        {data: SyncPortfoliosV2Request},
+        TContext
+      > => {
+      return useMutation(getSyncPortfoliosV2MutationOptions(options), queryClient);
     }
