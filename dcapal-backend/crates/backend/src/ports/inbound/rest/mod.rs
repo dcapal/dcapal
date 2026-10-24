@@ -32,6 +32,7 @@ use crate::{
 };
 
 pub mod error;
+pub mod lookup_assets_v2;
 pub mod openapi;
 pub mod proxy_types;
 pub mod request;
@@ -65,6 +66,7 @@ pub fn build_openapi_router() -> (Router<AppContext>, OpenApi) {
         .routes(routes!(get_imported_portfolio))
         .nest("/v1", build_v1_openapi_router())
         .nest("/v2", build_v2_openapi_router())
+        .nest("/markets/v2", build_markets_v2_openapi_router())
         .split_for_parts()
 }
 
@@ -74,6 +76,10 @@ fn build_v1_openapi_router() -> OpenApiRouter<AppContext> {
 
 fn build_v2_openapi_router() -> OpenApiRouter<AppContext> {
     OpenApiRouter::new().routes(routes!(sync_portfolio_v2::sync_portfolios))
+}
+
+fn build_markets_v2_openapi_router() -> OpenApiRouter<AppContext> {
+    OpenApiRouter::new().routes(routes!(lookup_assets_v2::lookup_assets))
 }
 
 fn base_openapi() -> OpenApi {

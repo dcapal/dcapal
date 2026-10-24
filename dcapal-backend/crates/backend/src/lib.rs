@@ -24,7 +24,9 @@ use tracing::{error, info};
 use crate::{
     app::{
         infra,
-        services::{market_data::MarketDataService, portfolio::PortfolioService},
+        services::{
+            asset::AssetService, market_data::MarketDataService, portfolio::PortfolioService,
+        },
         workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
     config::{Config, Postgres},
@@ -32,12 +34,16 @@ use crate::{
     ports::{
         inbound::rest,
         outbound::{
-            adapter::{CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider},
+            adapter::{
+                CryptoWatchProvider, IpApi, KrakenAssetProvider, KrakenProvider, PriceProviders,
+                ProviderRoutedAssetProvider, YahooProvider,
+            },
             repository::{
                 ImportedRepository, MiscRepository, StatsRepository,
+                asset::AssetDirectory,
                 market_data::MarketDataRepository,
                 portfolio::PortfolioRepository,
-                postgres::{SqlxPortfolioRepository, SqlxUserRepository},
+                postgres::{SqlxAssetDirectory, SqlxPortfolioRepository, SqlxUserRepository},
                 user::UserRepository,
             },
         },
@@ -80,6 +86,7 @@ pub type AppContext = Arc<AppContextInner>;
 struct Services {
     mkt_data: Arc<MarketDataService>,
     portfolio: Arc<PortfolioService>,
+    asset: Arc<AssetService>,
 }
 
 #[derive(Clone)]
@@ -89,6 +96,7 @@ struct Repository {
     pub stats: Arc<StatsRepository>,
     pub imported: Arc<ImportedRepository>,
     pub portfolio: Arc<dyn PortfolioRepository>,
+    pub asset: Arc<dyn AssetDirectory>,
     pub user: Arc<dyn UserRepository>,
 }
 
@@ -145,6 +153,7 @@ impl DcaServer {
             stats: Arc::new(StatsRepository::new(redis.clone())),
             imported: Arc::new(ImportedRepository::new(redis.clone())),
             portfolio: Arc::new(SqlxPortfolioRepository::new(postgres.clone())),
+            asset: Arc::new(SqlxAssetDirectory::new(postgres.clone())),
             user: Arc::new(SqlxUserRepository::new(postgres.clone())),
         });
 
@@ -161,6 +170,13 @@ impl DcaServer {
         let services = Services {
             mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
             portfolio: Arc::new(PortfolioService::new(repos.portfolio.clone())),
+            asset: Arc::new(AssetService::new(
+                repos.asset.clone(),
+                Arc::new(ProviderRoutedAssetProvider::new(
+                    providers.yahoo.clone(),
+                    Arc::new(KrakenAssetProvider::new(repos.mkt_data.clone())),
+                )),
+            )),
         };
 
         let (api_routes, openapi) = rest::build_openapi_router();

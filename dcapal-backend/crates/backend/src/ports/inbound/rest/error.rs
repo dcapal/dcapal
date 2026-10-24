@@ -6,8 +6,11 @@ use hyper::StatusCode;
 
 use crate::{
     app::{
-        commands::sync_portfolios_v2::SyncPortfoliosV2CommandError,
-        services::portfolio::PortfolioServiceError,
+        commands::{
+            lookup_assets::LookupAssetsCommandError,
+            sync_portfolios_v2::SyncPortfoliosV2CommandError,
+        },
+        services::{asset::AssetServiceError, portfolio::PortfolioServiceError},
     },
     ports::inbound::rest::types::sync_portfolio_v2::{
         V2ErrorResponse, V2FieldError, V2ValidationError,
@@ -22,6 +25,13 @@ const CONFLICT_MESSAGE: &str =
     "The Portfolio changed while it was being synchronized; retry the request.";
 const INTERNAL_CODE: &str = "internal_error";
 const INTERNAL_MESSAGE: &str = "The Portfolio could not be synchronized.";
+const LOOKUP_INVALID_MESSAGE: &str = "The asset lookup request is invalid.";
+const ASSET_INTERNAL_MESSAGE: &str = "The assets could not be resolved.";
+const UNRESOLVED_ASSET_CODE: &str = "unresolved_asset";
+const UNRESOLVED_ASSET_MESSAGE: &str = "Some assets are unknown to their provider.";
+const PROVIDER_UNAVAILABLE_CODE: &str = "provider_unavailable";
+const PROVIDER_UNAVAILABLE_MESSAGE: &str =
+    "An asset provider is unavailable; retry the request later.";
 
 /// Errors emitted by the v2 HTTP boundary.
 #[derive(Debug, thiserror::Error)]
@@ -32,6 +42,22 @@ pub enum V2HttpError {
     Command(#[source] SyncPortfoliosV2CommandError),
     #[error("v2 Portfolio synchronization failed")]
     Service(#[source] PortfolioServiceError),
+    #[error("v2 asset lookup request is invalid")]
+    LookupCommand(#[source] LookupAssetsCommandError),
+    #[error("v2 asset service failed")]
+    Asset(#[source] AssetServiceError),
+}
+
+impl From<LookupAssetsCommandError> for V2HttpError {
+    fn from(error: LookupAssetsCommandError) -> Self {
+        Self::LookupCommand(error)
+    }
+}
+
+impl From<AssetServiceError> for V2HttpError {
+    fn from(error: AssetServiceError) -> Self {
+        Self::Asset(error)
+    }
 }
 
 impl From<PortfolioServiceError> for V2HttpError {
@@ -107,6 +133,62 @@ impl IntoResponse for V2HttpError {
                     errors: Vec::new(),
                 },
             ),
+            Self::LookupCommand(error) => {
+                let field = match &error {
+                    LookupAssetsCommandError::Invalid { index, .. } => format!("asset[{index}]"),
+                    _ => "asset".to_string(),
+                };
+                (
+                    StatusCode::BAD_REQUEST,
+                    V2ErrorResponse {
+                        code: "validation_error".to_string(),
+                        message: LOOKUP_INVALID_MESSAGE.to_string(),
+                        errors: vec![V2FieldError {
+                            field,
+                            message: match error {
+                                LookupAssetsCommandError::Invalid { reason, .. } => {
+                                    reason.to_string()
+                                }
+                                other => other.to_string(),
+                            },
+                        }],
+                    },
+                )
+            }
+            Self::Asset(AssetServiceError::Unresolved(refs)) => (
+                StatusCode::BAD_REQUEST,
+                V2ErrorResponse {
+                    code: UNRESOLVED_ASSET_CODE.to_string(),
+                    message: UNRESOLVED_ASSET_MESSAGE.to_string(),
+                    errors: refs
+                        .into_iter()
+                        .map(|r| V2FieldError {
+                            field: "asset".to_string(),
+                            message: format!(
+                                "{}:{} is not a known asset",
+                                r.provider.as_str(),
+                                r.symbol
+                            ),
+                        })
+                        .collect(),
+                },
+            ),
+            Self::Asset(AssetServiceError::ProviderUnavailable(_)) => (
+                StatusCode::BAD_GATEWAY,
+                V2ErrorResponse {
+                    code: PROVIDER_UNAVAILABLE_CODE.to_string(),
+                    message: PROVIDER_UNAVAILABLE_MESSAGE.to_string(),
+                    errors: Vec::new(),
+                },
+            ),
+            Self::Asset(AssetServiceError::Directory(_)) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                V2ErrorResponse {
+                    code: INTERNAL_CODE.to_string(),
+                    message: ASSET_INTERNAL_MESSAGE.to_string(),
+                    errors: Vec::new(),
+                },
+            ),
             Self::Service(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 V2ErrorResponse {
@@ -153,6 +235,67 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "validation_error");
         assert_eq!(body["errors"][0]["field"], "portfolios[0].name");
+    }
+
+    #[tokio::test]
+    async fn lookup_validation_points_at_the_offending_asset() {
+        // GIVEN an invalid asset reference at index 2, WHEN the lookup command error is
+        // adapted, THEN the 400 body names `asset[2]` with the reason.
+        let (status, body) = response_body(V2HttpError::LookupCommand(
+            LookupAssetsCommandError::Invalid {
+                index: 2,
+                reason: "provider must be one of yf, kraken",
+            },
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["code"], "validation_error");
+        assert_eq!(body["errors"][0]["field"], "asset[2]");
+        assert_eq!(
+            body["errors"][0]["message"],
+            "provider must be one of yf, kraken"
+        );
+
+        let (status, body) = response_body(V2HttpError::LookupCommand(
+            LookupAssetsCommandError::TooMany,
+        ))
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["errors"][0]["field"], "asset");
+    }
+
+    #[tokio::test]
+    async fn asset_service_failures_keep_distinct_statuses() {
+        // GIVEN unresolved assets, a provider outage and a directory failure,
+        // WHEN each is adapted, THEN they map to 400, 502 and 500 with distinct codes.
+        use crate::app::domain::{asset::AssetRef, portfolio::Provider};
+        use crate::ports::outbound::{
+            adapter::AssetProviderError, repository::asset::AssetDirectoryError,
+        };
+
+        let (status, body) =
+            response_body(V2HttpError::Asset(AssetServiceError::Unresolved(vec![
+                AssetRef::new(Provider::YF, "nope"),
+            ])))
+            .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["code"], UNRESOLVED_ASSET_CODE);
+        assert_eq!(body["errors"][0]["message"], "yf:NOPE is not a known asset");
+
+        let (status, body) = response_body(V2HttpError::Asset(
+            AssetServiceError::ProviderUnavailable(AssetProviderError::Malformed("x".into())),
+        ))
+        .await;
+        assert_eq!(status, StatusCode::BAD_GATEWAY);
+        assert_eq!(body["code"], PROVIDER_UNAVAILABLE_CODE);
+
+        let (status, body) = response_body(V2HttpError::Asset(AssetServiceError::Directory(
+            AssetDirectoryError::CorruptData("x".into()),
+        )))
+        .await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["code"], INTERNAL_CODE);
     }
 
     #[tokio::test]

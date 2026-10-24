@@ -150,6 +150,7 @@ mod tests {
             "/import/portfolio/{id}",
             "/v1/sync/portfolios",
             "/v2/sync/portfolios",
+            "/markets/v2/assets/lookup",
         ] {
             assert!(paths.contains_key(expected), "missing path {expected}");
         }
@@ -335,6 +336,37 @@ mod tests {
             openapi["components"]["schemas"]["SyncPortfoliosV2Request"]["properties"]["schemaVersion"]
                 ["maximum"],
             2
+        );
+    }
+
+    #[test]
+    fn v2_asset_lookup_documents_query_and_response_contract() {
+        // GIVEN the generated OpenAPI document, WHEN the v2 asset lookup operation is
+        // inspected, THEN it takes a repeatable `asset` query parameter and documents the
+        // `assets`/`notFound` response plus structured 400 and 500 errors.
+        let (_, openapi) = super::super::build_openapi_router();
+        let openapi = openapi_value(&openapi).expect("serialize openapi");
+
+        let operation = &openapi["paths"]["/markets/v2/assets/lookup"]["get"];
+        let asset_param = operation["parameters"]
+            .as_array()
+            .expect("lookup parameters")
+            .iter()
+            .find(|parameter| parameter["name"] == "asset")
+            .expect("missing asset query parameter");
+        assert_eq!(asset_param["in"], "query");
+        assert_eq!(asset_param["schema"]["type"], "array");
+
+        assert!(operation["responses"].get("200").is_some());
+        assert!(operation["responses"].get("400").is_some());
+        assert!(operation["responses"].get("500").is_some());
+
+        let response = &openapi["components"]["schemas"]["LookupAssetsV2Response"];
+        assert!(response["properties"].get("assets").is_some());
+        assert!(response["properties"].get("notFound").is_some());
+        assert_enum_contains(
+            &openapi["components"]["schemas"]["AssetRefV2Response"]["properties"]["provider"],
+            &["yf", "kraken"],
         );
     }
 

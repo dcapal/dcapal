@@ -56,6 +56,26 @@
           }
         ]
       },
+      "AssetRefV2Response": {
+        "description": "Reference to an asset that is not in the backend cache.",
+        "properties": {
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "symbol"
+        ],
+        "type": "object"
+      },
       "Crypto": {
         "description": "A cryptocurrency identified by its provider id and display symbol.",
         "properties": {
@@ -233,6 +253,28 @@
         "required": [
           "id",
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "LookupAssetsV2Response": {
+        "description": "Cached metadata of the looked-up assets and the references that are not cached.",
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/SharedAssetV2Response"
+            },
+            "type": "array"
+          },
+          "notFound": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefV2Response"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "assets",
+          "notFound"
         ],
         "type": "object"
       },
@@ -1815,6 +1857,67 @@
           }
         },
         "summary": "Returns a stored shared portfolio or a not-found response when it expired."
+      }
+    },
+    "/markets/v2/assets/lookup": {
+      "get": {
+        "operationId": "lookup_assets_v2",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`.\nRepeat the parameter for several assets (1 to 20 per call).",
+            "in": "query",
+            "name": "asset",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupAssetsV2Response"
+                }
+              }
+            },
+            "description": "Cached assets and unknown references"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid asset references"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Asset lookup failure"
+          }
+        },
+        "summary": "Reads the cached metadata of up to 20 assets without contacting providers."
       }
     },
     "/price/{asset}": {

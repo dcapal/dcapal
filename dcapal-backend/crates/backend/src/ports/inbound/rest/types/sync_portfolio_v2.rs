@@ -337,7 +337,7 @@ impl V2ValidationError {
     }
 }
 
-fn v2_provider_schema() -> Object {
+pub(crate) fn v2_provider_schema() -> Object {
     ObjectBuilder::new()
         .schema_type(Type::String)
         .enum_values(Some(["yf", "kraken"]))
@@ -353,7 +353,7 @@ fn v2_schema_version_schema() -> Object {
         .build()
 }
 
-fn v2_asset_class_schema() -> Object {
+pub(crate) fn v2_asset_class_schema() -> Object {
     ObjectBuilder::new()
         .schema_type(Type::String)
         .enum_values(Some([
