@@ -1,6 +1,6 @@
 //! The [`rest`](self) module implements the REST API of the system
 
-use std::{fmt::Display, time::Duration};
+use std::time::Duration;
 
 use axum::{
     Json, Router,
@@ -31,10 +31,14 @@ use crate::{
     ports::outbound::repository::ImportedPortfolio,
 };
 
+pub mod error;
+pub mod lookup_assets_v2;
 pub mod openapi;
 pub mod proxy_types;
 pub mod request;
 pub mod response;
+pub mod sync_portfolio_v2;
+pub mod types;
 
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../../../docs/schema/portfolio/v1/schema.json");
@@ -61,11 +65,21 @@ pub fn build_openapi_router() -> (Router<AppContext>, OpenApi) {
         .routes(routes!(import_portfolio))
         .routes(routes!(get_imported_portfolio))
         .nest("/v1", build_v1_openapi_router())
+        .nest("/v2", build_v2_openapi_router())
+        .nest("/markets/v2", build_markets_v2_openapi_router())
         .split_for_parts()
 }
 
 fn build_v1_openapi_router() -> OpenApiRouter<AppContext> {
     OpenApiRouter::new().routes(routes!(request::sync_portfolios))
+}
+
+fn build_v2_openapi_router() -> OpenApiRouter<AppContext> {
+    OpenApiRouter::new().routes(routes!(sync_portfolio_v2::sync_portfolios))
+}
+
+fn build_markets_v2_openapi_router() -> OpenApiRouter<AppContext> {
+    OpenApiRouter::new().routes(routes!(lookup_assets_v2::lookup_assets))
 }
 
 fn base_openapi() -> OpenApi {
@@ -398,14 +412,4 @@ pub enum FeeStructure {
         )]
         max_fee: Option<Decimal>,
     },
-}
-
-impl Display for FeeStructure {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FeeStructure::ZeroFee => write!(f, "ZeroFee"),
-            FeeStructure::Fixed { .. } => write!(f, "Fixed"),
-            FeeStructure::Variable { .. } => write!(f, "Variable"),
-        }
-    }
 }

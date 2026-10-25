@@ -27,7 +27,7 @@ VALUES
 
 INSERT INTO portfolio_asset (
     id, portfolio_id, assets_data_id, asset_class_override,
-    quantity, target_weight, manual_price, max_fee_impact, fee_type, fee_amount,
+    quantity, manual_price, max_fee_impact, fee_type, fee_amount,
     fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at
 )
 SELECT
@@ -36,7 +36,6 @@ SELECT
     assets_data.id,
     NULL,
     values.quantity,
-    values.target_weight,
     values.manual_price,
     values.max_fee_impact,
     values.fee_type,
@@ -53,3 +52,8 @@ FROM (
         ('00000000-0000-7000-8000-000000000012'::uuid, 'CASH'::text, 100::numeric, 0::numeric, 1::numeric, NULL::numeric, 'ZeroFee'::text, NULL::numeric, NULL::numeric, NULL::numeric, NULL::numeric, 1::numeric, '2025-01-01T00:00:00Z'::timestamptz, '2025-01-01T00:00:00Z'::timestamptz)
 ) AS values(id, symbol, quantity, target_weight, manual_price, max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee, average_buy_price, created_at, updated_at)
 JOIN assets_data ON assets_data.symbol = values.symbol AND assets_data.provider = 2;
+
+INSERT INTO portfolio_asset_allocation (portfolio_id, portfolio_asset_id, weight)
+VALUES
+    ('10000000-0000-0000-0000-000000000001', '00000000-0000-7000-8000-000000000011', 1),
+    ('10000000-0000-0000-0000-000000000001', '00000000-0000-7000-8000-000000000012', 0);

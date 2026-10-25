@@ -16,6 +16,7 @@ config = { workspace = true }
 const_format = { workspace = true }
 chrono = { workspace = true }
 deadpool-redis = { workspace = true }
+derive_more = { workspace = true }
 failsafe = { workspace = true }
 futures = { workspace = true }
 hyper = { workspace = true }
@@ -47,7 +48,9 @@ tracing-subscriber = { workspace = true }
 utoipa = { workspace = true }
 utoipa-axum = { workspace = true }
 uuid = { workspace = true }
+url = { workspace = true }
 rquest = { workspace = true }
 
 [dev-dependencies]
 migration = { path = "../migration" }
+mockall = { workspace = true }
