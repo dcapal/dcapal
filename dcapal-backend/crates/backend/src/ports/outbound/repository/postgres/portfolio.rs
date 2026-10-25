@@ -6,9 +6,9 @@ use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
 
-use crate::app::domain::portfolio::{
-    FeeStructure as AppFeeStructure, SyncPortfoliosV2Request, SyncPortfoliosV2Response,
-    TransactionFees,
+use crate::app::domain::{
+    portfolio::{FeeStructure as AppFeeStructure, TransactionFees},
+    portfolio_sync::{SyncPlan, SyncSnapshot},
 };
 use crate::ports::{
     inbound::rest::request::{PortfolioRequest, TransactionFeesRequest},
@@ -20,8 +20,8 @@ use crate::ports::{
         },
     },
 };
-mod sync_v2;
-mod sync_v2_snapshot;
+mod sync_apply;
+mod sync_snapshot;
 
 /// PostgreSQL persistence for portfolios and their assets.
 #[derive(Clone)]
@@ -647,11 +647,11 @@ impl PortfolioRepository for SqlxPortfolioRepository {
         .await
     }
 
-    async fn sync_v2(
-        &self,
-        user_id: Uuid,
-        request: &SyncPortfoliosV2Request,
-    ) -> Result<SyncPortfoliosV2Response> {
-        sync_v2::sync(self, user_id, request).await
+    async fn load_sync_snapshot(&self, user_id: Uuid) -> Result<SyncSnapshot> {
+        self.load_snapshot(user_id).await
+    }
+
+    async fn apply_sync_plan(&self, user_id: Uuid, plan: &SyncPlan) -> Result<()> {
+        self.apply_plan(user_id, plan).await
     }
 }

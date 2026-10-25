@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     app::{
         commands::sync_portfolios_v2::SyncPortfoliosV2Command,
-        domain::portfolio::SyncPortfoliosV2Response,
+        domain::{portfolio::SyncPortfoliosV2Response, portfolio_sync::plan_sync},
         infra::retry::retry_sync,
         services::asset::{AssetService, AssetServiceError},
     },
@@ -174,13 +174,14 @@ impl PortfolioService {
         })
     }
 
-    /// Atomically synchronizes a validated complete v2 Portfolio aggregate.
+    /// Synchronizes validated complete v2 Portfolio aggregates by planning the
+    /// outcome from a stored snapshot and applying that plan atomically.
     pub async fn sync_portfolios_v2(
         &self,
         command: SyncPortfoliosV2Command,
     ) -> std::result::Result<SyncPortfoliosV2Response, PortfolioServiceError> {
         let user_id = command.user_id();
-        // Shared asset rows are stored before the transaction opens so that no
+        // Shared asset rows are stored before the plan is applied so that no
         // provider or directory round trip happens while rows are locked.
         // Only assets the directory lacked or held unconfirmed need writing;
         // provider-confirmed ones are skipped.
@@ -189,8 +190,20 @@ impl PortfolioService {
             .await
             .map_err(PortfolioServiceError::Asset)?;
         let request = command.into_request();
+        // The whole read-plan-apply cycle is the retried unit, so a stale
+        // snapshot or a serialization conflict re-plans from fresh data.
         let response = retry_sync(
-            || self.portfolio_repository.sync_v2(user_id, &request),
+            || async {
+                let snapshot = self
+                    .portfolio_repository
+                    .load_sync_snapshot(user_id)
+                    .await?;
+                let plan = plan_sync(&snapshot, &request);
+                self.portfolio_repository
+                    .apply_sync_plan(user_id, &plan)
+                    .await?;
+                Ok(plan.response)
+            },
             PortfolioRepositoryError::is_retryable_concurrency,
         )
         .await;
@@ -250,12 +263,16 @@ mod tests {
         asset::{AssetRef, ResolvedAsset},
         portfolio::{
             AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider,
-            SyncPortfoliosV2Request, SyncPortfoliosV2Response,
+            SyncPortfoliosV2Request,
+        },
+        portfolio_sync::{
+            PortfolioVersion, StoredAggregate, StoredPortfolio, SyncPlan, SyncSnapshot,
+            TombstoneKind, WriteKind,
         },
     };
     use crate::ports::inbound::rest::request::PortfolioAssetRequest;
     use crate::ports::outbound::repository::{
-        portfolio::PortfolioRepository,
+        portfolio::{MockPortfolioRepository, PortfolioRepository},
         postgres::types::{PortfolioAssetRow, PortfolioRow},
     };
     use crate::ports::outbound::{
@@ -395,7 +412,7 @@ mod tests {
         // conflicts before succeeding,
         // WHEN the service synchronizes it,
         // THEN assets are onboarded exactly once, before the first attempt, and the
-        // transaction is retried without onboarding again.
+        // read-plan-apply cycle is retried without onboarding again.
         let log = Arc::new(Mutex::new(Vec::new()));
         let repository = Arc::new(RetryRepository::new(2, "40001").with_log(log.clone()));
         let attempts = &repository.upsert_attempts;
@@ -410,7 +427,7 @@ mod tests {
         assert_eq!(attempts.load(Ordering::Relaxed), 3);
         assert_eq!(
             *log.lock().unwrap(),
-            ["onboard", "sync_v2", "sync_v2", "sync_v2"]
+            ["onboard", "load", "apply", "load", "apply", "load", "apply"]
         );
     }
 
@@ -618,36 +635,311 @@ mod tests {
         repository: &dyn PortfolioRepository,
         assets: &AssetService,
     ) -> SyncPortfoliosV2Command {
+        v2_command(
+            repository,
+            assets,
+            vec![v2_portfolio(Uuid::new_v4(), Utc::now())],
+            Vec::new(),
+        )
+        .await
+    }
+
+    /// A Simple v2 aggregate holding VWCE, last updated at `updated_at`.
+    fn v2_portfolio(id: Uuid, updated_at: chrono::DateTime<Utc>) -> PortfolioV2 {
+        PortfolioV2 {
+            id,
+            name: "Portfolio".to_string(),
+            quote_currency: "EUR".to_string(),
+            allocation_mode: AllocationMode::Simple,
+            drift_band: None,
+            fees: None,
+            assets: vec![PortfolioAssetV2 {
+                asset: AssetRef::new(Provider::YF, "VWCE"),
+                asset_class_override: None,
+                quantity: Decimal::ONE,
+                target_weight: Some(Decimal::from(100)),
+                manual_price: None,
+                average_buy_price: None,
+                fees: None,
+            }],
+            strategic_allocation: None,
+            last_updated_at: updated_at,
+        }
+    }
+
+    async fn v2_command(
+        repository: &dyn PortfolioRepository,
+        assets: &AssetService,
+        portfolios: Vec<PortfolioV2>,
+        deleted_portfolios: Vec<Uuid>,
+    ) -> SyncPortfoliosV2Command {
         SyncPortfoliosV2Command::try_new(
             Uuid::nil(),
             SyncPortfoliosV2Request {
                 schema_version: 2,
-                portfolios: vec![PortfolioV2 {
-                    id: Uuid::new_v4(),
-                    name: "Portfolio".to_string(),
-                    quote_currency: "EUR".to_string(),
-                    allocation_mode: AllocationMode::Simple,
-                    drift_band: None,
-                    fees: None,
-                    assets: vec![PortfolioAssetV2 {
-                        asset: AssetRef::new(Provider::YF, "VWCE"),
-                        asset_class_override: None,
-                        quantity: Decimal::ONE,
-                        target_weight: Some(Decimal::from(100)),
-                        manual_price: None,
-                        average_buy_price: None,
-                        fees: None,
-                    }],
-                    strategic_allocation: None,
-                    last_updated_at: Utc::now(),
-                }],
-                deleted_portfolios: Vec::new(),
+                portfolios,
+                deleted_portfolios,
             },
             repository,
             assets,
         )
         .await
         .expect("v2 fixture should be valid")
+    }
+
+    /// The stored form of a live Portfolio with no assets.
+    fn stored_portfolio(id: Uuid, updated_at: chrono::DateTime<Utc>) -> StoredPortfolio {
+        StoredPortfolio {
+            id,
+            version: PortfolioVersion {
+                deleted: false,
+                last_updated_at: updated_at,
+                updated_at,
+            },
+            aggregate: Some(StoredAggregate {
+                name: "Stored".to_string(),
+                quote_currency: "EUR".to_string(),
+                allocation_mode: AllocationMode::Simple,
+                drift_band: None,
+                fees: None,
+                strategic_allocation_present: false,
+                assets: Vec::new(),
+                class_targets: Vec::new(),
+            }),
+        }
+    }
+
+    fn stored_tombstone(id: Uuid) -> StoredPortfolio {
+        StoredPortfolio {
+            id,
+            version: PortfolioVersion {
+                deleted: true,
+                last_updated_at: Utc::now(),
+                updated_at: Utc::now(),
+            },
+            aggregate: None,
+        }
+    }
+
+    /// A command repository for tests whose service uses a different mock.
+    fn command_repository() -> RetryRepository {
+        RetryRepository::new(0, "23505")
+    }
+
+    #[tokio::test]
+    async fn v2_happy_path_loads_then_applies_the_planned_writes_once() {
+        // GIVEN a user with no stored Portfolio and a v2 sync of one new Portfolio,
+        // WHEN the service synchronizes it,
+        // THEN the snapshot is loaded once, a plan creating that Portfolio is
+        // applied once, and the planned response is returned.
+        let id = Uuid::new_v4();
+        let mut repository = MockPortfolioRepository::new();
+        repository
+            .expect_load_sync_snapshot()
+            .times(1)
+            .returning(|_| Box::pin(async { Ok(SyncSnapshot::default()) }));
+        repository
+            .expect_apply_sync_plan()
+            .times(1)
+            .withf(move |_, plan| {
+                plan.writes.len() == 1
+                    && plan.writes[0].kind == WriteKind::Create
+                    && plan.writes[0].portfolio.id == id
+                    && plan.tombstones.is_empty()
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let assets = unknown_free_assets();
+        let command = v2_command(
+            &command_repository(),
+            &assets,
+            vec![v2_portfolio(id, Utc::now())],
+            Vec::new(),
+        )
+        .await;
+        let service = PortfolioService::new(Arc::new(repository), assets.clone());
+
+        let response = service
+            .sync_portfolios_v2(command)
+            .await
+            .expect("sync should succeed");
+
+        assert_eq!(response.updated_portfolios.len(), 1);
+        assert_eq!(response.updated_portfolios[0].id, id);
+        assert!(response.deleted_portfolios.is_empty());
+    }
+
+    /// Asset service whose directory already holds VWCE as provider-confirmed.
+    fn unknown_free_assets() -> Arc<AssetService> {
+        let mut directory = MockAssetDirectory::new();
+        directory.expect_find_by_refs().returning(|_| {
+            Ok(vec![crate::app::domain::asset::StoredAsset {
+                asset: resolved_vwce(),
+                source: crate::app::domain::asset::MetadataSource::ProviderConfirmed,
+            }])
+        });
+        directory.expect_upsert_resolved().never();
+        Arc::new(AssetService::new(
+            Arc::new(directory),
+            Arc::new(MockAssetProvider::new()),
+        ))
+    }
+
+    #[tokio::test]
+    async fn v2_stale_snapshot_replans_from_a_fresh_load() {
+        // GIVEN an apply that fails once with a stale snapshot, and a second
+        // snapshot in which the Portfolio meanwhile became a tombstone,
+        // WHEN the service synchronizes a new aggregate of that Portfolio,
+        // THEN assets are onboarded once, the snapshot is reloaded, the second
+        // plan writes nothing and reports the Portfolio deleted.
+        let id = Uuid::new_v4();
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let assets = logging_assets(&log);
+        let mut repository = MockPortfolioRepository::new();
+        let mut loads = 0;
+        repository
+            .expect_load_sync_snapshot()
+            .times(2)
+            .returning(move |_| {
+                loads += 1;
+                let snapshot = if loads == 1 {
+                    SyncSnapshot::default()
+                } else {
+                    SyncSnapshot {
+                        portfolios: vec![stored_tombstone(id)],
+                    }
+                };
+                Box::pin(async move { Ok(snapshot) })
+            });
+        let mut applies = 0;
+        repository
+            .expect_apply_sync_plan()
+            .times(2)
+            .returning(move |_, plan| {
+                applies += 1;
+                let result = if applies == 1 {
+                    assert_eq!(plan.writes.len(), 1);
+                    Err(PortfolioRepositoryError::StaleSnapshot)
+                } else {
+                    assert!(plan.writes.is_empty());
+                    Ok(())
+                };
+                Box::pin(async move { result })
+            });
+        let command = v2_command(
+            &command_repository(),
+            &assets,
+            vec![v2_portfolio(id, Utc::now())],
+            Vec::new(),
+        )
+        .await;
+        let service = PortfolioService::new(Arc::new(repository), assets.clone());
+
+        let response = service
+            .sync_portfolios_v2(command)
+            .await
+            .expect("second plan should succeed");
+
+        assert!(response.updated_portfolios.is_empty());
+        assert_eq!(response.deleted_portfolios, vec![id]);
+        assert_eq!(*log.lock().unwrap(), ["onboard"]);
+    }
+
+    #[tokio::test]
+    async fn v2_persistent_stale_snapshot_returns_conflict() {
+        // GIVEN an apply that is always rejected as stale,
+        // WHEN the service synchronizes,
+        // THEN every attempt reloads and re-plans, and after the last attempt
+        // the service returns Conflict.
+        let mut repository = MockPortfolioRepository::new();
+        repository
+            .expect_load_sync_snapshot()
+            .times(3)
+            .returning(|_| Box::pin(async { Ok(SyncSnapshot::default()) }));
+        repository
+            .expect_apply_sync_plan()
+            .times(3)
+            .returning(|_, _| Box::pin(async { Err(PortfolioRepositoryError::StaleSnapshot) }));
+        let assets = unknown_free_assets();
+        let command = v2_command(
+            &command_repository(),
+            &assets,
+            vec![v2_portfolio(Uuid::new_v4(), Utc::now())],
+            Vec::new(),
+        )
+        .await;
+        let service = PortfolioService::new(Arc::new(repository), assets.clone());
+
+        let error = service
+            .sync_portfolios_v2(command)
+            .await
+            .expect_err("persistent staleness should conflict");
+
+        assert!(matches!(
+            error,
+            PortfolioServiceError::Conflict(PortfolioRepositoryError::StaleSnapshot)
+        ));
+    }
+
+    #[tokio::test]
+    async fn v2_plan_applies_last_write_wins_and_tombstones() {
+        // GIVEN stored Portfolios: one newer than the submitted copy, one live
+        // that the request deletes, and a request that also deletes an unknown id,
+        // WHEN the service synchronizes,
+        // THEN the plan writes nothing, marks the stored id, creates a tombstone
+        // for the unknown id, and the response returns the server copy and
+        // acknowledges both deletions.
+        let newer = Uuid::from_u128(1);
+        let doomed = Uuid::from_u128(2);
+        let unknown = Uuid::from_u128(3);
+        let now = Utc::now();
+        let mut repository = MockPortfolioRepository::new();
+        repository
+            .expect_load_sync_snapshot()
+            .times(1)
+            .returning(move |_| {
+                let snapshot = SyncSnapshot {
+                    portfolios: vec![
+                        stored_portfolio(newer, now + chrono::Duration::days(1)),
+                        stored_portfolio(doomed, now),
+                    ],
+                };
+                Box::pin(async move { Ok(snapshot) })
+            });
+        repository
+            .expect_apply_sync_plan()
+            .times(1)
+            .withf(move |_, plan: &SyncPlan| {
+                plan.writes.is_empty()
+                    && plan
+                        .tombstones
+                        .iter()
+                        .map(|t| (t.id, t.kind))
+                        .collect::<Vec<_>>()
+                        == vec![
+                            (doomed, TombstoneKind::Mark),
+                            (unknown, TombstoneKind::Create),
+                        ]
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let assets = unknown_free_assets();
+        let command = v2_command(
+            &command_repository(),
+            &assets,
+            vec![v2_portfolio(newer, now)],
+            vec![doomed, unknown],
+        )
+        .await;
+        let service = PortfolioService::new(Arc::new(repository), assets.clone());
+
+        let response = service
+            .sync_portfolios_v2(command)
+            .await
+            .expect("sync should succeed");
+
+        assert_eq!(response.updated_portfolios.len(), 1);
+        assert_eq!(response.updated_portfolios[0].id, newer);
+        assert_eq!(response.updated_portfolios[0].name, "Stored");
+        assert_eq!(response.deleted_portfolios, vec![doomed, unknown]);
     }
 
     #[derive(Debug, thiserror::Error)]
@@ -687,7 +979,7 @@ mod tests {
         error_code: &'static str,
         upsert_attempts: AtomicUsize,
         last_upserted_portfolio: Mutex<Option<PortfolioRequest>>,
-        /// Optional shared event log; each v2 attempt appends `"sync_v2"`.
+        /// Optional shared event log; each v2 attempt appends `"load"` and `"apply"`.
         log: Option<Arc<Mutex<Vec<&'static str>>>>,
     }
 
@@ -780,14 +1072,23 @@ mod tests {
             ))
         }
 
-        async fn sync_v2(
+        async fn load_sync_snapshot(
             &self,
             _user_id: Uuid,
-            request: &SyncPortfoliosV2Request,
-        ) -> crate::ports::outbound::repository::portfolio::Result<SyncPortfoliosV2Response>
-        {
+        ) -> crate::ports::outbound::repository::portfolio::Result<SyncSnapshot> {
             if let Some(log) = &self.log {
-                log.lock().unwrap().push("sync_v2");
+                log.lock().unwrap().push("load");
+            }
+            Ok(SyncSnapshot::default())
+        }
+
+        async fn apply_sync_plan(
+            &self,
+            _user_id: Uuid,
+            _plan: &SyncPlan,
+        ) -> crate::ports::outbound::repository::portfolio::Result<()> {
+            if let Some(log) = &self.log {
+                log.lock().unwrap().push("apply");
             }
             let attempt = self.upsert_attempts.fetch_add(1, Ordering::Relaxed) + 1;
             if attempt <= self.failures_before_success {
@@ -797,11 +1098,7 @@ mod tests {
                     }),
                 )));
             }
-
-            Ok(SyncPortfoliosV2Response {
-                updated_portfolios: request.portfolios.clone(),
-                deleted_portfolios: request.deleted_portfolios.clone(),
-            })
+            Ok(())
         }
     }
 

@@ -20,3 +20,30 @@ small mechanical trait implementations, and `mockall` for test-only port
 mocks. Use RAII guards for scoped stack/path state, bind SQL values (including
 enum discriminants) instead of embedding literals, and never rewrite applied
 migrations to satisfy a new test; add forward migrations or test fixtures.
+
+## Conventions for new endpoints and services
+
+Apply these when adding or changing a use case; `CODING_STANDARDS.md` has the
+reasoning and examples.
+
+- Layers: REST handler -> `Command::try_new` -> service -> outbound port ->
+  adapter. The command validates and resolves context with read-only access.
+  The service owns the workflow and every business decision. The adapter runs
+  SQL and transactions and makes no business decisions.
+- For multi-aggregate writes, the service reads a snapshot, computes a pure,
+  unit-tested plan, and the adapter applies the plan in one short transaction
+  with set-based statements and an optimistic version check (see ADR 0006).
+  Do not put last-write-wins, response building or other decisions in a
+  repository.
+- All value validation (ranges, enums, formats) lives in the application. Do
+  not add database `CHECK` constraints for value ranges; keep structural
+  constraints (keys, uniqueness, foreign keys, `NOT NULL`). When a migration
+  must cope with legacy data, drop the malformed records instead of keeping a
+  constraint.
+- Every outbound network call has an explicit timeout, and any fan-out driven
+  by a request has a documented cap. Route to a provider with an explicit
+  `match` on the provider name rather than looping over implementations.
+- Data cached from a provider records where it came from, and provider-confirmed
+  data is never overwritten by client-supplied data.
+- Migrations that are not merged may be edited in place; applied migrations stay
+  immutable.

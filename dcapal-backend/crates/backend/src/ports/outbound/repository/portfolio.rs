@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::{
-    app::domain::portfolio::{SyncPortfoliosV2Request, SyncPortfoliosV2Response},
+    app::domain::portfolio_sync::{SyncPlan, SyncSnapshot},
     ports::{
         inbound::rest::request::PortfolioRequest,
         outbound::repository::postgres::types::{PortfolioAssetRow, PortfolioRow},
@@ -26,6 +26,10 @@ pub enum PortfolioRepositoryError {
     AssetNotOnboarded(String),
     #[error("stored portfolio data is corrupt: {0}")]
     CorruptData(String),
+    /// The stored Portfolios no longer match the snapshot a plan was derived
+    /// from, so the plan must not be applied. The caller re-plans.
+    #[error("the stored portfolios changed since the synchronization snapshot was read")]
+    StaleSnapshot,
 }
 
 /// Identifies an existing resource that cannot be used by the requesting user.
@@ -43,13 +47,16 @@ pub enum OwnershipConflict {
 pub type Result<T> = std::result::Result<T, PortfolioRepositoryError>;
 
 impl PortfolioRepositoryError {
-    /// Returns whether PostgreSQL reported a retryable concurrency conflict.
+    /// Returns whether the failure is a retryable concurrency conflict: a
+    /// PostgreSQL serialization failure or deadlock, or a stale snapshot.
     pub fn is_retryable_concurrency(&self) -> bool {
-        matches!(
-            self,
-            Self::Database(sqlx::Error::Database(error))
-                if matches!(error.code().as_deref(), Some("40001") | Some("40P01"))
-        )
+        match self {
+            Self::StaleSnapshot => true,
+            Self::Database(sqlx::Error::Database(error)) => {
+                matches!(error.code().as_deref(), Some("40001") | Some("40P01"))
+            }
+            _ => false,
+        }
     }
 }
 
@@ -80,10 +87,21 @@ pub trait PortfolioRepository: Send + Sync {
         portfolio_req: PortfolioRequest,
     ) -> Result<(PortfolioRow, Vec<PortfolioAssetRow>)>;
 
-    /// Atomically synchronizes complete v2 Portfolio aggregates.
-    async fn sync_v2(
-        &self,
-        user_id: Uuid,
-        request: &SyncPortfoliosV2Request,
-    ) -> Result<SyncPortfoliosV2Response>;
+    /// Reads every Portfolio of the user (tombstones included) with its
+    /// content and version in one consistent read, without locking.
+    ///
+    /// Stored data that cannot be decoded is reported as
+    /// [`PortfolioRepositoryError::CorruptData`].
+    async fn load_sync_snapshot(&self, user_id: Uuid) -> Result<SyncSnapshot>;
+
+    /// Atomically applies a v2 synchronization plan in one short transaction.
+    ///
+    /// The rows named by [`SyncPlan::expected`] are locked and compared with
+    /// the versions the plan was derived from; any difference (or a row
+    /// appearing for an identifier expected to be absent) fails the whole
+    /// application with [`PortfolioRepositoryError::StaleSnapshot`] and writes
+    /// nothing. A row owned by another user is an
+    /// [`PortfolioRepositoryError::OwnershipConflict`]. The adapter performs
+    /// the plan as given and takes no synchronization decisions.
+    async fn apply_sync_plan(&self, user_id: Uuid, plan: &SyncPlan) -> Result<()>;
 }

@@ -31,10 +31,11 @@ replaces this with reference-only assets.
   provider outages become `502 provider_unavailable`. The command performs
   reads only.
 - The service onboards the resolved assets (`AssetService::onboard`:
-  `upsert_resolved` and `confirm`, idempotent) before the retried serializable
-  transaction, so no provider or network I/O happens while rows are locked.
+  `upsert_resolved` and `confirm`, idempotent) before the sync plan is applied
+  (see ADR 0006 for the plan-then-apply workflow), so no provider or network
+  I/O happens while rows are locked.
 - The repository looks up the already-stored `assets_data` IDs inside the
-  transaction, updates relationships matching by shared asset, inserts new
+  apply transaction, updates relationships matching by shared asset, inserts new
   ones with fresh UUIDv7 IDs, and deletes the rest. Switching an asset is a
   delete plus an insert. No schema change is needed; allocation rows remain
   keyed by the internal relationship ID.

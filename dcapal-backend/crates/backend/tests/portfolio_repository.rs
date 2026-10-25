@@ -7,8 +7,9 @@ use dcapal_backend::app::domain::asset::{AssetRef, MetadataSource, ResolvedAsset
 use dcapal_backend::app::domain::portfolio::{
     AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
     StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
-    SyncPortfoliosV2Request,
+    SyncPortfoliosV2Request, SyncPortfoliosV2Response,
 };
+use dcapal_backend::app::domain::portfolio_sync::{WriteKind, plan_sync};
 use dcapal_backend::app::services::{asset::AssetService, portfolio::PortfolioService};
 use dcapal_backend::ports::{
     inbound::rest::{
@@ -124,6 +125,19 @@ async fn onboard(pool: &PgPool, symbol: &str) -> Result<(), Box<dyn std::error::
         }])
         .await?;
     Ok(())
+}
+
+/// Synchronizes `request` for `user_id` the way the service does: loads the
+/// snapshot, plans, applies the plan once and returns the planned response.
+async fn sync_v2(
+    repository: &SqlxPortfolioRepository,
+    user_id: Uuid,
+    request: &SyncPortfoliosV2Request,
+) -> Result<SyncPortfoliosV2Response, PortfolioRepositoryError> {
+    let snapshot = repository.load_sync_snapshot(user_id).await?;
+    let plan = plan_sync(&snapshot, request);
+    repository.apply_sync_plan(user_id, &plan).await?;
+    Ok(plan.response)
 }
 
 /// Provider stub that knows exactly one symbol, `NEWCO`.
@@ -250,14 +264,7 @@ async fn rejects_corrupt_v2_snapshot_fee_data(
     .await?;
 
     let error = SqlxPortfolioRepository::new(pool)
-        .sync_v2(
-            USER_ID,
-            &SyncPortfoliosV2Request {
-                schema_version: 2,
-                portfolios: Vec::new(),
-                deleted_portfolios: Vec::new(),
-            },
-        )
+        .load_sync_snapshot(USER_ID)
         .await
         .unwrap_err();
 
@@ -285,14 +292,7 @@ async fn rejects_corrupt_v2_snapshot_asset_override(
     .await?;
 
     let error = SqlxPortfolioRepository::new(pool)
-        .sync_v2(
-            USER_ID,
-            &SyncPortfoliosV2Request {
-                schema_version: 2,
-                portfolios: Vec::new(),
-                deleted_portfolios: Vec::new(),
-            },
-        )
+        .load_sync_snapshot(USER_ID)
         .await
         .unwrap_err();
 
@@ -753,7 +753,7 @@ async fn v2_sync_persists_strategic_descendants_and_exact_decimals(
     };
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    let response = repository.sync_v2(USER_ID, &request).await?;
+    let response = sync_v2(&repository, USER_ID, &request).await?;
 
     let portfolio = &response.updated_portfolios[0];
     assert_eq!(portfolio.allocation_mode, AllocationMode::Strategic);
@@ -818,7 +818,7 @@ async fn v2_sync_reuses_relationships_by_portfolio_and_asset(
     let request = v2_simple_request(vec![(cash, dec!(25)), (vwce, dec!(75))]);
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    let response = repository.sync_v2(USER_ID, &request).await?;
+    let response = sync_v2(&repository, USER_ID, &request).await?;
     assert_eq!(response.updated_portfolios[0].assets.len(), 2);
 
     let stored: Vec<(Uuid, String, Decimal, Decimal)> = sqlx::query_as(
@@ -865,7 +865,7 @@ async fn v2_sync_deletes_relationships_for_dropped_assets(
     let request = v2_simple_request(vec![(v2_asset("VWCE"), dec!(100))]);
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    let response = repository.sync_v2(USER_ID, &request).await?;
+    let response = sync_v2(&repository, USER_ID, &request).await?;
     assert_eq!(response.updated_portfolios[0].assets.len(), 1);
 
     let relationships: Vec<Uuid> =
@@ -904,7 +904,7 @@ async fn v2_sync_switching_an_asset_is_a_delete_and_an_insert(
     ]);
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
-    repository.sync_v2(USER_ID, &request).await?;
+    sync_v2(&repository, USER_ID, &request).await?;
 
     let stored: Vec<(Uuid, String, Decimal)> = sqlx::query_as(
         "SELECT pa.id, ad.symbol, paa.weight
@@ -944,7 +944,7 @@ async fn v2_sync_stores_class_overrides_verbatim_and_hides_relationship_ids(
     let request = v2_simple_request(vec![(vwce, dec!(100))]);
 
     let repository = SqlxPortfolioRepository::new(pool);
-    let response = repository.sync_v2(USER_ID, &request).await?;
+    let response = sync_v2(&repository, USER_ID, &request).await?;
 
     let portfolio = response.updated_portfolios[0].clone();
     assert_eq!(
@@ -1029,10 +1029,7 @@ async fn v2_sync_rejects_a_portfolio_owned_by_another_user(
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
     assert!(matches!(
-        repository.sync_v2(
-            OTHER_USER_ID,
-            &request,
-        ).await,
+        sync_v2(&repository, OTHER_USER_ID, &request).await,
         Err(PortfolioRepositoryError::OwnershipConflict(OwnershipConflict::Portfolio { id }))
             if id == PORTFOLIO_ID
     ));
@@ -1061,7 +1058,7 @@ async fn v2_sync_keeps_unknown_deletions_as_terminal_tombstones(
         deleted_portfolios: vec![tombstone_id],
     };
 
-    let response = repository.sync_v2(USER_ID, &deletion).await?;
+    let response = sync_v2(&repository, USER_ID, &deletion).await?;
     assert_eq!(response.deleted_portfolios, vec![tombstone_id]);
 
     let tombstone: (Uuid, bool) =
@@ -1086,7 +1083,7 @@ async fn v2_sync_keeps_unknown_deletions_as_terminal_tombstones(
         }],
         deleted_portfolios: Vec::new(),
     };
-    let stale_response = repository.sync_v2(USER_ID, &stale).await?;
+    let stale_response = sync_v2(&repository, USER_ID, &stale).await?;
     assert_eq!(stale_response.deleted_portfolios, vec![tombstone_id]);
 
     let name: String = sqlx::query_scalar("SELECT name FROM portfolios WHERE id = $1")
@@ -1111,7 +1108,7 @@ async fn v2_sync_rolls_back_parent_when_an_asset_was_not_onboarded(
 
     let repository = SqlxPortfolioRepository::new(pool.clone());
     assert!(matches!(
-        repository.sync_v2(USER_ID, &request).await,
+        sync_v2(&repository, USER_ID, &request).await,
         Err(PortfolioRepositoryError::AssetNotOnboarded(_))
     ));
 
@@ -1120,6 +1117,291 @@ async fn v2_sync_rolls_back_parent_when_an_asset_was_not_onboarded(
         .fetch_one(&pool)
         .await?;
     assert_eq!(portfolio_count, 0);
+
+    Ok(())
+}
+
+/// A Simple aggregate with the given identifier and assets (symbol, target).
+fn simple_aggregate(id: Uuid, name: &str, assets: &[(&str, Decimal)]) -> PortfolioV2 {
+    PortfolioV2 {
+        id,
+        name: name.to_string(),
+        quote_currency: "EUR".to_string(),
+        allocation_mode: AllocationMode::Simple,
+        drift_band: None,
+        fees: None,
+        assets: assets
+            .iter()
+            .map(|(symbol, weight)| PortfolioAssetV2 {
+                target_weight: Some(*weight),
+                ..v2_asset(symbol)
+            })
+            .collect(),
+        strategic_allocation: None,
+        last_updated_at: Utc::now(),
+    }
+}
+
+fn request_of(portfolios: Vec<PortfolioV2>, deleted: Vec<Uuid>) -> SyncPortfoliosV2Request {
+    SyncPortfoliosV2Request {
+        schema_version: 2,
+        portfolios,
+        deleted_portfolios: deleted,
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn applying_a_plan_over_a_changed_row_is_stale_and_writes_nothing(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a plan that updates the stored Portfolio, creates another one and
+    // tombstones an unknown id,
+    // WHEN the stored Portfolio is modified (by another writer) before the plan
+    // is applied,
+    // THEN applying fails with a retryable StaleSnapshot and the transaction
+    // rolls back: no Portfolio was created, tombstoned or updated.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let new_id = Uuid::from_u128(0x10000000000000000000000000000041);
+    let tombstone_id = Uuid::from_u128(0x10000000000000000000000000000042);
+    let request = request_of(
+        vec![
+            simple_aggregate(PORTFOLIO_ID, "Planned update", &[("VWCE", dec!(100))]),
+            simple_aggregate(new_id, "Planned creation", &[("VWCE", dec!(100))]),
+        ],
+        vec![tombstone_id],
+    );
+    let snapshot = repository.load_sync_snapshot(USER_ID).await?;
+    let plan = plan_sync(&snapshot, &request);
+    sqlx::query("UPDATE portfolios SET name = 'Concurrent edit', updated_at = NOW() WHERE id = $1")
+        .bind(PORTFOLIO_ID)
+        .execute(&pool)
+        .await?;
+
+    let error = repository
+        .apply_sync_plan(USER_ID, &plan)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, PortfolioRepositoryError::StaleSnapshot));
+    assert!(error.is_retryable_concurrency());
+    let names: Vec<(Uuid, String)> = sqlx::query_as("SELECT id, name FROM portfolios ORDER BY id")
+        .fetch_all(&pool)
+        .await?;
+    assert_eq!(names, vec![(PORTFOLIO_ID, "Concurrent edit".to_string())]);
+    let relationships: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM portfolio_asset WHERE portfolio_id = $1")
+            .bind(PORTFOLIO_ID)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(relationships, 2);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn applying_a_plan_detects_rows_that_appeared_or_belong_to_others(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a plan creating a Portfolio that did not exist when it was planned,
+    // WHEN a row with that identifier appears for the same user, THEN applying
+    // is a retryable StaleSnapshot; WHEN it instead belongs to another user,
+    // THEN applying is an ownership conflict.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let id = Uuid::from_u128(0x10000000000000000000000000000051);
+    let request = request_of(vec![simple_aggregate(id, "Created", &[])], vec![]);
+    let plan = plan_sync(&repository.load_sync_snapshot(USER_ID).await?, &request);
+
+    sqlx::query(
+        "INSERT INTO portfolios (id, user_id, name, currency, deleted, last_updated_at)
+         VALUES ($1, $2, 'Appeared', 'EUR', FALSE, NOW())",
+    )
+    .bind(id)
+    .bind(USER_ID)
+    .execute(&pool)
+    .await?;
+    assert!(matches!(
+        repository.apply_sync_plan(USER_ID, &plan).await,
+        Err(PortfolioRepositoryError::StaleSnapshot)
+    ));
+
+    sqlx::query("UPDATE portfolios SET user_id = $2 WHERE id = $1")
+        .bind(id)
+        .bind(OTHER_USER_ID)
+        .execute(&pool)
+        .await?;
+    assert!(matches!(
+        repository.apply_sync_plan(USER_ID, &plan).await,
+        Err(PortfolioRepositoryError::OwnershipConflict(OwnershipConflict::Portfolio { id: conflict }))
+            if conflict == id
+    ));
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn concurrent_insert_of_the_same_portfolio_is_a_retryable_stale_snapshot(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a plan creating a Portfolio and an uncommitted transaction of another
+    // connection that inserts the same identifier (invisible to the plan's
+    // verification, so the insert waits on the unique index),
+    // WHEN the other transaction commits, THEN the unique violation surfaces as
+    // a retryable StaleSnapshot, and re-planning then sees the row.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let id = Uuid::from_u128(0x10000000000000000000000000000061);
+    let request = request_of(vec![simple_aggregate(id, "Created", &[])], vec![]);
+    let plan = plan_sync(&repository.load_sync_snapshot(USER_ID).await?, &request);
+
+    let mut competing = pool.begin().await?;
+    sqlx::query(
+        "INSERT INTO portfolios (id, user_id, name, currency, deleted, last_updated_at)
+         VALUES ($1, $2, 'Competing', 'EUR', FALSE, '2020-01-01T00:00:00Z')",
+    )
+    .bind(id)
+    .bind(USER_ID)
+    .execute(&mut *competing)
+    .await?;
+
+    let applying = {
+        let repository = repository.clone();
+        tokio::spawn(async move { repository.apply_sync_plan(USER_ID, &plan).await })
+    };
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    competing.commit().await?;
+
+    let error = applying.await?.unwrap_err();
+    assert!(matches!(error, PortfolioRepositoryError::StaleSnapshot));
+    assert!(error.is_retryable_concurrency());
+
+    let replanned = plan_sync(&repository.load_sync_snapshot(USER_ID).await?, &request);
+    assert_eq!(replanned.writes[0].kind, WriteKind::Update);
+    repository.apply_sync_plan(USER_ID, &replanned).await?;
+    let name: String = sqlx::query_scalar("SELECT name FROM portfolios WHERE id = $1")
+        .bind(id)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(name, "Created");
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn one_plan_writes_several_portfolios_sharing_assets_and_matches_a_reload(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN one plan that empties the stored Portfolio, creates a Simple
+    // Portfolio (with a hidden class target and a sub-microsecond timestamp)
+    // and a Strategic one, both holding the same shared assets,
+    // WHEN it is applied once,
+    // THEN every Portfolio, relationship, allocation and class target is
+    // stored, shared assets are not duplicated, and a fresh snapshot projects
+    // exactly to the response the plan promised.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let simple_id = Uuid::from_u128(0x10000000000000000000000000000071);
+    let strategic_id = Uuid::from_u128(0x10000000000000000000000000000072);
+    let emptied = simple_aggregate(PORTFOLIO_ID, "Emptied", &[]);
+    let mut simple_portfolio = simple_aggregate(
+        simple_id,
+        "Simple",
+        &[("VWCE", dec!(60.50)), ("CASH", dec!(39.50))],
+    );
+    simple_portfolio.last_updated_at += chrono::Duration::nanoseconds(789);
+    simple_portfolio.strategic_allocation = Some(StrategicAllocationV2 {
+        asset_class_targets: vec![StrategicAssetClassTargetV2 {
+            asset_class: AssetClass::Equity,
+            target_weight: dec!(100),
+        }],
+        asset_targets: Vec::new(),
+    });
+    let strategic_portfolio = PortfolioV2 {
+        id: strategic_id,
+        name: "Strategic".to_string(),
+        allocation_mode: AllocationMode::Strategic,
+        assets: vec![v2_asset("VWCE"), v2_asset("CASH")],
+        strategic_allocation: Some(StrategicAllocationV2 {
+            asset_class_targets: vec![
+                StrategicAssetClassTargetV2 {
+                    asset_class: AssetClass::Cash,
+                    target_weight: dec!(30.0),
+                },
+                StrategicAssetClassTargetV2 {
+                    asset_class: AssetClass::Equity,
+                    target_weight: dec!(70.0),
+                },
+            ],
+            asset_targets: vec![StrategicAssetTargetV2 {
+                asset: v2_ref("VWCE"),
+                relative_target_weight: dec!(100.00),
+            }],
+        }),
+        ..simple_aggregate(strategic_id, "Strategic", &[])
+    };
+    let request = request_of(vec![emptied, simple_portfolio, strategic_portfolio], vec![]);
+    let plan = plan_sync(&repository.load_sync_snapshot(USER_ID).await?, &request);
+
+    repository.apply_sync_plan(USER_ID, &plan).await?;
+
+    let relationships: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT pa.portfolio_id, ad.symbol
+         FROM portfolio_asset AS pa JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         ORDER BY pa.portfolio_id, ad.symbol",
+    )
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(
+        relationships,
+        vec![
+            (simple_id, "CASH".to_string()),
+            (simple_id, "VWCE".to_string()),
+            (strategic_id, "CASH".to_string()),
+            (strategic_id, "VWCE".to_string()),
+        ]
+    );
+    let shared: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_data")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(shared, 2);
+    let allocations: Vec<(Uuid, String, Decimal)> = sqlx::query_as(
+        "SELECT paa.portfolio_id, ad.symbol, paa.weight
+         FROM portfolio_asset_allocation AS paa
+         JOIN portfolio_asset AS pa ON pa.id = paa.portfolio_asset_id
+         JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+         ORDER BY paa.portfolio_id, ad.symbol",
+    )
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(
+        allocations,
+        vec![
+            (simple_id, "CASH".to_string(), dec!(39.50)),
+            (simple_id, "VWCE".to_string(), dec!(60.50)),
+            (strategic_id, "CASH".to_string(), dec!(0)),
+            (strategic_id, "VWCE".to_string(), dec!(100.00)),
+        ]
+    );
+    let class_targets: Vec<(Uuid, i16)> = sqlx::query_as(
+        "SELECT portfolio_id, asset_class FROM strategic_asset_class_targets
+         ORDER BY portfolio_id, asset_class",
+    )
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(class_targets.len(), 3);
+
+    // The plan's promised response equals what a later read projects.
+    let reloaded = plan_sync(
+        &repository.load_sync_snapshot(USER_ID).await?,
+        &request_of(vec![], vec![]),
+    );
+    let by_id = |portfolios: &[PortfolioV2]| {
+        let mut sorted = portfolios.to_vec();
+        sorted.sort_by_key(|portfolio| portfolio.id);
+        sorted
+    };
+    assert_eq!(
+        by_id(&reloaded.response.updated_portfolios),
+        by_id(&plan.response.updated_portfolios)
+    );
+    assert!(reloaded.response.deleted_portfolios.is_empty());
 
     Ok(())
 }

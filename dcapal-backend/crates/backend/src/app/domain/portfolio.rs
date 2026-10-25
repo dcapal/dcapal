@@ -47,7 +47,10 @@ impl Provider {
 }
 
 /// Asset class used by Portfolio allocation rules.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
+///
+/// The declaration order is the canonical ordering of class targets in
+/// synchronization responses (it matches the stored class codes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
 pub enum AssetClass {
     /// Assets with no more specific classification.
     Other,
