@@ -22,32 +22,6 @@ ALTER TABLE portfolio_asset
     ADD CONSTRAINT fk_portfolio_asset_portfolio_id
         FOREIGN KEY (portfolio_id) REFERENCES portfolios (id) ON DELETE CASCADE;
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conrelid = 'portfolios'::regclass
-          AND conname = 'portfolios_allocation_mode_check'
-    ) THEN
-        ALTER TABLE portfolios
-            ADD CONSTRAINT portfolios_allocation_mode_check
-            CHECK (allocation_mode IN (1, 2));
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conrelid = 'portfolios'::regclass
-          AND conname = 'portfolios_drift_band_check'
-    ) THEN
-        ALTER TABLE portfolios
-            ADD CONSTRAINT portfolios_drift_band_check
-            CHECK (drift_band IS NULL OR (drift_band >= 0 AND drift_band <= 100));
-    END IF;
-END
-$$;
-
 -- A composite foreign key keeps an allocation tied to the same Portfolio as
 -- its Portfolio Asset relationship.
 DO $$
@@ -75,9 +49,7 @@ CREATE TABLE portfolio_asset_allocation (
     CONSTRAINT portfolio_asset_allocation_portfolio_asset_fk
         FOREIGN KEY (portfolio_id, portfolio_asset_id)
         REFERENCES portfolio_asset (portfolio_id, id)
-        ON DELETE CASCADE,
-    CONSTRAINT portfolio_asset_allocation_weight_check
-        CHECK (weight >= 0 AND weight <= 100)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE strategic_asset_class_targets (
@@ -89,18 +61,15 @@ CREATE TABLE strategic_asset_class_targets (
     PRIMARY KEY (portfolio_id, asset_class),
     CONSTRAINT strategic_asset_class_targets_portfolio_fk
         FOREIGN KEY (portfolio_id) REFERENCES portfolios (id)
-        ON DELETE CASCADE,
-    CONSTRAINT strategic_asset_class_targets_weight_check
-        CHECK (target_weight >= 0 AND target_weight <= 100),
-    CONSTRAINT strategic_asset_class_targets_class_check
-        CHECK (asset_class BETWEEN 0 AND 5)
+        ON DELETE CASCADE
 );
 
 -- Existing v1 targets are absolute Portfolio targets. Copy valid values before
--- the legacy column is removed. Legacy data predates the allocation check, so
--- an invalid value is left without an allocation rather than being clamped or
--- causing the whole migration to fail. Reads treat a missing allocation as
--- zero, and the next synchronization must provide a valid target.
+-- the legacy column is removed. Range validation lives in the application, and
+-- legacy data was never range-checked, so an out-of-range value is malformed:
+-- it is dropped (the asset is left without an allocation) rather than clamped
+-- or allowed to fail the migration. Reads treat a missing allocation as zero,
+-- and the next synchronization must provide a valid target.
 DO $$
 DECLARE
     skipped_target_count BIGINT;

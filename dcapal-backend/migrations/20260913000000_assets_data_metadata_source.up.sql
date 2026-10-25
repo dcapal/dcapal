@@ -3,5 +3,4 @@
 -- column), 1 = confirmed by the asset's provider. The default keeps older
 -- backend binaries, whose INSERTs omit the column, working against this schema.
 ALTER TABLE assets_data
-    ADD COLUMN metadata_source SMALLINT NOT NULL DEFAULT 0,
-    ADD CONSTRAINT assets_data_metadata_source_check CHECK (metadata_source IN (0, 1));
+    ADD COLUMN metadata_source SMALLINT NOT NULL DEFAULT 0;

@@ -26,8 +26,6 @@ ALTER TABLE portfolio_asset
         FOREIGN KEY (portfolio_id) REFERENCES portfolios (id);
 
 ALTER TABLE portfolios
-    DROP CONSTRAINT IF EXISTS portfolios_allocation_mode_check,
-    DROP CONSTRAINT IF EXISTS portfolios_drift_band_check,
     DROP COLUMN IF EXISTS allocation_mode,
     DROP COLUMN IF EXISTS drift_band,
     DROP COLUMN IF EXISTS strategic_allocation_present;
