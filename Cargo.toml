@@ -50,7 +50,7 @@ log = "0.4.34"
 metrics = "0.24.6"
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["http-listener"] }
 num_enum = "0.7.6"
-parking_lot = "0.12.5"
+parking_lot = "0.13.0"
 rand = "0.10.3"
 redis = { version = "1.8.0", default-features = false, features = ["tokio-comp"] }
 reqwest = { version = "0.13.5", default-features = false, features = [
