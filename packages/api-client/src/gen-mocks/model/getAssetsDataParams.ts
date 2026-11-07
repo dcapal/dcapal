@@ -6,8 +6,6 @@
  */
 
 export type GetAssetsDataParams = {
-/**
- * Asset name query.
- */
-name: string;
+  /** Asset name query. */
+  name: string;
 };

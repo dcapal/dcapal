@@ -6,8 +6,6 @@
  */
 
 export type LookupAssetsV2Params = {
-/**
- * Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`. Repeat the parameter for several assets (1 to 20 per call).
- */
-asset: string[];
+  /** Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`. Repeat the parameter for several assets (1 to 20 per call). */
+  asset: string[];
 };

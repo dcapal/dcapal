@@ -6,12 +6,8 @@
  */
 
 export type GetAssetsChartParams = {
-/**
- * Chart start timestamp (unix seconds).
- */
-startPeriod: number;
-/**
- * Chart end timestamp (unix seconds).
- */
-endPeriod: number;
+  /** Chart start timestamp (unix seconds). */
+  startPeriod: number;
+  /** Chart end timestamp (unix seconds). */
+  endPeriod: number;
 };

@@ -13,6 +13,8 @@ import {
   http
 } from 'msw';
 import type {
+  HttpResponseResolver,
+  PathParams,
   RequestHandlerOptions
 } from 'msw';
 
@@ -21,11 +23,14 @@ import {
 } from './model';
 import type {
   Asset,
+  ImportPortfolioBody,
   ImportPortfolioResponse,
   LookupAssetsV2Response,
   Price,
   StrategicAllocationV2Response,
+  SyncPortfoliosRequest,
   SyncPortfoliosResponse,
+  SyncPortfoliosV2Request,
   SyncPortfoliosV2Response,
   TransactionFeesResponse,
   TransactionFeesV2Response,
@@ -43,9 +48,9 @@ export const getGetAssetsChartResponseYahooChartIndicatorsMock = (overrideRespon
 
 export const getGetAssetsChartResponseYahooChartMetaMock = (overrideResponse: Partial<YahooChartMeta> = {}): YahooChartMeta => ({...{currency: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null])}, ...overrideResponse});
 
-export const getGetAssetsChartResponseYahooChartPayloadMock = (overrideResponse: Partial<YahooChartPayload> = {}): YahooChartPayload => ({...{error: faker.helpers.arrayElement([{}, undefined]), result: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({indicators: faker.helpers.arrayElement([null,{...getGetAssetsChartResponseYahooChartIndicatorsMock()},]), meta: faker.helpers.arrayElement([null,{...getGetAssetsChartResponseYahooChartMetaMock()},])})), null])}, ...overrideResponse});
+export const getGetAssetsChartResponseYahooChartPayloadMock = (overrideResponse: Partial<YahooChartPayload> = {}): YahooChartPayload => ({...{error: faker.helpers.arrayElement([{}, undefined]), result: faker.helpers.arrayElement([Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({indicators: faker.helpers.arrayElement([{...getGetAssetsChartResponseYahooChartIndicatorsMock()},null,]), meta: faker.helpers.arrayElement([{...getGetAssetsChartResponseYahooChartMetaMock()},null,])})), null])}, ...overrideResponse});
 
-export const getGetAssetsChartResponseMock = (overrideResponse: Partial<Extract<YahooChartResponse, object>> = {}): YahooChartResponse => ({chart: faker.helpers.arrayElement([null,{...getGetAssetsChartResponseYahooChartPayloadMock()},]), ...overrideResponse})
+export const getGetAssetsChartResponseMock = (overrideResponse: Partial<Extract<YahooChartResponse, object>> = {}): YahooChartResponse => ({chart: faker.helpers.arrayElement([{...getGetAssetsChartResponseYahooChartPayloadMock()},null,]), ...overrideResponse})
 
 export const getGetAssetsCryptoResponseMock = (): Asset[] => (Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.helpers.arrayElement([{...{id: faker.string.alpha({length: {min: 10, max: 20}}), symbol: faker.string.alpha({length: {min: 10, max: 20}})},...{type: faker.helpers.arrayElement(['Crypto'] as const)},},{...{id: faker.string.alpha({length: {min: 10, max: 20}}), symbol: faker.string.alpha({length: {min: 10, max: 20}})},...{type: faker.helpers.arrayElement(['Fiat'] as const)},},]))))
 
@@ -61,7 +66,7 @@ export const getGetPriceResponseMock = (overrideResponse: Partial<Extract<Price,
 
 export const getSyncPortfoliosResponseTransactionFeesResponseMock = (overrideResponse: Partial<TransactionFeesResponse> = {}): TransactionFeesResponse => ({...{feeStructure: faker.helpers.arrayElement([{type: faker.helpers.arrayElement(['zeroFee'] as const)},{feeAmount: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['fixed'] as const)},{feeRate: faker.string.alpha({length: {min: 10, max: 20}}), maxFee: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), minFee: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['variable'] as const)},]), maxFeeImpact: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null])}, ...overrideResponse});
 
-export const getSyncPortfoliosResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosResponse, object>> = {}): SyncPortfoliosResponse => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclass: faker.helpers.arrayElement(['EQUITY','BOND','CURRENCY','CRYPTO','COMMODITY','OTHER'] as const), averageBuyPrice: faker.string.alpha({length: {min: 10, max: 20}}), baseCcy: faker.string.alpha({length: {min: 10, max: 20}}), fees: faker.helpers.arrayElement([null,{...getSyncPortfoliosResponseTransactionFeesResponseMock()},]), name: faker.string.alpha({length: {min: 10, max: 20}}), price: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['DCAPal','YF'] as const), qty: faker.string.alpha({length: {min: 10, max: 20}}), symbol: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.string.alpha({length: {min: 10, max: 20}})})), fees: faker.helpers.arrayElement([null,{...getSyncPortfoliosResponseTransactionFeesResponseMock()},]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCcy: faker.string.alpha({length: {min: 10, max: 20}})})), ...overrideResponse})
+export const getSyncPortfoliosResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosResponse, object>> = {}): SyncPortfoliosResponse => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclass: faker.helpers.arrayElement(['EQUITY','BOND','CURRENCY','CRYPTO','COMMODITY','OTHER'] as const), averageBuyPrice: faker.string.alpha({length: {min: 10, max: 20}}), baseCcy: faker.string.alpha({length: {min: 10, max: 20}}), fees: faker.helpers.arrayElement([{...getSyncPortfoliosResponseTransactionFeesResponseMock()},null,]), name: faker.string.alpha({length: {min: 10, max: 20}}), price: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['DCAPal','YF'] as const), qty: faker.string.alpha({length: {min: 10, max: 20}}), symbol: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.string.alpha({length: {min: 10, max: 20}})})), fees: faker.helpers.arrayElement([{...getSyncPortfoliosResponseTransactionFeesResponseMock()},null,]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCcy: faker.string.alpha({length: {min: 10, max: 20}})})), ...overrideResponse})
 
 export const getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock = (overrideResponse: Partial<TransactionFeesV2Response> = {}): TransactionFeesV2Response => ({...{feeStructure: faker.helpers.arrayElement([{type: faker.helpers.arrayElement(['zeroFee'] as const)},{feeAmount: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['fixed'] as const)},{feeRate: faker.string.alpha({length: {min: 10, max: 20}}), maxFee: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), minFee: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), type: faker.helpers.arrayElement(['variable'] as const)},]), maxFeeImpact: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null])}, ...overrideResponse});
 
@@ -70,8 +75,8 @@ export const getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock = (ove
 export const getSyncPortfoliosV2ResponseMock = (overrideResponse: Partial<Extract<SyncPortfoliosV2Response, object>> = {}): SyncPortfoliosV2Response => ({deletedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.uuid())), updatedPortfolios: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({allocationMode: faker.helpers.arrayElement(Object.values(AllocationModeWire)), assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclassOverride: faker.helpers.arrayElement([faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), null]), asset: {provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})}, averageBuyPrice: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), fees: faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), manualPrice: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), quantity: faker.string.alpha({length: {min: 10, max: 20}}), targetWeight: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null])})), driftBand: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), fees: faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseTransactionFeesV2ResponseMock()},]), id: faker.string.uuid(), lastUpdatedAt: faker.date.past().toISOString().slice(0, 19) + 'Z', name: faker.string.alpha({length: {min: 10, max: 20}}), quoteCurrency: faker.string.alpha({length: {min: 10, max: 20}}), strategicAllocation: faker.helpers.arrayElement([null,{...getSyncPortfoliosV2ResponseStrategicAllocationV2ResponseMock()},])})), ...overrideResponse})
 
 
-export const getRootMockHandler = (overrideResponse?: string | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
-  return http.get('*/', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getRootMockHandler = (overrideResponse?: string | ((info: Parameters<HttpResponseResolver>[0]) => Promise<string> | string), options?: RequestHandlerOptions) => {
+  return http.get('*/', async (info: Parameters<HttpResponseResolver>[0]) => {
 
   const resolvedBody = overrideResponse !== undefined
     ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
@@ -83,8 +88,8 @@ export const getRootMockHandler = (overrideResponse?: string | ((info: Parameter
   }, options)
 }
 
-export const getGetAssetsChartMockHandler = (overrideResponse?: YahooChartResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<YahooChartResponse> | YahooChartResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/assets/chart/:symbol', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getGetAssetsChartMockHandler = (overrideResponse?: YahooChartResponse | ((info: Parameters<HttpResponseResolver<{ symbol: string }>>[0]) => Promise<YahooChartResponse> | YahooChartResponse), options?: RequestHandlerOptions) => {
+  return http.get<{ symbol: string }>('*/assets/chart/:symbol', async (info: Parameters<HttpResponseResolver<{ symbol: string }>>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -95,8 +100,8 @@ export const getGetAssetsChartMockHandler = (overrideResponse?: YahooChartRespon
   }, options)
 }
 
-export const getGetAssetsCryptoMockHandler = (overrideResponse?: Asset[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<Asset[]> | Asset[]), options?: RequestHandlerOptions) => {
-  return http.get('*/assets/crypto', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getGetAssetsCryptoMockHandler = (overrideResponse?: Asset[] | ((info: Parameters<HttpResponseResolver>[0]) => Promise<Asset[]> | Asset[]), options?: RequestHandlerOptions) => {
+  return http.get('*/assets/crypto', async (info: Parameters<HttpResponseResolver>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -107,8 +112,8 @@ export const getGetAssetsCryptoMockHandler = (overrideResponse?: Asset[] | ((inf
   }, options)
 }
 
-export const getGetAssetsFiatMockHandler = (overrideResponse?: Asset[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<Asset[]> | Asset[]), options?: RequestHandlerOptions) => {
-  return http.get('*/assets/fiat', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getGetAssetsFiatMockHandler = (overrideResponse?: Asset[] | ((info: Parameters<HttpResponseResolver>[0]) => Promise<Asset[]> | Asset[]), options?: RequestHandlerOptions) => {
+  return http.get('*/assets/fiat', async (info: Parameters<HttpResponseResolver>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -119,8 +124,8 @@ export const getGetAssetsFiatMockHandler = (overrideResponse?: Asset[] | ((info:
   }, options)
 }
 
-export const getGetAssetsDataMockHandler = (overrideResponse?: YahooSearchResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<YahooSearchResponse> | YahooSearchResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/assets/search', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getGetAssetsDataMockHandler = (overrideResponse?: YahooSearchResponse | ((info: Parameters<HttpResponseResolver>[0]) => Promise<YahooSearchResponse> | YahooSearchResponse), options?: RequestHandlerOptions) => {
+  return http.get('*/assets/search', async (info: Parameters<HttpResponseResolver>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -131,8 +136,8 @@ export const getGetAssetsDataMockHandler = (overrideResponse?: YahooSearchRespon
   }, options)
 }
 
-export const getImportPortfolioMockHandler = (overrideResponse?: ImportPortfolioResponse | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<ImportPortfolioResponse> | ImportPortfolioResponse), options?: RequestHandlerOptions) => {
-  return http.post('*/import/portfolio', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+export const getImportPortfolioMockHandler = (overrideResponse?: ImportPortfolioResponse | ((info: Parameters<HttpResponseResolver<PathParams, ImportPortfolioBody>>[0]) => Promise<ImportPortfolioResponse> | ImportPortfolioResponse), options?: RequestHandlerOptions) => {
+  return http.post<PathParams, ImportPortfolioBody>('*/import/portfolio', async (info: Parameters<HttpResponseResolver<PathParams, ImportPortfolioBody>>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -143,8 +148,8 @@ export const getImportPortfolioMockHandler = (overrideResponse?: ImportPortfolio
   }, options)
 }
 
-export const getGetImportedPortfolioMockHandler = (overrideResponse?: unknown | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<unknown> | unknown), options?: RequestHandlerOptions) => {
-  return http.get('*/import/portfolio/:id', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getGetImportedPortfolioMockHandler = (overrideResponse?: unknown | ((info: Parameters<HttpResponseResolver<{ id: string }>>[0]) => Promise<unknown> | unknown), options?: RequestHandlerOptions) => {
+  return http.get<{ id: string }>('*/import/portfolio/:id', async (info: Parameters<HttpResponseResolver<{ id: string }>>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -153,8 +158,8 @@ export const getGetImportedPortfolioMockHandler = (overrideResponse?: unknown | 
   }, options)
 }
 
-export const getLookupAssetsV2MockHandler = (overrideResponse?: LookupAssetsV2Response | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<LookupAssetsV2Response> | LookupAssetsV2Response), options?: RequestHandlerOptions) => {
-  return http.get('*/markets/v2/assets/lookup', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getLookupAssetsV2MockHandler = (overrideResponse?: LookupAssetsV2Response | ((info: Parameters<HttpResponseResolver>[0]) => Promise<LookupAssetsV2Response> | LookupAssetsV2Response), options?: RequestHandlerOptions) => {
+  return http.get('*/markets/v2/assets/lookup', async (info: Parameters<HttpResponseResolver>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -165,8 +170,8 @@ export const getLookupAssetsV2MockHandler = (overrideResponse?: LookupAssetsV2Re
   }, options)
 }
 
-export const getGetPriceMockHandler = (overrideResponse?: Price | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<Price> | Price), options?: RequestHandlerOptions) => {
-  return http.get('*/price/:asset', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+export const getGetPriceMockHandler = (overrideResponse?: Price | ((info: Parameters<HttpResponseResolver<{ asset: string }>>[0]) => Promise<Price> | Price), options?: RequestHandlerOptions) => {
+  return http.get<{ asset: string }>('*/price/:asset', async (info: Parameters<HttpResponseResolver<{ asset: string }>>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -177,8 +182,8 @@ export const getGetPriceMockHandler = (overrideResponse?: Price | ((info: Parame
   }, options)
 }
 
-export const getSyncPortfoliosMockHandler = (overrideResponse?: SyncPortfoliosResponse | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<SyncPortfoliosResponse> | SyncPortfoliosResponse), options?: RequestHandlerOptions) => {
-  return http.post('*/v1/sync/portfolios', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+export const getSyncPortfoliosMockHandler = (overrideResponse?: SyncPortfoliosResponse | ((info: Parameters<HttpResponseResolver<PathParams, SyncPortfoliosRequest>>[0]) => Promise<SyncPortfoliosResponse> | SyncPortfoliosResponse), options?: RequestHandlerOptions) => {
+  return http.post<PathParams, SyncPortfoliosRequest>('*/v1/sync/portfolios', async (info: Parameters<HttpResponseResolver<PathParams, SyncPortfoliosRequest>>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -189,8 +194,8 @@ export const getSyncPortfoliosMockHandler = (overrideResponse?: SyncPortfoliosRe
   }, options)
 }
 
-export const getSyncPortfoliosV2MockHandler = (overrideResponse?: SyncPortfoliosV2Response | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<SyncPortfoliosV2Response> | SyncPortfoliosV2Response), options?: RequestHandlerOptions) => {
-  return http.post('*/v2/sync/portfolios', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+export const getSyncPortfoliosV2MockHandler = (overrideResponse?: SyncPortfoliosV2Response | ((info: Parameters<HttpResponseResolver<PathParams, SyncPortfoliosV2Request>>[0]) => Promise<SyncPortfoliosV2Response> | SyncPortfoliosV2Response), options?: RequestHandlerOptions) => {
+  return http.post<PathParams, SyncPortfoliosV2Request>('*/v2/sync/portfolios', async (info: Parameters<HttpResponseResolver<PathParams, SyncPortfoliosV2Request>>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined

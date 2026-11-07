@@ -171,7 +171,10 @@ mod tests {
             .as_ref()
             .expect("missing chart params")
             .iter()
-            .map(|parameter| parameter.name.clone())
+            .filter_map(|parameter| match parameter {
+                RefOr::T(parameter) => Some(parameter.name.clone()),
+                RefOr::Ref(_) => None,
+            })
             .collect();
 
         assert!(param_names.contains(&"startPeriod".to_string()));
@@ -412,7 +415,10 @@ mod tests {
             RefOr::T(r) => r,
         };
 
-        let json_content = response.content.get("application/json")?;
+        let json_content = match response.content.get("application/json")? {
+            RefOr::T(content) => content,
+            RefOr::Ref(_) => return None,
+        };
         let schema = json_content.schema.as_ref()?;
 
         match schema {

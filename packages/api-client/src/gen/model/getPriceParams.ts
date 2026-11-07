@@ -6,8 +6,6 @@
  */
 
 export type GetPriceParams = {
-/**
- * Quote currency.
- */
-quote: string;
+  /** Quote currency. */
+  quote: string;
 };

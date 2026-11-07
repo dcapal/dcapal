@@ -7,5 +7,5 @@
 import type { YahooChartPayload } from './yahooChartPayload';
 
 export interface YahooChartResponse {
-  chart?: null | YahooChartPayload;
+  chart?: YahooChartPayload | null;
 }

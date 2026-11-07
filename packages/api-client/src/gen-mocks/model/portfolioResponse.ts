@@ -13,7 +13,7 @@ import type { TransactionFeesResponse } from './transactionFeesResponse';
 export interface PortfolioResponse {
   /** The assets held by the portfolio. */
   assets: PortfolioAssetResponse[];
-  fees?: null | TransactionFeesResponse;
+  fees?: TransactionFeesResponse | null;
   /** The portfolio identifier. */
   id: string;
   /** The timestamp used to compare this state with a client copy. */

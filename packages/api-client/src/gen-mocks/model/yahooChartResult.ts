@@ -8,6 +8,6 @@ import type { YahooChartIndicators } from './yahooChartIndicators';
 import type { YahooChartMeta } from './yahooChartMeta';
 
 export interface YahooChartResult {
-  indicators?: null | YahooChartIndicators;
-  meta?: null | YahooChartMeta;
+  indicators?: YahooChartIndicators | null;
+  meta?: YahooChartMeta | null;
 }

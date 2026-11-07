@@ -12,7 +12,7 @@ import type { TransactionFeesRequest } from './transactionFeesRequest';
  */
 export interface PortfolioRequest {
   assets: PortfolioAssetRequest[];
-  fees?: null | TransactionFeesRequest;
+  fees?: TransactionFeesRequest | null;
   id: string;
   lastUpdatedAt: string;
   name: string;

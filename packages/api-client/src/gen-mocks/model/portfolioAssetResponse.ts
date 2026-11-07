@@ -20,7 +20,7 @@ export interface PortfolioAssetResponse {
   averageBuyPrice: string;
   /** The asset currency. */
   baseCcy: string;
-  fees?: null | TransactionFeesResponse;
+  fees?: TransactionFeesResponse | null;
   /** The asset display name. */
   name: string;
   /** The latest known price. */
