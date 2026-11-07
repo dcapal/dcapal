@@ -35,26 +35,6 @@ export interface DriftSnapshot {
   largestGap: DriftRowModel | null;
 }
 
-/** A Portfolio Asset inside a class group, with its share of the class target. */
-export interface ClassDriftAsset extends DriftRowModel {
-  /** Relative target weight: the asset target over its class target, in percent. */
-  shareOfClass: number;
-}
-
-/** One asset class compared with its class target, with its assets nested below. */
-export interface ClassDriftGroup {
-  assetClass: AssetClass;
-  label: string;
-  /** Current weight of the class, in percent of the Portfolio. */
-  currentWeight: number;
-  /** Asset-class target weight: the sum of its assets' absolute targets. */
-  targetWeight: number;
-  /** Current weight minus class target, in percentage points. */
-  driftPp: number;
-  /** Assets of the class, widest gap first. */
-  assets: ClassDriftAsset[];
-}
-
 /** The investor's inputs for one Invest journey. */
 export interface InvestmentPlan {
   strategy: InvestmentStrategy;

@@ -16,7 +16,7 @@ export type DriftState = "over" | "under" | "on-target";
 
 /** Columns a portfolio asset table or card list can be ordered by. */
 export type PortfolioAssetSortKey =
-  "name" | "class" | "value" | "current" | "target" | "drift";
+  "name" | "class" | "value" | "current" | "target" | "drift" | "gap";
 
 export type SortDirection = "asc" | "desc";
 
@@ -120,6 +120,11 @@ export const driftStateLabels: Record<DriftState, string> = {
   under: "Under target",
   "on-target": "On target",
 };
+
+/** "1 asset" / "3 assets": the count wording used wherever assets are tallied. */
+export function assetCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "asset" : "assets"}`;
+}
 
 /** Muted place or denomination shown beside an asset class. */
 export function assetRegion(
@@ -226,6 +231,8 @@ function sortValue(
         return entry.targetWeight;
       case "drift":
         return entry.driftPp;
+      case "gap":
+        return Math.abs(entry.driftPp);
     }
   }
   const { group } = subject;
@@ -241,6 +248,8 @@ function sortValue(
       return group.targetWeight;
     case "drift":
       return group.driftPp;
+    case "gap":
+      return Math.abs(group.driftPp);
   }
 }
 
@@ -303,6 +312,12 @@ export function normalizePortfolioAssetSort(
     ? defaultPortfolioAssetSort
     : sort;
 }
+
+/** Ordering for drift views: the widest gap from target, either side, first. */
+export const largestGapPortfolioAssetSort: PortfolioAssetSort = {
+  key: "gap",
+  direction: "desc",
+};
 
 /**
  * Next ordering after the investor activates a column header: the same column

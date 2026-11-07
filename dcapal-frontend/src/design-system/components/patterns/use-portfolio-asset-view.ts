@@ -27,11 +27,10 @@ export interface PortfolioAssetViewState {
 /** Owns the ordering and the collapsed asset classes of one asset view. */
 export function usePortfolioAssetViewState(
   defaultCollapsedClasses: readonly AssetClass[] = [],
-  mode: PortfolioAssetMode = "simple"
+  mode: PortfolioAssetMode = "simple",
+  initialSort: PortfolioAssetSort = defaultPortfolioAssetSort
 ): PortfolioAssetViewState {
-  const [rawSort, setSort] = React.useState<PortfolioAssetSort>(
-    defaultPortfolioAssetSort
-  );
+  const [rawSort, setSort] = React.useState<PortfolioAssetSort>(initialSort);
   const [collapsedClasses, setCollapsed] = React.useState<
     readonly AssetClass[]
   >(defaultCollapsedClasses);
@@ -50,7 +49,7 @@ export function usePortfolioAssetViewState(
           )
         ),
       setSort: (next) => setSort(next),
-      resetSort: () => setSort(defaultPortfolioAssetSort),
+      resetSort: () => setSort(initialSort),
       collapsedClasses,
       onToggleClass: (assetClass) =>
         setCollapsed((current) =>
@@ -59,6 +58,6 @@ export function usePortfolioAssetViewState(
             : [...current, assetClass]
         ),
     }),
-    [sort, collapsedClasses, mode]
+    [sort, collapsedClasses, mode, initialSort]
   );
 }

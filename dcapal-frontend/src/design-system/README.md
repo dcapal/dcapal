@@ -119,11 +119,33 @@ Search results and unpriced results use the shared neutral `AssetTickerChip`.
 
 ### Portfolio asset collection
 
-`PortfolioAssetCollection` is the only component that shows portfolio assets.
-Overview, asset-management and edit surfaces all render it; do not build a
-second holdings table or card list. It owns one `mode` and one sort and
-collapse state, and renders a table (from 48rem) and cards (below 48rem) from
-the same model, so both always agree.
+`PortfolioAssetCollection` is the one component that lists portfolio
+holdings. The Overview, Edit and remove asset, Invest drift overview and the
+`Patterns / Portfolio` stories all render it, in Simple and Strategic mode, as
+a table from 48rem and as cards below it, so asset identity (name, ticker
+chip, class), class group rows (value, invested, target, drift, share), the
+drift badge, the pinned actions and the mobile cards look the same everywhere.
+Do not build a second holdings table or card list. It owns one `mode` and one
+sort and collapse state, and renders both layouts from the same model.
+
+The plan step's narrow "Where you are today" aside uses it with
+`layout="cards"`, which always shows the shared cards and never the table,
+because the aside cannot fit the table at any viewport width.
+
+Surfaces that are not a holdings list are legitimately different and do not use
+it: search and unpriced results and setup picks (candidates, not holdings),
+portfolio summaries, `ProposedTransactionCollection` (trades to make, with
+quantities and fees), the class-weight and edit dialogs' weight lists (inputs),
+and `AllocationAfterList` (projection bars).
+
+`InvestmentResult` is a change view (Before, After, Change quantities), so it
+keeps its own columns but reuses the shared `PortfolioAssetIdentity` and
+`PortfolioClassIdentity` cells, the `AssetCardShell` and `AssetGroupCardHeader`
+card layouts, and the asset and group row styling. The identity classes
+(`ds-asset-identity`, `ds-class-identity`) are table-independent; only the
+grouped indent is scoped to `ds-table--assets` and `ds-table--result`, and the
+holdings table rules never apply to the transactions table, which keeps its
+stacked `ds-table__asset-identity`.
 
 - `mode` is `simple` (default) or `strategic`; it is controlled with
   `mode` / `onModeChange` or started with `defaultMode`. A segmented
@@ -134,6 +156,13 @@ the same model, so both always agree.
   `targets` passes a stated Strategic allocation (class targets and shares) so
   the table shows them as entered, and `onEditClass` adds an `Edit {Class}`
   button to every class row and class card.
+- Read-only surfaces (the Invest drift overview) pass no `onEdit`,
+  `onEditClass` or `onMenu`: the actions column is then omitted. `defaultSort`
+  sets the first ordering (`largestGapPortfolioAssetSort` orders by absolute
+  drift, widest gap first) and `surface` is exposed as `data-surface`. The
+  collection keeps the 48rem viewport boundary even inside Invest, whose other
+  layouts follow their container width; a table wider than its container
+  scrolls inside its wrapper.
 - `presentation` is the column density: `detailed` (quantity, price, cost
   basis) or `overview` (value, weights and drift only).
 - Simple is a flat list. Detailed adds a dedicated "Asset class" column;
@@ -296,7 +325,7 @@ so the optimizer is not needed to run Storybook.
 The Invest components take `mode: "simple" | "strategic"` (default `simple`,
 which keeps the flat asset lists). In Strategic allocation every step that lists
 assets lists asset classes first and nests the assets below: `DriftOverview` and
-the plan's "Where you are today" (`DriftClassGroupList`), the grouped
+the plan's "Where you are today", the grouped
 `ProposedTransactionCollection` (`groups`), class-level `AllocationAfterList`,
 and the grouped `InvestmentResult`. Class figures are derived, never stored, by
 the pure helpers in `invest-classes.ts`: a class target is the sum of its
@@ -351,8 +380,12 @@ state separately.
 - Keep new design-system source typed and independent of Radix/Vaul.
 - Preserve equivalent mobile and desktop behaviour where a layout changes.
 - Add intentional state stories and accessibility coverage.
-- Use `PortfolioAssetCollection` for every responsive asset presentation; do
-  not introduce a second holdings table for a shell composition.
+- Use `PortfolioAssetCollection` for every holdings list (Overview, Edit and
+  remove, Invest drift) and reuse `PortfolioAssetIdentity` and
+  `PortfolioClassIdentity` for change views such as the Invest result; do not
+  introduce a second holdings table. Search results, setup picks, trades,
+  projection bars and weight-edit lists are not holdings lists and stay
+  separate.
 - Keep first-use metric placeholders and the setup wizard's progress visible in
   every deterministic overview stage until the setup is finished.
 - Keep feature data, queries, validation, and calculations in hooks or pure

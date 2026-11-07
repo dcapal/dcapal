@@ -30,6 +30,7 @@ const sortOptions: { value: PortfolioAssetSortKey; label: string }[] = [
   { value: "current", label: "Current weight" },
   { value: "target", label: "Target weight" },
   { value: "drift", label: "Drift" },
+  { value: "gap", label: "Largest gap" },
 ];
 
 export interface PortfolioAssetTableOptionsProps {

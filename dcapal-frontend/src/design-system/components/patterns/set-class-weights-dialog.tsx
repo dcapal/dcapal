@@ -6,7 +6,7 @@ import {
   type PortfolioAsset,
 } from "../../fixtures/portfolio";
 import { formatDeviation } from "./invest-format";
-import { assetClassOrder } from "./portfolio-asset-groups";
+import { assetClassOrder, assetCountLabel } from "./portfolio-asset-groups";
 import { ResponsiveOverlay } from "./responsive-overlay";
 import { weightInputA11y, WeightInputError } from "./weight-input-error";
 import {
@@ -183,9 +183,7 @@ export function SetClassWeightsDialog({
               <span role="cell" className="ds-class-weights__name">
                 <strong>{label}</strong>
                 <span>
-                  {count === 0
-                    ? "No assets yet"
-                    : `${count} ${count === 1 ? "asset" : "assets"}`}
+                  {count === 0 ? "No assets yet" : assetCountLabel(count)}
                 </span>
               </span>
               <span role="cell">

@@ -462,6 +462,7 @@ export function InvestComposition({
             onUseSuggested={useSuggested}
             drift={investDrift}
             mode={mode}
+            targets={strategicTargets}
             commissions={{
               summary: feeSummary,
               policy: fees.policy,

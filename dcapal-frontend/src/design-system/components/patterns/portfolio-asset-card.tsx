@@ -1,9 +1,11 @@
 import { MoreVertical, Pencil } from "lucide-react";
+import * as React from "react";
 import { AssetTickerChip, IconButton } from "../ui";
 import {
   assetClassLabels,
   formatCurrency,
   formatPercent,
+  type AssetClass,
   type PortfolioAsset,
 } from "../../fixtures/portfolio";
 import { cn } from "../../lib/cn";
@@ -28,6 +30,65 @@ export interface PortfolioAssetCardProps {
   onMenu?: (asset: PortfolioAsset) => void;
 }
 
+export interface AssetCardShellProps {
+  /** Colours the card's left rail. */
+  assetClass: AssetClass;
+  /** Set when the card sits inside an asset-class card. */
+  grouped?: boolean;
+  /** Renders an `li` when the card sits in a list; an `article` otherwise. */
+  as?: "article" | "li";
+  name: React.ReactNode;
+  /** Badges and buttons at the end of the heading line. */
+  trailing?: React.ReactNode;
+  ticker: string;
+  /** Muted text after the ticker chip. */
+  meta?: React.ReactNode;
+  /** Figure at the end of the chip line. */
+  value?: React.ReactNode;
+  /** Extra lines below the chip line. */
+  children?: React.ReactNode;
+  "data-row-kind"?: string;
+}
+
+/**
+ * The presentational layout of every asset card: name and trailing controls,
+ * then the ticker chip with its meta and value. The portfolio asset card and
+ * the Invest result's change card both render it.
+ */
+export function AssetCardShell({
+  assetClass,
+  grouped = false,
+  as: Tag = "article",
+  name,
+  trailing,
+  ticker,
+  meta,
+  value,
+  children,
+  "data-row-kind": rowKind,
+}: AssetCardShellProps) {
+  return (
+    <Tag
+      className={cn("ds-asset-card", grouped && "ds-asset-card--grouped")}
+      data-asset-class={assetClass}
+      data-row-kind={rowKind}
+    >
+      <div className="ds-asset-card__heading">
+        <span className="ds-asset-card__name">{name}</span>
+        <div className="ds-asset-card__trailing">{trailing}</div>
+      </div>
+      <div className="ds-asset-card__line">
+        <AssetTickerChip ticker={ticker} />
+        <span className="ds-asset-card__meta">{meta}</span>
+        {value === undefined ? null : (
+          <span className="ds-asset-card__value">{value}</span>
+        )}
+      </div>
+      {children}
+    </Tag>
+  );
+}
+
 /**
  * The mobile counterpart of a portfolio asset table row. The name wraps beside
  * the drift badge; a second line carries the ticker chip, context and value.
@@ -41,13 +102,13 @@ export function PortfolioAssetCard({
 }: PortfolioAssetCardProps) {
   const { asset } = entry;
   return (
-    <article
-      className={cn("ds-asset-card", grouped && "ds-asset-card--grouped")}
-      data-asset-class={asset.assetClass}
-    >
-      <div className="ds-asset-card__heading">
-        <span className="ds-asset-card__name">{asset.name}</span>
-        <div className="ds-asset-card__trailing">
+    <AssetCardShell
+      assetClass={asset.assetClass}
+      grouped={grouped}
+      name={asset.name}
+      ticker={asset.ticker}
+      trailing={
+        <>
           <PortfolioDriftBadge driftPp={entry.driftPp} />
           {onEdit ? (
             <IconButton
@@ -69,19 +130,15 @@ export function PortfolioAssetCard({
               <MoreVertical size={16} aria-hidden />
             </IconButton>
           ) : null}
-        </div>
-      </div>
-      <div className="ds-asset-card__line">
-        <AssetTickerChip ticker={asset.ticker} />
-        <span className="ds-asset-card__meta">
-          {grouped
-            ? `${formatPercent(entry.currentWeight)} → ${formatPercent(entry.targetWeight)} · ${formatPercent(entry.targetShareOfClass)} of class`
-            : `${assetClassLabels[asset.assetClass]} · ${assetRegion(asset)}`}
-        </span>
-        <span className="ds-asset-card__value">
-          {formatCurrency(asset.value, asset.currency)}
-        </span>
-      </div>
+        </>
+      }
+      meta={
+        grouped
+          ? `${formatPercent(entry.currentWeight)} → ${formatPercent(entry.targetWeight)} · ${formatPercent(entry.targetShareOfClass)} of class`
+          : `${assetClassLabels[asset.assetClass]} · ${assetRegion(asset)}`
+      }
+      value={formatCurrency(asset.value, asset.currency)}
+    >
       {grouped ? null : (
         <div className="ds-asset-card__meta">
           {formatPercent(entry.currentWeight)} now ·{" "}
@@ -98,6 +155,6 @@ export function PortfolioAssetCard({
             : formatCurrency(asset.averageCostBasis, asset.currency)}
         </p>
       ) : null}
-    </article>
+    </AssetCardShell>
   );
 }

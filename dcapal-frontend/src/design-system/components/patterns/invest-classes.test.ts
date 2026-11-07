@@ -2,96 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   classDriftBeforeAfter,
   collapsesToClassRow,
-  classLargestGap,
-  classTotalDriftPp,
   groupAllocationAfterByClass,
-  groupDriftByClass,
   groupProposalByClass,
   groupResultByClass,
 } from "./invest-classes";
-import type {
-  AllocationAfterRow,
-  DriftRowModel,
-  ProposedTransaction,
-} from "./invest-types";
-
-const drift = (
-  id: string,
-  assetClass: DriftRowModel["assetClass"],
-  current: number,
-  target: number
-): DriftRowModel => ({
-  id,
-  name: id,
-  ticker: id.toUpperCase(),
-  assetClass,
-  currentWeight: current,
-  targetWeight: target,
-  driftPp: current - target,
-});
-
-const rows = [
-  drift("vwce", "equities", 32, 30),
-  drift("ieur", "equities", 14, 20),
-  drift("vig", "equities", 16, 15),
-  drift("aggh", "bonds", 2, 25),
-  drift("cash", "cash", 36, 10),
-];
-
-describe("groupDriftByClass", () => {
-  /**
-   * GIVEN five asset rows in three classes
-   * WHEN they are grouped
-   * THEN class targets are summed, classes sort by widest gap first, assets
-   * sort by their own gap and carry their relative share of the class.
-   */
-  it("aggregates classes, orders by gap and derives relative shares", () => {
-    const groups = groupDriftByClass(rows);
-    expect(groups.map((g) => g.assetClass)).toEqual([
-      "cash",
-      "bonds",
-      "equities",
-    ]);
-    const equities = groups[2];
-    expect(equities.targetWeight).toBe(65);
-    expect(equities.currentWeight).toBe(62);
-    expect(equities.driftPp).toBe(-3);
-    expect(equities.assets.map((a) => a.id)).toEqual(["ieur", "vwce", "vig"]);
-    expect(equities.assets[0].shareOfClass).toBeCloseTo(30.77, 1);
-    expect(groups[1].assets[0].shareOfClass).toBe(100);
-  });
-
-  /**
-   * GIVEN drift rows and a stated Strategic allocation with an equities target of 60
-   * WHEN they are grouped with it
-   * THEN the class target and its drift come from the stated target, and each
-   * asset's target is the class target times its stated share.
-   */
-  it("prefers stated class targets and shares over derived ones", () => {
-    const groups = groupDriftByClass(rows, {
-      classTargets: { equities: 60 },
-      shares: { vwce: 50 },
-    });
-    const equities = groups.find((g) => g.assetClass === "equities");
-    expect(equities?.targetWeight).toBe(60);
-    expect(equities?.driftPp).toBe(2);
-    const vwce = equities?.assets.find((a) => a.id === "vwce");
-    expect(vwce?.targetWeight).toBe(30);
-    expect(vwce?.shareOfClass).toBe(50);
-  });
-
-  /**
-   * GIVEN the class groups above
-   * WHEN total drift and the largest gap are measured on classes
-   * THEN they use class weights, not asset weights.
-   */
-  it("measures total drift and largest gap on classes", () => {
-    const groups = groupDriftByClass(rows);
-    expect(classTotalDriftPp(groups)).toBeCloseTo(26, 5);
-    expect(classLargestGap(groups)?.assetClass).toBe("cash");
-    expect(classLargestGap([])).toBeNull();
-  });
-});
+import type { AllocationAfterRow, ProposedTransaction } from "./invest-types";
 
 const after = (
   id: string,

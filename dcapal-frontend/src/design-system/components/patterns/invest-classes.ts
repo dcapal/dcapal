@@ -3,19 +3,12 @@ import { largestGap, totalDriftPp } from "./invest-plan";
 import type {
   AllocationAfterClassGroup,
   AllocationAfterRow,
-  ClassDriftAsset,
-  ClassDriftGroup,
-  DriftRowModel,
   InvestmentProposalModel,
   InvestmentResultChange,
   InvestmentResultModel,
   ProposalClassGroup,
 } from "./invest-types";
-import {
-  assetClassOrder,
-  ratioPercent,
-  type StrategicTargets,
-} from "./portfolio-asset-groups";
+import { assetClassOrder, ratioPercent } from "./portfolio-asset-groups";
 
 /**
  * Class-level view models of the Invest journey in Strategic allocation mode.
@@ -58,61 +51,6 @@ export function collapsesToClassRow(
   memberCount: number
 ): boolean {
   return isClassOnly(assetClass) && memberCount <= 1;
-}
-
-/**
- * Groups drift rows by asset class. Classes and the assets inside them are
- * ordered by the widest gap first; ties keep the canonical class order.
- */
-export function groupDriftByClass(
-  rows: readonly DriftRowModel[],
-  stated?: StrategicTargets
-): ClassDriftGroup[] {
-  return classesInOrder(rows)
-    .map(({ assetClass, members }): ClassDriftGroup => {
-      const currentWeight = sum(members.map((row) => row.currentWeight));
-      const derivedTarget = sum(members.map((row) => row.targetWeight));
-      // A stated Strategic allocation wins over targets derived from the
-      // rows, so class rows and the Invest gate come from one target set.
-      const targetWeight = stated?.classTargets[assetClass] ?? derivedTarget;
-      const assets = members
-        .map((row): ClassDriftAsset => {
-          const share = stated?.shares[row.id];
-          const rowTarget =
-            share === undefined
-              ? row.targetWeight
-              : (targetWeight * share) / 100;
-          return {
-            ...row,
-            targetWeight: rowTarget,
-            driftPp: row.currentWeight - rowTarget,
-            shareOfClass:
-              share ?? ratioPercent(row.targetWeight, derivedTarget),
-          };
-        })
-        .sort((a, b) => Math.abs(b.driftPp) - Math.abs(a.driftPp));
-      return {
-        assetClass,
-        label: assetClassLabels[assetClass],
-        currentWeight,
-        targetWeight,
-        driftPp: currentWeight - targetWeight,
-        assets,
-      };
-    })
-    .sort((a, b) => Math.abs(b.driftPp) - Math.abs(a.driftPp));
-}
-
-/** Total drift measured on class weights, in percentage points. */
-export function classTotalDriftPp(groups: readonly ClassDriftGroup[]): number {
-  return totalDriftPp(groups);
-}
-
-/** The class with the widest gap from its class target, or null when there are none. */
-export function classLargestGap(
-  groups: readonly ClassDriftGroup[]
-): ClassDriftGroup | null {
-  return largestGap(groups);
 }
 
 /**

@@ -18,8 +18,16 @@ import {
   SegmentedControl,
   Skeleton,
 } from "../ui";
-import { DriftClassGroupList, DriftRowList } from "./drift-overview";
-import { classTotalDriftPp, groupDriftByClass } from "./invest-classes";
+import {
+  classTotalDriftPp,
+  driftClassGroups,
+  useDriftAssets,
+} from "./drift-assets";
+import { PortfolioAssetCollection } from "./portfolio-asset-collection";
+import {
+  largestGapPortfolioAssetSort,
+  type StrategicTargets,
+} from "./portfolio-asset-groups";
 import { canContinue } from "./invest-plan";
 import { formatPoints } from "./invest-format";
 import type {
@@ -158,6 +166,11 @@ export interface InvestmentPlanFormProps {
   drift: DriftSnapshot;
   /** Allocation mode: Strategic lists asset classes with their assets nested. Defaults to simple. */
   mode?: AllocationMode;
+  /**
+   * The stated Strategic allocation, as the drift step uses it, so the aside
+   * and the drift step show the same class targets.
+   */
+  targets?: StrategicTargets;
   /** The parsed budget, or null when nothing valid was typed. */
   amount: number | null;
   /** Fee policy summary and editor configuration. */
@@ -205,6 +218,7 @@ export function InvestmentPlanForm({
   onUseSuggested,
   drift,
   mode = "simple",
+  targets,
   amount,
   commissions,
   feesOpen,
@@ -225,7 +239,11 @@ export function InvestmentPlanForm({
   const { summary, ...feeProps } = commissions;
   const rebalancing = plan.strategy === "rebalance";
   const strategic = mode === "strategic";
-  const classGroups = strategic ? groupDriftByClass(drift.rows) : [];
+  const assets = useDriftAssets(drift);
+  const classGroups = React.useMemo(
+    () => (strategic ? driftClassGroups(assets, targets) : []),
+    [strategic, assets, targets]
+  );
   const above = strategic
     ? classGroups.filter((group) => group.driftPp > 0)
     : drift.rows.filter((row) => row.driftPp > 0);
@@ -338,19 +356,19 @@ export function InvestmentPlanForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="ds-plan-form__today-body">
-            {strategic ? (
-              <DriftClassGroupList
-                rows={drift.rows}
-                density="compact"
-                label="Asset classes and assets compared with their targets"
-              />
-            ) : (
-              <DriftRowList
-                rows={drift.rows}
-                density="compact"
-                label="Assets compared with their targets"
-              />
-            )}
+            {/* The aside is too narrow for the table at any viewport width. */}
+            <PortfolioAssetCollection
+              assets={assets}
+              presentation="overview"
+              layout="cards"
+              mode={mode}
+              targets={strategic ? targets : undefined}
+              showModeToggle={false}
+              title="Assets vs target"
+              subtitle={null}
+              defaultSort={largestGapPortfolioAssetSort}
+              surface="invest-plan"
+            />
             {rebalancing ? (
               <Alert variant="warning">
                 <TriangleAlert aria-hidden size={16} />

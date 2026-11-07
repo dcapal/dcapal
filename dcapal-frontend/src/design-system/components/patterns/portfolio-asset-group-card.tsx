@@ -9,7 +9,40 @@ import {
 } from "../../fixtures/portfolio";
 import { PortfolioAssetCard } from "./portfolio-asset-card";
 import { PortfolioDriftBadge } from "./portfolio-asset-drift-badge";
-import type { PortfolioAssetClassGroup } from "./portfolio-asset-groups";
+import {
+  assetCountLabel,
+  type PortfolioAssetClassGroup,
+} from "./portfolio-asset-groups";
+
+export interface AssetGroupCardHeaderProps {
+  /** The class name, with its toggle or count. */
+  title: React.ReactNode;
+  /** Badges and buttons at the end of the title row. */
+  trailing?: React.ReactNode;
+  /** Figures or meta lines below the title row. */
+  children?: React.ReactNode;
+}
+
+/**
+ * The presentational header of an asset-class card: a title row with trailing
+ * controls above the class figures. The portfolio group card and the Invest
+ * result's class card both render it.
+ */
+export function AssetGroupCardHeader({
+  title,
+  trailing,
+  children,
+}: AssetGroupCardHeaderProps) {
+  return (
+    <div className="ds-asset-group-card__header">
+      <div className="ds-asset-group-card__title-row">
+        {title}
+        {trailing}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export interface PortfolioAssetGroupCardProps {
   group: PortfolioAssetClassGroup;
@@ -43,8 +76,8 @@ export function PortfolioAssetGroupCard({
       aria-label={group.label}
       data-asset-class={group.assetClass}
     >
-      <div className="ds-asset-group-card__header">
-        <div className="ds-asset-group-card__title-row">
+      <AssetGroupCardHeader
+        title={
           <button
             type="button"
             className="ds-asset-group-card__toggle"
@@ -56,21 +89,26 @@ export function PortfolioAssetGroupCard({
             <ChevronDown size={16} aria-hidden />
             <span className="ds-asset-group-card__name">{group.label}</span>
             <span className="ds-asset-group-card__count">
-              {count} {count === 1 ? "asset" : "assets"}
+              {assetCountLabel(count)}
             </span>
           </button>
-          <PortfolioDriftBadge driftPp={group.driftPp} showStatus />
-          {onEditClass ? (
-            <IconButton
-              label={`Edit ${group.label}`}
-              variant="ghost"
-              size="sm"
-              onClick={() => onEditClass(group.assetClass)}
-            >
-              <Pencil size={16} aria-hidden />
-            </IconButton>
-          ) : null}
-        </div>
+        }
+        trailing={
+          <>
+            <PortfolioDriftBadge driftPp={group.driftPp} showStatus />
+            {onEditClass ? (
+              <IconButton
+                label={`Edit ${group.label}`}
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditClass(group.assetClass)}
+              >
+                <Pencil size={16} aria-hidden />
+              </IconButton>
+            ) : null}
+          </>
+        }
+      >
         <dl className="ds-asset-group-card__stats">
           <div>
             <dt>Value</dt>
@@ -92,7 +130,7 @@ export function PortfolioAssetGroupCard({
             </dd>
           </div>
         </dl>
-      </div>
+      </AssetGroupCardHeader>
       <div id={listId} hidden={!expanded}>
         {expanded
           ? group.entries.map((entry) => (

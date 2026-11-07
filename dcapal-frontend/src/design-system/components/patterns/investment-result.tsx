@@ -1,6 +1,14 @@
 import * as React from "react";
+import { cn } from "../../lib/cn";
+import { AssetCardShell } from "./portfolio-asset-card";
+import { AssetGroupCardHeader } from "./portfolio-asset-group-card";
+import { assetCountLabel } from "./portfolio-asset-groups";
 import { Check, Info } from "lucide-react";
-import { formatCurrency, formatPercent } from "../../fixtures/portfolio";
+import {
+  assetClassLabels,
+  formatCurrency,
+  formatPercent,
+} from "../../fixtures/portfolio";
 import {
   Alert,
   Badge,
@@ -27,6 +35,10 @@ import type {
   InvestmentResultModel,
 } from "./invest-types";
 import { MetricStrip } from "./metric-card";
+import {
+  PortfolioAssetIdentity,
+  PortfolioClassIdentity,
+} from "./portfolio-asset-identity";
 import { StickyActionBar } from "./sticky-action-bar";
 
 export interface InvestmentResultProps {
@@ -68,7 +80,10 @@ function quantityText(change: InvestmentResultChange): string {
   return `${formatQuantity(change.quantityBefore)} → ${formatQuantity(change.quantityAfter)} units`;
 }
 
-/** Table row with the quantity of one asset before, after and the change. */
+/**
+ * Table row with the quantity of one asset before, after and the change. It
+ * reuses the asset identity and row styling of the portfolio asset table.
+ */
 function ResultChangeRow({
   change,
   nested = false,
@@ -80,21 +95,22 @@ function ResultChangeRow({
 }) {
   return (
     <TableRow
-      className={nested ? "ds-table__row--nested" : undefined}
+      className="ds-table__row ds-table__row--asset"
       data-asset-class={assetClass}
       data-row-kind={nested ? "asset" : undefined}
     >
-      <TableCell>
-        <span
-          className={
-            nested
-              ? "ds-table__asset-identity ds-table__asset-identity--nested"
-              : "ds-table__asset-identity"
-          }
-        >
-          <strong>{change.ticker}</strong>
-          <span className="ds-table__asset-ticker">{change.name}</span>
-        </span>
+      <TableCell
+        className={cn(
+          "ds-table__asset-cell",
+          nested && "ds-table__asset-cell--grouped"
+        )}
+      >
+        <PortfolioAssetIdentity
+          name={change.name}
+          ticker={change.ticker}
+          assetClass={change.assetClass}
+          showClass={!nested}
+        />
       </TableCell>
       <TableCell numeric>{formatQuantity(change.quantityBefore)}</TableCell>
       <TableCell numeric>
@@ -107,7 +123,11 @@ function ResultChangeRow({
   );
 }
 
-/** Mobile card with the quantity of one asset before and after. */
+/**
+ * Mobile card with the quantity of one asset before and after. It is the
+ * portfolio asset card layout: name and change badge, then ticker chip and
+ * the quantities.
+ */
 function ResultChangeCard({
   change,
   nested = false,
@@ -116,16 +136,16 @@ function ResultChangeCard({
   nested?: boolean;
 }) {
   return (
-    <li className="ds-result-card" data-row-kind={nested ? "asset" : undefined}>
-      <div className="ds-result-card__top">
-        <strong>{change.ticker}</strong>
-        <ChangeBadge change={change} />
-      </div>
-      <p className="ds-result-card__meta">
-        {formatQuantity(change.quantityBefore)} {"→"}{" "}
-        <strong>{formatQuantity(change.quantityAfter)}</strong> units
-      </p>
-    </li>
+    <AssetCardShell
+      as="li"
+      assetClass={change.assetClass ?? "other"}
+      grouped={nested}
+      name={change.name}
+      ticker={change.ticker}
+      trailing={<ChangeBadge change={change} />}
+      meta={`${!nested && change.assetClass ? `${assetClassLabels[change.assetClass]} · ` : ""}${quantityText(change)}`}
+      data-row-kind={nested ? "asset" : undefined}
+    />
   );
 }
 
@@ -160,6 +180,7 @@ export function InvestmentResult({
           {strategic ? (
             <ul
               className="ds-result__cards ds-result__cards--classes"
+              data-testid="result-asset-cards"
               aria-label="Updated quantities by asset class"
             >
               {groups.map((group) => {
@@ -173,24 +194,39 @@ export function InvestmentResult({
                 );
                 return (
                   <li
-                    className="ds-result-group-card"
+                    className="ds-asset-group-card"
                     key={group.assetClass}
                     data-asset-class={group.assetClass}
                     data-row-kind="class"
                   >
-                    <div className="ds-result-group-card__header">
-                      <strong>{group.label}</strong>
-                      {classOnly ? (
-                        <ChangeBadge change={group.changes[0]} />
+                    <AssetGroupCardHeader
+                      title={
+                        <span className="ds-asset-group-card__name">
+                          {group.label}
+                        </span>
+                      }
+                      trailing={
+                        classOnly ? (
+                          <ChangeBadge change={group.changes[0]} />
+                        ) : (
+                          <span className="ds-asset-group-card__count">
+                            {assetCountLabel(group.changes.length)}
+                          </span>
+                        )
+                      }
+                    >
+                      {standing ? (
+                        <span className="ds-asset-card__meta">{standing}</span>
                       ) : null}
-                      {standing ? <span>{standing}</span> : null}
                       {classOnly ? (
-                        <span>{quantityText(group.changes[0])}</span>
+                        <span className="ds-asset-card__meta">
+                          {quantityText(group.changes[0])}
+                        </span>
                       ) : null}
-                    </div>
+                    </AssetGroupCardHeader>
                     {classOnly ? null : (
                       <ul
-                        className="ds-result-group-card__assets"
+                        className="ds-asset-group-card__list"
                         aria-label={`${group.label} assets`}
                       >
                         {group.changes.map((change) => (
@@ -207,14 +243,22 @@ export function InvestmentResult({
               })}
             </ul>
           ) : (
-            <ul className="ds-result__cards" aria-label="Updated quantities">
+            <ul
+              className="ds-result__cards"
+              aria-label="Updated quantities"
+              data-testid="result-asset-cards"
+            >
               {result.changes.map((change) => (
                 <ResultChangeCard key={change.id} change={change} />
               ))}
             </ul>
           )}
           <div className="ds-result__table">
-            <Table aria-label="Updated quantities" className="ds-table--result">
+            <Table
+              aria-label="Updated quantities"
+              className="ds-table--result"
+              data-testid="result-asset-table"
+            >
               <TableHeader>
                 <TableRow>
                   <TableHead>Asset</TableHead>
@@ -237,19 +281,18 @@ export function InvestmentResult({
                       return [
                         <TableRow
                           key={group.assetClass}
-                          className="ds-table__row--group"
+                          className="ds-table__row ds-table__row--group"
                           data-asset-class={group.assetClass}
                           data-row-kind="class"
                         >
                           <TableCell>
-                            <span className="ds-table__asset-identity">
-                              <strong>{group.label}</strong>
-                              {standing ? (
-                                <span className="ds-table__asset-ticker">
-                                  {standing}
-                                </span>
-                              ) : null}
-                            </span>
+                            <PortfolioClassIdentity
+                              label={group.label}
+                              detail={
+                                standing ??
+                                assetCountLabel(group.changes.length)
+                              }
+                            />
                           </TableCell>
                           <TableCell numeric>
                             {classOnly

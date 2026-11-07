@@ -2,6 +2,7 @@ import * as React from "react";
 import { formatPercent } from "../../fixtures/portfolio";
 import { cn } from "../../lib/cn";
 import { AllocationBar, allocationBarScale } from "./allocation-bar";
+import { assetCountLabel } from "./portfolio-asset-groups";
 import { groupAllocationAfterByClass } from "./invest-classes";
 import { formatDeviation } from "./invest-format";
 import type { AllocationAfterRow, AllocationMode } from "./invest-types";
@@ -138,8 +139,7 @@ function ClassAllocationAfter({
             </span>
             <span className="ds-allocation-after__sub">
               {formatDeviation(group.weightAfter - group.targetWeight)} from
-              target after · {group.assetCount}{" "}
-              {group.assetCount === 1 ? "asset" : "assets"}
+              target after · {assetCountLabel(group.assetCount)}
             </span>
           </li>
         ))}

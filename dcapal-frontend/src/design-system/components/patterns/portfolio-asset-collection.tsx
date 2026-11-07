@@ -7,6 +7,8 @@ import { DriftBandProvider } from "./portfolio-asset-drift-badge";
 import {
   buildPortfolioAssetSummary,
   DEFAULT_DRIFT_BAND_PP,
+  assetCountLabel,
+  type PortfolioAssetSort,
   type StrategicTargets,
   sortAssetEntries,
   sortAssetGroups,
@@ -56,6 +58,16 @@ export interface PortfolioAssetCollectionProps {
   /** Edits an asset class's target weight (Strategic mode); adds `Edit {Class}` buttons. */
   onEditClass?: (assetClass: AssetClass) => void;
   onMenu?: (asset: PortfolioAsset) => void;
+  /** Ordering before the investor chooses one. Defaults to target weight, largest first. */
+  defaultSort?: PortfolioAssetSort;
+  /**
+   * `responsive` (default) shows a table from 48rem and cards below it.
+   * `cards` always shows the shared cards, for narrow containers such as a
+   * side card that cannot fit the table at any viewport width.
+   */
+  layout?: "responsive" | "cards";
+  /** Names the surface that embeds the collection (exposed as `data-surface`). */
+  surface?: string;
 }
 
 const defaultSubtitles: Record<PortfolioAssetMode, string> = {
@@ -86,12 +98,19 @@ export function PortfolioAssetCollection({
   onEdit,
   onEditClass,
   onMenu,
+  defaultSort,
+  layout = "responsive",
+  surface,
 }: PortfolioAssetCollectionProps) {
   const headingId = React.useId();
   const [uncontrolledMode, setUncontrolledMode] =
     React.useState<PortfolioAssetMode>(defaultMode);
   const mode = controlledMode ?? uncontrolledMode;
-  const view = usePortfolioAssetViewState(defaultCollapsedClasses, mode);
+  const view = usePortfolioAssetViewState(
+    defaultCollapsedClasses,
+    mode,
+    defaultSort
+  );
   const summary = React.useMemo(
     () => buildPortfolioAssetSummary(assets, targets),
     [assets, targets]
@@ -114,7 +133,10 @@ export function PortfolioAssetCollection({
     <DriftBandProvider bandPp={driftBandPp}>
       <section
         aria-labelledby={headingId}
-        className={`ds-asset-collection ds-asset-collection--${presentation}`}
+        className={`ds-asset-collection ds-asset-collection--${presentation} ds-asset-collection--layout-${layout}`}
+        data-testid="portfolio-asset-collection"
+        data-surface={surface}
+        data-mode={mode}
       >
         <header className="ds-asset-collection__header">
           <div>
@@ -129,7 +151,7 @@ export function PortfolioAssetCollection({
           </div>
           <div className="ds-asset-collection__header-side">
             <span className="ds-asset-collection__count" aria-live="polite">
-              {assets.length} {assets.length === 1 ? "asset" : "assets"}
+              {assetCountLabel(assets.length)}
             </span>
           </div>
           {headerActions || showOptions ? (
@@ -169,7 +191,10 @@ export function PortfolioAssetCollection({
           />
         ) : (
           <>
-            <div className="ds-asset-collection__cards">
+            <div
+              className="ds-asset-collection__cards"
+              data-testid="portfolio-asset-cards"
+            >
               {mode === "strategic"
                 ? sortAssetGroups(summary.groups, view.sort).map((group) => (
                     <PortfolioAssetGroupCard
@@ -195,18 +220,20 @@ export function PortfolioAssetCollection({
                     />
                   ))}
             </div>
-            <div className="ds-asset-collection__table">
-              <PortfolioAssetTable
-                assets={assets}
-                mode={mode}
-                presentation={presentation}
-                view={view}
-                targets={targets}
-                onEdit={onEdit}
-                onEditClass={onEditClass}
-                onMenu={onMenu}
-              />
-            </div>
+            {layout === "cards" ? null : (
+              <div className="ds-asset-collection__table">
+                <PortfolioAssetTable
+                  assets={assets}
+                  mode={mode}
+                  presentation={presentation}
+                  view={view}
+                  targets={targets}
+                  onEdit={onEdit}
+                  onEditClass={onEditClass}
+                  onMenu={onMenu}
+                />
+              </div>
+            )}
           </>
         )}
       </section>

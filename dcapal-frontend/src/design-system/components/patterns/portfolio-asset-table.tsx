@@ -7,7 +7,6 @@ import {
   Pencil,
 } from "lucide-react";
 import {
-  AssetTickerChip,
   IconButton,
   Table,
   TableBody,
@@ -24,8 +23,14 @@ import {
   type PortfolioAsset,
 } from "../../fixtures/portfolio";
 import { cn } from "../../lib/cn";
+import {
+  AssetClassDot,
+  PortfolioAssetIdentity,
+  PortfolioClassIdentity,
+} from "./portfolio-asset-identity";
 import { PortfolioDriftBadge } from "./portfolio-asset-drift-badge";
 import {
+  assetCountLabel,
   assetRegion,
   buildPortfolioAssetSummary,
   sortAssetEntries,
@@ -151,10 +156,6 @@ function Stacked({
   );
 }
 
-function AssetClassDot() {
-  return <span className="ds-asset-class-dot" aria-hidden />;
-}
-
 /** Sortable (or plain) column header cell. */
 function HeaderCell({
   column,
@@ -205,6 +206,8 @@ interface AssetRowProps {
   /** Set inside a strategic group to show shares of the class. */
   grouped: boolean;
   overview: boolean;
+  /** Renders the trailing actions cell. */
+  actions: boolean;
   onEdit?: (asset: PortfolioAsset) => void;
   onMenu?: (asset: PortfolioAsset) => void;
 }
@@ -215,6 +218,7 @@ function AssetRow({
   columns,
   grouped,
   overview,
+  actions,
   onEdit,
   onMenu,
 }: AssetRowProps) {
@@ -230,17 +234,12 @@ function AssetRow({
               grouped && "ds-table__asset-cell--grouped"
             )}
           >
-            <span className="ds-table__asset-identity">
-              <strong className="ds-table__asset-name" title={asset.name}>
-                {asset.name}
-              </strong>
-              <AssetTickerChip ticker={asset.ticker} />
-              {!grouped && overview ? (
-                <span className="ds-table__sub ds-table__asset-class">
-                  {assetClassLabels[asset.assetClass]}
-                </span>
-              ) : null}
-            </span>
+            <PortfolioAssetIdentity
+              name={asset.name}
+              ticker={asset.ticker}
+              assetClass={asset.assetClass}
+              showClass={!grouped && overview}
+            />
           </TableCell>
         );
       case "class":
@@ -322,28 +321,30 @@ function AssetRow({
       data-asset-class={grouped ? asset.assetClass : undefined}
     >
       {columns.map(cell)}
-      <TableCell className="ds-table__actions">
-        {onEdit ? (
-          <IconButton
-            label={`Edit ${asset.ticker}`}
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(asset)}
-          >
-            <Pencil size={16} aria-hidden />
-          </IconButton>
-        ) : null}
-        {onMenu ? (
-          <IconButton
-            label={`More actions for ${asset.ticker}`}
-            variant="ghost"
-            size="sm"
-            onClick={() => onMenu(asset)}
-          >
-            <MoreVertical size={16} aria-hidden />
-          </IconButton>
-        ) : null}
-      </TableCell>
+      {actions ? (
+        <TableCell className="ds-table__actions">
+          {onEdit ? (
+            <IconButton
+              label={`Edit ${asset.ticker}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(asset)}
+            >
+              <Pencil size={16} aria-hidden />
+            </IconButton>
+          ) : null}
+          {onMenu ? (
+            <IconButton
+              label={`More actions for ${asset.ticker}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => onMenu(asset)}
+            >
+              <MoreVertical size={16} aria-hidden />
+            </IconButton>
+          ) : null}
+        </TableCell>
+      ) : null}
     </TableRow>
   );
 }
@@ -353,10 +354,12 @@ function GroupRow({
   group,
   columns,
   expanded,
+  actions,
   onToggle,
   onEditClass,
 }: {
   group: PortfolioAssetClassGroup;
+  actions: boolean;
   columns: ColumnKey[];
   expanded: boolean;
   onToggle: () => void;
@@ -368,23 +371,22 @@ function GroupRow({
       case "asset":
         return (
           <TableCell key={key}>
-            <span className="ds-table__group-identity">
-              <IconButton
-                label={`${expanded ? "Collapse" : "Expand"} ${group.label}`}
-                variant="ghost"
-                size="sm"
-                aria-expanded={expanded}
-                className="ds-table__toggle"
-                onClick={onToggle}
-              >
-                <ChevronDown size={16} aria-hidden />
-              </IconButton>
-              <AssetClassDot />
-              <strong>{group.label}</strong>
-              <span className="ds-table__sub">
-                {count} {count === 1 ? "asset" : "assets"}
-              </span>
-            </span>
+            <PortfolioClassIdentity
+              label={group.label}
+              detail={assetCountLabel(count)}
+              leading={
+                <IconButton
+                  label={`${expanded ? "Collapse" : "Expand"} ${group.label}`}
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded={expanded}
+                  className="ds-table__toggle"
+                  onClick={onToggle}
+                >
+                  <ChevronDown size={16} aria-hidden />
+                </IconButton>
+              }
+            />
           </TableCell>
         );
       case "cost":
@@ -434,18 +436,20 @@ function GroupRow({
       data-asset-class={group.assetClass}
     >
       {columns.map(cell)}
-      <TableCell className="ds-table__actions">
-        {onEditClass ? (
-          <IconButton
-            label={`Edit ${group.label}`}
-            variant="ghost"
-            size="sm"
-            onClick={() => onEditClass(group.assetClass)}
-          >
-            <Pencil size={16} aria-hidden />
-          </IconButton>
-        ) : null}
-      </TableCell>
+      {actions ? (
+        <TableCell className="ds-table__actions">
+          {onEditClass ? (
+            <IconButton
+              label={`Edit ${group.label}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => onEditClass(group.assetClass)}
+            >
+              <Pencil size={16} aria-hidden />
+            </IconButton>
+          ) : null}
+        </TableCell>
+      ) : null}
     </TableRow>
   );
 }
@@ -454,22 +458,22 @@ function GroupRow({
 function TotalRow({
   summary,
   columns,
+  actions,
 }: {
   summary: PortfolioAssetSummary;
   columns: ColumnKey[];
+  actions: boolean;
 }) {
   const cell = (key: ColumnKey) => {
     switch (key) {
       case "asset":
         return (
           <TableCell key={key}>
-            <span className="ds-table__group-identity ds-table__group-identity--total">
-              <strong>Portfolio total</strong>
-              <span className="ds-table__sub">
-                {summary.entries.length}{" "}
-                {summary.entries.length === 1 ? "asset" : "assets"}
-              </span>
-            </span>
+            <PortfolioClassIdentity
+              label="Portfolio total"
+              dot={false}
+              detail={assetCountLabel(summary.entries.length)}
+            />
           </TableCell>
         );
       case "cost":
@@ -511,7 +515,7 @@ function TotalRow({
   return (
     <TableRow className="ds-table__row ds-table__row--total">
       {columns.map(cell)}
-      <TableCell className="ds-table__actions" />
+      {actions ? <TableCell className="ds-table__actions" /> : null}
     </TableRow>
   );
 }
@@ -535,6 +539,8 @@ export function PortfolioAssetTable({
   const state = view ?? localView;
   const overview = presentation === "overview";
   const columns = columnsFor(mode, overview);
+  // A read-only table (no edit, class-edit or menu callbacks) has no actions column.
+  const actions = Boolean(onEdit || onEditClass || onMenu);
   const summary = React.useMemo(
     () => buildPortfolioAssetSummary(assets, targets),
     [assets, targets]
@@ -543,6 +549,7 @@ export function PortfolioAssetTable({
   return (
     <Table
       aria-label="Portfolio assets"
+      data-testid="portfolio-asset-table"
       className={cn(
         "ds-table--assets",
         overview && "ds-table--assets-overview",
@@ -553,7 +560,7 @@ export function PortfolioAssetTable({
         {columns.map((key) => (
           <col key={key} className={`ds-table__col--${key}`} />
         ))}
-        <col className="ds-table__col--actions" />
+        {actions ? <col className="ds-table__col--actions" /> : null}
       </colgroup>
       <TableHeader>
         <TableRow>
@@ -564,9 +571,11 @@ export function PortfolioAssetTable({
               view={state}
             />
           ))}
-          <TableHead className="ds-table__actions">
-            <span className="ds-sr-only">Actions</span>
-          </TableHead>
+          {actions ? (
+            <TableHead className="ds-table__actions">
+              <span className="ds-sr-only">Actions</span>
+            </TableHead>
+          ) : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -578,6 +587,7 @@ export function PortfolioAssetTable({
               columns={columns}
               grouped={false}
               overview={overview}
+              actions={actions}
               onEdit={onEdit}
               onMenu={onMenu}
             />
@@ -594,6 +604,7 @@ export function PortfolioAssetTable({
                     group={group}
                     columns={columns}
                     expanded={expanded}
+                    actions={actions}
                     onToggle={() => state.onToggleClass(group.assetClass)}
                     onEditClass={onEditClass}
                   />
@@ -605,6 +616,7 @@ export function PortfolioAssetTable({
                           columns={columns}
                           grouped
                           overview={overview}
+                          actions={actions}
                           onEdit={onEdit}
                           onMenu={onMenu}
                         />
@@ -613,7 +625,7 @@ export function PortfolioAssetTable({
                 </React.Fragment>
               );
             })}
-            <TotalRow summary={summary} columns={columns} />
+            <TotalRow summary={summary} columns={columns} actions={actions} />
           </>
         )}
       </TableBody>

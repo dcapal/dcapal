@@ -506,7 +506,7 @@ test("portfolio selector keeps overview content and navigation synchronized", as
   const assetNames = page.locator(
     testInfo.project.name === "storybook-mobile"
       ? ".ds-asset-card__name"
-      : ".ds-table__asset-name"
+      : ".ds-asset-identity__name"
   );
   await expect(assetNames).toHaveText(["Cash"]);
 });
@@ -544,7 +544,7 @@ test("asset collection groups assets by class in strategic mode", async ({
   await page.waitForLoadState("networkidle");
 
   const visibleNames = page.locator(
-    ".ds-table__asset-name:visible, .ds-asset-card__name:visible"
+    ".ds-asset-identity__name:visible, .ds-asset-card__name:visible"
   );
   await expect(
     page.getByRole("button", { name: "Collapse Equities" })
@@ -599,7 +599,7 @@ test("asset table headers sort the assets", async ({ page }, testInfo) => {
     name: "Target weight",
   });
   const valueHeader = page.getByRole("columnheader", { name: "Current value" });
-  const names = page.locator(".ds-table__asset-name");
+  const names = page.locator(".ds-asset-identity__name");
   await expect(targetHeader).toHaveAttribute("aria-sort", "descending");
   await expect(names.first()).toHaveText("Vanguard FTSE All-World UCITS ETF");
 
@@ -1677,7 +1677,7 @@ const PAGE_ACTION_JOURNEYS = [
   },
   {
     page: "invest drift",
-    title: "Compositions / Invest",
+    title: INVEST_TITLE,
     story: "Drift overview Mobile",
     actions: ["Add money", "Rebalance"],
   },
@@ -2022,7 +2022,7 @@ test("single-asset collection shows the stored fixture weight", async ({
   // The asset name keeps a readable width instead of collapsing to "Va...".
   const testInfo = test.info();
   if (testInfo.project.name !== "storybook-mobile") {
-    const name = page.locator(".ds-table__asset-name").first();
+    const name = page.locator(".ds-asset-identity__name").first();
     await expect(name).toBeVisible();
     const truncated = await name.evaluate(
       (el) => el.scrollWidth > el.clientWidth
@@ -2033,20 +2033,42 @@ test("single-asset collection shows the stored fixture weight", async ({
 });
 
 /**
- * GIVEN the Invest "Updated" result and a proposal story with transaction tables
- * WHEN they render on desktop
- * THEN asset identities keep their stacked layout (grid), unaffected by the
- * portfolio asset table's inline identity styling.
+ * GIVEN the Invest proposal's transactions table and the shared holdings
+ * tables (Updated result, drift overview)
+ * WHEN a desktop viewer reads the asset identity
+ * THEN the transactions table keeps its stacked (grid) identity, while the
+ * holdings tables show the shared one-line (flex) identity, so holdings
+ * table rules never leak into the transactions table.
  */
-test("invest tables keep stacked asset identity", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name === "storybook-mobile", "Table is desktop.");
-  const storyId = await findStory(page, INVEST_TITLE, "Updated");
-  await page.goto(`/iframe.html?id=${encodeURIComponent(storyId)}`);
-  await page.waitForLoadState("networkidle");
-  const identity = page.locator(".ds-table__asset-identity").first();
-  await expect(identity).toHaveCSS("display", "grid");
+test.describe("Table asset identity layouts", () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name === "storybook-mobile",
+      "Tables are desktop."
+    );
+  });
+
+  test("transactions table keeps its stacked asset identity", async ({
+    page,
+  }) => {
+    await openStory(page, INVEST_TITLE, "Proposal add money");
+    await expect(
+      page
+        .locator(".ds-table--transactions .ds-table__asset-identity:visible")
+        .first()
+    ).toHaveCSS("display", "grid");
+  });
+
+  for (const name of ["Updated", "Drift Overview"]) {
+    test(`${name} holdings table uses the shared one-line asset identity`, async ({
+      page,
+    }) => {
+      await openStory(page, INVEST_TITLE, name);
+      await expect(
+        page.locator(".ds-asset-identity:visible").first()
+      ).toHaveCSS("display", "flex");
+    });
+  }
 });
 
 test.describe("Invest journey in Strategic allocation", () => {
@@ -2076,33 +2098,30 @@ test.describe("Invest journey in Strategic allocation", () => {
       page.getByText("Class targets: Equities 65% · Bonds 25% · Cash 10%")
     ).toBeVisible();
 
-    const list = page.getByRole("list", {
-      name: "Asset classes and assets compared with their targets",
-    });
-    const classes = list.locator("> li[data-row-kind='class']");
-    await expect(classes).toHaveCount(3);
-    await expect(classes.nth(0).locator("strong").first()).toHaveText("Cash");
-    await expect(classes.nth(1).locator("strong").first()).toHaveText("Bonds");
-    await expect(classes.nth(2).locator("strong").first()).toHaveText(
-      "Equities"
-    );
-    // Cash has no nested assets; bonds and equities list theirs after the class row.
-    await expect(classes.nth(0).locator("[data-row-kind='asset']")).toHaveCount(
-      0
-    );
-    await expect(classes.nth(1).locator("[data-row-kind='asset']")).toHaveCount(
-      1
-    );
-    await expect(classes.nth(2).locator("[data-row-kind='asset']")).toHaveCount(
-      3
-    );
+    // The shared collection lists classes by widest gap with their assets.
+    const collection = page.getByTestId("portfolio-asset-collection");
+    await expect(collection).toHaveAttribute("data-surface", "invest-drift");
+    const classNames = mobileVariant
+      ? collection.locator(".ds-asset-group-card__name:visible")
+      : collection.locator(".ds-table__row--group strong:visible");
+    await expect(classNames).toHaveText(["Cash", "Bonds", "Equities"]);
     await expect(
-      classes.nth(2).getByRole("list", { name: "Equities assets" })
-    ).toContainText("30.8% of class");
+      collection.locator(":visible").getByText("30.8% of class").first()
+    ).toBeVisible();
     await expect(page.getByText("Cash +25.9 pp")).toBeVisible();
+    // The collection judges the class by the same figure as the header.
+    await expect(
+      collection
+        .locator(".ds-table__row--group:visible, .ds-asset-group-card:visible")
+        .first()
+    ).toContainText("+25.9 pp");
 
     await openInvest(page, "Drift overview", { mobileVariant });
-    await expect(page.locator("[data-row-kind]")).toHaveCount(0);
+    await expect(
+      page.locator(
+        ".ds-table__row--group:visible, .ds-asset-group-card:visible"
+      )
+    ).toHaveCount(0);
   });
 
   /**
@@ -2157,7 +2176,9 @@ test.describe("Invest journey in Strategic allocation", () => {
     await openInvest(page, "Plan strategic", { mobileVariant });
     const today = page.locator(".ds-plan-form__today");
     await expect(today).toContainText("25.9 pp drift");
-    expect((await rowKinds(page, ".ds-plan-form__today"))[0]).toBe("class");
+    await expect(
+      today.locator(".ds-asset-group-card:visible").first()
+    ).toBeVisible();
 
     await openInvest(page, "Updated strategic", { mobileVariant });
     const result = mobileVariant ? ".ds-result__cards" : ".ds-result__table";
@@ -2701,5 +2722,153 @@ test("tablet widths never scroll the page horizontally", async ({
       const values = page.locator(".ds-metric-card__value");
       if (await values.count()) await expectTextNotClipped(values);
     }
+  }
+});
+
+/**
+ * Holdings surfaces that must render the one shared PortfolioAssetCollection,
+ * with the mode each fixes.
+ */
+const COLLECTION_SURFACES: {
+  title: string;
+  name: string;
+  mode: "simple" | "strategic";
+  /** True for the narrow aside that always shows cards, never the table. */
+  cardsOnly?: boolean;
+}[] = [
+  {
+    title: INVEST_TITLE,
+    name: "Plan Add Money",
+    mode: "simple",
+    cardsOnly: true,
+  },
+  {
+    title: INVEST_TITLE,
+    name: "Plan Strategic",
+    mode: "strategic",
+    cardsOnly: true,
+  },
+  { title: INVEST_TITLE, name: "Drift Overview", mode: "simple" },
+  {
+    title: INVEST_TITLE,
+    name: "Drift Strategic",
+    mode: "strategic",
+  },
+  {
+    title: "Compositions / Portfolio overview",
+    name: "Populated",
+    mode: "simple",
+  },
+  {
+    title: "Compositions / Portfolio overview",
+    name: "Portfolio Overview Strategic",
+    mode: "strategic",
+  },
+  {
+    title: "Compositions / Edit and remove asset",
+    name: "Edit Details",
+    mode: "simple",
+  },
+  {
+    title: "Compositions / Edit and remove asset",
+    name: "Edit Asset Strategic",
+    mode: "strategic",
+  },
+  { title: "Patterns / Portfolio", name: "Assets", mode: "simple" },
+  {
+    title: "Patterns / Portfolio",
+    name: "Assets Strategic",
+    mode: "strategic",
+  },
+];
+
+test.describe("Holdings surfaces share one asset collection", () => {
+  for (const surface of COLLECTION_SURFACES) {
+    /**
+     * GIVEN a story that shows portfolio holdings in a fixed allocation mode
+     * WHEN it renders on desktop or on a phone
+     * THEN it shows the shared PortfolioAssetCollection: the shared table
+     * (desktop) or shared cards (phone), with class group rows or cards in
+     * Strategic mode and none in Simple mode.
+     */
+    test(`${surface.title} / ${surface.name} uses the shared collection (${surface.mode})`, async ({
+      page,
+    }, testInfo) => {
+      const mobile = testInfo.project.name === "storybook-mobile";
+      await openStory(page, surface.title, surface.name);
+      const collection = page.getByTestId("portfolio-asset-collection").first();
+      await expect(collection).toBeVisible();
+      await expect(collection).toHaveAttribute("data-mode", surface.mode);
+      const strategic = surface.mode === "strategic";
+      const cards = mobile || surface.cardsOnly === true;
+      // The scope, asset rows and class rows differ by layout only.
+      const layout = cards
+        ? {
+            scope: collection.getByTestId("portfolio-asset-cards"),
+            other: collection.getByTestId("portfolio-asset-table"),
+            asset: ".ds-asset-card:visible",
+            group: ".ds-asset-group-card",
+          }
+        : {
+            scope: collection.getByTestId("portfolio-asset-table"),
+            other: collection.getByTestId("portfolio-asset-cards"),
+            asset: ".ds-table__row--asset",
+            group: ".ds-table__row--group",
+          };
+      await expect(layout.scope).toBeVisible();
+      await expect(layout.other).toBeHidden();
+      if (!cards) await expect(layout.scope).toHaveClass(/ds-table--assets/);
+      await expect(layout.scope.locator(layout.asset).first()).toBeVisible();
+      // Class groups exist in Strategic mode only.
+      const groups = layout.scope.locator(layout.group);
+      if (strategic) await expect(groups.first()).toBeVisible();
+      else await expect(groups).toHaveCount(0);
+    });
+  }
+
+  /**
+   * GIVEN the Invest result in Simple and Strategic allocation
+   * WHEN it renders on desktop or on a phone
+   * THEN its quantities reuse the shared asset identity (name and ticker
+   * chip), asset row and class group row styling, or the shared asset and
+   * class group cards, and keep the Before, After and Change columns.
+   */
+  for (const name of ["Updated", "Updated Strategic"]) {
+    test(`Invest result ${name} reuses the shared asset pieces`, async ({
+      page,
+    }, testInfo) => {
+      const mobile = testInfo.project.name === "storybook-mobile";
+      const strategic = name === "Updated Strategic";
+      await openStory(page, INVEST_TITLE, name);
+      const layout = mobile
+        ? {
+            scope: page.getByTestId("result-asset-cards"),
+            asset: ".ds-asset-card",
+            group: ".ds-asset-group-card",
+          }
+        : {
+            scope: page.getByTestId("result-asset-table"),
+            asset: ".ds-table__row--asset",
+            group: ".ds-table__row--group",
+          };
+      await expect(layout.scope).toBeVisible();
+      await expect(layout.scope.locator(layout.asset).first()).toBeVisible();
+      if (strategic) {
+        await expect(layout.scope.locator(layout.group).first()).toBeVisible();
+      }
+      if (!mobile) {
+        // A change view keeps its quantity columns beside the shared identity.
+        for (const column of ["Before", "After", "Change"]) {
+          await expect(
+            layout.scope.getByRole("columnheader", { name: column })
+          ).toBeVisible();
+        }
+        await expect(
+          layout.scope
+            .locator(".ds-asset-identity .ds-asset-ticker-chip")
+            .first()
+        ).toBeVisible();
+      }
+    });
   }
 });
