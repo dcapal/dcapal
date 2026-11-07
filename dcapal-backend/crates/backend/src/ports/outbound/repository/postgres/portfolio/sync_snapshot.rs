@@ -1,7 +1,8 @@
 //! Loading of the complete v2 synchronization snapshot of one user.
 //!
-//! This module only maps stored rows to the domain snapshot, strictly: values
-//! that cannot belong to a valid aggregate are reported as corrupt data.
+//! This module only maps stored rows to the domain snapshot, strictly. Enum
+//! codes are decoded by SQLx and fail the load as database errors; values that
+//! cannot belong to a valid aggregate are reported as corrupt data.
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,18 +13,15 @@ use uuid::Uuid;
 use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
-        FeeStructure as AppFeeStructure, PortfolioAssetV2, StrategicAssetClassTargetV2,
+        FeeStructure as AppFeeStructure, FeeType, PortfolioAssetV2, StrategicAssetClassTargetV2,
         TransactionFees,
     },
     portfolio_sync::{
-        PortfolioVersion, StoredAggregate, StoredAsset, StoredPortfolio, SyncSnapshot,
+        PortfolioContent, PortfolioVersion, StoredAsset, StoredPortfolio, SyncSnapshot,
     },
 };
 use crate::ports::outbound::repository::portfolio::PortfolioRepositoryError;
 use crate::ports::outbound::repository::portfolio::Result;
-use crate::ports::outbound::repository::postgres::convert::{
-    app_allocation_mode, app_asset_class, app_provider,
-};
 use crate::ports::outbound::repository::postgres::types::{
     AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
 };
@@ -40,7 +38,6 @@ struct SnapshotRow {
     portfolio_deleted: bool,
     portfolio_last_updated_at: chrono::DateTime<chrono::Utc>,
     portfolio_updated_at: chrono::DateTime<chrono::Utc>,
-    #[sqlx(try_from = "i16")]
     portfolio_allocation_mode: DbAllocationMode,
     portfolio_drift_band: Option<Decimal>,
     portfolio_strategic_allocation_present: bool,
@@ -52,8 +49,8 @@ struct SnapshotRow {
     portfolio_max_fee: Option<Decimal>,
     asset_id: Option<Uuid>,
     asset_symbol: Option<String>,
-    asset_class_override: Option<i16>,
-    asset_provider: Option<i16>,
+    asset_class_override: Option<DbAssetClass>,
+    asset_provider: Option<DbProvider>,
     asset_quantity: Option<Decimal>,
     asset_target_weight: Option<Decimal>,
     asset_manual_price: Option<Decimal>,
@@ -70,7 +67,7 @@ struct SnapshotRow {
 #[derive(Debug, sqlx::FromRow)]
 struct ClassTargetRow {
     portfolio_id: Uuid,
-    asset_class: i16,
+    asset_class: DbAssetClass,
     target_weight: Decimal,
 }
 
@@ -92,72 +89,47 @@ fn decode_fees(
     min_fee: Option<Decimal>,
     max_fee: Option<Decimal>,
 ) -> Result<Option<TransactionFees>> {
-    if let Some(value) = max_fee_impact
-        && !stored_percentage_is_valid(value)
-    {
-        return Err(corrupt_data("Portfolio fee maxFeeImpact is outside 0..100"));
+    let Some(fee_type) = fee_type else {
+        let orphan_fields = [max_fee_impact, fee_amount, fee_rate, min_fee, max_fee];
+        return if orphan_fields.iter().any(Option::is_some) {
+            Err(corrupt_data("fee fields without a fee type"))
+        } else {
+            Ok(None)
+        };
+    };
+    if max_fee_impact.is_some_and(|value| !stored_percentage_is_valid(value)) {
+        return Err(corrupt_data("maxFeeImpact out of range"));
     }
 
-    let fee_structure = match fee_type.as_deref() {
-        None => {
-            if max_fee_impact.is_some()
-                || fee_amount.is_some()
-                || fee_rate.is_some()
-                || min_fee.is_some()
-                || max_fee.is_some()
-            {
-                return Err(corrupt_data(
-                    "Portfolio fee fields are present without a fee type",
-                ));
-            }
-            return Ok(None);
+    let has_variable_fields = fee_rate.is_some() || min_fee.is_some() || max_fee.is_some();
+    let fee_structure = match fee_type.parse::<FeeType>() {
+        Ok(FeeType::ZeroFee) if fee_amount.is_some() || has_variable_fields => {
+            return Err(corrupt_data("ZeroFee with fee amounts"));
         }
-        Some("ZeroFee") => {
-            if fee_amount.is_some() || fee_rate.is_some() || min_fee.is_some() || max_fee.is_some()
-            {
-                return Err(corrupt_data(
-                    "ZeroFee Portfolio fee contains unrelated numeric fields",
-                ));
-            }
-            AppFeeStructure::ZeroFee
+        Ok(FeeType::ZeroFee) => AppFeeStructure::ZeroFee,
+        Ok(FeeType::Fixed) if has_variable_fields => {
+            return Err(corrupt_data("Fixed fee with variable fields"));
         }
-        Some("Fixed") => {
-            if fee_rate.is_some() || min_fee.is_some() || max_fee.is_some() {
-                return Err(corrupt_data(
-                    "Fixed Portfolio fee contains variable fee fields",
-                ));
+        Ok(FeeType::Fixed) => match fee_amount {
+            Some(fee_amount) if fee_amount >= Decimal::ZERO => {
+                AppFeeStructure::Fixed { fee_amount }
             }
-            let fee_amount = fee_amount
-                .ok_or_else(|| corrupt_data("Fixed Portfolio fee is missing feeAmount"))?;
-            if fee_amount < Decimal::ZERO {
-                return Err(corrupt_data("Fixed Portfolio fee is negative"));
-            }
-            AppFeeStructure::Fixed { fee_amount }
+            _ => return Err(corrupt_data("Fixed fee needs a non-negative feeAmount")),
+        },
+        Ok(FeeType::Variable) if fee_amount.is_some() => {
+            return Err(corrupt_data("Variable fee with a fixed amount"));
         }
-        Some("Variable") => {
-            if fee_amount.is_some() {
-                return Err(corrupt_data(
-                    "Variable Portfolio fee contains a fixed fee amount",
-                ));
-            }
+        Ok(FeeType::Variable) => {
             let fee_rate = fee_rate
-                .ok_or_else(|| corrupt_data("Variable Portfolio fee is missing feeRate"))?;
-            if !stored_percentage_is_valid(fee_rate) {
-                return Err(corrupt_data(
-                    "Variable Portfolio fee rate is outside 0..100",
-                ));
-            }
-            if min_fee.is_some_and(|value| value < Decimal::ZERO)
-                || max_fee.is_some_and(|value| value < Decimal::ZERO)
-            {
-                return Err(corrupt_data("Variable Portfolio fee bounds are negative"));
-            }
-            if let (Some(max_fee), Some(min_fee)) = (max_fee, min_fee)
-                && max_fee < min_fee
-            {
-                return Err(corrupt_data(
-                    "Variable Portfolio fee maxFee is below minFee",
-                ));
+                .filter(|rate| stored_percentage_is_valid(*rate))
+                .ok_or_else(|| corrupt_data("Variable fee needs a feeRate within 0..100"))?;
+            let bounds_ok = [min_fee, max_fee]
+                .into_iter()
+                .flatten()
+                .all(|bound| bound >= Decimal::ZERO)
+                && min_fee.zip(max_fee).is_none_or(|(min, max)| max >= min);
+            if !bounds_ok {
+                return Err(corrupt_data("Variable fee has invalid bounds"));
             }
             AppFeeStructure::Variable {
                 fee_rate,
@@ -165,7 +137,7 @@ fn decode_fees(
                 max_fee,
             }
         }
-        Some(other) => return Err(corrupt_data(format!("unknown Portfolio fee type {other}"))),
+        Err(_) => return Err(corrupt_data(format!("unknown fee type {fee_type}"))),
     };
     Ok(Some(TransactionFees {
         max_fee_impact,
@@ -176,22 +148,14 @@ fn decode_fees(
 /// Decodes the stored Strategic Asset Class targets of one Portfolio, ignoring
 /// repeated classes.
 fn decode_class_targets(rows: Vec<ClassTargetRow>) -> Result<Vec<StrategicAssetClassTargetV2>> {
-    let mut class_ids = HashSet::new();
+    let mut seen = HashSet::new();
     let mut targets = Vec::new();
-    for row in rows {
-        if !class_ids.insert(row.asset_class) {
-            continue;
-        }
-        let asset_class = DbAssetClass::try_from(row.asset_class).map_err(|_| {
-            corrupt_data("Portfolio snapshot contains an invalid Strategic Asset Class")
-        })?;
+    for row in rows.into_iter().filter(|row| seen.insert(row.asset_class)) {
         if !stored_percentage_is_valid(row.target_weight) {
-            return Err(corrupt_data(
-                "Portfolio snapshot contains an invalid Strategic target weight",
-            ));
+            return Err(corrupt_data("Strategic target weight out of range"));
         }
         targets.push(StrategicAssetClassTargetV2 {
-            asset_class: app_asset_class(asset_class),
+            asset_class: row.asset_class.into(),
             target_weight: row.target_weight,
         });
     }
@@ -217,31 +181,23 @@ fn has_partial_asset_data(row: &SnapshotRow) -> bool {
 /// Decodes the asset part of a snapshot row, or `None` when the Portfolio has
 /// no asset in this row.
 fn decode_asset(row: &mut SnapshotRow) -> Result<Option<StoredAsset>> {
-    let Some(_) = row.asset_id else {
-        if has_partial_asset_data(row) {
-            return Err(corrupt_data(
-                "Portfolio snapshot contains asset fields without an asset id",
-            ));
-        }
-        return Ok(None);
-    };
+    if row.asset_id.is_none() {
+        return if has_partial_asset_data(row) {
+            Err(corrupt_data("asset fields without an asset id"))
+        } else {
+            Ok(None)
+        };
+    }
     let symbol = row
         .asset_symbol
         .take()
-        .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset symbol"))?;
-    let provider = DbProvider::try_from(
-        row.asset_provider
-            .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset provider"))?,
-    )
-    .map_err(|_| corrupt_data("Portfolio snapshot contains an invalid Provider"))?;
-    let asset_class_override = row
-        .asset_class_override
-        .map(|value| {
-            DbAssetClass::try_from(value)
-                .map(app_asset_class)
-                .map_err(|_| corrupt_data("Portfolio Asset has an invalid aclassOverride"))
-        })
-        .transpose()?;
+        .ok_or_else(|| corrupt_data("asset without a symbol"))?;
+    let provider = row
+        .asset_provider
+        .ok_or_else(|| corrupt_data("asset without a provider"))?;
+    let quantity = row
+        .asset_quantity
+        .ok_or_else(|| corrupt_data("asset without a quantity"))?;
     let fees = decode_fees(
         row.asset_max_fee_impact,
         row.asset_fee_type.take(),
@@ -253,13 +209,11 @@ fn decode_asset(row: &mut SnapshotRow) -> Result<Option<StoredAsset>> {
     Ok(Some(StoredAsset {
         asset: PortfolioAssetV2 {
             asset: AssetRef {
-                provider: app_provider(provider),
+                provider: provider.into(),
                 symbol,
             },
-            asset_class_override,
-            quantity: row
-                .asset_quantity
-                .ok_or_else(|| corrupt_data("Portfolio snapshot is missing an Asset quantity"))?,
+            asset_class_override: row.asset_class_override.map(Into::into),
+            quantity,
             target_weight: None,
             manual_price: row.asset_manual_price,
             average_buy_price: row.asset_average_buy_price,
@@ -285,16 +239,16 @@ fn finish_portfolio(
         return Ok(StoredPortfolio {
             id: head.portfolio_id,
             version,
-            aggregate: None,
+            content: None,
         });
     }
     Ok(StoredPortfolio {
         id: head.portfolio_id,
         version,
-        aggregate: Some(StoredAggregate {
+        content: Some(PortfolioContent {
             name: head.portfolio_name,
             quote_currency: head.portfolio_currency,
-            allocation_mode: app_allocation_mode(head.portfolio_allocation_mode),
+            allocation_mode: head.portfolio_allocation_mode.into(),
             drift_band: head.portfolio_drift_band,
             fees: decode_fees(
                 head.portfolio_max_fee_impact,
@@ -350,9 +304,7 @@ fn decode_snapshot(
         if let Some(asset_id) = asset_id
             && !asset_ids.insert(asset_id)
         {
-            return Err(corrupt_data(
-                "Portfolio snapshot contains a duplicate Portfolio Asset row",
-            ));
+            return Err(corrupt_data("duplicate Portfolio Asset row"));
         }
         let (_, assets) = current.get_or_insert_with(|| (row, Vec::new()));
         assets.extend(asset);

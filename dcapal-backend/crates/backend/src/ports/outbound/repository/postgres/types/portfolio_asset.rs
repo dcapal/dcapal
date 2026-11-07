@@ -4,7 +4,7 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// The provider codes used by canonical Portfolio Asset storage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
 #[repr(i16)]
 pub enum Provider {
     /// Yahoo Finance.
@@ -35,7 +35,7 @@ impl Provider {
 }
 
 /// The Asset Class codes used by canonical Portfolio Asset storage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
 #[repr(i16)]
 pub enum AssetClass {
     /// An unclassified or unsupported asset.
@@ -104,14 +104,12 @@ pub struct PortfolioAssetRow {
     /// The immutable shared asset display name.
     pub name: String,
     /// The shared default Asset Class.
-    #[sqlx(try_from = "i16")]
     pub asset_class: AssetClass,
     /// The Portfolio-specific Asset Class override.
-    pub asset_class_override: Option<i16>,
+    pub asset_class_override: Option<AssetClass>,
     /// The shared asset's trading currency.
     pub currency: String,
     /// The shared asset provider.
-    #[sqlx(try_from = "i16")]
     pub provider: Provider,
     /// The current quantity held.
     pub quantity: Decimal,
@@ -142,9 +140,7 @@ pub struct PortfolioAssetRow {
 impl PortfolioAssetRow {
     /// Returns the Portfolio-specific class when present, otherwise the shared default.
     pub fn effective_asset_class(&self) -> AssetClass {
-        self.asset_class_override
-            .and_then(|value| AssetClass::try_from(value).ok())
-            .unwrap_or(self.asset_class)
+        self.asset_class_override.unwrap_or(self.asset_class)
     }
 }
 

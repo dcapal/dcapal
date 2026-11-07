@@ -266,7 +266,7 @@ mod tests {
             SyncPortfoliosV2Request,
         },
         portfolio_sync::{
-            PortfolioVersion, StoredAggregate, StoredPortfolio, SyncPlan, SyncSnapshot,
+            PortfolioContent, PortfolioVersion, StoredPortfolio, SyncPlan, SyncSnapshot,
             TombstoneKind, WriteKind,
         },
     };
@@ -696,7 +696,7 @@ mod tests {
                 last_updated_at: updated_at,
                 updated_at,
             },
-            aggregate: Some(StoredAggregate {
+            content: Some(PortfolioContent {
                 name: "Stored".to_string(),
                 quote_currency: "EUR".to_string(),
                 allocation_mode: AllocationMode::Simple,
@@ -717,7 +717,7 @@ mod tests {
                 last_updated_at: Utc::now(),
                 updated_at: Utc::now(),
             },
-            aggregate: None,
+            content: None,
         }
     }
 
@@ -744,7 +744,7 @@ mod tests {
             .withf(move |_, plan| {
                 plan.writes.len() == 1
                     && plan.writes[0].kind == WriteKind::Create
-                    && plan.writes[0].portfolio.id == id
+                    && plan.writes[0].id == id
                     && plan.tombstones.is_empty()
             })
             .returning(|_, _| Box::pin(async { Ok(()) }));

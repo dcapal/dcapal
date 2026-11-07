@@ -1,10 +1,11 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, num::NonZeroU32, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use tracing::{debug, error, warn};
 
 use super::asset_provider::{AssetProvider, AssetProviderError};
@@ -18,14 +19,89 @@ use crate::{
     error::{DcaError, Result},
 };
 
+/// Sustained and burst budget of requests per second shared by every Yahoo call.
+///
+/// Yahoo is unofficially said to throttle an IP at ~2500 requests per hour, but
+/// production has never been throttled, so this is a generous ceiling that
+/// smooths bursts and stops runaway loops. Lower it (for example with
+/// `Quota::per_hour(2000).allow_burst(20)`) if Yahoo ever answers 429.
+const YAHOO_REQUESTS_PER_SECOND: NonZeroU32 = NonZeroU32::new(10).unwrap();
+
+/// Upper bound on one Yahoo request made by a worker or a proxy endpoint.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// How a Yahoo call behaves when the shared rate limiter has no capacity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Admission {
+    /// Wait until a request is allowed (workers and synchronization lookups).
+    Wait,
+    /// Fail immediately instead of holding the caller (public proxy endpoints).
+    Reject,
+}
+
+/// Failure of a rate-limited Yahoo request.
+#[derive(Debug, thiserror::Error)]
+enum GetError {
+    /// The limiter had no capacity and the caller asked not to wait.
+    #[error("Yahoo rate limit reached")]
+    RateLimited,
+    /// The HTTP request failed or timed out.
+    #[error(transparent)]
+    Request(#[from] rquest::Error),
+}
+
+impl From<GetError> for DcaError {
+    fn from(error: GetError) -> Self {
+        match error {
+            GetError::RateLimited => DcaError::Generic(error.to_string()),
+            GetError::Request(e) => e.into(),
+        }
+    }
+}
+
+/// Client of the Yahoo Finance endpoints.
+///
+/// All traffic goes through [`YahooProvider::get`], which applies one rate
+/// limiter shared by prices, search, chart proxying and asset lookups.
 #[derive(Clone)]
 pub struct YahooProvider {
     http: rquest::Client,
+    limiter: Arc<DefaultDirectRateLimiter>,
 }
 
 impl YahooProvider {
+    /// Creates a provider limited to [`YAHOO_REQUESTS_PER_SECOND`].
     pub fn new(http: rquest::Client) -> Self {
-        Self { http }
+        Self::with_quota(http, Quota::per_second(YAHOO_REQUESTS_PER_SECOND))
+    }
+
+    /// Creates a provider whose shared rate limiter enforces `quota`.
+    fn with_quota(http: rquest::Client, quota: Quota) -> Self {
+        Self {
+            http,
+            limiter: Arc::new(RateLimiter::direct(quota)),
+        }
+    }
+
+    /// Sends a GET to Yahoo once the rate limiter admits it.
+    ///
+    /// This is the only place that touches the HTTP client. `timeout` bounds the
+    /// request itself, not the wait for the limiter.
+    async fn get(
+        &self,
+        url: &str,
+        timeout: Duration,
+        admission: Admission,
+    ) -> std::result::Result<rquest::Response, GetError> {
+        match admission {
+            Admission::Wait => self.limiter.until_ready().await,
+            Admission::Reject => {
+                if self.limiter.check().is_err() {
+                    return Err(GetError::RateLimited);
+                }
+            }
+        }
+        Ok(self.http.get(url).timeout(timeout).send().await?)
     }
 
     pub async fn fetch_market_price(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
@@ -67,7 +143,7 @@ impl YahooProvider {
             r_hi
         );
 
-        let res = self.http.get(&url).send().await?;
+        let res = self.get(&url, REQUEST_TIMEOUT, Admission::Wait).await?;
         if !res.status().is_success() {
             if res.status() == reqwest::StatusCode::NOT_FOUND {
                 let res = res.json::<chart::ChartResponse>().await?;
@@ -135,8 +211,10 @@ impl YahooProvider {
         self.forward(url).await
     }
 
+    /// Streams the Yahoo reply to the caller, answering 429 when the shared rate
+    /// limiter has no capacity.
     async fn forward(&self, url: String) -> Response {
-        match self.http.get(url).send().await {
+        match self.get(&url, REQUEST_TIMEOUT, Admission::Reject).await {
             Ok(res) => {
                 let mut response = Response::builder().status(res.status());
 
@@ -148,6 +226,10 @@ impl YahooProvider {
                 let body = axum::body::Body::from_stream(res.bytes_stream());
                 response.body(body).unwrap().into_response()
             }
+            Err(GetError::RateLimited) => {
+                warn!("Yahoo proxy request rejected by the rate limiter");
+                StatusCode::TOO_MANY_REQUESTS.into_response()
+            }
             Err(e) => {
                 error!("Proxy error: {e:?}");
                 StatusCode::BAD_GATEWAY.into_response()
@@ -158,8 +240,8 @@ impl YahooProvider {
 
 const CHART_BASE_URL: &str = "https://query1.finance.yahoo.com/v8/finance/chart/";
 
-/// Upper bound on one Yahoo asset lookup, so a stalled request cannot hold a
-/// synchronization open.
+/// Upper bound on one Yahoo asset lookup (rate-limiter wait included), so a
+/// stalled request cannot hold a synchronization open.
 const LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[async_trait]
@@ -170,18 +252,20 @@ impl AssetProvider for YahooProvider {
         asset: &AssetRef,
     ) -> std::result::Result<Option<ResolvedAsset>, AssetProviderError> {
         let url = lookup_url(&asset.symbol)?;
-        let response = self
-            .http
-            .get(url.as_str())
-            .timeout(LOOKUP_TIMEOUT)
-            .send()
-            .await
-            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
-        let status = response.status().as_u16();
-        let body = response
-            .bytes()
-            .await
-            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+        let (status, body) = tokio::time::timeout(LOOKUP_TIMEOUT, async {
+            let response = self
+                .get(url.as_str(), LOOKUP_TIMEOUT, Admission::Wait)
+                .await
+                .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+            let status = response.status().as_u16();
+            let body = response
+                .bytes()
+                .await
+                .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+            Ok::<_, AssetProviderError>((status, body))
+        })
+        .await
+        .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))??;
 
         parse_lookup_response(asset, status, &body)
     }
@@ -476,6 +560,69 @@ mod lookup_tests {
             url.as_str(),
             "https://query1.finance.yahoo.com/v8/finance/chart/A%2FB%3FC?range=1d&interval=1d"
         );
+    }
+}
+
+#[cfg(test)]
+mod rate_limit_tests {
+    use super::*;
+
+    /// Unroutable-in-practice local URL: connecting is refused immediately, so no
+    /// test depends on the network.
+    const REFUSED_URL: &str = "http://127.0.0.1:1/";
+
+    /// A provider that admits a single request per hour, then nothing.
+    fn single_request_provider() -> YahooProvider {
+        let quota = Quota::per_hour(NonZeroU32::new(1).unwrap());
+        YahooProvider::with_quota(rquest::Client::new(), quota)
+    }
+
+    #[tokio::test]
+    async fn proxy_gets_too_many_requests_when_the_burst_is_spent() {
+        // GIVEN a limiter whose only slot is already used,
+        // WHEN the public search and chart proxies are called,
+        // THEN both answer 429 without contacting Yahoo.
+        let provider = single_request_provider();
+        provider.limiter.check().unwrap();
+
+        let search = provider.search("aapl".to_string()).await;
+        let chart = provider.chart("AAPL".to_string(), 0, 1).await;
+
+        assert_eq!(search.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(chart.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn rejecting_get_only_fails_once_capacity_is_spent() {
+        // GIVEN a limiter with a single slot,
+        // WHEN two non-waiting requests are made,
+        // THEN the first reaches the (refused) connection and the second is rate limited.
+        let provider = single_request_provider();
+
+        let first = provider
+            .get(REFUSED_URL, REQUEST_TIMEOUT, Admission::Reject)
+            .await;
+        let second = provider
+            .get(REFUSED_URL, REQUEST_TIMEOUT, Admission::Reject)
+            .await;
+
+        assert!(matches!(first, Err(GetError::Request(_))));
+        assert!(matches!(second, Err(GetError::RateLimited)));
+    }
+
+    #[tokio::test]
+    async fn lookup_waits_for_capacity_instead_of_failing() {
+        // GIVEN a limiter whose only slot is already used,
+        // WHEN an asset lookup is started,
+        // THEN it keeps waiting for the limiter rather than returning an error.
+        let provider = single_request_provider();
+        provider.limiter.check().unwrap();
+        let asset = AssetRef::new(Provider::YF, "AAPL");
+
+        let outcome =
+            tokio::time::timeout(Duration::from_millis(150), provider.lookup(&asset)).await;
+
+        assert!(outcome.is_err(), "lookup should still be waiting");
     }
 }
 

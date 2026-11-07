@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     DateTime,
+    app::domain::portfolio::FeeType,
     error::DcaError,
     ports::{
         inbound::rest::FeeStructure,
@@ -107,6 +108,45 @@ fn v1_response_asset_class_schema() -> Object {
         .build()
 }
 
+/// Builds the v1 fee settings from the stored fee columns of a portfolio or
+/// asset, or `None` when no fee type is stored.
+fn legacy_fees(
+    fee_type: Option<&str>,
+    max_fee_impact: Option<Decimal>,
+    fee_amount: Option<Decimal>,
+    fee_rate: Option<Decimal>,
+    min_fee: Option<Decimal>,
+    max_fee: Option<Decimal>,
+) -> Result<Option<TransactionFeesResponse>, DcaError> {
+    let Some(fee_type) = fee_type else {
+        return Ok(None);
+    };
+    let fee_structure = match fee_type.parse::<FeeType>() {
+        Ok(FeeType::ZeroFee) => FeeStructure::ZeroFee,
+        Ok(FeeType::Fixed) => FeeStructure::Fixed {
+            fee_amount: fee_amount.ok_or_else(|| {
+                DcaError::Generic("Fixed fee requires fee_amount to be Some.".to_string())
+            })?,
+        },
+        Ok(FeeType::Variable) => FeeStructure::Variable {
+            fee_rate: fee_rate.ok_or_else(|| {
+                DcaError::Generic("Variable fee requires fee_rate to be Some.".to_string())
+            })?,
+            // v2 treats an absent lower bound as no minimum;
+            // v1 can represent that policy with a zero bound.
+            min_fee: min_fee.unwrap_or(Decimal::ZERO),
+            max_fee,
+        },
+        Err(_) => {
+            return Err(DcaError::Generic(format!("Unknown fee type {fee_type}.")));
+        }
+    };
+    Ok(Some(TransactionFeesResponse {
+        max_fee_impact,
+        fee_structure,
+    }))
+}
+
 impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
     type Error = DcaError;
 
@@ -115,45 +155,14 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
         let portfolio_assets: Vec<PortfolioAssetResponse> = assets
             .iter()
             .map(|asset| {
-                let fees = if let Some(fee_type) = asset.fee_type.clone() {
-                    Some(TransactionFeesResponse {
-                        max_fee_impact: asset.max_fee_impact,
-                        fee_structure: match fee_type {
-                            val if val == *"ZeroFee" => FeeStructure::ZeroFee,
-                            val if val == *"Fixed" => {
-                                if let Some(fee_amount) = asset.fee_amount {
-                                    FeeStructure::Fixed { fee_amount }
-                                } else {
-                                    return Err(DcaError::Generic(
-                                        "Fixed fee requires fee_amount to be Some.".to_string(),
-                                    ));
-                                }
-                            }
-                            val if val == *"Variable" => {
-                                if let Some(fee_rate) = asset.fee_rate {
-                                    FeeStructure::Variable {
-                                        fee_rate,
-                                        // v2 treats an absent lower bound as no minimum;
-                                        // v1 can represent that policy with a zero bound.
-                                        min_fee: asset.min_fee.unwrap_or(Decimal::ZERO),
-                                        max_fee: asset.max_fee,
-                                    }
-                                } else {
-                                    return Err(DcaError::Generic(
-                                        "Variable fee requires fee_rate to be Some.".to_string(),
-                                    ));
-                                }
-                            }
-                            _ => {
-                                return Err(DcaError::Generic(
-                                    "Fee type is not specified.".to_string(),
-                                ));
-                            }
-                        },
-                    })
-                } else {
-                    None
-                };
+                let fees = legacy_fees(
+                    asset.fee_type.as_deref(),
+                    asset.max_fee_impact,
+                    asset.fee_amount,
+                    asset.fee_rate,
+                    asset.min_fee,
+                    asset.max_fee,
+                )?;
 
                 Ok(PortfolioAssetResponse {
                     symbol: asset.symbol.clone(),
@@ -183,51 +192,20 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                     fees,
                 })
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, DcaError>>()?;
 
         Ok(Self {
             id: portfolio.id,
             name: portfolio.name.clone(),
             quote_ccy: portfolio.currency.clone(),
-            fees: if let Some(fee_type) = portfolio.fee_type {
-                Some(TransactionFeesResponse {
-                    max_fee_impact: portfolio.max_fee_impact,
-                    fee_structure: match fee_type {
-                        val if val == *"ZeroFee" => FeeStructure::ZeroFee,
-                        val if val == *"Fixed" => {
-                            if let Some(fee_amount) = portfolio.fee_amount {
-                                FeeStructure::Fixed { fee_amount }
-                            } else {
-                                return Err(DcaError::Generic(
-                                    "Fixed fee requires fee_amount to be Some.".to_string(),
-                                ));
-                            }
-                        }
-                        val if val == *"Variable" => {
-                            if let Some(fee_rate) = portfolio.fee_rate {
-                                FeeStructure::Variable {
-                                    fee_rate,
-                                    // v2 treats an absent lower bound as no minimum;
-                                    // v1 can represent that policy with a zero bound.
-                                    min_fee: portfolio.min_fee.unwrap_or(Decimal::ZERO),
-                                    max_fee: portfolio.max_fee,
-                                }
-                            } else {
-                                return Err(DcaError::Generic(
-                                    "Variable fee requires fee_rate to be Some.".to_string(),
-                                ));
-                            }
-                        }
-                        _ => {
-                            return Err(DcaError::Generic(
-                                "Fee type is not specified.".to_string(),
-                            ));
-                        }
-                    },
-                })
-            } else {
-                None
-            },
+            fees: legacy_fees(
+                portfolio.fee_type.as_deref(),
+                portfolio.max_fee_impact,
+                portfolio.fee_amount,
+                portfolio.fee_rate,
+                portfolio.min_fee,
+                portfolio.max_fee,
+            )?,
             assets: portfolio_assets,
             last_updated_at: portfolio.last_updated_at,
         })

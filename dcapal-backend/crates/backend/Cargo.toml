@@ -19,6 +19,7 @@ deadpool-redis = { workspace = true }
 derive_more = { workspace = true }
 failsafe = { workspace = true }
 futures = { workspace = true }
+governor = { workspace = true }
 hyper = { workspace = true }
 ip2location = { workspace = true }
 itertools = { workspace = true }
@@ -36,6 +37,7 @@ rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
+strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

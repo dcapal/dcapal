@@ -35,14 +35,11 @@ async fn insert_client_supplied(
         "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class)
          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)",
     )
-    .bind(i16::from(match asset.provider {
-        Provider::YF => DbProvider::YF,
-        Provider::Kraken => DbProvider::Kraken,
-    }))
+    .bind(DbProvider::from(&asset.provider))
     .bind(&asset.symbol)
     .bind(&asset.name)
     .bind(&asset.currency)
-    .bind(i16::from(DbAssetClass::Equity))
+    .bind(DbAssetClass::Equity)
     .execute(pool)
     .await?;
     Ok(())

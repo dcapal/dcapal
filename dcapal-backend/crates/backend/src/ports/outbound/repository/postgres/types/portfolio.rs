@@ -4,23 +4,13 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// Portfolio-wide allocation semantics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
 #[repr(i16)]
 pub enum AllocationMode {
     /// Every Portfolio Asset allocation is an absolute Portfolio target.
     Simple = 1,
     /// Asset Class targets are absolute and Portfolio Asset allocations are relative within a class.
     Strategic = 2,
-}
-
-impl AllocationMode {
-    /// Returns the stable v2 wire name for this mode.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Simple => "simple",
-            Self::Strategic => "strategic",
-        }
-    }
 }
 
 /// A row from the `portfolios` table.
@@ -39,7 +29,6 @@ pub struct PortfolioRow {
     /// The timestamp supplied by the client for synchronization.
     pub last_updated_at: DateTime<Utc>,
     /// The portfolio-wide allocation semantics.
-    #[sqlx(try_from = "i16")]
     pub allocation_mode: AllocationMode,
     /// The optional portfolio drift band used by rebalancing.
     pub drift_band: Option<Decimal>,

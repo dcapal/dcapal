@@ -44,7 +44,7 @@ pub struct PortfolioVersion {
     pub updated_at: DateTime,
 }
 
-/// One stored Portfolio Asset together with its stored allocation weight.
+/// One Portfolio Asset together with its allocation weight.
 ///
 /// The weight is an absolute target in Simple mode and a relative target in
 /// Strategic mode; which one it is depends on the Portfolio's mode.
@@ -55,13 +55,13 @@ pub struct StoredAsset {
     pub weight: Decimal,
 }
 
-/// The stored content of a live (not deleted) Portfolio, as persisted.
+/// The content of a live Portfolio in its neutral stored shape: every stored
+/// value is kept regardless of the Allocation Mode.
 ///
-/// This is the neutral stored shape: it keeps every stored value regardless
-/// of the Allocation Mode, and [`StoredPortfolio::to_portfolio`] projects it
-/// to the aggregate clients see.
+/// It is both what the store holds and what a write persists;
+/// [`PortfolioContent::to_client`] projects it to the aggregate clients see.
 #[derive(Debug, Clone, PartialEq)]
-pub struct StoredAggregate {
+pub struct PortfolioContent {
     pub name: String,
     pub quote_currency: String,
     pub allocation_mode: AllocationMode,
@@ -70,8 +70,110 @@ pub struct StoredAggregate {
     /// Whether a Strategic Allocation object (possibly empty) was submitted.
     pub strategic_allocation_present: bool,
     pub assets: Vec<StoredAsset>,
-    /// Stored Strategic Asset Class targets, kept even in Simple mode.
+    /// Strategic Asset Class targets, kept even in Simple mode.
     pub class_targets: Vec<StrategicAssetClassTargetV2>,
+}
+
+impl PortfolioContent {
+    /// Builds the content to store from a submitted aggregate, deriving each
+    /// asset weight for the aggregate's mode: its own target in Simple mode,
+    /// its relative Strategic target (zero when absent) in Strategic mode.
+    /// Assets keep their submitted order.
+    fn from_submitted(submitted: &PortfolioV2) -> Self {
+        let relative_targets: HashMap<&AssetRef, Decimal> = submitted
+            .strategic_allocation
+            .iter()
+            .flat_map(|allocation| &allocation.asset_targets)
+            .map(|target| (&target.asset, target.relative_target_weight))
+            .collect();
+        let assets = submitted
+            .assets
+            .iter()
+            .map(|asset| StoredAsset {
+                asset: PortfolioAssetV2 {
+                    target_weight: None,
+                    ..asset.clone()
+                },
+                weight: match submitted.allocation_mode {
+                    AllocationMode::Simple => asset.target_weight.unwrap_or_default(),
+                    AllocationMode::Strategic => relative_targets
+                        .get(&asset.asset)
+                        .copied()
+                        .unwrap_or_default(),
+                },
+            })
+            .collect();
+        Self {
+            name: submitted.name.clone(),
+            quote_currency: submitted.quote_currency.clone(),
+            allocation_mode: submitted.allocation_mode,
+            drift_band: submitted.drift_band,
+            fees: submitted.fees.clone(),
+            strategic_allocation_present: submitted.strategic_allocation.is_some(),
+            assets,
+            class_targets: submitted
+                .strategic_allocation
+                .as_ref()
+                .map(|allocation| allocation.asset_class_targets.clone())
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Builds the aggregate clients see.
+    ///
+    /// Assets are ordered by provider identifier and symbol and class targets
+    /// by class. In Simple mode each asset carries its absolute target and a
+    /// present Strategic Allocation is empty; in Strategic mode assets carry
+    /// no own target and the Strategic Allocation lists the class targets and
+    /// the relative target of every asset.
+    pub fn to_client(&self, id: Uuid, last_updated_at: DateTime) -> PortfolioV2 {
+        let simple = self.allocation_mode == AllocationMode::Simple;
+        let mut assets = self.assets.clone();
+        assets.sort_by(|a, b| {
+            (a.asset.asset.provider.as_str(), &a.asset.asset.symbol)
+                .cmp(&(b.asset.asset.provider.as_str(), &b.asset.asset.symbol))
+        });
+        let mut class_targets = self.class_targets.clone();
+        class_targets.sort_by_key(|target| target.asset_class);
+
+        let strategic_allocation = self.strategic_allocation_present.then(|| {
+            if simple {
+                StrategicAllocationV2 {
+                    asset_class_targets: Vec::new(),
+                    asset_targets: Vec::new(),
+                }
+            } else {
+                StrategicAllocationV2 {
+                    asset_class_targets: class_targets,
+                    asset_targets: assets
+                        .iter()
+                        .map(|stored| StrategicAssetTargetV2 {
+                            asset: stored.asset.asset.clone(),
+                            relative_target_weight: stored.weight,
+                        })
+                        .collect(),
+                }
+            }
+        });
+
+        PortfolioV2 {
+            id,
+            name: self.name.clone(),
+            quote_currency: self.quote_currency.clone(),
+            allocation_mode: self.allocation_mode,
+            drift_band: self.drift_band,
+            fees: self.fees.clone(),
+            assets: assets
+                .into_iter()
+                .map(|stored| PortfolioAssetV2 {
+                    target_weight: simple.then_some(stored.weight),
+                    ..stored.asset
+                })
+                .collect(),
+            strategic_allocation,
+            last_updated_at,
+        }
+    }
 }
 
 /// A Portfolio of the synchronizing user as it is stored.
@@ -80,7 +182,7 @@ pub struct StoredPortfolio {
     pub id: Uuid,
     pub version: PortfolioVersion,
     /// The stored content, absent exactly when the Portfolio is a tombstone.
-    pub aggregate: Option<StoredAggregate>,
+    pub content: Option<PortfolioContent>,
 }
 
 impl StoredPortfolio {
@@ -92,19 +194,8 @@ impl StoredPortfolio {
     /// Projects the stored content to the aggregate returned to clients, or
     /// `None` for a tombstone.
     pub fn to_portfolio(&self) -> Option<PortfolioV2> {
-        let aggregate = self.aggregate.as_ref()?;
-        Some(project(Projection {
-            id: self.id,
-            name: aggregate.name.clone(),
-            quote_currency: aggregate.quote_currency.clone(),
-            allocation_mode: aggregate.allocation_mode,
-            drift_band: aggregate.drift_band,
-            fees: aggregate.fees.clone(),
-            last_updated_at: self.version.last_updated_at,
-            strategic_allocation_present: aggregate.strategic_allocation_present,
-            assets: aggregate.assets.clone(),
-            class_targets: aggregate.class_targets.clone(),
-        }))
+        let content = self.content.as_ref()?;
+        Some(content.to_client(self.id, self.version.last_updated_at))
     }
 }
 
@@ -123,94 +214,29 @@ pub enum WriteKind {
     Update,
 }
 
-/// The target weight of one Portfolio Asset, derived for the Portfolio's mode.
-#[derive(Debug, Clone, PartialEq)]
-pub struct AssetAllocation {
-    pub asset: AssetRef,
-    /// Absolute target in Simple mode, relative target in Strategic mode.
-    pub weight: Decimal,
-}
-
-/// A validated Portfolio aggregate to persist with everything derived from it.
+/// A validated Portfolio to persist, with everything derived from it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortfolioWrite {
     pub kind: WriteKind,
-    /// The submitted aggregate, with the timestamp reduced to the precision
-    /// the store keeps.
-    pub portfolio: PortfolioV2,
-    /// The allocation weight of every asset of `portfolio`, in its order.
-    pub allocations: Vec<AssetAllocation>,
-    /// Whether a Strategic Allocation object was submitted.
-    pub strategic_allocation_present: bool,
-    /// The Strategic Asset Class targets to store, whatever the mode is.
-    pub class_targets: Vec<StrategicAssetClassTargetV2>,
+    pub id: Uuid,
+    /// The submitted timestamp reduced to the precision the store keeps.
+    pub last_updated_at: DateTime,
+    pub content: PortfolioContent,
 }
 
 impl PortfolioWrite {
     fn new(kind: WriteKind, submitted: &PortfolioV2) -> Self {
-        let mut portfolio = submitted.clone();
-        portfolio.last_updated_at = store_precision(portfolio.last_updated_at);
-        let relative_targets: HashMap<&AssetRef, Decimal> = submitted
-            .strategic_allocation
-            .iter()
-            .flat_map(|allocation| &allocation.asset_targets)
-            .map(|target| (&target.asset, target.relative_target_weight))
-            .collect();
-        let allocations = submitted
-            .assets
-            .iter()
-            .map(|asset| AssetAllocation {
-                asset: asset.asset.clone(),
-                weight: match submitted.allocation_mode {
-                    AllocationMode::Simple => asset.target_weight.unwrap_or_default(),
-                    AllocationMode::Strategic => relative_targets
-                        .get(&asset.asset)
-                        .copied()
-                        .unwrap_or_default(),
-                },
-            })
-            .collect();
-        let class_targets = submitted
-            .strategic_allocation
-            .as_ref()
-            .map(|allocation| allocation.asset_class_targets.clone())
-            .unwrap_or_default();
         Self {
             kind,
-            strategic_allocation_present: submitted.strategic_allocation.is_some(),
-            portfolio,
-            allocations,
-            class_targets,
+            id: submitted.id,
+            last_updated_at: store_precision(submitted.last_updated_at),
+            content: PortfolioContent::from_submitted(submitted),
         }
     }
 
     /// Returns the aggregate clients see once this write is stored.
     pub fn to_response(&self) -> PortfolioV2 {
-        let weights: HashMap<&AssetRef, Decimal> = self
-            .allocations
-            .iter()
-            .map(|allocation| (&allocation.asset, allocation.weight))
-            .collect();
-        project(Projection {
-            id: self.portfolio.id,
-            name: self.portfolio.name.clone(),
-            quote_currency: self.portfolio.quote_currency.clone(),
-            allocation_mode: self.portfolio.allocation_mode,
-            drift_band: self.portfolio.drift_band,
-            fees: self.portfolio.fees.clone(),
-            last_updated_at: self.portfolio.last_updated_at,
-            strategic_allocation_present: self.strategic_allocation_present,
-            assets: self
-                .portfolio
-                .assets
-                .iter()
-                .map(|asset| StoredAsset {
-                    asset: asset.clone(),
-                    weight: weights.get(&asset.asset).copied().unwrap_or_default(),
-                })
-                .collect(),
-            class_targets: self.class_targets.clone(),
-        })
+        self.content.to_client(self.id, self.last_updated_at)
     }
 }
 
@@ -230,11 +256,11 @@ pub struct Tombstone {
     pub kind: TombstoneKind,
 }
 
-/// The stored state a plan was derived from for one Portfolio identifier.
+/// The stored version a plan was derived from for one Portfolio identifier.
 ///
 /// The adapter must verify it still holds before applying the plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExpectedPortfolio {
+pub struct ExpectedVersion {
     pub id: Uuid,
     /// The version read from the snapshot, or `None` when no row of the user
     /// existed and none must exist when the plan is applied.
@@ -251,7 +277,7 @@ pub struct SyncPlan {
     /// The state the plan relies on: every identifier of the snapshot, of the
     /// submitted Portfolios and of the requested deletions, ordered by
     /// identifier.
-    pub expected: Vec<ExpectedPortfolio>,
+    pub expected: Vec<ExpectedVersion>,
     /// What the client is told once the plan has been applied.
     pub response: SyncPortfoliosV2Response,
 }
@@ -274,63 +300,97 @@ pub fn plan_sync(snapshot: &SyncSnapshot, request: &SyncPortfoliosV2Request) -> 
         .iter()
         .map(|portfolio| (portfolio.id, portfolio))
         .collect();
-    let incoming_ids: HashSet<Uuid> = request
-        .portfolios
-        .iter()
-        .map(|portfolio| portfolio.id)
-        .collect();
-    let requested_deleted_ids: HashSet<Uuid> = request.deleted_portfolios.iter().copied().collect();
 
+    let (writes, mut response) = plan_submitted(&stored, &request.portfolios);
+    echo_server_only(snapshot, request, &mut response);
+    let tombstones = plan_tombstones(&stored, &writes, request, &mut response);
+
+    SyncPlan {
+        expected: expected_versions(snapshot, request),
+        writes,
+        tombstones,
+        response,
+    }
+}
+
+/// Decides, for every submitted Portfolio, whether it is written or the stored
+/// copy wins, returning the writes and the response entries so far.
+fn plan_submitted(
+    stored: &HashMap<Uuid, &StoredPortfolio>,
+    submitted: &[PortfolioV2],
+) -> (Vec<PortfolioWrite>, SyncPortfoliosV2Response) {
     let mut writes = Vec::new();
-    let mut updated_portfolios = Vec::new();
-    let mut deleted_portfolios = Vec::new();
-    for submitted in &request.portfolios {
-        match stored.get(&submitted.id) {
-            Some(current) if !is_written(submitted, current) => {
+    let mut response = SyncPortfoliosV2Response::default();
+    for portfolio in submitted {
+        let current = stored.get(&portfolio.id);
+        match current {
+            Some(current) if !client_is_newer(portfolio, current) => {
                 if current.is_deleted() {
-                    deleted_portfolios.push(submitted.id);
+                    response.deleted_portfolios.push(portfolio.id);
                 } else {
-                    updated_portfolios.extend(current.to_portfolio());
+                    response.updated_portfolios.extend(current.to_portfolio());
                 }
             }
-            current => {
+            _ => {
                 let kind = if current.is_some() {
                     WriteKind::Update
                 } else {
                     WriteKind::Create
                 };
-                let write = PortfolioWrite::new(kind, submitted);
-                updated_portfolios.push(write.to_response());
+                let write = PortfolioWrite::new(kind, portfolio);
+                response.updated_portfolios.push(write.to_response());
                 writes.push(write);
             }
         }
     }
+    (writes, response)
+}
 
-    // Return server-side aggregates omitted by the client.
+/// Adds the server-side Portfolios the client neither submitted nor deleted.
+fn echo_server_only(
+    snapshot: &SyncSnapshot,
+    request: &SyncPortfoliosV2Request,
+    response: &mut SyncPortfoliosV2Response,
+) {
+    let mentioned: HashSet<Uuid> = request
+        .portfolios
+        .iter()
+        .map(|portfolio| portfolio.id)
+        .chain(request.deleted_portfolios.iter().copied())
+        .collect();
     for current in &snapshot.portfolios {
-        if incoming_ids.contains(&current.id) || requested_deleted_ids.contains(&current.id) {
+        if mentioned.contains(&current.id) {
             continue;
         }
         if current.is_deleted() {
-            deleted_portfolios.push(current.id);
+            response.deleted_portfolios.push(current.id);
         } else {
-            updated_portfolios.extend(current.to_portfolio());
+            response.updated_portfolios.extend(current.to_portfolio());
         }
     }
+}
 
+/// Turns the requested deletions into tombstones (once per identifier) and
+/// acknowledges each in the response.
+fn plan_tombstones(
+    stored: &HashMap<Uuid, &StoredPortfolio>,
+    writes: &[PortfolioWrite],
+    request: &SyncPortfoliosV2Request,
+    response: &mut SyncPortfoliosV2Response,
+) -> Vec<Tombstone> {
     let created_ids: HashSet<Uuid> = writes
         .iter()
         .filter(|write| write.kind == WriteKind::Create)
-        .map(|write| write.portfolio.id)
+        .map(|write| write.id)
         .collect();
-    let mut acknowledged: HashSet<Uuid> = deleted_portfolios.iter().copied().collect();
-    let mut tombstones = Vec::new();
+    let mut acknowledged: HashSet<Uuid> = response.deleted_portfolios.iter().copied().collect();
     let mut tombstoned = HashSet::new();
-    for deleted_id in &request.deleted_portfolios {
-        if tombstoned.insert(*deleted_id) {
-            let exists = stored.contains_key(deleted_id) || created_ids.contains(deleted_id);
+    let mut tombstones = Vec::new();
+    for &id in &request.deleted_portfolios {
+        if tombstoned.insert(id) {
+            let exists = stored.contains_key(&id) || created_ids.contains(&id);
             tombstones.push(Tombstone {
-                id: *deleted_id,
+                id,
                 kind: if exists {
                     TombstoneKind::Mark
                 } else {
@@ -338,37 +398,41 @@ pub fn plan_sync(snapshot: &SyncSnapshot, request: &SyncPortfoliosV2Request) -> 
                 },
             });
         }
-        if acknowledged.insert(*deleted_id) {
-            deleted_portfolios.push(*deleted_id);
+        if acknowledged.insert(id) {
+            response.deleted_portfolios.push(id);
         }
     }
+    tombstones
+}
 
+/// Collects the stored version each involved identifier must still have when
+/// the plan is applied, ordered by identifier.
+fn expected_versions(
+    snapshot: &SyncSnapshot,
+    request: &SyncPortfoliosV2Request,
+) -> Vec<ExpectedVersion> {
     let mut expected: BTreeMap<Uuid, Option<PortfolioVersion>> = snapshot
         .portfolios
         .iter()
         .map(|portfolio| (portfolio.id, Some(portfolio.version.clone())))
         .collect();
-    for id in incoming_ids.iter().chain(&requested_deleted_ids) {
-        expected.entry(*id).or_insert(None);
+    let involved = request
+        .portfolios
+        .iter()
+        .map(|portfolio| portfolio.id)
+        .chain(request.deleted_portfolios.iter().copied());
+    for id in involved {
+        expected.entry(id).or_insert(None);
     }
-
-    SyncPlan {
-        writes,
-        tombstones,
-        expected: expected
-            .into_iter()
-            .map(|(id, version)| ExpectedPortfolio { id, version })
-            .collect(),
-        response: SyncPortfoliosV2Response {
-            updated_portfolios,
-            deleted_portfolios,
-        },
-    }
+    expected
+        .into_iter()
+        .map(|(id, version)| ExpectedVersion { id, version })
+        .collect()
 }
 
-/// Tells whether a submitted Portfolio must be written: the stored one is not
-/// a tombstone and is strictly older than the submitted one.
-fn is_written(submitted: &PortfolioV2, current: &StoredPortfolio) -> bool {
+/// Tells whether the client's copy must replace the stored one: the stored
+/// Portfolio is not a tombstone and is strictly older than the submitted one.
+fn client_is_newer(submitted: &PortfolioV2, current: &StoredPortfolio) -> bool {
     !current.is_deleted() && current.version.last_updated_at < submitted.last_updated_at
 }
 
@@ -378,78 +442,6 @@ fn store_precision(timestamp: DateTime) -> DateTime {
     timestamp
         .with_nanosecond(timestamp.nanosecond() / 1_000 * 1_000)
         .unwrap_or(timestamp)
-}
-
-/// The values from which the client-facing aggregate is projected.
-struct Projection {
-    id: Uuid,
-    name: String,
-    quote_currency: String,
-    allocation_mode: AllocationMode,
-    drift_band: Option<Decimal>,
-    fees: Option<TransactionFees>,
-    last_updated_at: DateTime,
-    strategic_allocation_present: bool,
-    assets: Vec<StoredAsset>,
-    class_targets: Vec<StrategicAssetClassTargetV2>,
-}
-
-/// Builds the aggregate clients see from stored values.
-///
-/// Assets are ordered by provider and symbol and class targets by class. In
-/// Simple mode each asset carries its absolute target and a present Strategic
-/// Allocation is empty; in Strategic mode assets carry no own target and the
-/// Strategic Allocation lists the class targets and the relative target of
-/// every asset.
-fn project(mut parts: Projection) -> PortfolioV2 {
-    parts.assets.sort_by(|a, b| {
-        (a.asset.asset.provider.as_str(), &a.asset.asset.symbol)
-            .cmp(&(b.asset.asset.provider.as_str(), &b.asset.asset.symbol))
-    });
-    parts.class_targets.sort_by_key(|target| target.asset_class);
-    let simple = parts.allocation_mode == AllocationMode::Simple;
-
-    let strategic_allocation = parts
-        .strategic_allocation_present
-        .then(|| StrategicAllocationV2 {
-            asset_class_targets: if simple {
-                Vec::new()
-            } else {
-                parts.class_targets.clone()
-            },
-            asset_targets: if simple {
-                Vec::new()
-            } else {
-                parts
-                    .assets
-                    .iter()
-                    .map(|asset| StrategicAssetTargetV2 {
-                        asset: asset.asset.asset.clone(),
-                        relative_target_weight: asset.weight,
-                    })
-                    .collect()
-            },
-        });
-    let assets = parts
-        .assets
-        .into_iter()
-        .map(|stored| PortfolioAssetV2 {
-            target_weight: simple.then_some(stored.weight),
-            ..stored.asset
-        })
-        .collect();
-
-    PortfolioV2 {
-        id: parts.id,
-        name: parts.name,
-        quote_currency: parts.quote_currency,
-        allocation_mode: parts.allocation_mode,
-        drift_band: parts.drift_band,
-        fees: parts.fees,
-        assets,
-        strategic_allocation,
-        last_updated_at: parts.last_updated_at,
-    }
 }
 
 #[cfg(test)]
@@ -511,35 +503,10 @@ mod tests {
 
     /// Stores `portfolio` as the snapshot would hold its projection.
     fn stored(portfolio: &PortfolioV2, version: PortfolioVersion) -> StoredPortfolio {
-        let write = PortfolioWrite::new(WriteKind::Update, portfolio);
-        let weights: HashMap<&AssetRef, Decimal> = write
-            .allocations
-            .iter()
-            .map(|allocation| (&allocation.asset, allocation.weight))
-            .collect();
         StoredPortfolio {
             id: portfolio.id,
             version,
-            aggregate: Some(StoredAggregate {
-                name: portfolio.name.clone(),
-                quote_currency: portfolio.quote_currency.clone(),
-                allocation_mode: portfolio.allocation_mode,
-                drift_band: portfolio.drift_band,
-                fees: portfolio.fees.clone(),
-                strategic_allocation_present: write.strategic_allocation_present,
-                assets: portfolio
-                    .assets
-                    .iter()
-                    .map(|asset| StoredAsset {
-                        asset: PortfolioAssetV2 {
-                            target_weight: None,
-                            ..asset.clone()
-                        },
-                        weight: weights[&asset.asset],
-                    })
-                    .collect(),
-                class_targets: write.class_targets,
-            }),
+            content: Some(PortfolioContent::from_submitted(portfolio)),
         }
     }
 
@@ -547,7 +514,7 @@ mod tests {
         StoredPortfolio {
             id,
             version: version(day, true),
-            aggregate: None,
+            content: None,
         }
     }
 
@@ -607,10 +574,10 @@ mod tests {
 
         assert_eq!(plan.writes.len(), 1);
         assert_eq!(plan.writes[0].kind, WriteKind::Create);
-        assert_eq!(plan.writes[0].portfolio, submitted);
+        assert_eq!(plan.writes[0].to_response(), submitted);
         assert_eq!(
             plan.expected,
-            vec![ExpectedPortfolio {
+            vec![ExpectedVersion {
                 id: A,
                 version: None
             }]
@@ -783,7 +750,7 @@ mod tests {
 
         let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
 
-        assert_eq!(plan.writes[0].allocations[0].weight, Decimal::ZERO);
+        assert_eq!(plan.writes[0].content.assets[0].weight, Decimal::ZERO);
         assert_eq!(
             plan.response.updated_portfolios[0].assets[0].target_weight,
             Some(Decimal::ZERO)
@@ -814,9 +781,10 @@ mod tests {
         let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
 
         let weights: Vec<_> = plan.writes[0]
-            .allocations
+            .content
+            .assets
             .iter()
-            .map(|allocation| (allocation.asset.symbol.as_str(), allocation.weight))
+            .map(|stored| (stored.asset.asset.symbol.as_str(), stored.weight))
             .collect();
         assert_eq!(weights, vec![("VWCE", dec!(100.00)), ("CASH", dec!(0))]);
         let response = &plan.response.updated_portfolios[0];
@@ -861,8 +829,8 @@ mod tests {
 
         let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
 
-        assert!(!plan.writes[0].strategic_allocation_present);
-        assert_eq!(plan.writes[0].allocations[0].weight, Decimal::ZERO);
+        assert!(!plan.writes[0].content.strategic_allocation_present);
+        assert_eq!(plan.writes[0].content.assets[0].weight, Decimal::ZERO);
         assert_eq!(
             plan.response.updated_portfolios[0].strategic_allocation,
             None
@@ -887,7 +855,7 @@ mod tests {
 
         let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
 
-        assert_eq!(plan.writes[0].class_targets.len(), 1);
+        assert_eq!(plan.writes[0].content.class_targets.len(), 1);
         assert_eq!(
             plan.response.updated_portfolios[0].strategic_allocation,
             Some(StrategicAllocationV2 {
@@ -921,7 +889,7 @@ mod tests {
             .map(|a| (a.asset.provider.as_str(), a.asset.symbol.as_str()))
             .collect();
         assert_eq!(ordered, [("kraken", "BTC"), ("yf", "AAA"), ("yf", "ZZZ")]);
-        assert_eq!(plan.writes[0].portfolio.assets[0].asset.symbol, "ZZZ");
+        assert_eq!(plan.writes[0].content.assets[0].asset.asset.symbol, "ZZZ");
     }
 
     #[test]
@@ -963,7 +931,7 @@ mod tests {
         let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
 
         let expected = at(2) + Duration::nanoseconds(123_456_000);
-        assert_eq!(plan.writes[0].portfolio.last_updated_at, expected);
+        assert_eq!(plan.writes[0].last_updated_at, expected);
         assert_eq!(
             plan.response.updated_portfolios[0].last_updated_at,
             expected
@@ -1002,15 +970,15 @@ mod tests {
         assert_eq!(
             plan.expected,
             vec![
-                ExpectedPortfolio {
+                ExpectedVersion {
                     id: A,
                     version: None
                 },
-                ExpectedPortfolio {
+                ExpectedVersion {
                     id: B,
                     version: Some(version(1, false))
                 },
-                ExpectedPortfolio {
+                ExpectedVersion {
                     id: C,
                     version: None
                 },

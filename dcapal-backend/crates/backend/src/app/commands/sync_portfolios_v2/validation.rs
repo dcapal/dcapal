@@ -11,7 +11,8 @@ use crate::app::domain::{
     },
 };
 
-const SCHEMA_VERSION: u16 = 2;
+/// The only accepted request schema version.
+pub const SCHEMA_VERSION: u16 = 2;
 
 const FIELD_SCHEMA_VERSION: &str = "schemaVersion";
 const FIELD_DELETED_PORTFOLIOS: &str = "deletedPortfolios";
@@ -40,7 +41,7 @@ const FIELD_ASSET_CLASS_TARGETS: &str = "assetClassTargets";
 const FIELD_ASSET_TARGETS: &str = "assetTargets";
 const FIELD_RELATIVE_TARGET_WEIGHT: &str = "relativeTargetWeight";
 
-const MESSAGE_SCHEMA_VERSION: &str = "must be 2";
+const MESSAGE_SCHEMA_VERSION: &str = const_format::formatcp!("must be {SCHEMA_VERSION}");
 const MESSAGE_DUPLICATE_PORTFOLIO_ID: &str = "duplicate Portfolio id";
 const MESSAGE_PORTFOLIO_DELETED_AND_SYNCED: &str = "cannot be both synchronized and deleted";
 const MESSAGE_NOT_EMPTY: &str = "must not be empty";

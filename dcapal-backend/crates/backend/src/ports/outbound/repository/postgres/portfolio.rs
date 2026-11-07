@@ -7,7 +7,7 @@ use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
 
 use crate::app::domain::{
-    portfolio::{FeeStructure as AppFeeStructure, TransactionFees},
+    portfolio::{FeeStructure as AppFeeStructure, FeeType, TransactionFees},
     portfolio_sync::{SyncPlan, SyncSnapshot},
 };
 use crate::ports::{
@@ -22,6 +22,41 @@ use crate::ports::{
 };
 mod sync_apply;
 mod sync_snapshot;
+
+/// The columns of a Portfolio Asset joined with its shared asset data, which
+/// together form a [`PortfolioAssetRow`] (its `target_weight` is added by
+/// [`ASSET_SELECT`]).
+const ASSET_COLUMNS: &str = "pa.id, pa.portfolio_id, pa.assets_data_id,
+    ad.symbol, ad.name, ad.asset_class, pa.asset_class_override, ad.currency, ad.provider,
+    pa.quantity, pa.manual_price, pa.max_fee_impact, pa.fee_type, pa.fee_amount,
+    pa.fee_rate, pa.min_fee, pa.max_fee, pa.average_buy_price, pa.created_at, pa.updated_at";
+
+/// Selects [`PortfolioAssetRow`]s. The effective target weight of a Strategic
+/// Portfolio Asset is its relative weight scaled by its class target; `$2` is
+/// the stored Strategic allocation mode. Callers append the `WHERE` clause.
+const ASSET_SELECT: &str = const_format::formatcp!(
+    "SELECT {ASSET_COLUMNS},
+            CASE WHEN p.allocation_mode = $2
+                 THEN COALESCE(paa.weight, 0) * COALESCE(class_target.target_weight, 0) / 100
+                 ELSE COALESCE(paa.weight, 0)
+            END AS target_weight
+     FROM portfolio_asset AS pa
+     JOIN portfolios AS p ON p.id = pa.portfolio_id
+     JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+     LEFT JOIN portfolio_asset_allocation AS paa
+       ON paa.portfolio_id = pa.portfolio_id AND paa.portfolio_asset_id = pa.id
+     LEFT JOIN strategic_asset_class_targets AS class_target
+       ON class_target.portfolio_id = pa.portfolio_id
+      AND class_target.asset_class = COALESCE(pa.asset_class_override, ad.asset_class)"
+);
+
+/// Selects the given Portfolio Assets (`$1`: relationship identifiers).
+const ASSETS_BY_ID_SQL: &str = const_format::formatcp!("{ASSET_SELECT} WHERE pa.id = ANY($1)");
+
+/// Selects the assets of the given Portfolios (`$1`: Portfolio identifiers).
+const ASSETS_BY_PORTFOLIO_SQL: &str = const_format::formatcp!(
+    "{ASSET_SELECT} WHERE pa.portfolio_id = ANY($1) ORDER BY pa.portfolio_id, pa.id"
+);
 
 /// PostgreSQL persistence for portfolios and their assets.
 #[derive(Clone)]
@@ -43,33 +78,30 @@ impl FeeFields {
     ///
     /// An absent policy leaves every fee column empty.
     fn from_fees(fees: Option<&TransactionFees>) -> Self {
-        match fees {
-            Some(fees) => match fees.fee_structure {
-                AppFeeStructure::ZeroFee => Self {
-                    max_fee_impact: fees.max_fee_impact,
-                    fee_type: Some(fees.fee_structure.to_string()),
-                    ..Default::default()
-                },
-                AppFeeStructure::Fixed { fee_amount } => Self {
-                    max_fee_impact: fees.max_fee_impact,
-                    fee_type: Some(fees.fee_structure.to_string()),
-                    fee_amount: Some(fee_amount),
-                    ..Default::default()
-                },
-                AppFeeStructure::Variable {
-                    fee_rate,
-                    min_fee,
-                    max_fee,
-                } => Self {
-                    max_fee_impact: fees.max_fee_impact,
-                    fee_type: Some(fees.fee_structure.to_string()),
-                    fee_rate: Some(fee_rate),
-                    min_fee,
-                    max_fee,
-                    ..Default::default()
-                },
+        let Some(fees) = fees else {
+            return Self::default();
+        };
+        let base = Self {
+            max_fee_impact: fees.max_fee_impact,
+            fee_type: Some(fees.fee_structure.fee_type().to_string()),
+            ..Default::default()
+        };
+        match fees.fee_structure {
+            AppFeeStructure::ZeroFee => base,
+            AppFeeStructure::Fixed { fee_amount } => Self {
+                fee_amount: Some(fee_amount),
+                ..base
             },
-            None => Self::default(),
+            AppFeeStructure::Variable {
+                fee_rate,
+                min_fee,
+                max_fee,
+            } => Self {
+                fee_rate: Some(fee_rate),
+                min_fee,
+                max_fee,
+                ..base
+            },
         }
     }
 }
@@ -80,30 +112,9 @@ struct AssetData {
     id: Uuid,
     symbol: String,
     name: String,
-    #[sqlx(try_from = "i16")]
     asset_class: DbAssetClass,
     currency: String,
-    #[sqlx(try_from = "i16")]
     provider: DbProvider,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-}
-/// Portfolio-specific values returned by relationship writes.
-#[derive(Debug, sqlx::FromRow)]
-struct PortfolioAssetRecord {
-    id: Uuid,
-    portfolio_id: Uuid,
-    assets_data_id: Uuid,
-    asset_class_override: Option<i16>,
-    quantity: Decimal,
-    manual_price: Option<Decimal>,
-    max_fee_impact: Option<Decimal>,
-    fee_type: Option<String>,
-    fee_amount: Option<Decimal>,
-    fee_rate: Option<Decimal>,
-    min_fee: Option<Decimal>,
-    max_fee: Option<Decimal>,
-    average_buy_price: Option<Decimal>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -141,63 +152,6 @@ impl AssetData {
             created_at: now,
             updated_at: now,
         }
-    }
-}
-impl PortfolioAssetRecord {
-    fn candidate(
-        portfolio_id: Uuid,
-        assets_data_id: Uuid,
-        asset_class_override: Option<DbAssetClass>,
-        asset: &PortfolioAssetInput,
-        fee_fields: &FeeFields,
-    ) -> Self {
-        let now = Utc::now();
-        Self {
-            id: Uuid::now_v7(),
-            portfolio_id,
-            assets_data_id,
-            asset_class_override: asset_class_override.map(i16::from),
-            quantity: asset.quantity,
-            manual_price: asset.manual_price,
-            max_fee_impact: fee_fields.max_fee_impact,
-            fee_type: fee_fields.fee_type.clone(),
-            fee_amount: fee_fields.fee_amount,
-            fee_rate: fee_fields.fee_rate,
-            min_fee: fee_fields.min_fee,
-            max_fee: fee_fields.max_fee,
-            average_buy_price: asset.average_buy_price,
-            created_at: now,
-            updated_at: now,
-        }
-    }
-}
-fn combine_asset_rows(
-    asset_data: AssetData,
-    relationship: PortfolioAssetRecord,
-    target_weight: Decimal,
-) -> PortfolioAssetRow {
-    PortfolioAssetRow {
-        id: relationship.id,
-        portfolio_id: relationship.portfolio_id,
-        assets_data_id: asset_data.id,
-        symbol: asset_data.symbol,
-        name: asset_data.name,
-        asset_class: asset_data.asset_class,
-        asset_class_override: relationship.asset_class_override,
-        currency: asset_data.currency,
-        provider: asset_data.provider,
-        quantity: relationship.quantity,
-        target_weight,
-        manual_price: relationship.manual_price,
-        max_fee_impact: relationship.max_fee_impact,
-        fee_type: relationship.fee_type,
-        fee_amount: relationship.fee_amount,
-        fee_rate: relationship.fee_rate,
-        min_fee: relationship.min_fee,
-        max_fee: relationship.max_fee,
-        average_buy_price: relationship.average_buy_price,
-        created_at: relationship.created_at,
-        updated_at: relationship.updated_at,
     }
 }
 /// Stores the target weight of one Portfolio Asset relationship, replacing any
@@ -244,11 +198,11 @@ impl SqlxPortfolioRepository {
                        created_at, updated_at",
         )
         .bind(asset_data.id)
-        .bind(i16::from(asset_data.provider))
+        .bind(asset_data.provider)
         .bind(&asset_data.symbol)
         .bind(&asset_data.name)
         .bind(&asset_data.currency)
-        .bind(i16::from(asset_data.asset_class))
+        .bind(asset_data.asset_class)
         .bind(asset_data.created_at)
         .bind(asset_data.updated_at)
         .fetch_one(&mut **tx)
@@ -261,141 +215,88 @@ impl SqlxPortfolioRepository {
         assets: Vec<PortfolioAssetInput>,
     ) -> Result<Vec<PortfolioAssetRow>> {
         // Lock the current asset set so concurrent syncs cannot both reconcile it from stale data.
-        let existing_assets = query_as::<_, PortfolioAssetRow>(
-            "SELECT pa.id, pa.portfolio_id, pa.assets_data_id,
-                    ad.symbol, ad.name, ad.asset_class, pa.asset_class_override,
-                    ad.currency, ad.provider,
-                    pa.quantity, COALESCE(paa.weight, 0) AS target_weight, pa.manual_price,
-                    pa.max_fee_impact, pa.fee_type, pa.fee_amount,
-                    pa.fee_rate, pa.min_fee, pa.max_fee, pa.average_buy_price,
-                    pa.created_at, pa.updated_at
-             FROM portfolio_asset AS pa
-             JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-             LEFT JOIN portfolio_asset_allocation AS paa
-               ON paa.portfolio_id = pa.portfolio_id
-              AND paa.portfolio_asset_id = pa.id
-             WHERE pa.portfolio_id = $1
-             ORDER BY pa.id
-             FOR UPDATE OF pa",
+        let existing_ids: HashMap<Uuid, Uuid> = query_as::<_, (Uuid, Uuid)>(
+            "SELECT assets_data_id, id
+             FROM portfolio_asset
+             WHERE portfolio_id = $1
+             ORDER BY id
+             FOR UPDATE",
         )
         .bind(portfolio_id)
         .fetch_all(&mut **tx)
-        .await?;
-        let mut updated_assets = Vec::with_capacity(assets.len());
+        .await?
+        .into_iter()
+        .collect();
+
+        let mut relationship_ids = Vec::with_capacity(assets.len());
         for asset in &assets {
             let fee_fields = Self::extract_fee_fields(asset.fees.clone());
             let shared_asset = Self::upsert_asset_data(tx, &asset.asset_data).await?;
             let asset_class_override = (shared_asset.asset_class != asset.asset_data.asset_class)
                 .then_some(asset.asset_data.asset_class);
-            let existing_asset = existing_assets
-                .iter()
-                .find(|row| row.assets_data_id == shared_asset.id);
-            let candidate = PortfolioAssetRecord::candidate(
-                portfolio_id,
-                shared_asset.id,
-                asset_class_override,
-                asset,
-                &fee_fields,
-            );
-
-            let updated = if let Some(existing_asset) = existing_asset {
-                let relationship = query_as::<_, PortfolioAssetRecord>(
-                    "UPDATE portfolio_asset
-                     SET assets_data_id = $2, asset_class_override = $3,
-                         quantity = $4, manual_price = $5,
-                         average_buy_price = $6, max_fee_impact = $7, fee_type = $8,
-                         fee_amount = $9, fee_rate = $10, min_fee = $11, max_fee = $12,
-                         updated_at = $13
-                     WHERE id = $1
-                     RETURNING id, portfolio_id, assets_data_id, asset_class_override,
-                               quantity, manual_price, max_fee_impact, fee_type,
-                               fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
-                               created_at, updated_at",
-                )
-                .bind(existing_asset.id)
-                .bind(candidate.assets_data_id)
-                .bind(candidate.asset_class_override)
-                .bind(candidate.quantity)
-                .bind(candidate.manual_price)
-                .bind(candidate.average_buy_price)
-                .bind(candidate.max_fee_impact)
-                .bind(&candidate.fee_type)
-                .bind(candidate.fee_amount)
-                .bind(candidate.fee_rate)
-                .bind(candidate.min_fee)
-                .bind(candidate.max_fee)
-                .bind(candidate.updated_at)
-                .fetch_one(&mut **tx)
-                .await?;
-
-                upsert_allocation(
-                    tx,
-                    portfolio_id,
-                    relationship.id,
-                    asset.target_weight,
-                    candidate.updated_at,
-                )
-                .await?;
-
-                combine_asset_rows(shared_asset, relationship, asset.target_weight)
-            } else {
-                let relationship = query_as::<_, PortfolioAssetRecord>(
-                    "INSERT INTO portfolio_asset
-                         (id, portfolio_id, assets_data_id, asset_class_override,
-                          quantity, manual_price, average_buy_price, max_fee_impact,
-                          fee_type, fee_amount, fee_rate, min_fee, max_fee,
-                          created_at, updated_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-                     RETURNING id, portfolio_id, assets_data_id, asset_class_override,
-                               quantity, manual_price, max_fee_impact, fee_type,
-                               fee_amount, fee_rate, min_fee, max_fee, average_buy_price,
-                               created_at, updated_at",
-                )
-                .bind(candidate.id)
-                .bind(candidate.portfolio_id)
-                .bind(candidate.assets_data_id)
-                .bind(candidate.asset_class_override)
-                .bind(candidate.quantity)
-                .bind(candidate.manual_price)
-                .bind(candidate.average_buy_price)
-                .bind(candidate.max_fee_impact)
-                .bind(&candidate.fee_type)
-                .bind(candidate.fee_amount)
-                .bind(candidate.fee_rate)
-                .bind(candidate.min_fee)
-                .bind(candidate.max_fee)
-                .bind(candidate.created_at)
-                .bind(candidate.updated_at)
-                .fetch_one(&mut **tx)
-                .await?;
-
-                upsert_allocation(
-                    tx,
-                    portfolio_id,
-                    relationship.id,
-                    asset.target_weight,
-                    candidate.updated_at,
-                )
-                .await?;
-
-                combine_asset_rows(shared_asset, relationship, asset.target_weight)
-            };
-
-            updated_assets.push(updated);
+            // A kept asset keeps its relationship identifier; a new one gets a fresh UUIDv7.
+            let relationship_id = existing_ids
+                .get(&shared_asset.id)
+                .copied()
+                .unwrap_or_else(Uuid::now_v7);
+            let now = Utc::now();
+            query(
+                "INSERT INTO portfolio_asset
+                     (id, portfolio_id, assets_data_id, asset_class_override,
+                      quantity, manual_price, average_buy_price, max_fee_impact,
+                      fee_type, fee_amount, fee_rate, min_fee, max_fee,
+                      created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+                 ON CONFLICT (id) DO UPDATE SET
+                     assets_data_id = EXCLUDED.assets_data_id,
+                     asset_class_override = EXCLUDED.asset_class_override,
+                     quantity = EXCLUDED.quantity, manual_price = EXCLUDED.manual_price,
+                     average_buy_price = EXCLUDED.average_buy_price,
+                     max_fee_impact = EXCLUDED.max_fee_impact, fee_type = EXCLUDED.fee_type,
+                     fee_amount = EXCLUDED.fee_amount, fee_rate = EXCLUDED.fee_rate,
+                     min_fee = EXCLUDED.min_fee, max_fee = EXCLUDED.max_fee,
+                     updated_at = EXCLUDED.updated_at",
+            )
+            .bind(relationship_id)
+            .bind(portfolio_id)
+            .bind(shared_asset.id)
+            .bind(asset_class_override)
+            .bind(asset.quantity)
+            .bind(asset.manual_price)
+            .bind(asset.average_buy_price)
+            .bind(fee_fields.max_fee_impact)
+            .bind(&fee_fields.fee_type)
+            .bind(fee_fields.fee_amount)
+            .bind(fee_fields.fee_rate)
+            .bind(fee_fields.min_fee)
+            .bind(fee_fields.max_fee)
+            .bind(now)
+            .execute(&mut **tx)
+            .await?;
+            upsert_allocation(tx, portfolio_id, relationship_id, asset.target_weight, now).await?;
+            relationship_ids.push(relationship_id);
         }
-        let current_asset_ids: Vec<Uuid> = updated_assets
+
+        // Assets that are no longer submitted are removed (their allocation rows cascade).
+        query("DELETE FROM portfolio_asset WHERE portfolio_id = $1 AND id <> ALL($2)")
+            .bind(portfolio_id)
+            .bind(&relationship_ids)
+            .execute(&mut **tx)
+            .await?;
+
+        // Read the written rows back through the shared projection, in submitted order.
+        let mut rows = query_as::<_, PortfolioAssetRow>(ASSETS_BY_ID_SQL)
+            .bind(&relationship_ids)
+            .bind(DbAllocationMode::Strategic)
+            .fetch_all(&mut **tx)
+            .await?;
+        let position: HashMap<Uuid, usize> = relationship_ids
             .iter()
-            .map(|asset| asset.assets_data_id)
+            .enumerate()
+            .map(|(index, id)| (*id, index))
             .collect();
-        for existing_asset in existing_assets {
-            if !current_asset_ids.contains(&existing_asset.assets_data_id) {
-                query("DELETE FROM portfolio_asset WHERE id = $1")
-                    .bind(existing_asset.id)
-                    .execute(&mut **tx)
-                    .await?;
-            }
-        }
-        Ok(updated_assets)
+        rows.sort_by_key(|row| position[&row.id]);
+        Ok(rows)
     }
     #[allow(clippy::too_many_arguments)]
     async fn upsert_portfolio(
@@ -445,7 +346,7 @@ impl SqlxPortfolioRepository {
             .bind(&portfolio.name)
             .bind(&portfolio.quote_ccy)
             .bind(portfolio.last_updated_at)
-            .bind(i16::from(DbAllocationMode::Simple))
+            .bind(DbAllocationMode::Simple)
             .bind(fee_fields.max_fee_impact)
             .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
@@ -497,7 +398,7 @@ impl SqlxPortfolioRepository {
         match fees {
             Some(fees) => FeeFields::from_fees(Some(&TransactionFees::from(fees))),
             None => FeeFields {
-                fee_type: Some(AppFeeStructure::ZeroFee.to_string()),
+                fee_type: Some(FeeType::ZeroFee.to_string()),
                 ..Default::default()
             },
         }
@@ -542,36 +443,11 @@ impl PortfolioRepository for SqlxPortfolioRepository {
         }
 
         let portfolio_ids: Vec<Uuid> = portfolios.iter().map(|portfolio| portfolio.id).collect();
-        let assets = query_as::<_, PortfolioAssetRow>(
-            "SELECT pa.id, pa.portfolio_id, pa.assets_data_id,
-                    ad.symbol, ad.name, ad.asset_class, pa.asset_class_override,
-                    ad.currency, ad.provider,
-                    pa.quantity,
-                    CASE WHEN p.allocation_mode = $2
-                         THEN COALESCE(paa.weight, 0)
-                              * COALESCE(class_target.target_weight, 0) / 100
-                         ELSE COALESCE(paa.weight, 0)
-                    END AS target_weight,
-                    pa.manual_price,
-                    pa.max_fee_impact, pa.fee_type, pa.fee_amount,
-                    pa.fee_rate, pa.min_fee, pa.max_fee, pa.average_buy_price,
-                    pa.created_at, pa.updated_at
-             FROM portfolio_asset AS pa
-             JOIN portfolios AS p ON p.id = pa.portfolio_id
-             JOIN assets_data AS ad ON ad.id = pa.assets_data_id
-             LEFT JOIN portfolio_asset_allocation AS paa
-               ON paa.portfolio_id = pa.portfolio_id
-              AND paa.portfolio_asset_id = pa.id
-             LEFT JOIN strategic_asset_class_targets AS class_target
-               ON class_target.portfolio_id = pa.portfolio_id
-              AND class_target.asset_class = COALESCE(pa.asset_class_override, ad.asset_class)
-             WHERE pa.portfolio_id = ANY($1)
-             ORDER BY pa.portfolio_id, pa.id",
-        )
-        .bind(&portfolio_ids)
-        .bind(i16::from(DbAllocationMode::Strategic))
-        .fetch_all(&self.pool)
-        .await?;
+        let assets = query_as::<_, PortfolioAssetRow>(ASSETS_BY_PORTFOLIO_SQL)
+            .bind(&portfolio_ids)
+            .bind(DbAllocationMode::Strategic)
+            .fetch_all(&self.pool)
+            .await?;
 
         let mut assets_by_portfolio: HashMap<Uuid, Vec<PortfolioAssetRow>> = HashMap::new();
         for asset in assets {

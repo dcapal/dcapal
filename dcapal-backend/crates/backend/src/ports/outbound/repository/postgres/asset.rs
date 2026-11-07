@@ -9,7 +9,7 @@ use crate::{
     ports::outbound::repository::{
         asset::{AssetDirectory, AssetDirectoryError},
         postgres::{
-            convert::{app_asset_class, app_provider, db_asset_class, db_provider, unnest_refs},
+            convert::unnest_refs,
             types::{AssetClass as DbAssetClass, Provider as DbProvider},
         },
     },
@@ -30,11 +30,11 @@ impl SqlxAssetDirectory {
 
 #[derive(sqlx::FromRow)]
 struct AssetRow {
-    provider: i16,
+    provider: DbProvider,
     symbol: String,
     name: String,
     currency: String,
-    asset_class: i16,
+    asset_class: DbAssetClass,
     metadata_source: i16,
 }
 
@@ -82,22 +82,13 @@ impl AssetDirectory for SqlxAssetDirectory {
                   created_at, updated_at) ",
         );
         let now = chrono::Utc::now();
-        let mut values = Vec::with_capacity(assets.len());
-        for asset in assets {
-            values.push((
-                Uuid::now_v7(),
-                i16::from(db_provider(&asset.provider)),
-                i16::from(db_asset_class(asset.asset_class)),
-                asset,
-            ));
-        }
-        builder.push_values(values, |mut row, (id, provider, class, asset)| {
-            row.push_bind(id)
-                .push_bind(provider)
+        builder.push_values(assets, |mut row, asset| {
+            row.push_bind(Uuid::now_v7())
+                .push_bind(DbProvider::from(&asset.provider))
                 .push_bind(&asset.symbol)
                 .push_bind(&asset.name)
                 .push_bind(&asset.currency)
-                .push_bind(class)
+                .push_bind(DbAssetClass::from(asset.asset_class))
                 .push_bind(i16::from(MetadataSource::ProviderConfirmed))
                 .push_bind(now)
                 .push_bind(now);
@@ -142,6 +133,8 @@ impl AssetDirectory for SqlxAssetDirectory {
     }
 }
 
+/// Decodes a stored row; only the metadata source is validated here, because
+/// the other enum columns are decoded by SQLx when the row is fetched.
 fn stored_asset(row: AssetRow) -> Result<StoredAsset, AssetDirectoryError> {
     let source = MetadataSource::try_from(row.metadata_source).map_err(|_| {
         AssetDirectoryError::CorruptData(format!(
@@ -150,24 +143,13 @@ fn stored_asset(row: AssetRow) -> Result<StoredAsset, AssetDirectoryError> {
         ))
     })?;
     Ok(StoredAsset {
-        asset: resolved_asset(row)?,
+        asset: ResolvedAsset {
+            provider: row.provider.into(),
+            symbol: row.symbol,
+            name: row.name,
+            currency: row.currency,
+            asset_class: row.asset_class.into(),
+        },
         source,
-    })
-}
-
-fn resolved_asset(row: AssetRow) -> Result<ResolvedAsset, AssetDirectoryError> {
-    let provider = DbProvider::try_from(row.provider).map_err(|_| {
-        AssetDirectoryError::CorruptData(format!("unknown provider code {}", row.provider))
-    })?;
-    let class = DbAssetClass::try_from(row.asset_class).map_err(|_| {
-        AssetDirectoryError::CorruptData(format!("unknown asset class code {}", row.asset_class))
-    })?;
-
-    Ok(ResolvedAsset {
-        provider: app_provider(provider),
-        symbol: row.symbol,
-        name: row.name,
-        currency: row.currency,
-        asset_class: app_asset_class(class),
     })
 }

@@ -1,11 +1,28 @@
+use std::sync::LazyLock;
+
 use derive_more::Display;
 use rust_decimal::Decimal;
+use strum::VariantNames;
 use uuid::Uuid;
 
 use crate::{DateTime, app::domain::asset::AssetRef};
 
 /// Provider supported by the Portfolio aggregate.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
+///
+/// The lowercase variant names are the canonical v2 provider identifiers.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Display,
+    strum::IntoStaticStr,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::VariantNames,
+)]
+#[strum(serialize_all = "lowercase", ascii_case_insensitive)]
 pub enum Provider {
     /// Yahoo Finance.
     YF,
@@ -15,11 +32,16 @@ pub enum Provider {
 
 impl Provider {
     /// Returns the canonical v2 provider identifier.
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::YF => "yf",
-            Self::Kraken => "kraken",
-        }
+    pub fn as_str(&self) -> &'static str {
+        self.into()
+    }
+
+    /// Returns every canonical provider identifier as a comma-separated list,
+    /// for validation messages.
+    pub fn names() -> &'static str {
+        static NAMES: LazyLock<String> =
+            LazyLock::new(|| <Provider as VariantNames>::VARIANTS.join(", "));
+        NAMES.as_str()
     }
 
     /// Tells whether the provider's own lookup yields metadata better than what
@@ -34,23 +56,33 @@ impl Provider {
         }
     }
 
-    /// Parses a canonical v2 provider identifier.
+    /// Parses a canonical v2 provider identifier, ignoring case and
+    /// surrounding whitespace.
     pub fn parse(value: &str) -> Option<Self> {
-        if value.trim().eq_ignore_ascii_case("yf") {
-            Some(Self::YF)
-        } else if value.trim().eq_ignore_ascii_case("kraken") {
-            Some(Self::Kraken)
-        } else {
-            None
-        }
+        value.trim().parse().ok()
     }
 }
 
 /// Asset class used by Portfolio allocation rules.
 ///
 /// The declaration order is the canonical ordering of class targets in
-/// synchronization responses (it matches the stored class codes).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display)]
+/// synchronization responses (it matches the stored class codes). The lowercase
+/// variant names are the canonical v2 asset-class identifiers.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Display,
+    strum::IntoStaticStr,
+    strum::EnumString,
+    strum::EnumIter,
+)]
+#[strum(serialize_all = "lowercase", ascii_case_insensitive)]
 pub enum AssetClass {
     /// Assets with no more specific classification.
     Other,
@@ -68,35 +100,22 @@ pub enum AssetClass {
 
 impl AssetClass {
     /// Returns the canonical v2 asset-class identifier.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Other => "other",
-            Self::Equity => "equity",
-            Self::Bond => "bond",
-            Self::Cash => "cash",
-            Self::Crypto => "crypto",
-            Self::Commodity => "commodity",
-        }
+    pub fn as_str(self) -> &'static str {
+        self.into()
     }
 
-    /// Parses a canonical v2 asset-class identifier.
+    /// Parses a canonical v2 asset-class identifier, ignoring case and
+    /// surrounding whitespace.
     pub fn parse(value: &str) -> Option<Self> {
-        let value = value.trim();
-        [
-            ("other", Self::Other),
-            ("equity", Self::Equity),
-            ("bond", Self::Bond),
-            ("cash", Self::Cash),
-            ("crypto", Self::Crypto),
-            ("commodity", Self::Commodity),
-        ]
-        .into_iter()
-        .find_map(|(name, class)| value.eq_ignore_ascii_case(name).then_some(class))
+        value.trim().parse().ok()
     }
 }
 
 /// Portfolio-wide allocation semantics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+///
+/// The lowercase variant names are the stable v2 wire names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, strum::IntoStaticStr, strum::EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum AllocationMode {
     /// Each Portfolio Asset target is an absolute Portfolio weight.
     Simple,
@@ -148,21 +167,30 @@ pub struct TransactionFees {
 }
 
 /// Fee policy variants persisted by the Portfolio aggregate.
-#[derive(Debug, Clone, PartialEq, Display)]
+///
+/// [`FeeType`] is the fieldless counterpart; its names are the values stored
+/// in the `fee_type` columns.
+#[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
+#[strum_discriminants(name(FeeType))]
+#[strum_discriminants(derive(strum::Display, strum::EnumString))]
 pub enum FeeStructure {
     /// No transaction fee applies.
-    #[display("ZeroFee")]
     ZeroFee,
     /// A fixed amount applies to each transaction.
-    #[display("Fixed")]
     Fixed { fee_amount: Decimal },
     /// A percentage rate applies, optionally bounded by minimum and maximum amounts.
-    #[display("Variable")]
     Variable {
         fee_rate: Decimal,
         min_fee: Option<Decimal>,
         max_fee: Option<Decimal>,
     },
+}
+
+impl FeeStructure {
+    /// Returns the fieldless kind of this fee policy.
+    pub fn fee_type(&self) -> FeeType {
+        self.into()
+    }
 }
 
 /// Complete v2 synchronization input after HTTP decoding.
@@ -191,8 +219,59 @@ pub struct PortfolioV2 {
 }
 
 /// Canonical synchronization result returned by the application service.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct SyncPortfoliosV2Response {
     pub updated_portfolios: Vec<PortfolioV2>,
     pub deleted_portfolios: Vec<Uuid>,
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn provider_names_are_lowercase_and_parse_case_insensitively() {
+        // GIVEN every supported provider,
+        // WHEN its identifier is read and parsed back, also with odd casing and padding,
+        // THEN identifiers are the lowercase names in declaration order and parsing
+        // accepts them, while unknown identifiers are rejected.
+        let names: Vec<_> = Provider::iter().map(|provider| provider.as_str()).collect();
+
+        assert_eq!(names, ["yf", "kraken"]);
+        assert_eq!(Provider::names(), "yf, kraken");
+        assert_eq!(Provider::parse(" Kraken "), Some(Provider::Kraken));
+        assert_eq!(Provider::parse("YF"), Some(Provider::YF));
+        assert_eq!(Provider::parse("ibkr"), None);
+    }
+
+    #[test]
+    fn asset_class_names_round_trip() {
+        // GIVEN every asset class,
+        // WHEN its identifier is read and parsed back,
+        // THEN the lowercase name parses to the same class, ignoring case and padding.
+        for class in AssetClass::iter() {
+            assert_eq!(AssetClass::parse(class.as_str()), Some(class));
+            assert_eq!(
+                AssetClass::parse(&format!(" {} ", class.as_str().to_uppercase())),
+                Some(class)
+            );
+        }
+
+        assert_eq!(AssetClass::Commodity.as_str(), "commodity");
+        assert_eq!(AssetClass::parse("currency"), None);
+    }
+
+    #[test]
+    fn allocation_mode_and_fee_type_use_their_stored_names() {
+        // GIVEN the allocation modes and fee policies,
+        // WHEN they are rendered as names,
+        // THEN modes are lowercase and fee types keep the stored variant names.
+        assert_eq!(<&str>::from(AllocationMode::Simple), "simple");
+        assert_eq!("strategic".parse(), Ok(AllocationMode::Strategic));
+        assert_eq!(FeeStructure::ZeroFee.fee_type().to_string(), "ZeroFee");
+        assert_eq!(FeeType::Fixed.to_string(), "Fixed");
+        assert_eq!("Variable".parse(), Ok(FeeType::Variable));
+    }
 }

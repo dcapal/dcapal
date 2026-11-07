@@ -150,7 +150,7 @@ impl TryFrom<AssetRefV2> for AssetRef {
 
     fn try_from(reference: AssetRefV2) -> Result<Self, Self::Error> {
         let provider = app::Provider::parse(&reference.provider)
-            .ok_or_else(|| V2ConversionError::field("provider", KNOWN_PROVIDER_MESSAGE))?;
+            .ok_or_else(|| V2ConversionError::field("provider", known_provider_message()))?;
         Ok(Self {
             provider,
             symbol: AssetRef::canonical_symbol(&reference.symbol),

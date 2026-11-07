@@ -9,23 +9,30 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
+use const_format::formatcp;
 use rust_decimal::Decimal;
-use sqlx::{Postgres, Transaction, query, query_as};
+use sqlx::{
+    Postgres, Row, Transaction,
+    postgres::{PgArguments, PgRow},
+    query,
+    query::Query,
+    query_as,
+};
 use uuid::Uuid;
 
 use crate::app::domain::{
     asset::AssetRef,
     portfolio_sync::{
-        ExpectedPortfolio, PortfolioVersion, PortfolioWrite, SyncPlan, TombstoneKind, WriteKind,
+        ExpectedVersion, PortfolioVersion, PortfolioWrite, SyncPlan, TombstoneKind, WriteKind,
     },
 };
 use crate::ports::outbound::repository::portfolio::{
     OwnershipConflict, PortfolioRepositoryError, Result,
 };
-use crate::ports::outbound::repository::postgres::convert::{
-    db_allocation_mode, db_asset_class, unnest_refs,
+use crate::ports::outbound::repository::postgres::convert::unnest_refs;
+use crate::ports::outbound::repository::postgres::types::{
+    AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
 };
-use crate::ports::outbound::repository::postgres::types::AllocationMode as DbAllocationMode;
 
 use super::{FeeFields, SqlxPortfolioRepository};
 
@@ -42,16 +49,10 @@ type LockedRow = (
 /// The name of the unique index on `portfolios.id`.
 const PORTFOLIO_PRIMARY_KEY: &str = "portfolios_pkey";
 
-/// The columns of the Portfolios to insert or update, one array per column.
+/// The fee columns shared by Portfolios and Portfolio Assets, one array per
+/// column. They are always bound first, as `$1` to `$6`.
 #[derive(Default)]
-struct PortfolioColumns {
-    ids: Vec<Uuid>,
-    names: Vec<String>,
-    currencies: Vec<String>,
-    last_updated_at: Vec<chrono::DateTime<Utc>>,
-    allocation_modes: Vec<i16>,
-    drift_bands: Vec<Option<Decimal>>,
-    strategic_present: Vec<bool>,
+struct FeeColumns {
     max_fee_impacts: Vec<Option<Decimal>>,
     fee_types: Vec<Option<String>>,
     fee_amounts: Vec<Option<Decimal>>,
@@ -60,31 +61,124 @@ struct PortfolioColumns {
     max_fees: Vec<Option<Decimal>>,
 }
 
+impl FeeColumns {
+    fn push(&mut self, fees: FeeFields) {
+        self.max_fee_impacts.push(fees.max_fee_impact);
+        self.fee_types.push(fees.fee_type);
+        self.fee_amounts.push(fees.fee_amount);
+        self.fee_rates.push(fees.fee_rate);
+        self.min_fees.push(fees.min_fee);
+        self.max_fees.push(fees.max_fee);
+    }
+
+    /// Binds the arrays as `$1` to `$6`, matching [`FEE_ARRAYS`].
+    fn bind<'q>(
+        &'q self,
+        query: Query<'q, Postgres, PgArguments>,
+    ) -> Query<'q, Postgres, PgArguments> {
+        query
+            .bind(&self.max_fee_impacts)
+            .bind(&self.fee_types)
+            .bind(&self.fee_amounts)
+            .bind(&self.fee_rates)
+            .bind(&self.min_fees)
+            .bind(&self.max_fees)
+    }
+}
+
+/// The typed `UNNEST` arguments of [`FeeColumns`], in bind order.
+const FEE_ARRAYS: &str =
+    "$1::numeric[], $2::text[], $3::numeric[], $4::numeric[], $5::numeric[], $6::numeric[]";
+
+/// The fee columns in the order of [`FEE_ARRAYS`].
+const FEE_COLUMNS: &str = "max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee";
+
+/// The `SET` assignments copying the fee columns from the row source `$source`.
+macro_rules! fee_set {
+    ($source:literal) => {
+        concat!(
+            "max_fee_impact = ",
+            $source,
+            ".max_fee_impact, fee_type = ",
+            $source,
+            ".fee_type, fee_amount = ",
+            $source,
+            ".fee_amount, fee_rate = ",
+            $source,
+            ".fee_rate, min_fee = ",
+            $source,
+            ".min_fee, max_fee = ",
+            $source,
+            ".max_fee"
+        )
+    };
+}
+
+/// The columns of the Portfolios to insert or update, one array per column.
+#[derive(Default)]
+struct PortfolioColumns {
+    fees: FeeColumns,
+    ids: Vec<Uuid>,
+    names: Vec<String>,
+    currencies: Vec<String>,
+    last_updated_at: Vec<chrono::DateTime<Utc>>,
+    allocation_modes: Vec<DbAllocationMode>,
+    drift_bands: Vec<Option<Decimal>>,
+    strategic_present: Vec<bool>,
+}
+
+/// The Portfolio row source: the fee arrays, then the arrays of
+/// [`PortfolioColumns`] as `$7` to `$13`, aliased `w` with [`PORTFOLIO_COLUMNS`].
+const PORTFOLIO_ROWS: &str = formatcp!(
+    "UNNEST({FEE_ARRAYS}, $7::uuid[], $8::text[], $9::text[], $10::timestamptz[],
+            $11::smallint[], $12::numeric[], $13::bool[])
+          AS w({FEE_COLUMNS}, id, name, currency, last_updated_at, allocation_mode,
+               drift_band, strategic_allocation_present)"
+);
+
+/// The target columns of [`PORTFOLIO_ROWS`], in order.
+const PORTFOLIO_COLUMNS: &str = formatcp!(
+    "{FEE_COLUMNS}, id, name, currency, last_updated_at, allocation_mode, drift_band,
+     strategic_allocation_present"
+);
+
 impl PortfolioColumns {
     fn of_kind(plan: &SyncPlan, kind: WriteKind) -> Self {
         let mut columns = Self::default();
         for write in plan.writes.iter().filter(|write| write.kind == kind) {
-            let portfolio = &write.portfolio;
-            let fees = FeeFields::from_fees(portfolio.fees.as_ref());
-            columns.ids.push(portfolio.id);
-            columns.names.push(portfolio.name.clone());
-            columns.currencies.push(portfolio.quote_currency.clone());
-            columns.last_updated_at.push(portfolio.last_updated_at);
+            let content = &write.content;
+            columns
+                .fees
+                .push(FeeFields::from_fees(content.fees.as_ref()));
+            columns.ids.push(write.id);
+            columns.names.push(content.name.clone());
+            columns.currencies.push(content.quote_currency.clone());
+            columns.last_updated_at.push(write.last_updated_at);
             columns
                 .allocation_modes
-                .push(i16::from(db_allocation_mode(portfolio.allocation_mode)));
-            columns.drift_bands.push(portfolio.drift_band);
+                .push(content.allocation_mode.into());
+            columns.drift_bands.push(content.drift_band);
             columns
                 .strategic_present
-                .push(write.strategic_allocation_present);
-            columns.max_fee_impacts.push(fees.max_fee_impact);
-            columns.fee_types.push(fees.fee_type);
-            columns.fee_amounts.push(fees.fee_amount);
-            columns.fee_rates.push(fees.fee_rate);
-            columns.min_fees.push(fees.min_fee);
-            columns.max_fees.push(fees.max_fee);
+                .push(content.strategic_allocation_present);
         }
         columns
+    }
+
+    /// Binds every array as `$1` to `$13`, matching [`PORTFOLIO_ROWS`].
+    fn bind<'q>(
+        &'q self,
+        query: Query<'q, Postgres, PgArguments>,
+    ) -> Query<'q, Postgres, PgArguments> {
+        self.fees
+            .bind(query)
+            .bind(&self.ids)
+            .bind(&self.names)
+            .bind(&self.currencies)
+            .bind(&self.last_updated_at)
+            .bind(&self.allocation_modes)
+            .bind(&self.drift_bands)
+            .bind(&self.strategic_present)
     }
 }
 
@@ -110,7 +204,7 @@ fn insert_conflict_as_stale(error: sqlx::Error) -> PortfolioRepositoryError {
 async fn lock_and_verify(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
-    expected: &[ExpectedPortfolio],
+    expected: &[ExpectedVersion],
 ) -> Result<()> {
     if expected.is_empty() {
         return Ok(());
@@ -180,7 +274,7 @@ async fn resolve_asset_ids<'a>(
     }
 
     let (providers, symbols) = unnest_refs(distinct.iter().copied());
-    let rows: Vec<(Uuid, i16, String)> = query_as(
+    let rows: Vec<(Uuid, DbProvider, String)> = query_as(
         "SELECT ad.id, ad.provider, ad.symbol
          FROM assets_data AS ad
          JOIN UNNEST($1::smallint[], $2::text[]) AS wanted(provider, symbol)
@@ -190,7 +284,7 @@ async fn resolve_asset_ids<'a>(
     .bind(symbols)
     .fetch_all(&mut **tx)
     .await?;
-    let stored: HashMap<(i16, String), Uuid> = rows
+    let stored: HashMap<(DbProvider, String), Uuid> = rows
         .into_iter()
         .map(|(id, provider, symbol)| ((provider, symbol), id))
         .collect();
@@ -222,40 +316,16 @@ async fn insert_portfolios(
     if columns.ids.is_empty() {
         return Ok(());
     }
-    query(
-        "INSERT INTO portfolios
-             (id, user_id, name, currency, deleted, last_updated_at,
-              allocation_mode, drift_band, strategic_allocation_present,
-              max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee)
-         SELECT w.id, $2, w.name, w.currency, $3, w.last_updated_at,
-                w.allocation_mode, w.drift_band, w.strategic_allocation_present,
-                w.max_fee_impact, w.fee_type, w.fee_amount, w.fee_rate, w.min_fee, w.max_fee
-         FROM UNNEST($1::uuid[], $4::text[], $5::text[], $6::timestamptz[],
-                     $7::smallint[], $8::numeric[], $9::bool[], $10::numeric[],
-                     $11::text[], $12::numeric[], $13::numeric[], $14::numeric[],
-                     $15::numeric[])
-              AS w(id, name, currency, last_updated_at, allocation_mode, drift_band,
-                   strategic_allocation_present, max_fee_impact, fee_type, fee_amount,
-                   fee_rate, min_fee, max_fee)",
-    )
-    .bind(&columns.ids)
-    .bind(user_id)
-    .bind(false)
-    .bind(&columns.names)
-    .bind(&columns.currencies)
-    .bind(&columns.last_updated_at)
-    .bind(&columns.allocation_modes)
-    .bind(&columns.drift_bands)
-    .bind(&columns.strategic_present)
-    .bind(&columns.max_fee_impacts)
-    .bind(&columns.fee_types)
-    .bind(&columns.fee_amounts)
-    .bind(&columns.fee_rates)
-    .bind(&columns.min_fees)
-    .bind(&columns.max_fees)
-    .execute(&mut **tx)
-    .await
-    .map_err(insert_conflict_as_stale)?;
+    columns
+        .bind(query(formatcp!(
+            "INSERT INTO portfolios ({PORTFOLIO_COLUMNS}, user_id, deleted)
+             SELECT w.*, $14, $15 FROM {PORTFOLIO_ROWS}"
+        )))
+        .bind(user_id)
+        .bind(false)
+        .execute(&mut **tx)
+        .await
+        .map_err(insert_conflict_as_stale)?;
     Ok(())
 }
 
@@ -269,41 +339,22 @@ async fn update_portfolios(
     if columns.ids.is_empty() {
         return Ok(());
     }
-    let updated = query(
-        "UPDATE portfolios AS p
-         SET name = w.name, currency = w.currency, last_updated_at = w.last_updated_at,
-             allocation_mode = w.allocation_mode, drift_band = w.drift_band,
-             strategic_allocation_present = w.strategic_allocation_present,
-             max_fee_impact = w.max_fee_impact, fee_type = w.fee_type,
-             fee_amount = w.fee_amount, fee_rate = w.fee_rate,
-             min_fee = w.min_fee, max_fee = w.max_fee,
-             updated_at = NOW()
-         FROM UNNEST($1::uuid[], $3::text[], $4::text[], $5::timestamptz[],
-                     $6::smallint[], $7::numeric[], $8::bool[], $9::numeric[],
-                     $10::text[], $11::numeric[], $12::numeric[], $13::numeric[],
-                     $14::numeric[])
-              AS w(id, name, currency, last_updated_at, allocation_mode, drift_band,
-                   strategic_allocation_present, max_fee_impact, fee_type, fee_amount,
-                   fee_rate, min_fee, max_fee)
-         WHERE p.id = w.id AND p.user_id = $2",
-    )
-    .bind(&columns.ids)
-    .bind(user_id)
-    .bind(&columns.names)
-    .bind(&columns.currencies)
-    .bind(&columns.last_updated_at)
-    .bind(&columns.allocation_modes)
-    .bind(&columns.drift_bands)
-    .bind(&columns.strategic_present)
-    .bind(&columns.max_fee_impacts)
-    .bind(&columns.fee_types)
-    .bind(&columns.fee_amounts)
-    .bind(&columns.fee_rates)
-    .bind(&columns.min_fees)
-    .bind(&columns.max_fees)
-    .execute(&mut **tx)
-    .await?
-    .rows_affected();
+    let updated = columns
+        .bind(query(formatcp!(
+            "UPDATE portfolios AS p
+             SET {}, name = w.name, currency = w.currency,
+                 last_updated_at = w.last_updated_at, allocation_mode = w.allocation_mode,
+                 drift_band = w.drift_band,
+                 strategic_allocation_present = w.strategic_allocation_present,
+                 updated_at = NOW()
+             FROM {PORTFOLIO_ROWS}
+             WHERE p.id = w.id AND p.user_id = $14",
+            fee_set!("w")
+        )))
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
     // The rows were locked and verified, so a different count means they are
     // gone: do not report a half-applied plan as done.
     if updated != columns.ids.len() as u64 {
@@ -327,37 +378,31 @@ async fn write_assets(
     let updated_ids: Vec<Uuid> = writes
         .iter()
         .filter(|write| write.kind == WriteKind::Update)
-        .map(|write| write.portfolio.id)
+        .map(|write| write.id)
         .collect();
     let mut kept_portfolios = Vec::new();
     let mut kept_assets = Vec::new();
     let mut relationships = RelationshipColumns::default();
     for write in writes {
-        for asset in &write.portfolio.assets {
-            let fees = FeeFields::from_fees(asset.fees.as_ref());
+        for stored in &write.content.assets {
+            let asset = &stored.asset;
             let assets_data_id = asset_ids[&asset.asset];
-            kept_portfolios.push(write.portfolio.id);
+            kept_portfolios.push(write.id);
             kept_assets.push(assets_data_id);
+            relationships
+                .fees
+                .push(FeeFields::from_fees(asset.fees.as_ref()));
             relationships.ids.push(Uuid::now_v7());
-            relationships.portfolio_ids.push(write.portfolio.id);
+            relationships.portfolio_ids.push(write.id);
             relationships.assets_data_ids.push(assets_data_id);
-            relationships.class_overrides.push(
-                asset
-                    .asset_class_override
-                    .map(db_asset_class)
-                    .map(i16::from),
-            );
+            relationships
+                .class_overrides
+                .push(asset.asset_class_override.map(DbAssetClass::from));
             relationships.quantities.push(asset.quantity);
             relationships.manual_prices.push(asset.manual_price);
             relationships
                 .average_buy_prices
                 .push(asset.average_buy_price);
-            relationships.max_fee_impacts.push(fees.max_fee_impact);
-            relationships.fee_types.push(fees.fee_type);
-            relationships.fee_amounts.push(fees.fee_amount);
-            relationships.fee_rates.push(fees.fee_rate);
-            relationships.min_fees.push(fees.min_fee);
-            relationships.max_fees.push(fees.max_fee);
         }
     }
 
@@ -382,51 +427,36 @@ async fn write_assets(
     }
 
     let now = Utc::now();
-    let persisted: Vec<(Uuid, Uuid, Uuid)> = query_as(
-        "INSERT INTO portfolio_asset
-             (id, portfolio_id, assets_data_id, asset_class_override,
-              quantity, manual_price, average_buy_price, max_fee_impact,
-              fee_type, fee_amount, fee_rate, min_fee, max_fee,
-              created_at, updated_at)
-         SELECT r.id, r.portfolio_id, r.assets_data_id, r.asset_class_override,
-                r.quantity, r.manual_price, r.average_buy_price, r.max_fee_impact,
-                r.fee_type, r.fee_amount, r.fee_rate, r.min_fee, r.max_fee, $14, $14
-         FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[], $4::smallint[], $5::numeric[],
-                     $6::numeric[], $7::numeric[], $8::numeric[], $9::text[],
-                     $10::numeric[], $11::numeric[], $12::numeric[], $13::numeric[])
-              AS r(id, portfolio_id, assets_data_id, asset_class_override, quantity,
-                   manual_price, average_buy_price, max_fee_impact, fee_type,
-                   fee_amount, fee_rate, min_fee, max_fee)
-         ON CONFLICT (portfolio_id, assets_data_id) DO UPDATE
-         SET asset_class_override = EXCLUDED.asset_class_override,
-             quantity = EXCLUDED.quantity,
-             manual_price = EXCLUDED.manual_price,
-             average_buy_price = EXCLUDED.average_buy_price,
-             max_fee_impact = EXCLUDED.max_fee_impact,
-             fee_type = EXCLUDED.fee_type,
-             fee_amount = EXCLUDED.fee_amount,
-             fee_rate = EXCLUDED.fee_rate,
-             min_fee = EXCLUDED.min_fee,
-             max_fee = EXCLUDED.max_fee,
-             updated_at = EXCLUDED.updated_at
-         RETURNING id, portfolio_id, assets_data_id",
-    )
-    .bind(&relationships.ids)
-    .bind(&relationships.portfolio_ids)
-    .bind(&relationships.assets_data_ids)
-    .bind(&relationships.class_overrides)
-    .bind(&relationships.quantities)
-    .bind(&relationships.manual_prices)
-    .bind(&relationships.average_buy_prices)
-    .bind(&relationships.max_fee_impacts)
-    .bind(&relationships.fee_types)
-    .bind(&relationships.fee_amounts)
-    .bind(&relationships.fee_rates)
-    .bind(&relationships.min_fees)
-    .bind(&relationships.max_fees)
-    .bind(now)
-    .fetch_all(&mut **tx)
-    .await?;
+    let persisted: Vec<(Uuid, Uuid, Uuid)> = relationships
+        .bind(query(formatcp!(
+            "INSERT INTO portfolio_asset
+                 ({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
+                  quantity, manual_price, average_buy_price, created_at, updated_at)
+             SELECT r.*, $14, $14
+             FROM UNNEST({FEE_ARRAYS}, $7::uuid[], $8::uuid[], $9::uuid[], $10::smallint[],
+                         $11::numeric[], $12::numeric[], $13::numeric[])
+                  AS r({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
+                       quantity, manual_price, average_buy_price)
+             ON CONFLICT (portfolio_id, assets_data_id) DO UPDATE
+             SET {},
+                 asset_class_override = EXCLUDED.asset_class_override,
+                 quantity = EXCLUDED.quantity,
+                 manual_price = EXCLUDED.manual_price,
+                 average_buy_price = EXCLUDED.average_buy_price,
+                 updated_at = EXCLUDED.updated_at
+             RETURNING id, portfolio_id, assets_data_id",
+            fee_set!("EXCLUDED")
+        )))
+        .bind(now)
+        .map(|row: PgRow| {
+            (
+                row.get::<Uuid, _>("id"),
+                row.get::<Uuid, _>("portfolio_id"),
+                row.get::<Uuid, _>("assets_data_id"),
+            )
+        })
+        .fetch_all(&mut **tx)
+        .await?;
     let relationship_ids: HashMap<(Uuid, Uuid), Uuid> = persisted
         .into_iter()
         .map(|(id, portfolio_id, assets_data_id)| ((portfolio_id, assets_data_id), id))
@@ -436,14 +466,14 @@ async fn write_assets(
     let mut allocation_relationships = Vec::new();
     let mut weights = Vec::new();
     for write in writes {
-        for allocation in &write.allocations {
-            let key = (write.portfolio.id, asset_ids[&allocation.asset]);
+        for stored in &write.content.assets {
+            let key = (write.id, asset_ids[&stored.asset.asset]);
             let relationship_id = relationship_ids.get(&key).ok_or_else(|| {
                 PortfolioRepositoryError::CorruptData("relationship was not persisted".into())
             })?;
-            allocation_portfolios.push(write.portfolio.id);
+            allocation_portfolios.push(write.id);
             allocation_relationships.push(*relationship_id);
-            weights.push(allocation.weight);
+            weights.push(stored.weight);
         }
     }
     query(
@@ -464,22 +494,35 @@ async fn write_assets(
     Ok(())
 }
 
-/// The columns of the Portfolio Asset relationships to upsert.
+/// The columns of the Portfolio Asset relationships to upsert, bound as
+/// `$1` to `$13` (fees first).
 #[derive(Default)]
 struct RelationshipColumns {
+    fees: FeeColumns,
     ids: Vec<Uuid>,
     portfolio_ids: Vec<Uuid>,
     assets_data_ids: Vec<Uuid>,
-    class_overrides: Vec<Option<i16>>,
+    class_overrides: Vec<Option<DbAssetClass>>,
     quantities: Vec<Decimal>,
     manual_prices: Vec<Option<Decimal>>,
     average_buy_prices: Vec<Option<Decimal>>,
-    max_fee_impacts: Vec<Option<Decimal>>,
-    fee_types: Vec<Option<String>>,
-    fee_amounts: Vec<Option<Decimal>>,
-    fee_rates: Vec<Option<Decimal>>,
-    min_fees: Vec<Option<Decimal>>,
-    max_fees: Vec<Option<Decimal>>,
+}
+
+impl RelationshipColumns {
+    fn bind<'q>(
+        &'q self,
+        query: Query<'q, Postgres, PgArguments>,
+    ) -> Query<'q, Postgres, PgArguments> {
+        self.fees
+            .bind(query)
+            .bind(&self.ids)
+            .bind(&self.portfolio_ids)
+            .bind(&self.assets_data_ids)
+            .bind(&self.class_overrides)
+            .bind(&self.quantities)
+            .bind(&self.manual_prices)
+            .bind(&self.average_buy_prices)
+    }
 }
 
 /// Replaces the Strategic Asset Class targets of all written Portfolios: one
@@ -491,7 +534,7 @@ async fn replace_class_targets(
     let updated_ids: Vec<Uuid> = writes
         .iter()
         .filter(|write| write.kind == WriteKind::Update)
-        .map(|write| write.portfolio.id)
+        .map(|write| write.id)
         .collect();
     if !updated_ids.is_empty() {
         query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = ANY($1)")
@@ -504,9 +547,9 @@ async fn replace_class_targets(
     let mut classes = Vec::new();
     let mut weights = Vec::new();
     for write in writes {
-        for target in &write.class_targets {
-            portfolio_ids.push(write.portfolio.id);
-            classes.push(i16::from(db_asset_class(target.asset_class)));
+        for target in &write.content.class_targets {
+            portfolio_ids.push(write.id);
+            classes.push(DbAssetClass::from(target.asset_class));
             weights.push(target.target_weight);
         }
     }
@@ -569,7 +612,7 @@ async fn write_tombstones(
         .bind("")
         .bind("")
         .bind(true)
-        .bind(i16::from(DbAllocationMode::Simple))
+        .bind(DbAllocationMode::Simple)
         .bind(false)
         .execute(&mut **tx)
         .await
@@ -594,7 +637,13 @@ impl SqlxPortfolioRepository {
         // would make the future unusable inside Axum handlers.
         let referenced: Vec<&AssetRef> = writes
             .iter()
-            .flat_map(|write| write.portfolio.assets.iter().map(|asset| &asset.asset))
+            .flat_map(|write| {
+                write
+                    .content
+                    .assets
+                    .iter()
+                    .map(|stored| &stored.asset.asset)
+            })
             .collect();
         let asset_ids = resolve_asset_ids(&mut tx, referenced).await?;
 

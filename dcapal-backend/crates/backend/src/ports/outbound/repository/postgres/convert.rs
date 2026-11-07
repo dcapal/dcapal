@@ -13,71 +13,51 @@ use crate::{
     },
 };
 
-/// Maps an application Provider to its stored representation.
-pub(super) fn db_provider(provider: &AppProvider) -> DbProvider {
-    match provider {
-        AppProvider::YF => DbProvider::YF,
-        AppProvider::Kraken => DbProvider::Kraken,
+/// Generates the total, mutually inverse conversions between an application
+/// enum and its stored counterpart, which share variant names one to one.
+macro_rules! convert_enum {
+    ($app:ty, $db:ty, [$($variant:ident),+ $(,)?]) => {
+        impl From<$app> for $db {
+            fn from(value: $app) -> Self {
+                match value {
+                    $(<$app>::$variant => <$db>::$variant,)+
+                }
+            }
+        }
+
+        impl From<$db> for $app {
+            fn from(value: $db) -> Self {
+                match value {
+                    $(<$db>::$variant => <$app>::$variant,)+
+                }
+            }
+        }
+    };
+}
+
+convert_enum!(AppProvider, DbProvider, [YF, Kraken]);
+convert_enum!(
+    AppAssetClass,
+    DbAssetClass,
+    [Other, Equity, Bond, Cash, Crypto, Commodity]
+);
+convert_enum!(AppAllocationMode, DbAllocationMode, [Simple, Strategic]);
+
+impl From<&AppProvider> for DbProvider {
+    fn from(provider: &AppProvider) -> Self {
+        provider.clone().into()
     }
 }
 
-/// Maps a stored Provider to its application representation.
-pub(super) fn app_provider(provider: DbProvider) -> AppProvider {
-    match provider {
-        DbProvider::YF => AppProvider::YF,
-        DbProvider::Kraken => AppProvider::Kraken,
-    }
-}
-
-/// Maps an application Asset Class to its stored representation.
-pub(super) fn db_asset_class(class: AppAssetClass) -> DbAssetClass {
-    match class {
-        AppAssetClass::Other => DbAssetClass::Other,
-        AppAssetClass::Equity => DbAssetClass::Equity,
-        AppAssetClass::Bond => DbAssetClass::Bond,
-        AppAssetClass::Cash => DbAssetClass::Cash,
-        AppAssetClass::Crypto => DbAssetClass::Crypto,
-        AppAssetClass::Commodity => DbAssetClass::Commodity,
-    }
-}
-
-/// Maps a stored Asset Class to its application representation.
-pub(super) fn app_asset_class(class: DbAssetClass) -> AppAssetClass {
-    match class {
-        DbAssetClass::Other => AppAssetClass::Other,
-        DbAssetClass::Equity => AppAssetClass::Equity,
-        DbAssetClass::Bond => AppAssetClass::Bond,
-        DbAssetClass::Cash => AppAssetClass::Cash,
-        DbAssetClass::Crypto => AppAssetClass::Crypto,
-        DbAssetClass::Commodity => AppAssetClass::Commodity,
-    }
-}
-
-/// Maps an application Allocation Mode to its stored representation.
-pub(super) fn db_allocation_mode(mode: AppAllocationMode) -> DbAllocationMode {
-    match mode {
-        AppAllocationMode::Simple => DbAllocationMode::Simple,
-        AppAllocationMode::Strategic => DbAllocationMode::Strategic,
-    }
-}
-
-/// Maps a stored Allocation Mode to its application representation.
-pub(super) fn app_allocation_mode(mode: DbAllocationMode) -> AppAllocationMode {
-    match mode {
-        DbAllocationMode::Simple => AppAllocationMode::Simple,
-        DbAllocationMode::Strategic => AppAllocationMode::Strategic,
-    }
-}
-
-/// Splits asset references into the parallel provider-code and symbol arrays
+/// Splits asset references into the parallel provider and symbol arrays
 /// that SQL `UNNEST($1::smallint[], $2::text[])` joins consume.
 pub(super) fn unnest_refs<'a>(
     refs: impl IntoIterator<Item = &'a AssetRef>,
-) -> (Vec<i16>, Vec<String>) {
+) -> (Vec<DbProvider>, Vec<String>) {
     refs.into_iter()
         .map(|reference| {
             (
-                i16::from(db_provider(&reference.provider)),
+                DbProvider::from(&reference.provider),
                 reference.symbol.clone(),
             )
         })
@@ -105,7 +85,7 @@ mod tests {
 
         let codes: Vec<i16> = classes
             .iter()
-            .map(|class| i16::from(db_asset_class(*class)))
+            .map(|class| i16::from(DbAssetClass::from(*class)))
             .collect();
 
         assert!(classes.windows(2).all(|pair| pair[0] < pair[1]));

@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::State,
     response::{IntoResponse, Response},
 };
 
@@ -10,6 +10,7 @@ use crate::{
 
 use super::{
     error::V2HttpError,
+    extract::LookupAssetRefs,
     types::{lookup_assets_v2::LookupAssetsV2Response, sync_portfolio_v2::V2ErrorResponse},
 };
 
@@ -28,17 +29,11 @@ use super::{
         (status = 500, description = "Asset lookup failure", body = V2ErrorResponse)
     )
 )]
-// The handler reads the raw query pairs because repeated keys do not
-// deserialize into a struct field.
 pub async fn lookup_assets(
     State(ctx): State<AppContext>,
     _claims: Claims,
-    Query(pairs): Query<Vec<(String, String)>>,
+    LookupAssetRefs(raw_assets): LookupAssetRefs,
 ) -> Result<Response, V2HttpError> {
-    let raw_assets = pairs
-        .into_iter()
-        .filter_map(|(key, value)| (key == "asset").then_some(value))
-        .collect::<Vec<_>>();
     let command = LookupAssetsCommand::try_new(&raw_assets)?;
     let lookup = ctx.services.asset.lookup_known(command).await?;
 

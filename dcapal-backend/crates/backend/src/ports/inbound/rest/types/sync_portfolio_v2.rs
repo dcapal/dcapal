@@ -1,12 +1,18 @@
+use std::sync::LazyLock;
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 use utoipa::{
     ToSchema,
     openapi::schema::{Object, ObjectBuilder, SchemaType, Type},
 };
 use uuid::Uuid;
 
-use crate::app::{commands::sync_portfolios_v2::ValidationError, domain::portfolio as app};
+use crate::app::{
+    commands::sync_portfolios_v2::{ValidationError, validation::SCHEMA_VERSION},
+    domain::portfolio as app,
+};
 
 mod conversion;
 
@@ -274,7 +280,13 @@ pub struct V2ValidationError {
 pub(crate) const VALIDATION_CODE: &str = "validation_error";
 const VALIDATION_MESSAGE: &str = "The Portfolio aggregate is invalid.";
 const KNOWN_ASSET_CLASS_MESSAGE: &str = "must be a known Asset Class";
-const KNOWN_PROVIDER_MESSAGE: &str = "must be one of yf, kraken";
+
+/// Validation message listing the accepted provider identifiers.
+fn known_provider_message() -> &'static str {
+    static MESSAGE: LazyLock<String> =
+        LazyLock::new(|| format!("must be one of {}", app::Provider::names()));
+    MESSAGE.as_str()
+}
 
 /// A fallible conversion failure at the REST-to-application boundary.
 #[derive(Debug, thiserror::Error)]
@@ -298,30 +310,33 @@ impl V2ValidationError {
 pub(crate) fn v2_provider_schema() -> Object {
     ObjectBuilder::new()
         .schema_type(Type::String)
-        .enum_values(Some(["yf", "kraken"]))
+        .enum_values(Some(
+            app::Provider::iter().map(|provider| provider.as_str()),
+        ))
         .build()
 }
 
 fn v2_schema_version_schema() -> Object {
     ObjectBuilder::new()
         .schema_type(Type::Integer)
-        .minimum(Some(2))
-        .maximum(Some(2))
-        .enum_values(Some([2]))
+        .minimum(Some(SCHEMA_VERSION))
+        .maximum(Some(SCHEMA_VERSION))
+        .enum_values(Some([SCHEMA_VERSION]))
         .build()
+}
+
+/// Asset-class identifiers in schema order: `other` is documented last.
+fn asset_class_names() -> impl Iterator<Item = &'static str> {
+    app::AssetClass::iter()
+        .filter(|class| *class != app::AssetClass::Other)
+        .chain([app::AssetClass::Other])
+        .map(app::AssetClass::as_str)
 }
 
 pub(crate) fn v2_asset_class_schema() -> Object {
     ObjectBuilder::new()
         .schema_type(Type::String)
-        .enum_values(Some([
-            "equity",
-            "bond",
-            "cash",
-            "crypto",
-            "commodity",
-            "other",
-        ]))
+        .enum_values(Some(asset_class_names()))
         .build()
 }
 
@@ -332,15 +347,11 @@ fn v2_optional_asset_class_schema() -> Object {
                 .into_iter()
                 .collect::<SchemaType>(),
         )
-        .enum_values(Some(vec![
-            serde_json::Value::String("equity".to_string()),
-            serde_json::Value::String("bond".to_string()),
-            serde_json::Value::String("cash".to_string()),
-            serde_json::Value::String("crypto".to_string()),
-            serde_json::Value::String("commodity".to_string()),
-            serde_json::Value::String("other".to_string()),
-            serde_json::Value::Null,
-        ]))
+        .enum_values(Some(
+            asset_class_names()
+                .map(|name| serde_json::Value::String(name.to_string()))
+                .chain([serde_json::Value::Null]),
+        ))
         .build()
 }
 
@@ -348,6 +359,25 @@ fn v2_optional_asset_class_schema() -> Object {
 mod tests {
     use super::*;
     use rust_decimal::dec;
+
+    #[test]
+    fn allocation_mode_wire_names_match_the_domain_names() {
+        // GIVEN each wire allocation mode,
+        // WHEN it is serialized,
+        // THEN the JSON string equals the domain mode's name, so both stay in sync.
+        let modes = [
+            (AllocationModeWire::Simple, app::AllocationMode::Simple),
+            (
+                AllocationModeWire::Strategic,
+                app::AllocationMode::Strategic,
+            ),
+        ];
+
+        for (wire, domain) in modes {
+            let name: &str = domain.into();
+            assert_eq!(serde_json::to_value(wire).unwrap(), name);
+        }
+    }
 
     #[test]
     fn v2_decimals_are_strings_on_the_wire() {

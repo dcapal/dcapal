@@ -32,6 +32,7 @@ use crate::{
 };
 
 pub mod error;
+pub mod extract;
 pub mod lookup_assets_v2;
 pub mod openapi;
 pub mod proxy_types;

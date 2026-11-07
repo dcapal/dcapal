@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::LazyLock};
 
 use crate::app::domain::{asset::AssetRef, portfolio::Provider};
 
@@ -58,11 +58,18 @@ impl LookupAssetsCommand {
     }
 }
 
+/// Reason reported for an unrecognized provider identifier.
+fn unknown_provider_message() -> &'static str {
+    static MESSAGE: LazyLock<String> =
+        LazyLock::new(|| format!("provider must be one of {}", Provider::names()));
+    MESSAGE.as_str()
+}
+
 fn parse_asset_ref(raw: &str) -> Result<AssetRef, &'static str> {
     let (provider, symbol) = raw
         .split_once(':')
         .ok_or("must have the form <provider>:<symbol>")?;
-    let provider = Provider::parse(provider).ok_or("provider must be one of yf, kraken")?;
+    let provider = Provider::parse(provider).ok_or_else(unknown_provider_message)?;
     let reference = AssetRef::new(provider, symbol);
     if reference.symbol.is_empty() {
         return Err("symbol must not be empty");

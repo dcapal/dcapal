@@ -187,7 +187,7 @@ async fn rejects_invalid_provider_codes_from_storage(
     pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GIVEN a canonical portfolio asset with an invalid provider code, WHEN the repository reads it,
-    // THEN it returns a column-decode error with the enum conversion cause intact.
+    // THEN it returns a column-decode error with the invalid code in its cause.
     sqlx::query(
         "UPDATE assets_data
          SET provider = 99
@@ -203,14 +203,9 @@ async fn rejects_invalid_provider_codes_from_storage(
 
     assert!(matches!(
         &error,
-        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, .. })
-            if index == "provider"
+        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, source })
+            if index.contains("provider") && source.to_string().contains("invalid value 99")
     ));
-    let database_error = std::error::Error::source(&error).expect("database error source");
-    assert!(
-        std::error::Error::source(database_error).is_some(),
-        "column decode should retain the enum conversion cause"
-    );
 
     Ok(())
 }
@@ -220,7 +215,7 @@ async fn rejects_invalid_asset_class_codes_from_storage(
     pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GIVEN a canonical portfolio asset with an invalid Asset Class code, WHEN the repository reads it,
-    // THEN it returns a column-decode error with the enum conversion cause intact.
+    // THEN it returns a column-decode error with the invalid code in its cause.
     sqlx::query(
         "UPDATE assets_data
          SET asset_class = 99
@@ -236,14 +231,9 @@ async fn rejects_invalid_asset_class_codes_from_storage(
 
     assert!(matches!(
         &error,
-        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, .. })
-            if index == "asset_class"
+        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, source })
+            if index.contains("asset_class") && source.to_string().contains("invalid value 99")
     ));
-    let database_error = std::error::Error::source(&error).expect("database error source");
-    assert!(
-        std::error::Error::source(database_error).is_some(),
-        "column decode should retain the enum conversion cause"
-    );
 
     Ok(())
 }
@@ -271,7 +261,7 @@ async fn rejects_corrupt_v2_snapshot_fee_data(
     assert!(matches!(
         error,
         PortfolioRepositoryError::CorruptData(message)
-            if message.contains("missing feeAmount")
+            if message.contains("non-negative feeAmount")
     ));
     Ok(())
 }
@@ -281,8 +271,8 @@ async fn rejects_corrupt_v2_snapshot_asset_override(
     pool: PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GIVEN a persisted Portfolio Asset with an unknown Asset Class override,
-    // WHEN a synchronization snapshot is loaded, THEN corruption is returned
-    // instead of treating the override as null.
+    // WHEN a synchronization snapshot is loaded, THEN the load fails with a
+    // column-decode error instead of treating the override as null.
     sqlx::query(
         "UPDATE portfolio_asset
          SET asset_class_override = 99
@@ -297,9 +287,10 @@ async fn rejects_corrupt_v2_snapshot_asset_override(
         .unwrap_err();
 
     assert!(matches!(
-        error,
-        PortfolioRepositoryError::CorruptData(message)
-            if message.contains("invalid aclassOverride")
+        &error,
+        PortfolioRepositoryError::Database(sqlx::Error::ColumnDecode { index, source })
+            if index.contains("asset_class_override")
+                && source.to_string().contains("invalid value 99")
     ));
     Ok(())
 }
