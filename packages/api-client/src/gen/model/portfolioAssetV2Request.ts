@@ -17,7 +17,7 @@ export interface PortfolioAssetV2Request {
   asset: AssetRefV2;
   /** @nullable */
   averageBuyPrice?: string | null;
-  fees?: null | TransactionFeesV2Request;
+  fees?: TransactionFeesV2Request | null;
   /** @nullable */
   manualPrice?: string | null;
   quantity: string;

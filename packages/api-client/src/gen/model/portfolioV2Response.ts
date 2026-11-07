@@ -17,10 +17,10 @@ export interface PortfolioV2Response {
   assets: PortfolioAssetV2Response[];
   /** @nullable */
   driftBand?: string | null;
-  fees?: null | TransactionFeesV2Response;
+  fees?: TransactionFeesV2Response | null;
   id: string;
   lastUpdatedAt: string;
   name: string;
   quoteCurrency: string;
-  strategicAllocation?: null | StrategicAllocationV2Response;
+  strategicAllocation?: StrategicAllocationV2Response | null;
 }
