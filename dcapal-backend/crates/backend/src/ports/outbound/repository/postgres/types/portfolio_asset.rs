@@ -3,6 +3,9 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
+use super::{AllocationMode, FeeFields};
+use crate::app::domain::portfolio_sync::legacy_target_weight;
+
 /// The provider codes used by canonical Portfolio Asset storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
 #[repr(i16)]
@@ -113,22 +116,18 @@ pub struct PortfolioAssetRow {
     pub provider: Provider,
     /// The current quantity held.
     pub quantity: Decimal,
-    /// The target portfolio weight.
-    pub target_weight: Decimal,
+    /// The Allocation Mode of the Portfolio containing the asset.
+    pub allocation_mode: AllocationMode,
+    /// The stored allocation weight: absolute in Simple mode, relative within
+    /// its Asset Class in Strategic mode. Zero when none is stored.
+    pub weight: Decimal,
+    /// The Strategic target of the asset's effective Asset Class, if stored.
+    pub class_target: Option<Decimal>,
     /// The Portfolio-specific manual price override.
     pub manual_price: Option<Decimal>,
-    /// The maximum fee impact configured for transactions.
-    pub max_fee_impact: Option<Decimal>,
-    /// The persisted fee structure name.
-    pub fee_type: Option<String>,
-    /// The fixed fee amount, when the fee structure is fixed.
-    pub fee_amount: Option<Decimal>,
-    /// The variable fee rate, when the fee structure is variable.
-    pub fee_rate: Option<Decimal>,
-    /// The minimum variable fee, when configured.
-    pub min_fee: Option<Decimal>,
-    /// The maximum variable fee, when configured.
-    pub max_fee: Option<Decimal>,
+    /// The stored fee policy columns.
+    #[sqlx(flatten)]
+    pub fees: FeeFields,
     /// The average price paid for the current holding.
     pub average_buy_price: Option<Decimal>,
     /// When the database row was created.
@@ -141,6 +140,11 @@ impl PortfolioAssetRow {
     /// Returns the Portfolio-specific class when present, otherwise the shared default.
     pub fn effective_asset_class(&self) -> AssetClass {
         self.asset_class_override.unwrap_or(self.asset_class)
+    }
+
+    /// Returns the absolute Portfolio target the legacy v1 API reports.
+    pub fn legacy_target_weight(&self) -> Decimal {
+        legacy_target_weight(self.allocation_mode.into(), self.weight, self.class_target)
     }
 }
 

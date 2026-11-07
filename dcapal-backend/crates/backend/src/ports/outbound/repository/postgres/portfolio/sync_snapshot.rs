@@ -14,8 +14,8 @@ use uuid::Uuid;
 use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
-        FeeStructure as AppFeeStructure, FeeType, PortfolioAssetV2, StrategicAssetClassTargetV2,
-        TransactionFees, is_percentage,
+        FeeType as AppFeeType, PortfolioAssetV2, StrategicAssetClassTargetV2, TransactionFees,
+        is_percentage,
     },
     portfolio_sync::{
         PortfolioContent, PortfolioVersion, StoredAsset, StoredPortfolio, SyncSnapshot,
@@ -24,7 +24,8 @@ use crate::app::domain::{
 use crate::ports::outbound::repository::portfolio::PortfolioRepositoryError;
 use crate::ports::outbound::repository::portfolio::Result;
 use crate::ports::outbound::repository::postgres::types::{
-    AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
+    AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, FeeFields,
+    FeeType as DbFeeType, Provider as DbProvider,
 };
 
 use super::SqlxPortfolioRepository;
@@ -43,7 +44,7 @@ struct SnapshotRow {
     portfolio_drift_band: Option<Decimal>,
     portfolio_strategic_allocation_present: bool,
     portfolio_max_fee_impact: Option<Decimal>,
-    portfolio_fee_type: Option<String>,
+    portfolio_fee_type: Option<DbFeeType>,
     portfolio_fee_amount: Option<Decimal>,
     portfolio_fee_rate: Option<Decimal>,
     portfolio_min_fee: Option<Decimal>,
@@ -56,7 +57,7 @@ struct SnapshotRow {
     asset_target_weight: Option<Decimal>,
     asset_manual_price: Option<Decimal>,
     asset_max_fee_impact: Option<Decimal>,
-    asset_fee_type: Option<String>,
+    asset_fee_type: Option<DbFeeType>,
     asset_fee_amount: Option<Decimal>,
     asset_fee_rate: Option<Decimal>,
     asset_min_fee: Option<Decimal>,
@@ -78,14 +79,18 @@ fn corrupt_data(message: impl Into<String>) -> PortfolioRepositoryError {
 
 /// Decodes the fee columns of a Portfolio or Portfolio Asset, rejecting
 /// combinations no valid fee policy can produce.
-fn decode_fees(
-    max_fee_impact: Option<Decimal>,
-    fee_type: Option<String>,
-    fee_amount: Option<Decimal>,
-    fee_rate: Option<Decimal>,
-    min_fee: Option<Decimal>,
-    max_fee: Option<Decimal>,
-) -> Result<Option<TransactionFees>> {
+///
+/// Unlike the lenient [`FeeFields::into_fees`] the v1 API uses, this checks
+/// ranges and that no column unused by the fee type is set.
+fn decode_fees(fields: FeeFields) -> Result<Option<TransactionFees>> {
+    let FeeFields {
+        max_fee_impact,
+        fee_type,
+        fee_amount,
+        fee_rate,
+        min_fee,
+        max_fee,
+    } = fields.clone();
     let Some(fee_type) = fee_type else {
         let orphan_fields = [max_fee_impact, fee_amount, fee_rate, min_fee, max_fee];
         return if orphan_fields.iter().any(Option::is_some) {
@@ -97,29 +102,27 @@ fn decode_fees(
     if max_fee_impact.is_some_and(|value| !is_percentage(value)) {
         return Err(corrupt_data("maxFeeImpact out of range"));
     }
-
     let has_variable_fields = fee_rate.is_some() || min_fee.is_some() || max_fee.is_some();
-    let fee_structure = match fee_type.parse::<FeeType>() {
-        Ok(FeeType::ZeroFee) if fee_amount.is_some() || has_variable_fields => {
+    match AppFeeType::from(fee_type) {
+        AppFeeType::ZeroFee if fee_amount.is_some() || has_variable_fields => {
             return Err(corrupt_data("ZeroFee with fee amounts"));
         }
-        Ok(FeeType::ZeroFee) => AppFeeStructure::ZeroFee,
-        Ok(FeeType::Fixed) if has_variable_fields => {
+        AppFeeType::ZeroFee => {}
+        AppFeeType::Fixed if has_variable_fields => {
             return Err(corrupt_data("Fixed fee with variable fields"));
         }
-        Ok(FeeType::Fixed) => match fee_amount {
-            Some(fee_amount) if fee_amount >= Decimal::ZERO => {
-                AppFeeStructure::Fixed { fee_amount }
+        AppFeeType::Fixed => {
+            if !fee_amount.is_some_and(|amount| amount >= Decimal::ZERO) {
+                return Err(corrupt_data("Fixed fee needs a non-negative feeAmount"));
             }
-            _ => return Err(corrupt_data("Fixed fee needs a non-negative feeAmount")),
-        },
-        Ok(FeeType::Variable) if fee_amount.is_some() => {
+        }
+        AppFeeType::Variable if fee_amount.is_some() => {
             return Err(corrupt_data("Variable fee with a fixed amount"));
         }
-        Ok(FeeType::Variable) => {
-            let fee_rate = fee_rate
-                .filter(|rate| is_percentage(*rate))
-                .ok_or_else(|| corrupt_data("Variable fee needs a feeRate within 0..100"))?;
+        AppFeeType::Variable => {
+            if !fee_rate.is_some_and(is_percentage) {
+                return Err(corrupt_data("Variable fee needs a feeRate within 0..100"));
+            }
             let bounds_ok = [min_fee, max_fee]
                 .into_iter()
                 .flatten()
@@ -128,18 +131,11 @@ fn decode_fees(
             if !bounds_ok {
                 return Err(corrupt_data("Variable fee has invalid bounds"));
             }
-            AppFeeStructure::Variable {
-                fee_rate,
-                min_fee,
-                max_fee,
-            }
         }
-        Err(_) => return Err(corrupt_data(format!("unknown fee type {fee_type}"))),
-    };
-    Ok(Some(TransactionFees {
-        max_fee_impact,
-        fee_structure,
-    }))
+    }
+    fields
+        .into_fees()
+        .map_err(|error| corrupt_data(error.to_string()))
 }
 
 /// Decodes the stored Strategic Asset Class targets of one Portfolio, ignoring
@@ -195,14 +191,14 @@ fn decode_asset(row: &mut SnapshotRow) -> Result<Option<StoredAsset>> {
     let quantity = row
         .asset_quantity
         .ok_or_else(|| corrupt_data("asset without a quantity"))?;
-    let fees = decode_fees(
-        row.asset_max_fee_impact,
-        row.asset_fee_type.take(),
-        row.asset_fee_amount,
-        row.asset_fee_rate,
-        row.asset_min_fee,
-        row.asset_max_fee,
-    )?;
+    let fees = decode_fees(FeeFields {
+        max_fee_impact: row.asset_max_fee_impact,
+        fee_type: row.asset_fee_type,
+        fee_amount: row.asset_fee_amount,
+        fee_rate: row.asset_fee_rate,
+        min_fee: row.asset_min_fee,
+        max_fee: row.asset_max_fee,
+    })?;
     Ok(Some(StoredAsset {
         asset: PortfolioAssetV2 {
             asset: AssetRef {
@@ -247,14 +243,14 @@ fn finish_portfolio(
             quote_currency: head.portfolio_currency,
             allocation_mode: head.portfolio_allocation_mode.into(),
             drift_band: head.portfolio_drift_band,
-            fees: decode_fees(
-                head.portfolio_max_fee_impact,
-                head.portfolio_fee_type,
-                head.portfolio_fee_amount,
-                head.portfolio_fee_rate,
-                head.portfolio_min_fee,
-                head.portfolio_max_fee,
-            )?,
+            fees: decode_fees(FeeFields {
+                max_fee_impact: head.portfolio_max_fee_impact,
+                fee_type: head.portfolio_fee_type,
+                fee_amount: head.portfolio_fee_amount,
+                fee_rate: head.portfolio_fee_rate,
+                min_fee: head.portfolio_min_fee,
+                max_fee: head.portfolio_max_fee,
+            })?,
             strategic_allocation_present: head.portfolio_strategic_allocation_present,
             assets,
             class_targets: decode_class_targets(class_target_rows)?,

@@ -32,10 +32,11 @@ use crate::ports::outbound::repository::portfolio::{
 };
 use crate::ports::outbound::repository::postgres::convert::unnest_refs;
 use crate::ports::outbound::repository::postgres::types::{
-    AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
+    AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, FeeFields,
+    FeeType as DbFeeType, Provider as DbProvider,
 };
 
-use super::{FeeFields, SqlxPortfolioRepository};
+use super::SqlxPortfolioRepository;
 
 /// A locked Portfolio row: identifier, owner, deleted flag, client timestamp and
 /// server timestamp.
@@ -64,7 +65,7 @@ const PORTFOLIO_PRIMARY_KEY: &str = "portfolios_pkey";
 #[derive(Default)]
 struct FeeColumns {
     max_fee_impacts: Vec<Option<Decimal>>,
-    fee_types: Vec<Option<String>>,
+    fee_types: Vec<Option<DbFeeType>>,
     fee_amounts: Vec<Option<Decimal>>,
     fee_rates: Vec<Option<Decimal>>,
     min_fees: Vec<Option<Decimal>>,

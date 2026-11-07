@@ -7,16 +7,16 @@ use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
 
 use crate::app::domain::{
-    portfolio::{FeeStructure as AppFeeStructure, FeeType, TransactionFees},
-    portfolio_sync::{SyncPlan, SyncSnapshot},
+    portfolio::TransactionFees,
+    portfolio_sync::{LEGACY_WRITE_ALLOCATION, SyncPlan, SyncSnapshot},
 };
 use crate::ports::{
     inbound::rest::request::{PortfolioRequest, TransactionFeesRequest},
     outbound::repository::{
         portfolio::{PortfolioRepository, PortfolioRepositoryError, Result},
         postgres::types::{
-            AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, PortfolioAssetRow,
-            PortfolioRow, Provider as DbProvider,
+            AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, FeeFields,
+            FeeType as DbFeeType, PortfolioAssetRow, PortfolioRow, Provider as DbProvider,
         },
     },
 };
@@ -31,15 +31,14 @@ const ASSET_COLUMNS: &str = "pa.id, pa.portfolio_id, pa.assets_data_id,
     pa.quantity, pa.manual_price, pa.max_fee_impact, pa.fee_type, pa.fee_amount,
     pa.fee_rate, pa.min_fee, pa.max_fee, pa.average_buy_price, pa.created_at, pa.updated_at";
 
-/// Selects [`PortfolioAssetRow`]s. The effective target weight of a Strategic
-/// Portfolio Asset is its relative weight scaled by its class target; `$2` is
-/// the stored Strategic allocation mode. Callers append the `WHERE` clause.
+/// Selects [`PortfolioAssetRow`]s with the raw stored allocation weight and the
+/// Strategic target of the asset's class; the effective target is derived by
+/// the domain. Callers append the `WHERE` clause.
 const ASSET_SELECT: &str = const_format::formatcp!(
     "SELECT {ASSET_COLUMNS},
-            CASE WHEN p.allocation_mode = $2
-                 THEN COALESCE(paa.weight, 0) * COALESCE(class_target.target_weight, 0) / 100
-                 ELSE COALESCE(paa.weight, 0)
-            END AS target_weight
+            p.allocation_mode,
+            COALESCE(paa.weight, 0) AS weight,
+            class_target.target_weight AS class_target
      FROM portfolio_asset AS pa
      JOIN portfolios AS p ON p.id = pa.portfolio_id
      JOIN assets_data AS ad ON ad.id = pa.assets_data_id
@@ -62,48 +61,6 @@ const ASSETS_BY_PORTFOLIO_SQL: &str = const_format::formatcp!(
 #[derive(Clone)]
 pub struct SqlxPortfolioRepository {
     pool: sqlx::PgPool,
-}
-
-#[derive(Default)]
-struct FeeFields {
-    max_fee_impact: Option<Decimal>,
-    fee_type: Option<String>,
-    fee_amount: Option<Decimal>,
-    fee_rate: Option<Decimal>,
-    min_fee: Option<Decimal>,
-    max_fee: Option<Decimal>,
-}
-impl FeeFields {
-    /// Maps an optional application fee policy to its persisted columns.
-    ///
-    /// An absent policy leaves every fee column empty.
-    fn from_fees(fees: Option<&TransactionFees>) -> Self {
-        let Some(fees) = fees else {
-            return Self::default();
-        };
-        let base = Self {
-            max_fee_impact: fees.max_fee_impact,
-            fee_type: Some(fees.fee_structure.fee_type().to_string()),
-            ..Default::default()
-        };
-        match fees.fee_structure {
-            AppFeeStructure::ZeroFee => base,
-            AppFeeStructure::Fixed { fee_amount } => Self {
-                fee_amount: Some(fee_amount),
-                ..base
-            },
-            AppFeeStructure::Variable {
-                fee_rate,
-                min_fee,
-                max_fee,
-            } => Self {
-                fee_rate: Some(fee_rate),
-                min_fee,
-                max_fee,
-                ..base
-            },
-        }
-    }
 }
 
 /// Shared provider metadata returned by the asset-data upsert.
@@ -265,7 +222,7 @@ impl SqlxPortfolioRepository {
             .bind(asset.manual_price)
             .bind(asset.average_buy_price)
             .bind(fee_fields.max_fee_impact)
-            .bind(&fee_fields.fee_type)
+            .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
             .bind(fee_fields.fee_rate)
             .bind(fee_fields.min_fee)
@@ -287,7 +244,6 @@ impl SqlxPortfolioRepository {
         // Read the written rows back through the shared projection, in submitted order.
         let mut rows = query_as::<_, PortfolioAssetRow>(ASSETS_BY_ID_SQL)
             .bind(&relationship_ids)
-            .bind(DbAllocationMode::Strategic)
             .fetch_all(&mut **tx)
             .await?;
         let position: HashMap<Uuid, usize> = relationship_ids
@@ -332,9 +288,9 @@ impl SqlxPortfolioRepository {
             query_as::<_, PortfolioRow>(
                 "UPDATE portfolios
                  SET name = $2, currency = $3, last_updated_at = $4,
-                     allocation_mode = $5, strategic_allocation_present = FALSE,
-                     max_fee_impact = $6, fee_type = $7, fee_amount = $8,
-                     fee_rate = $9, min_fee = $10, max_fee = $11
+                     allocation_mode = $5, strategic_allocation_present = $6,
+                     max_fee_impact = $7, fee_type = $8, fee_amount = $9,
+                     fee_rate = $10, min_fee = $11, max_fee = $12
                  WHERE id = $1
                  RETURNING id, user_id, name, currency, deleted, last_updated_at,
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
@@ -344,7 +300,10 @@ impl SqlxPortfolioRepository {
             .bind(&portfolio.name)
             .bind(&portfolio.quote_ccy)
             .bind(portfolio.last_updated_at)
-            .bind(DbAllocationMode::Simple)
+            .bind(DbAllocationMode::from(
+                LEGACY_WRITE_ALLOCATION.allocation_mode,
+            ))
+            .bind(LEGACY_WRITE_ALLOCATION.strategic_allocation_present)
             .bind(fee_fields.max_fee_impact)
             .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
@@ -357,8 +316,9 @@ impl SqlxPortfolioRepository {
             query_as::<_, PortfolioRow>(
                 "INSERT INTO portfolios
                      (id, user_id, name, currency, deleted, last_updated_at,
+                      allocation_mode, strategic_allocation_present,
                       max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee)
-                 VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, $8, $9, $10, $11)
+                 VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                  RETURNING id, user_id, name, currency, deleted, last_updated_at,
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
@@ -368,6 +328,10 @@ impl SqlxPortfolioRepository {
             .bind(&portfolio.name)
             .bind(&portfolio.quote_ccy)
             .bind(portfolio.last_updated_at)
+            .bind(DbAllocationMode::from(
+                LEGACY_WRITE_ALLOCATION.allocation_mode,
+            ))
+            .bind(LEGACY_WRITE_ALLOCATION.strategic_allocation_present)
             .bind(fee_fields.max_fee_impact)
             .bind(fee_fields.fee_type)
             .bind(fee_fields.fee_amount)
@@ -380,22 +344,24 @@ impl SqlxPortfolioRepository {
 
         let assets = Self::upsert_assets_transaction(&mut tx, portfolio.id, assets).await?;
 
-        // The legacy endpoint exposes only absolute Portfolio Asset targets;
-        // keep a v2 Strategic state from changing that contract implicitly.
-        query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = $1")
-            .bind(portfolio.id)
-            .execute(&mut *tx)
-            .await?;
+        if !LEGACY_WRITE_ALLOCATION.keeps_class_targets {
+            query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = $1")
+                .bind(portfolio.id)
+                .execute(&mut *tx)
+                .await?;
+        }
 
         // A sync must expose the portfolio and its asset set as one consistent change.
         tx.commit().await?;
         Ok((portfolio, assets))
     }
+    /// Maps an optional legacy v1 fee policy to its persisted columns; an
+    /// absent policy is stored as an explicit zero fee.
     fn extract_fee_fields(fees: Option<TransactionFeesRequest>) -> FeeFields {
         match fees {
             Some(fees) => FeeFields::from_fees(Some(&TransactionFees::from(fees))),
             None => FeeFields {
-                fee_type: Some(FeeType::ZeroFee.to_string()),
+                fee_type: Some(DbFeeType::ZeroFee),
                 ..Default::default()
             },
         }
@@ -441,7 +407,6 @@ impl PortfolioRepository for SqlxPortfolioRepository {
         let portfolio_ids: Vec<Uuid> = portfolios.iter().map(|portfolio| portfolio.id).collect();
         let assets = query_as::<_, PortfolioAssetRow>(ASSETS_BY_PORTFOLIO_SQL)
             .bind(&portfolio_ids)
-            .bind(DbAllocationMode::Strategic)
             .fetch_all(&self.pool)
             .await?;
 

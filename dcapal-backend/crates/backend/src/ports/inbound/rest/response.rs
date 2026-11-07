@@ -8,11 +8,11 @@ use uuid::Uuid;
 
 use crate::{
     DateTime,
-    app::domain::portfolio::FeeType,
+    app::domain::portfolio::FeeStructure as AppFeeStructure,
     error::DcaError,
     ports::{
         inbound::rest::FeeStructure,
-        outbound::repository::postgres::types::{PortfolioAssetRow, PortfolioRow},
+        outbound::repository::postgres::types::{FeeFields, PortfolioAssetRow, PortfolioRow},
     },
 };
 
@@ -110,40 +110,28 @@ fn v1_response_asset_class_schema() -> Object {
 
 /// Builds the v1 fee settings from the stored fee columns of a portfolio or
 /// asset, or `None` when no fee type is stored.
-fn legacy_fees(
-    fee_type: Option<&str>,
-    max_fee_impact: Option<Decimal>,
-    fee_amount: Option<Decimal>,
-    fee_rate: Option<Decimal>,
-    min_fee: Option<Decimal>,
-    max_fee: Option<Decimal>,
-) -> Result<Option<TransactionFeesResponse>, DcaError> {
-    let Some(fee_type) = fee_type else {
-        return Ok(None);
-    };
-    let fee_structure = match fee_type.parse::<FeeType>() {
-        Ok(FeeType::ZeroFee) => FeeStructure::ZeroFee,
-        Ok(FeeType::Fixed) => FeeStructure::Fixed {
-            fee_amount: fee_amount.ok_or_else(|| {
-                DcaError::Generic("Fixed fee requires fee_amount to be Some.".to_string())
-            })?,
+fn legacy_fees(fields: &FeeFields) -> Result<Option<TransactionFeesResponse>, DcaError> {
+    let fees = fields
+        .clone()
+        .into_fees()
+        .map_err(|error| DcaError::Generic(error.to_string()))?;
+    Ok(fees.map(|fees| TransactionFeesResponse {
+        max_fee_impact: fees.max_fee_impact,
+        fee_structure: match fees.fee_structure {
+            AppFeeStructure::ZeroFee => FeeStructure::ZeroFee,
+            AppFeeStructure::Fixed { fee_amount } => FeeStructure::Fixed { fee_amount },
+            AppFeeStructure::Variable {
+                fee_rate,
+                min_fee,
+                max_fee,
+            } => FeeStructure::Variable {
+                fee_rate,
+                // v2 treats an absent lower bound as no minimum;
+                // v1 can represent that policy with a zero bound.
+                min_fee: min_fee.unwrap_or(Decimal::ZERO),
+                max_fee,
+            },
         },
-        Ok(FeeType::Variable) => FeeStructure::Variable {
-            fee_rate: fee_rate.ok_or_else(|| {
-                DcaError::Generic("Variable fee requires fee_rate to be Some.".to_string())
-            })?,
-            // v2 treats an absent lower bound as no minimum;
-            // v1 can represent that policy with a zero bound.
-            min_fee: min_fee.unwrap_or(Decimal::ZERO),
-            max_fee,
-        },
-        Err(_) => {
-            return Err(DcaError::Generic(format!("Unknown fee type {fee_type}.")));
-        }
-    };
-    Ok(Some(TransactionFeesResponse {
-        max_fee_impact,
-        fee_structure,
     }))
 }
 
@@ -155,14 +143,7 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
         let portfolio_assets: Vec<PortfolioAssetResponse> = assets
             .iter()
             .map(|asset| {
-                let fees = legacy_fees(
-                    asset.fee_type.as_deref(),
-                    asset.max_fee_impact,
-                    asset.fee_amount,
-                    asset.fee_rate,
-                    asset.min_fee,
-                    asset.max_fee,
-                )?;
+                let fees = legacy_fees(&asset.fees)?;
 
                 Ok(PortfolioAssetResponse {
                     symbol: asset.symbol.clone(),
@@ -171,7 +152,7 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
                     base_ccy: asset.currency.clone(),
                     provider: asset.provider.as_legacy_name().to_string(),
                     qty: asset.quantity,
-                    target_weight: asset.target_weight,
+                    target_weight: asset.legacy_target_weight(),
                     // v2 makes both values optional; v1 requires both, so each stands in
                     // for the other and only an asset with neither cannot be projected.
                     price: asset
@@ -198,14 +179,7 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
             id: portfolio.id,
             name: portfolio.name.clone(),
             quote_ccy: portfolio.currency.clone(),
-            fees: legacy_fees(
-                portfolio.fee_type.as_deref(),
-                portfolio.max_fee_impact,
-                portfolio.fee_amount,
-                portfolio.fee_rate,
-                portfolio.min_fee,
-                portfolio.max_fee,
-            )?,
+            fees: legacy_fees(&portfolio.fees)?,
             assets: portfolio_assets,
             last_updated_at: portfolio.last_updated_at,
         })
@@ -234,7 +208,9 @@ mod test {
     use rust_decimal::dec;
 
     use super::*;
-    use crate::ports::outbound::repository::postgres::types::{AssetClass, Provider};
+    use crate::ports::outbound::repository::postgres::types::{
+        AllocationMode as DbAllocationMode, AssetClass, FeeType as DbFeeType, Provider,
+    };
 
     #[test]
     fn map_model_to_response() {
@@ -247,12 +223,14 @@ mod test {
             currency: String::from("EUR"),
             deleted: false,
             last_updated_at: Utc::now(),
-            max_fee_impact: None,
-            fee_type: Some(String::from("Fixed")),
-            fee_amount: Some(dec!(2.95)),
-            fee_rate: None,
-            min_fee: None,
-            max_fee: None,
+            fees: FeeFields {
+                max_fee_impact: None,
+                fee_type: Some(DbFeeType::Fixed),
+                fee_amount: Some(dec!(2.95)),
+                fee_rate: None,
+                min_fee: None,
+                max_fee: None,
+            },
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -268,14 +246,18 @@ mod test {
             currency: String::from("EUR"),
             provider: Provider::YF,
             quantity: dec!(10.0),
-            target_weight: dec!(1.0),
+            allocation_mode: DbAllocationMode::Simple,
+            weight: dec!(1.0),
+            class_target: None,
             manual_price: Some(dec!(100.0)),
-            max_fee_impact: None,
-            fee_type: None,
-            fee_amount: None,
-            fee_rate: None,
-            min_fee: None,
-            max_fee: None,
+            fees: FeeFields {
+                max_fee_impact: None,
+                fee_type: None,
+                fee_amount: None,
+                fee_rate: None,
+                min_fee: None,
+                max_fee: None,
+            },
             average_buy_price: Some(dec!(90.0)),
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -302,7 +284,7 @@ mod test {
                 base_ccy: asset_model.currency.clone(),
                 provider: asset_model.provider.as_legacy_name().to_string(),
                 qty: asset_model.quantity,
-                target_weight: asset_model.target_weight,
+                target_weight: asset_model.legacy_target_weight(),
                 price: asset_model.manual_price.unwrap(),
                 average_buy_price: dec!(90.0),
                 fees: None,
@@ -366,12 +348,14 @@ mod test {
             currency: "EUR".to_string(),
             deleted: false,
             last_updated_at: now,
-            max_fee_impact: None,
-            fee_type: Some("Variable".to_string()),
-            fee_amount: None,
-            fee_rate: Some(dec!(0.19)),
-            min_fee: None,
-            max_fee: None,
+            fees: FeeFields {
+                max_fee_impact: None,
+                fee_type: Some(DbFeeType::Variable),
+                fee_amount: None,
+                fee_rate: Some(dec!(0.19)),
+                min_fee: None,
+                max_fee: None,
+            },
             created_at: now,
             updated_at: now,
         };
@@ -386,14 +370,18 @@ mod test {
             currency: "EUR".to_string(),
             provider: Provider::YF,
             quantity: dec!(10),
-            target_weight: dec!(1),
+            allocation_mode: DbAllocationMode::Simple,
+            weight: dec!(1),
+            class_target: None,
             manual_price: Some(dec!(100)),
-            max_fee_impact: None,
-            fee_type: Some("Variable".to_string()),
-            fee_amount: None,
-            fee_rate: Some(dec!(0.19)),
-            min_fee: None,
-            max_fee: None,
+            fees: FeeFields {
+                max_fee_impact: None,
+                fee_type: Some(DbFeeType::Variable),
+                fee_amount: None,
+                fee_rate: Some(dec!(0.19)),
+                min_fee: None,
+                max_fee: None,
+            },
             average_buy_price: Some(dec!(90)),
             created_at: now,
             updated_at: now,
@@ -423,8 +411,8 @@ mod test {
         );
 
         // Existing explicit v1 bounds remain unchanged by the compatibility mapping.
-        portfolio.min_fee = Some(dec!(2.95));
-        asset.min_fee = Some(dec!(1.25));
+        portfolio.fees.min_fee = Some(dec!(2.95));
+        asset.fees.min_fee = Some(dec!(1.25));
         let response = PortfolioResponse::try_from((portfolio, vec![asset]))
             .expect("explicit v1 fee bounds should remain valid");
         assert!(matches!(
@@ -456,12 +444,14 @@ mod test {
             currency: "EUR".to_string(),
             deleted: false,
             last_updated_at: now,
-            max_fee_impact: None,
-            fee_type: None,
-            fee_amount: None,
-            fee_rate: None,
-            min_fee: None,
-            max_fee: None,
+            fees: FeeFields {
+                max_fee_impact: None,
+                fee_type: None,
+                fee_amount: None,
+                fee_rate: None,
+                min_fee: None,
+                max_fee: None,
+            },
             created_at: now,
             updated_at: now,
         };
@@ -492,14 +482,18 @@ mod test {
                     Provider::YF
                 },
                 quantity: dec!(1),
-                target_weight: dec!(1),
+                allocation_mode: DbAllocationMode::Simple,
+                weight: dec!(1),
+                class_target: None,
                 manual_price: Some(dec!(100)),
-                max_fee_impact: None,
-                fee_type: None,
-                fee_amount: None,
-                fee_rate: None,
-                min_fee: None,
-                max_fee: None,
+                fees: FeeFields {
+                    max_fee_impact: None,
+                    fee_type: None,
+                    fee_amount: None,
+                    fee_rate: None,
+                    min_fee: None,
+                    max_fee: None,
+                },
                 average_buy_price: Some(dec!(90)),
                 created_at: now,
                 updated_at: now,

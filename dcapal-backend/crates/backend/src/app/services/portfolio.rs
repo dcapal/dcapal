@@ -273,7 +273,7 @@ mod tests {
     use crate::ports::inbound::rest::request::PortfolioAssetRequest;
     use crate::ports::outbound::repository::{
         portfolio::{MockPortfolioRepository, PortfolioRepository},
-        postgres::types::{PortfolioAssetRow, PortfolioRow},
+        postgres::types::{FeeFields, PortfolioAssetRow, PortfolioRow},
     };
     use crate::ports::outbound::{
         adapter::MockAssetProvider, repository::asset::MockAssetDirectory,
@@ -1055,12 +1055,14 @@ mod tests {
                     currency: portfolio.quote_ccy,
                     deleted: false,
                     last_updated_at: portfolio.last_updated_at,
-                    max_fee_impact: None,
-                    fee_type: None,
-                    fee_amount: None,
-                    fee_rate: None,
-                    min_fee: None,
-                    max_fee: None,
+                    fees: FeeFields {
+                        max_fee_impact: None,
+                        fee_type: None,
+                        fee_amount: None,
+                        fee_rate: None,
+                        min_fee: None,
+                        max_fee: None,
+                    },
                     created_at: now,
                     updated_at: now,
                 },

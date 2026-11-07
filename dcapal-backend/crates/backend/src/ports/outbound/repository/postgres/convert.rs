@@ -5,11 +5,11 @@ use crate::{
         asset::{AssetRef, MetadataSource as AppMetadataSource},
         portfolio::{
             AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
-            Provider as AppProvider,
+            FeeType as AppFeeType, Provider as AppProvider,
         },
     },
     ports::outbound::repository::postgres::types::{
-        AllocationMode as DbAllocationMode, AssetClass as DbAssetClass,
+        AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, FeeType as DbFeeType,
         MetadataSource as DbMetadataSource, Provider as DbProvider,
     },
 };
@@ -43,6 +43,7 @@ convert_enum!(
     [Other, Equity, Bond, Cash, Crypto, Commodity]
 );
 convert_enum!(AppAllocationMode, DbAllocationMode, [Simple, Strategic]);
+convert_enum!(AppFeeType, DbFeeType, [ZeroFee, Fixed, Variable]);
 convert_enum!(
     AppMetadataSource,
     DbMetadataSource,

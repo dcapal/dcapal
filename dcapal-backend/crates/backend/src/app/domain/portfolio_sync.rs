@@ -176,6 +176,104 @@ impl PortfolioContent {
     }
 }
 
+/// The allocation state a legacy v1 write leaves a Portfolio in.
+///
+/// v1 clients only know absolute Portfolio Asset targets, so every v1 write
+/// demotes the Portfolio to Simple mode: it forgets any submitted Strategic
+/// Allocation and drops the stored Asset Class targets. The v1 targets are
+/// stored as the Portfolio Asset weights.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LegacyWriteAllocation {
+    /// The Allocation Mode the Portfolio is stored with.
+    pub allocation_mode: AllocationMode,
+    /// Whether a Strategic Allocation object counts as submitted.
+    pub strategic_allocation_present: bool,
+    /// Whether the stored Asset Class targets are kept.
+    pub keeps_class_targets: bool,
+}
+
+/// The allocation state every legacy v1 write stores.
+pub const LEGACY_WRITE_ALLOCATION: LegacyWriteAllocation = LegacyWriteAllocation {
+    allocation_mode: AllocationMode::Simple,
+    strategic_allocation_present: false,
+    keeps_class_targets: false,
+};
+
+/// The absolute Portfolio target of an asset as the legacy v1 API reports it.
+///
+/// In Simple mode the stored `weight` already is the absolute target. In
+/// Strategic mode it is relative within the asset's class and the absolute
+/// target is `weight * class_target / 100`, where a class without a stored
+/// target counts as zero.
+///
+/// The result is rendered with the scale PostgreSQL's `numeric` division gave
+/// the former SQL expression, so v1 clients keep receiving byte-identical
+/// decimal strings (for instance `60.0000000000000000`); zero has no scale.
+pub fn legacy_target_weight(
+    allocation_mode: AllocationMode,
+    weight: Decimal,
+    class_target: Option<Decimal>,
+) -> Decimal {
+    match allocation_mode {
+        AllocationMode::Simple => weight,
+        AllocationMode::Strategic => {
+            let product = weight * class_target.unwrap_or(Decimal::ZERO);
+            if product.is_zero() {
+                return Decimal::ZERO;
+            }
+            let scale = numeric_division_scale(product, Decimal::ONE_HUNDRED);
+            let mut quotient = product / Decimal::ONE_HUNDRED;
+            if quotient.scale() > scale {
+                quotient = quotient.round_dp_with_strategy(
+                    scale,
+                    rust_decimal::RoundingStrategy::MidpointAwayFromZero,
+                );
+            }
+            quotient.rescale(scale);
+            quotient
+        }
+    }
+}
+
+/// The scale PostgreSQL gives the quotient of two `numeric` values
+/// (`select_div_scale`): enough digits for 16 significant ones, and never
+/// fewer than either operand shows.
+fn numeric_division_scale(dividend: Decimal, divisor: Decimal) -> u32 {
+    /// The weight (in base-10000 digits) and leading base-10000 digit of a
+    /// value, the way PostgreSQL stores `numeric`; zero counts as `(0, 0)`.
+    fn weight_and_leading_digit(value: Decimal) -> (i32, u128) {
+        let mantissa = value.mantissa().unsigned_abs();
+        if mantissa == 0 {
+            return (0, 0);
+        }
+        let exponent = mantissa.ilog10() as i32 - value.scale() as i32;
+        let weight = exponent.div_euclid(4);
+        let shift = value.scale() as i32 + 4 * weight;
+        let leading = if shift >= 0 {
+            mantissa / 10u128.pow(shift as u32)
+        } else {
+            mantissa * 10u128.pow(shift.unsigned_abs())
+        };
+        (weight, leading)
+    }
+
+    /// The number of significant digits PostgreSQL guarantees a quotient.
+    const MIN_SIGNIFICANT_DIGITS: i32 = 16;
+    /// The number of decimal digits in a base-10000 digit.
+    const DIGITS_PER_GROUP: i32 = 4;
+
+    let (dividend_weight, dividend_digit) = weight_and_leading_digit(dividend);
+    let (divisor_weight, divisor_digit) = weight_and_leading_digit(divisor);
+    let mut quotient_weight = dividend_weight - divisor_weight;
+    if dividend_digit <= divisor_digit {
+        quotient_weight -= 1;
+    }
+    let significant = MIN_SIGNIFICANT_DIGITS - quotient_weight * DIGITS_PER_GROUP;
+    significant
+        .max(dividend.scale() as i32)
+        .max(divisor.scale() as i32) as u32
+}
+
 /// A Portfolio of the synchronizing user as it is stored.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredPortfolio {
@@ -990,5 +1088,42 @@ mod tests {
         assert!(AssetClass::Bond < AssetClass::Cash);
         assert!(AssetClass::Cash < AssetClass::Crypto);
         assert!(AssetClass::Crypto < AssetClass::Commodity);
+    }
+
+    #[test]
+    fn simple_mode_reports_the_stored_weight_untouched() {
+        // GIVEN a Simple Portfolio Asset weight with its own scale,
+        // WHEN its legacy v1 target is derived,
+        // THEN the weight is returned as stored, ignoring any class target.
+        let weight = legacy_target_weight(AllocationMode::Simple, dec!(30.00), Some(dec!(60)));
+
+        assert_eq!(weight.to_string(), "30.00");
+    }
+
+    #[test]
+    fn strategic_mode_scales_the_relative_weight_by_its_class_target() {
+        // GIVEN Strategic relative weights and class targets,
+        // WHEN their legacy v1 targets are derived,
+        // THEN each is relative * class / 100 with the scale PostgreSQL's
+        // numeric division gave the former SQL, and zero carries no scale.
+        let cases = [
+            (dec!(100.00), Some(dec!(60.00)), "60.0000000000000000"),
+            (dec!(33.333), Some(dec!(25)), "8.3332500000000000"),
+            (dec!(0.1), Some(dec!(0.3)), "0.00030000000000000000"),
+            (dec!(7), Some(dec!(3)), "0.21000000000000000000"),
+            (
+                dec!(99.99999999),
+                Some(dec!(99.99999999)),
+                "99.9999999800000000",
+            ),
+            (dec!(12345.6789), Some(dec!(1000)), "123456.789000000000"),
+            (dec!(50), None, "0"),
+            (dec!(0), Some(dec!(50)), "0"),
+        ];
+
+        for (weight, class_target, expected) in cases {
+            let target = legacy_target_weight(AllocationMode::Strategic, weight, class_target);
+            assert_eq!(target.to_string(), expected, "{weight} x {class_target:?}");
+        }
     }
 }
