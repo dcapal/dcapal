@@ -1399,3 +1399,132 @@ async fn one_plan_writes_several_portfolios_sharing_assets_and_matches_a_reload(
 
     Ok(())
 }
+
+/// Reads the v1 wire `targetWeight` strings of the fixture Portfolio's assets,
+/// in the order the v1 listing returns them.
+async fn v1_target_weights(
+    repository: &SqlxPortfolioRepository,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let portfolios = repository.get_user_portfolios_with_assets(USER_ID).await?;
+    let response = dcapal_backend::ports::inbound::rest::response::PortfolioResponse::try_from(
+        portfolios.into_iter().next().expect("fixture portfolio"),
+    )?;
+    let json = serde_json::to_value(response)?;
+    Ok(json["assets"]
+        .as_array()
+        .expect("assets")
+        .iter()
+        .map(|asset| asset["targetWeight"].as_str().expect("string").to_string())
+        .collect())
+}
+
+/// Stores a Strategic state for the fixture Portfolio: `(relative weight,
+/// class target)` for VWCE (Equity) and CASH (Cash); a `None` class target
+/// leaves the class without a stored target.
+async fn store_strategic_state(
+    pool: &PgPool,
+    vwce: (&str, Option<&str>),
+    cash: (&str, Option<&str>),
+) -> Result<(), Box<dyn std::error::Error>> {
+    sqlx::query("UPDATE portfolios SET allocation_mode = 2 WHERE id = $1")
+        .bind(PORTFOLIO_ID)
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = $1")
+        .bind(PORTFOLIO_ID)
+        .execute(pool)
+        .await?;
+    for (symbol, class, (weight, class_target)) in [("VWCE", 1_i16, vwce), ("CASH", 3_i16, cash)] {
+        sqlx::query(
+            "UPDATE portfolio_asset_allocation SET weight = $2::numeric
+             WHERE portfolio_asset_id = (
+                 SELECT pa.id FROM portfolio_asset pa
+                 JOIN assets_data ad ON ad.id = pa.assets_data_id
+                 WHERE pa.portfolio_id = $1 AND ad.symbol = $3)",
+        )
+        .bind(PORTFOLIO_ID)
+        .bind(weight)
+        .bind(symbol)
+        .execute(pool)
+        .await?;
+        if let Some(class_target) = class_target {
+            sqlx::query(
+                "INSERT INTO strategic_asset_class_targets (portfolio_id, asset_class, target_weight)
+                 VALUES ($1, $2, $3::numeric)",
+            )
+            .bind(PORTFOLIO_ID)
+            .bind(class)
+            .bind(class_target)
+            .execute(pool)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v1_renders_strategic_absolute_targets_with_the_stored_numeric_scale(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a Strategic Portfolio whose relative asset weights and class targets
+    // have assorted scales (including zero, which SQLx decodes without its scale, and a missing class target),
+    // WHEN the v1 listing renders each asset's absolute target,
+    // THEN every `targetWeight` string is exactly what the former SQL
+    // `relative * class_target / 100` produced, trailing zeros included.
+    let repository = SqlxPortfolioRepository::new(pool.clone());
+    let cases: [((&str, Option<&str>), (&str, Option<&str>), [&str; 2]); 5] = [
+        (
+            ("100.00", Some("60.00")),
+            ("33.333", Some("25")),
+            ["60.0000000000000000", "8.3332500000000000"],
+        ),
+        (
+            ("0.1", Some("0.3")),
+            ("7", Some("3")),
+            ["0.00030000000000000000", "0.21000000000000000000"],
+        ),
+        (
+            ("0", Some("50")),
+            ("50.5", Some("12.25")),
+            ["0", "6.1862500000000000"],
+        ),
+        (("50", None), ("100", Some("0.00")), ["0", "0"]),
+        (
+            ("99.99999999", Some("99.99999999")),
+            ("12345.6789", Some("1000")),
+            ["99.9999999800000000", "123456.789000000000"],
+        ),
+    ];
+    for (vwce, cash, expected) in cases {
+        store_strategic_state(&pool, vwce, cash).await?;
+        assert_eq!(
+            v1_target_weights(&repository).await?,
+            expected,
+            "{vwce:?} {cash:?}"
+        );
+    }
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v1_renders_simple_targets_exactly_as_stored(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a Simple Portfolio whose stored weights carry different scales,
+    // WHEN the v1 listing renders them,
+    // THEN the strings keep the stored scale untouched.
+    sqlx::query("UPDATE portfolio_asset_allocation SET weight = 30.00 WHERE portfolio_id = $1")
+        .bind(PORTFOLIO_ID)
+        .execute(&pool)
+        .await?;
+    sqlx::query(
+        "UPDATE portfolio_asset_allocation SET weight = 0.5
+         WHERE portfolio_asset_id = (SELECT id FROM portfolio_asset WHERE assets_data_id =
+               '00000000-0000-7000-8000-000000000002')",
+    )
+    .execute(&pool)
+    .await?;
+    let repository = SqlxPortfolioRepository::new(pool);
+    assert_eq!(v1_target_weights(&repository).await?, ["30.00", "0.5"]);
+    Ok(())
+}
