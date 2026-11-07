@@ -1,4 +1,4 @@
-import type { Preview } from "@storybook/react";
+import type { Preview } from "@storybook/react-webpack5";
 import "../src/style.css";
 import "../src/design-system/styles/index.css";
 
@@ -10,22 +10,23 @@ const preview: Preview = {
       </div>
     ),
   ],
+
   parameters: {
     a11y: {
       test: "error",
     },
     backgrounds: {
-      default: "Light canvas",
-      values: [
-        {
+      options: {
+        light_canvas: {
           name: "Light canvas",
           value: "var(--dcapal-canvas)",
         },
-        {
+
+        dark_chrome: {
           name: "Dark chrome",
           value: "var(--dcapal-chrome)",
         },
-      ],
+      },
     },
     controls: {
       matchers: {
@@ -35,7 +36,7 @@ const preview: Preview = {
     },
     layout: "fullscreen",
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: "Mobile",
           styles: { width: "390px", height: "844px" },
@@ -45,7 +46,17 @@ const preview: Preview = {
           styles: { width: "1440px", height: "900px" },
         },
       },
-      defaultViewport: "desktop",
+    },
+  },
+
+  initialGlobals: {
+    viewport: {
+      value: "desktop",
+      isRotated: false,
+    },
+
+    backgrounds: {
+      value: "light_canvas",
     },
   },
 };

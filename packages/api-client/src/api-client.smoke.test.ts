@@ -3,7 +3,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { getGetPriceQueryOptions } from "./gen";
-import { getGetPriceMockHandler } from "./gen-mocks";
+import { getGetPriceMockHandler } from "./gen-mocks/index.msw";
 import {
   configureApiClientBaseUrl,
   resetApiClientConfiguration,

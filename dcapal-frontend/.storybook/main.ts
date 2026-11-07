@@ -1,25 +1,33 @@
-import path from "node:path";
+// This file has been automatically migrated to valid ESM format by Storybook.
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import path, { dirname } from "node:path";
 import type { StorybookConfig } from "@storybook/react-webpack5";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
 
 const frontendRoot = path.resolve(__dirname, "..");
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
+
   addons: [
-    "@storybook/addon-essentials",
     "@storybook/addon-a11y",
+    "@storybook/addon-docs",
     "@storybook/addon-webpack5-compiler-babel",
   ],
+
   framework: {
     name: "@storybook/react-webpack5",
     options: {},
   },
-  docs: {
-    autodocs: "tag",
-  },
+
   core: {
     disableTelemetry: true,
   },
+
   webpackFinal: async (webpackConfig) => {
     const cssRule = {
       test: /\.css$/,
@@ -47,14 +55,22 @@ const config: StorybookConfig = {
         return true;
       }
 
-      const loaders = Array.isArray(rule.use) ? rule.use : [rule.use, rule.loader];
+      const loaders = Array.isArray(rule.use)
+        ? rule.use
+        : [rule.use, rule.loader];
       const usesBabel = loaders.some((loader) => {
         if (typeof loader === "string") return loader.includes("babel-loader");
-        if (!loader || typeof loader !== "object" || !("loader" in loader)) return false;
-        return typeof loader.loader === "string" && loader.loader.includes("babel-loader");
+        if (!loader || typeof loader !== "object" || !("loader" in loader))
+          return false;
+        return (
+          typeof loader.loader === "string" &&
+          loader.loader.includes("babel-loader")
+        );
       });
 
-      return !(rule.test instanceof RegExp && rule.test.test(".css")) && !usesBabel;
+      return (
+        !(rule.test instanceof RegExp && rule.test.test(".css")) && !usesBabel
+      );
     });
 
     const babelRule = {

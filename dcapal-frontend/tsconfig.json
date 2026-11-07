@@ -19,7 +19,7 @@
         "../packages/api-client/src/index.ts"
       ],
       "@dcapal/api-client/mocks": [
-        "../packages/api-client/src/gen-mocks/index.ts"
+        "../packages/api-client/src/gen-mocks/index.msw.ts"
       ],
       "@dcapal/api-client/model": [
         "../packages/api-client/src/gen/model/index.ts"

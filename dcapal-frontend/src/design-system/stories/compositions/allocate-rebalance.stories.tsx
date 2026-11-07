@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-webpack5";
 import { AllocateComposition } from "../../components/patterns/compositions";
 
 const meta = {
@@ -25,8 +25,13 @@ type Story = StoryObj<typeof meta>;
 
 export const AllocationOptions: Story = {};
 export const AllocationOptionsMobile: Story = {
-  parameters: { viewport: { defaultViewport: "mobile" } },
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 export const AllocationResult: Story = {
   args: { state: "result" },

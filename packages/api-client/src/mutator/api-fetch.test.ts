@@ -13,7 +13,7 @@ import {
 const API_ROOT = "http://api.test";
 const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 afterEach(() => {
   server.resetHandlers();
   resetApiClientConfiguration();

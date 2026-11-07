@@ -68,10 +68,15 @@ const startMocks = async () => {
   const { worker } = await import("./mocks/browser");
   await worker.start({
     quiet: true,
-    onUnhandledRequest({ request }, print) {
+    onUnhandledFrame({ frame, defaults }) {
+      if (frame.protocol !== "http") {
+        return;
+      }
+
+      const { request } = frame.data;
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/")) {
-        print.error();
+        defaults.error();
         throw new Error(
           `[MSW] Unhandled API request: ${request.method} ${url.pathname}`
         );

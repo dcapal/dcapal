@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-webpack5";
 import { PortfolioSettingsComposition } from "../../components/patterns/compositions";
 
 const meta = {
@@ -27,8 +27,13 @@ type Story = StoryObj<typeof meta>;
 export const AllocationMethod: Story = {};
 export const AllocationMethodMobile: Story = {
   args: { open: true },
-  parameters: { viewport: { defaultViewport: "mobile" } },
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 export const AllocationMethodOpen: Story = {
   args: { open: true },
@@ -40,8 +45,13 @@ export const StrategicAllocation: Story = {
 };
 export const StrategicAllocationMobile: Story = {
   args: { view: "strategic", open: true },
-  parameters: { viewport: { defaultViewport: "mobile" } },
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 export const SaveSuccess: Story = {
   args: { saveState: "success" },

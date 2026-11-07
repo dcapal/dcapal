@@ -82,9 +82,8 @@
     "@axe-core/playwright": "catalog:",
     "@playwright/test": "catalog:",
     "@storybook/addon-a11y": "catalog:",
-    "@storybook/addon-essentials": "catalog:",
+    "@storybook/addon-docs": "catalog:",
     "@storybook/addon-webpack5-compiler-babel": "catalog:",
-    "@storybook/react": "catalog:",
     "@storybook/react-webpack5": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/react": "catalog:",
@@ -116,7 +115,8 @@
     "webpack-cli": "catalog:",
     "webpack-dev-server": "catalog:",
     "webpack-merge": "catalog:",
-    "storybook": "catalog:"
+    "storybook": "catalog:",
+    "vite": "catalog:"
   },
   "msw": {
     "workerDirectory": [
