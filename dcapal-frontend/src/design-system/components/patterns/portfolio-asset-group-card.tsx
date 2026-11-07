@@ -83,11 +83,15 @@ export function PortfolioAssetGroupCard({
             className="ds-asset-group-card__toggle"
             aria-expanded={expanded}
             aria-controls={listId}
-            aria-label={`${expanded ? "Collapse" : "Expand"} ${group.label}`}
+            // The name must contain the visible text ("Cash 2 assets") to satisfy
+            // WCAG label-in-name; the action verb leads so it stays findable.
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${group.label} ${assetCountLabel(count)}`}
             onClick={onToggle}
           >
             <ChevronDown size={16} aria-hidden />
-            <span className="ds-asset-group-card__name">{group.label}</span>
+            <span className="ds-asset-group-card__name">
+              {group.label}
+            </span>{" "}
             <span className="ds-asset-group-card__count">
               {assetCountLabel(count)}
             </span>
