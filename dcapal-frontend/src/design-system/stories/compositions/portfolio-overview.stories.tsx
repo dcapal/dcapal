@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-webpack5";
 import { PortfolioOverviewComposition } from "../../components/patterns/compositions";
 
 const meta = {
@@ -27,6 +27,11 @@ export const FirstUse: Story = {
 };
 
 export const PopulatedMobile: Story = {
-  parameters: { viewport: { defaultViewport: "mobile" } },
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-webpack5";
 import { Pencil, PieChart, Plus, RefreshCw } from "lucide-react";
 import { Button } from "../../components/ui";
 import {
@@ -71,7 +71,6 @@ export const Shell: Story = {
 };
 
 export const ShellMobile: Story = {
-  parameters: { viewport: { defaultViewport: "mobile" } },
   render: () => (
     <AppShell
       navigation={
@@ -97,6 +96,12 @@ export const ShellMobile: Story = {
     </AppShell>
   ),
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 
 export const Drift: Story = {
@@ -148,7 +153,6 @@ export const Assets: Story = {
 };
 
 export const AssetsMobile: Story = {
-  parameters: { viewport: { defaultViewport: "mobile" } },
   render: () => (
     <div className="dcapal-theme" style={{ padding: "var(--dcapal-space-6)" }}>
       <PortfolioAssetCollection
@@ -159,10 +163,15 @@ export const AssetsMobile: Story = {
     </div>
   ),
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 
 export const AssetsDesktop: Story = {
-  parameters: { viewport: { defaultViewport: "desktop" } },
   render: () => (
     <div className="dcapal-theme" style={{ padding: "var(--dcapal-space-6)" }}>
       <PortfolioAssetCollection
@@ -173,6 +182,12 @@ export const AssetsDesktop: Story = {
     </div>
   ),
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "desktop",
+      isRotated: false,
+    },
+  },
 };
 
 export const ChartReady: Story = {
@@ -243,7 +258,6 @@ export const FloatingActions: Story = {
 };
 
 export const FloatingActionsMobile: Story = {
-  parameters: { viewport: { defaultViewport: "mobile" } },
   render: () => (
     <div className="dcapal-theme" style={{ minHeight: "18rem" }}>
       <FloatingActionMenu
@@ -273,10 +287,15 @@ export const FloatingActionsMobile: Story = {
     </div>
   ),
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };
 
 export const FloatingActionsDesktop: Story = {
-  parameters: { viewport: { defaultViewport: "desktop" } },
   render: () => (
     <div className="dcapal-theme" style={{ minHeight: "18rem" }}>
       <FloatingActionMenu
@@ -306,4 +325,10 @@ export const FloatingActionsDesktop: Story = {
     </div>
   ),
   tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "desktop",
+      isRotated: false,
+    },
+  },
 };

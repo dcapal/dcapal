@@ -193,10 +193,10 @@
           "fees": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/TransactionFeesRequest"
               },
               {
-                "$ref": "#/components/schemas/TransactionFeesRequest"
+                "type": "null"
               }
             ]
           },
@@ -265,11 +265,11 @@
           "fees": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/TransactionFeesResponse",
                 "description": "The asset-level transaction fee settings."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -327,10 +327,10 @@
           "fees": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/TransactionFeesRequest"
               },
               {
-                "$ref": "#/components/schemas/TransactionFeesRequest"
+                "type": "null"
               }
             ]
           },
@@ -371,11 +371,11 @@
           "fees": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/TransactionFeesResponse",
                 "description": "The portfolio-level transaction fee settings."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -578,10 +578,10 @@
           "chart": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/YahooChartPayload"
               },
               {
-                "$ref": "#/components/schemas/YahooChartPayload"
+                "type": "null"
               }
             ]
           }
@@ -593,20 +593,20 @@
           "indicators": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/YahooChartIndicators"
               },
               {
-                "$ref": "#/components/schemas/YahooChartIndicators"
+                "type": "null"
               }
             ]
           },
           "meta": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/YahooChartMeta"
               },
               {
-                "$ref": "#/components/schemas/YahooChartMeta"
+                "type": "null"
               }
             ]
           }

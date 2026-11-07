@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./mocks": "./src/gen-mocks/index.ts",
+    "./mocks": "./src/gen-mocks/index.msw.ts",
     "./model": "./src/gen/model/index.ts"
   },
   "scripts": {
@@ -23,6 +23,7 @@
     "msw": "catalog:",
     "orval": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vite": "catalog:"
   }
 }

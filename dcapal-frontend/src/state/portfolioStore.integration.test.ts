@@ -45,7 +45,7 @@ const syncFixture = JSON.parse(
 );
 
 describe("portfolioStore integration sync with MSW", () => {
-  beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+  beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 
   afterEach(() => {
     server.resetHandlers();
