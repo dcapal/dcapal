@@ -1,7 +1,5 @@
 //! Provider-bound asset references and their resolved shared metadata.
 
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-
 use crate::app::domain::portfolio::{AssetClass, Provider};
 
 /// Reference to an asset by the provider that lists it and its provider symbol.
@@ -39,27 +37,24 @@ pub struct ResolvedAsset {
     pub asset_class: AssetClass,
 }
 
-impl ResolvedAsset {
-    /// Returns the reference identifying this asset.
-    pub fn as_ref(&self) -> AssetRef {
-        AssetRef {
-            provider: self.provider.clone(),
-            symbol: self.symbol.clone(),
+impl From<&ResolvedAsset> for AssetRef {
+    /// Returns the reference identifying the asset.
+    fn from(asset: &ResolvedAsset) -> Self {
+        Self {
+            provider: asset.provider,
+            symbol: asset.symbol.clone(),
         }
     }
 }
 
 /// Origin of the metadata stored for a shared asset.
-///
-/// The discriminants are the values persisted in `assets_data.metadata_source`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
-#[repr(i16)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetadataSource {
     /// Supplied by a client through v1 synchronization, or stored before
     /// provenance was tracked. The provider has not confirmed it.
-    ClientSupplied = 0,
+    ClientSupplied,
     /// Confirmed by the asset's provider.
-    ProviderConfirmed = 1,
+    ProviderConfirmed,
 }
 
 /// Shared asset metadata as stored in the directory, with its provenance.

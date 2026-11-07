@@ -10,9 +10,10 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 use const_format::formatcp;
+use itertools::Itertools;
 use rust_decimal::Decimal;
 use sqlx::{
-    Postgres, Row, Transaction,
+    FromRow, Postgres, Transaction,
     postgres::{PgArguments, PgRow},
     query,
     query::Query,
@@ -38,13 +39,22 @@ use super::{FeeFields, SqlxPortfolioRepository};
 
 /// A locked Portfolio row: identifier, owner, deleted flag, client timestamp and
 /// server timestamp.
-type LockedRow = (
-    Uuid,
-    Uuid,
-    bool,
-    chrono::DateTime<Utc>,
-    chrono::DateTime<Utc>,
-);
+#[derive(sqlx::FromRow)]
+struct LockedRow {
+    id: Uuid,
+    user_id: Uuid,
+    deleted: bool,
+    last_updated_at: chrono::DateTime<Utc>,
+    updated_at: chrono::DateTime<Utc>,
+}
+
+/// A Portfolio Asset relationship as persisted by the upsert.
+#[derive(sqlx::FromRow)]
+struct PersistedRelationship {
+    id: Uuid,
+    portfolio_id: Uuid,
+    assets_data_id: Uuid,
+}
 
 /// The name of the unique index on `portfolios.id`.
 const PORTFOLIO_PRIMARY_KEY: &str = "portfolios_pkey";
@@ -187,7 +197,7 @@ impl PortfolioColumns {
 /// absent. Other failures are reported unchanged.
 fn insert_conflict_as_stale(error: sqlx::Error) -> PortfolioRepositoryError {
     if let sqlx::Error::Database(database_error) = &error
-        && database_error.code().as_deref() == Some("23505")
+        && database_error.is_unique_violation()
         && database_error.constraint() == Some(PORTFOLIO_PRIMARY_KEY)
     {
         return PortfolioRepositoryError::StaleSnapshot;
@@ -222,15 +232,15 @@ async fn lock_and_verify(
     .await?;
     let locked: HashMap<Uuid, (Uuid, PortfolioVersion)> = rows
         .into_iter()
-        .map(|(id, owner, deleted, last_updated_at, updated_at)| {
+        .map(|row| {
             (
-                id,
+                row.id,
                 (
-                    owner,
+                    row.user_id,
                     PortfolioVersion {
-                        deleted,
-                        last_updated_at,
-                        updated_at,
+                        deleted: row.deleted,
+                        last_updated_at: row.last_updated_at,
+                        updated_at: row.updated_at,
                     },
                 ),
             )
@@ -264,11 +274,7 @@ async fn resolve_asset_ids<'a>(
     tx: &mut Transaction<'_, Postgres>,
     refs: impl IntoIterator<Item = &'a AssetRef>,
 ) -> Result<HashMap<&'a AssetRef, Uuid>> {
-    let mut seen = std::collections::HashSet::new();
-    let distinct: Vec<&AssetRef> = refs
-        .into_iter()
-        .filter(|reference| seen.insert(*reference))
-        .collect();
+    let distinct: Vec<&AssetRef> = refs.into_iter().unique().collect();
     if distinct.is_empty() {
         return Ok(HashMap::new());
     }
@@ -299,8 +305,7 @@ async fn resolve_asset_ids<'a>(
                 .ok_or_else(|| {
                     PortfolioRepositoryError::AssetNotOnboarded(format!(
                         "{}:{}",
-                        reference.provider.as_str(),
-                        reference.symbol
+                        reference.provider, reference.symbol
                     ))
                 })
         })
@@ -369,26 +374,19 @@ async fn update_portfolios(
 ///
 /// Relationships are identified by (Portfolio, shared asset). Rows whose asset
 /// is no longer submitted are deleted (their allocation rows cascade), kept
-/// rows keep their identifier, and new rows get a fresh UUIDv7.
+/// rows keep their identifier, and new rows get a fresh UUIDv7. `updated_ids`
+/// are the identifiers of the existing Portfolios among `writes`.
 async fn write_assets(
     tx: &mut Transaction<'_, Postgres>,
-    writes: &[&PortfolioWrite],
+    writes: &[PortfolioWrite],
+    updated_ids: &[Uuid],
     asset_ids: &HashMap<&AssetRef, Uuid>,
 ) -> Result<()> {
-    let updated_ids: Vec<Uuid> = writes
-        .iter()
-        .filter(|write| write.kind == WriteKind::Update)
-        .map(|write| write.id)
-        .collect();
-    let mut kept_portfolios = Vec::new();
-    let mut kept_assets = Vec::new();
     let mut relationships = RelationshipColumns::default();
     for write in writes {
         for stored in &write.content.assets {
             let asset = &stored.asset;
             let assets_data_id = asset_ids[&asset.asset];
-            kept_portfolios.push(write.id);
-            kept_assets.push(assets_data_id);
             relationships
                 .fees
                 .push(FeeFields::from_fees(asset.fees.as_ref()));
@@ -416,9 +414,9 @@ async fn write_assets(
                    WHERE kept.portfolio_id = pa.portfolio_id
                      AND kept.assets_data_id = pa.assets_data_id)",
         )
-        .bind(&updated_ids)
-        .bind(&kept_portfolios)
-        .bind(&kept_assets)
+        .bind(updated_ids)
+        .bind(&relationships.portfolio_ids)
+        .bind(&relationships.assets_data_ids)
         .execute(&mut **tx)
         .await?;
     }
@@ -427,7 +425,7 @@ async fn write_assets(
     }
 
     let now = Utc::now();
-    let persisted: Vec<(Uuid, Uuid, Uuid)> = relationships
+    let persisted: Vec<PersistedRelationship> = relationships
         .bind(query(formatcp!(
             "INSERT INTO portfolio_asset
                  ({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
@@ -448,18 +446,12 @@ async fn write_assets(
             fee_set!("EXCLUDED")
         )))
         .bind(now)
-        .map(|row: PgRow| {
-            (
-                row.get::<Uuid, _>("id"),
-                row.get::<Uuid, _>("portfolio_id"),
-                row.get::<Uuid, _>("assets_data_id"),
-            )
-        })
+        .try_map(|row: PgRow| PersistedRelationship::from_row(&row))
         .fetch_all(&mut **tx)
         .await?;
     let relationship_ids: HashMap<(Uuid, Uuid), Uuid> = persisted
         .into_iter()
-        .map(|(id, portfolio_id, assets_data_id)| ((portfolio_id, assets_data_id), id))
+        .map(|row| ((row.portfolio_id, row.assets_data_id), row.id))
         .collect();
 
     let mut allocation_portfolios = Vec::new();
@@ -529,16 +521,12 @@ impl RelationshipColumns {
 /// delete and at most one insert.
 async fn replace_class_targets(
     tx: &mut Transaction<'_, Postgres>,
-    writes: &[&PortfolioWrite],
+    writes: &[PortfolioWrite],
+    updated_ids: &[Uuid],
 ) -> Result<()> {
-    let updated_ids: Vec<Uuid> = writes
-        .iter()
-        .filter(|write| write.kind == WriteKind::Update)
-        .map(|write| write.id)
-        .collect();
     if !updated_ids.is_empty() {
         query("DELETE FROM strategic_asset_class_targets WHERE portfolio_id = ANY($1)")
-            .bind(&updated_ids)
+            .bind(updated_ids)
             .execute(&mut **tx)
             .await?;
     }
@@ -632,7 +620,12 @@ impl SqlxPortfolioRepository {
         let mut tx = self.pool.begin().await?;
         lock_and_verify(&mut tx, user_id, &plan.expected).await?;
 
-        let writes: Vec<&PortfolioWrite> = plan.writes.iter().collect();
+        let writes = plan.writes.as_slice();
+        let updated_ids: Vec<Uuid> = writes
+            .iter()
+            .filter(|write| write.kind == WriteKind::Update)
+            .map(|write| write.id)
+            .collect();
         // Collected before awaiting: a pending iterator over borrowed closures
         // would make the future unusable inside Axum handlers.
         let referenced: Vec<&AssetRef> = writes
@@ -659,8 +652,8 @@ impl SqlxPortfolioRepository {
             PortfolioColumns::of_kind(plan, WriteKind::Update),
         )
         .await?;
-        write_assets(&mut tx, &writes, &asset_ids).await?;
-        replace_class_targets(&mut tx, &writes).await?;
+        write_assets(&mut tx, writes, &updated_ids, &asset_ids).await?;
+        replace_class_targets(&mut tx, writes, &updated_ids).await?;
         write_tombstones(&mut tx, user_id, plan).await?;
 
         tx.commit().await?;

@@ -270,7 +270,7 @@ pub struct V2ErrorResponse {
 }
 
 /// Validation failure reported by the v2 REST boundary as a 400 response.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Default, thiserror::Error)]
 #[error("The Portfolio aggregate is invalid.")]
 pub struct V2ValidationError {
     pub errors: Vec<V2FieldError>,
@@ -286,14 +286,6 @@ fn known_provider_message() -> &'static str {
     static MESSAGE: LazyLock<String> =
         LazyLock::new(|| format!("must be one of {}", app::Provider::names()));
     MESSAGE.as_str()
-}
-
-/// A fallible conversion failure at the REST-to-application boundary.
-#[derive(Debug, thiserror::Error)]
-#[error("the v2 request contains invalid typed values")]
-pub struct V2ConversionError {
-    /// Field-level conversion issues with paths relative to the converted value.
-    pub errors: Vec<V2FieldError>,
 }
 
 impl V2ValidationError {
@@ -374,7 +366,7 @@ mod tests {
         ];
 
         for (wire, domain) in modes {
-            let name: &str = domain.into();
+            let name = domain.to_string();
             assert_eq!(serde_json::to_value(wire).unwrap(), name);
         }
     }

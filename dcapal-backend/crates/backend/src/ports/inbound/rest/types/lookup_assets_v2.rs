@@ -30,11 +30,11 @@ pub struct LookupAssetsV2Response {
 impl From<ResolvedAsset> for ResolvedAssetV2Response {
     fn from(asset: ResolvedAsset) -> Self {
         Self {
-            provider: asset.provider.as_str().to_string(),
+            provider: asset.provider.to_string(),
             symbol: asset.symbol,
             name: asset.name,
             currency: asset.currency,
-            aclass: asset.asset_class.as_str().to_string(),
+            aclass: asset.asset_class.to_string(),
         }
     }
 }

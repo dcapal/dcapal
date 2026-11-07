@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use dcapal_backend::app::commands::sync_portfolios_v2::SyncPortfoliosV2Command;
-use dcapal_backend::app::domain::asset::{AssetRef, MetadataSource, ResolvedAsset};
+use dcapal_backend::app::domain::asset::{AssetRef, ResolvedAsset};
 use dcapal_backend::app::domain::portfolio::{
     AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider as AppProvider,
     StrategicAllocationV2, StrategicAssetClassTargetV2, StrategicAssetTargetV2,
@@ -19,7 +19,10 @@ use dcapal_backend::ports::{
     outbound::repository::{
         asset::AssetDirectory,
         portfolio::{OwnershipConflict, PortfolioRepository, PortfolioRepositoryError},
-        postgres::{SqlxAssetDirectory, SqlxPortfolioRepository, types::Provider},
+        postgres::{
+            SqlxAssetDirectory, SqlxPortfolioRepository,
+            types::{MetadataSource, Provider},
+        },
     },
 };
 use rust_decimal::{Decimal, dec};
@@ -151,7 +154,7 @@ impl dcapal_backend::ports::outbound::adapter::AssetProvider for NewcoProvider {
     ) -> Result<Option<ResolvedAsset>, dcapal_backend::ports::outbound::adapter::AssetProviderError>
     {
         Ok((asset.symbol == "NEWCO").then(|| ResolvedAsset {
-            provider: asset.provider.clone(),
+            provider: asset.provider,
             symbol: asset.symbol.clone(),
             name: "New company".to_string(),
             currency: "USD".to_string(),

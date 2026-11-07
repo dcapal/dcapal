@@ -28,12 +28,6 @@ pub struct PortfolioRow {
     pub deleted: bool,
     /// The timestamp supplied by the client for synchronization.
     pub last_updated_at: DateTime<Utc>,
-    /// The portfolio-wide allocation semantics.
-    pub allocation_mode: AllocationMode,
-    /// The optional portfolio drift band used by rebalancing.
-    pub drift_band: Option<Decimal>,
-    /// Whether the client explicitly supplied a Strategic Allocation object.
-    pub strategic_allocation_present: bool,
     /// The maximum fee impact configured for transactions.
     pub max_fee_impact: Option<Decimal>,
     /// The persisted fee structure name.

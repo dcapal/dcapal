@@ -1,6 +1,5 @@
 use std::sync::LazyLock;
 
-use derive_more::Display;
 use rust_decimal::Decimal;
 use strum::VariantNames;
 use uuid::Uuid;
@@ -13,10 +12,11 @@ use crate::{DateTime, app::domain::asset::AssetRef};
 #[derive(
     Debug,
     Clone,
+    Copy,
     PartialEq,
     Eq,
     Hash,
-    Display,
+    strum::Display,
     strum::IntoStaticStr,
     strum::EnumString,
     strum::EnumIter,
@@ -32,7 +32,7 @@ pub enum Provider {
 
 impl Provider {
     /// Returns the canonical v2 provider identifier.
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         self.into()
     }
 
@@ -49,7 +49,7 @@ impl Provider {
     ///
     /// The Kraken catalog only knows the symbol, which would overwrite a
     /// possibly more descriptive cached name; Yahoo Finance reports real names.
-    pub const fn has_authoritative_metadata(&self) -> bool {
+    pub const fn has_authoritative_metadata(self) -> bool {
         match self {
             Self::YF => true,
             Self::Kraken => false,
@@ -61,6 +61,11 @@ impl Provider {
     pub fn parse(value: &str) -> Option<Self> {
         value.trim().parse().ok()
     }
+}
+
+/// Tells whether `value` is a percentage between 0 and 100 inclusive.
+pub fn is_percentage(value: Decimal) -> bool {
+    (Decimal::ZERO..=Decimal::from(100)).contains(&value)
 }
 
 /// Asset class used by Portfolio allocation rules.
@@ -77,7 +82,7 @@ impl Provider {
     PartialOrd,
     Ord,
     Hash,
-    Display,
+    strum::Display,
     strum::IntoStaticStr,
     strum::EnumString,
     strum::EnumIter,
@@ -113,8 +118,8 @@ impl AssetClass {
 
 /// Portfolio-wide allocation semantics.
 ///
-/// The lowercase variant names are the stable v2 wire names.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, strum::IntoStaticStr, strum::EnumString)]
+/// The lowercase variant names are the stable v2 names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "lowercase")]
 pub enum AllocationMode {
     /// Each Portfolio Asset target is an absolute Portfolio weight.
@@ -264,12 +269,10 @@ mod tests {
     }
 
     #[test]
-    fn allocation_mode_and_fee_type_use_their_stored_names() {
-        // GIVEN the allocation modes and fee policies,
+    fn fee_type_uses_its_stored_names() {
+        // GIVEN the fee policies,
         // WHEN they are rendered as names,
-        // THEN modes are lowercase and fee types keep the stored variant names.
-        assert_eq!(<&str>::from(AllocationMode::Simple), "simple");
-        assert_eq!("strategic".parse(), Ok(AllocationMode::Strategic));
+        // THEN fee types keep the stored variant names.
         assert_eq!(FeeStructure::ZeroFee.fee_type().to_string(), "ZeroFee");
         assert_eq!(FeeType::Fixed.to_string(), "Fixed");
         assert_eq!("Variable".parse(), Ok(FeeType::Variable));

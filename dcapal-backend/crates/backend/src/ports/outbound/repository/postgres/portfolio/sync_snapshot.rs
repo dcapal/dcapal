@@ -4,17 +4,18 @@
 //! codes are decoded by SQLx and fail the load as database errors; values that
 //! cannot belong to a valid aggregate are reported as corrupt data.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
+use itertools::Itertools;
 use rust_decimal::Decimal;
-use sqlx::{query, query_as};
+use sqlx::query_as;
 use uuid::Uuid;
 
 use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
         FeeStructure as AppFeeStructure, FeeType, PortfolioAssetV2, StrategicAssetClassTargetV2,
-        TransactionFees,
+        TransactionFees, is_percentage,
     },
     portfolio_sync::{
         PortfolioContent, PortfolioVersion, StoredAsset, StoredPortfolio, SyncSnapshot,
@@ -75,10 +76,6 @@ fn corrupt_data(message: impl Into<String>) -> PortfolioRepositoryError {
     PortfolioRepositoryError::CorruptData(message.into())
 }
 
-fn stored_percentage_is_valid(value: Decimal) -> bool {
-    (Decimal::ZERO..=Decimal::from(100)).contains(&value)
-}
-
 /// Decodes the fee columns of a Portfolio or Portfolio Asset, rejecting
 /// combinations no valid fee policy can produce.
 fn decode_fees(
@@ -97,7 +94,7 @@ fn decode_fees(
             Ok(None)
         };
     };
-    if max_fee_impact.is_some_and(|value| !stored_percentage_is_valid(value)) {
+    if max_fee_impact.is_some_and(|value| !is_percentage(value)) {
         return Err(corrupt_data("maxFeeImpact out of range"));
     }
 
@@ -121,7 +118,7 @@ fn decode_fees(
         }
         Ok(FeeType::Variable) => {
             let fee_rate = fee_rate
-                .filter(|rate| stored_percentage_is_valid(*rate))
+                .filter(|rate| is_percentage(*rate))
                 .ok_or_else(|| corrupt_data("Variable fee needs a feeRate within 0..100"))?;
             let bounds_ok = [min_fee, max_fee]
                 .into_iter()
@@ -151,7 +148,7 @@ fn decode_class_targets(rows: Vec<ClassTargetRow>) -> Result<Vec<StrategicAssetC
     let mut seen = HashSet::new();
     let mut targets = Vec::new();
     for row in rows.into_iter().filter(|row| seen.insert(row.asset_class)) {
-        if !stored_percentage_is_valid(row.target_weight) {
+        if !is_percentage(row.target_weight) {
             return Err(corrupt_data("Strategic target weight out of range"));
         }
         targets.push(StrategicAssetClassTargetV2 {
@@ -270,13 +267,9 @@ fn decode_snapshot(
     rows: Vec<SnapshotRow>,
     class_target_rows: Vec<ClassTargetRow>,
 ) -> Result<SyncSnapshot> {
-    let mut class_targets_by_portfolio = HashMap::<Uuid, Vec<ClassTargetRow>>::new();
-    for row in class_target_rows {
-        class_targets_by_portfolio
-            .entry(row.portfolio_id)
-            .or_default()
-            .push(row);
-    }
+    let mut class_targets_by_portfolio = class_target_rows
+        .into_iter()
+        .into_group_map_by(|row| row.portfolio_id);
 
     let mut portfolios = Vec::new();
     // The Portfolio being accumulated: its first row, its assets and their ids.
@@ -318,9 +311,9 @@ impl SqlxPortfolioRepository {
     /// single repeatable-read, read-only transaction, so that the Portfolio
     /// rows and their class targets come from the same state.
     pub(super) async fn load_snapshot(&self, user_id: Uuid) -> Result<SyncSnapshot> {
-        let mut tx = self.pool.begin().await?;
-        query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-            .execute(&mut *tx)
+        let mut tx = self
+            .pool
+            .begin_with("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
             .await?;
         let rows = query_as::<_, SnapshotRow>(
             "SELECT p.id AS portfolio_id,

@@ -7,7 +7,7 @@ use crate::app::domain::{
     asset::AssetRef,
     portfolio::{
         AllocationMode, FeeStructure, PortfolioV2, StrategicAllocationV2, SyncPortfoliosV2Request,
-        TransactionFees,
+        TransactionFees, is_percentage,
     },
 };
 
@@ -58,7 +58,7 @@ const MESSAGE_ASSET_REFERENCE: &str = "must reference an Asset in the same Portf
 const MESSAGE_DUPLICATE_CLASS_TARGET: &str = "duplicate Asset Class target";
 const MESSAGE_DUPLICATE_ASSET_TARGET: &str = "duplicate Portfolio Asset target";
 /// Message for a sync that would onboard more new assets than allowed.
-pub const MESSAGE_TOO_MANY_NEW_ASSETS: &str =
+pub(super) const MESSAGE_TOO_MANY_NEW_ASSETS: &str =
     "introduces too many new assets in one synchronization; sync fewer new assets at a time";
 pub(super) const MESSAGE_UNRESOLVED_ASSET: &str = "is not a known asset";
 const MESSAGE_MAX_AT_LEAST_MIN: &str = "must be greater than or equal to minFee";
@@ -349,18 +349,17 @@ fn validate_portfolio(
                     }
                 }
             }
-            if let Some(allocation) = portfolio.strategic_allocation.as_ref()
-                && !allocation.asset_class_targets.is_empty()
-            {
-                let mut strategic_path = visitor.enter_field(FIELD_STRATEGIC_ALLOCATION);
-                strategic_path
-                    .issue_field(FIELD_ASSET_CLASS_TARGETS, MESSAGE_STRATEGIC_TARGETS_EMPTY);
-            }
-            if let Some(allocation) = portfolio.strategic_allocation.as_ref()
-                && !allocation.asset_targets.is_empty()
-            {
-                let mut strategic_path = visitor.enter_field(FIELD_STRATEGIC_ALLOCATION);
-                strategic_path.issue_field(FIELD_ASSET_TARGETS, MESSAGE_STRATEGIC_TARGETS_EMPTY);
+            if let Some(allocation) = portfolio.strategic_allocation.as_ref() {
+                if !allocation.asset_class_targets.is_empty() {
+                    let mut strategic_path = visitor.enter_field(FIELD_STRATEGIC_ALLOCATION);
+                    strategic_path
+                        .issue_field(FIELD_ASSET_CLASS_TARGETS, MESSAGE_STRATEGIC_TARGETS_EMPTY);
+                }
+                if !allocation.asset_targets.is_empty() {
+                    let mut strategic_path = visitor.enter_field(FIELD_STRATEGIC_ALLOCATION);
+                    strategic_path
+                        .issue_field(FIELD_ASSET_TARGETS, MESSAGE_STRATEGIC_TARGETS_EMPTY);
+                }
             }
         }
         AllocationMode::Strategic => {
@@ -379,14 +378,14 @@ fn validate_portfolio(
         }
     }
 
-    if let Some(strategic) = &mut portfolio.strategic_allocation {
+    if let Some(strategic) = &portfolio.strategic_allocation {
         validate_strategic(strategic, visitor, &asset_refs);
     }
 }
 
 /// Puts an asset reference's symbol in its canonical trimmed upper-case form.
 fn normalize_symbol(reference: &mut AssetRef) {
-    reference.symbol = AssetRef::canonical_symbol(&reference.symbol);
+    *reference = AssetRef::new(reference.provider, &reference.symbol);
 }
 
 fn validate_strategic(
@@ -471,11 +470,6 @@ fn validate_fees(fees: Option<&TransactionFees>, visitor: &mut PathGuard<'_>) {
             }
         }
     }
-}
-
-/// Tells whether `value` is a percentage between 0 and 100 inclusive.
-fn is_percentage(value: Decimal) -> bool {
-    (Decimal::ZERO..=Decimal::from(100)).contains(&value)
 }
 
 fn is_non_negative(value: Decimal) -> bool {

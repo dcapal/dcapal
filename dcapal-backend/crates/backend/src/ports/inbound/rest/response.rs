@@ -247,10 +247,6 @@ mod test {
             currency: String::from("EUR"),
             deleted: false,
             last_updated_at: Utc::now(),
-            allocation_mode:
-                crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
-            drift_band: None,
-            strategic_allocation_present: false,
             max_fee_impact: None,
             fee_type: Some(String::from("Fixed")),
             fee_amount: Some(dec!(2.95)),
@@ -370,10 +366,6 @@ mod test {
             currency: "EUR".to_string(),
             deleted: false,
             last_updated_at: now,
-            allocation_mode:
-                crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
-            drift_band: None,
-            strategic_allocation_present: false,
             max_fee_impact: None,
             fee_type: Some("Variable".to_string()),
             fee_amount: None,
@@ -464,10 +456,6 @@ mod test {
             currency: "EUR".to_string(),
             deleted: false,
             last_updated_at: now,
-            allocation_mode:
-                crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
-            drift_band: None,
-            strategic_allocation_present: false,
             max_fee_impact: None,
             fee_type: None,
             fee_amount: None,

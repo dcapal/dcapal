@@ -43,8 +43,7 @@ pub async fn sync_portfolios(
     Json(request): Json<SyncPortfoliosV2Request>,
 ) -> Result<Response, V2HttpError> {
     info!("Syncing v2 portfolios for user_id: {}.", claims.sub);
-    let request = AppSyncPortfoliosV2Request::try_from(request)
-        .map_err(|error| V2HttpError::Validation(error.into()))?;
+    let request = AppSyncPortfoliosV2Request::try_from(request)?;
     let command = SyncPortfoliosV2Command::try_new(
         claims.sub,
         request,

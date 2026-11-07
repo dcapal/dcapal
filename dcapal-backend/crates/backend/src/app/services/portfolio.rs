@@ -1055,10 +1055,6 @@ mod tests {
                     currency: portfolio.quote_ccy,
                     deleted: false,
                     last_updated_at: portfolio.last_updated_at,
-                    allocation_mode:
-                        crate::ports::outbound::repository::postgres::types::AllocationMode::Simple,
-                    drift_band: None,
-                    strategic_allocation_present: false,
                     max_fee_impact: None,
                     fee_type: None,
                     fee_amount: None,

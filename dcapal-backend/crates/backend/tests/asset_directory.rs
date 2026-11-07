@@ -35,7 +35,7 @@ async fn insert_client_supplied(
         "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class)
          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)",
     )
-    .bind(DbProvider::from(&asset.provider))
+    .bind(DbProvider::from(asset.provider))
     .bind(&asset.symbol)
     .bind(&asset.name)
     .bind(&asset.currency)
@@ -49,7 +49,7 @@ async fn find(
     directory: &SqlxAssetDirectory,
     asset: &ResolvedAsset,
 ) -> Result<StoredAsset, Box<dyn std::error::Error>> {
-    let mut found = directory.find_by_refs(&[asset.as_ref()]).await?;
+    let mut found = directory.find_by_refs(&[AssetRef::from(asset)]).await?;
     Ok(found.pop().expect("asset should be stored"))
 }
 
@@ -162,7 +162,7 @@ async fn confirm_flips_the_source_without_touching_metadata(
         .await?;
 
     directory
-        .confirm(&[client.as_ref(), verified.as_ref()])
+        .confirm(&[AssetRef::from(&client), AssetRef::from(&verified)])
         .await?;
     directory.confirm(&[]).await?;
 

@@ -1,15 +1,8 @@
 use super::*;
 use crate::app::domain::asset::AssetRef;
 
-impl From<V2ConversionError> for V2ValidationError {
-    fn from(error: V2ConversionError) -> Self {
-        Self {
-            errors: error.errors,
-        }
-    }
-}
-
-impl V2ConversionError {
+impl V2ValidationError {
+    /// Creates a failure holding one issue for `field`.
     fn field(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             errors: vec![V2FieldError {
@@ -19,6 +12,7 @@ impl V2ConversionError {
         }
     }
 
+    /// Prefixes the path of every issue with `prefix`.
     fn prepend(mut self, prefix: &str) -> Self {
         for error in &mut self.errors {
             error.field = format!("{prefix}.{}", error.field);
@@ -26,9 +20,26 @@ impl V2ConversionError {
         self
     }
 
+    /// Appends the issues of `other`.
     fn extend(&mut self, other: Self) {
         self.errors.extend(other.errors);
     }
+}
+
+/// Converts every item of a REST array, reporting the issues of failed items
+/// into `errors` under `<prefix>[<index>]` and returning the converted ones.
+fn convert_all<T, U>(items: Vec<T>, prefix: &str, errors: &mut V2ValidationError) -> Vec<U>
+where
+    U: TryFrom<T, Error = V2ValidationError>,
+{
+    let mut converted = Vec::with_capacity(items.len());
+    for (index, item) in items.into_iter().enumerate() {
+        match U::try_from(item) {
+            Ok(item) => converted.push(item),
+            Err(error) => errors.extend(error.prepend(&format!("{prefix}[{index}]"))),
+        }
+    }
+    converted
 }
 
 impl From<ValidationError> for V2ValidationError {
@@ -47,17 +58,11 @@ impl From<ValidationError> for V2ValidationError {
 }
 
 impl TryFrom<SyncPortfoliosV2Request> for app::SyncPortfoliosV2Request {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(request: SyncPortfoliosV2Request) -> Result<Self, Self::Error> {
-        let mut errors = V2ConversionError { errors: Vec::new() };
-        let mut portfolios = Vec::with_capacity(request.portfolios.len());
-        for (index, portfolio) in request.portfolios.into_iter().enumerate() {
-            match app::PortfolioV2::try_from(portfolio) {
-                Ok(portfolio) => portfolios.push(portfolio),
-                Err(error) => errors.extend(error.prepend(&format!("portfolios[{index}]"))),
-            }
-        }
+        let mut errors = V2ValidationError::default();
+        let portfolios = convert_all(request.portfolios, "portfolios", &mut errors);
         if errors.errors.is_empty() {
             Ok(Self {
                 schema_version: request.schema_version,
@@ -71,17 +76,11 @@ impl TryFrom<SyncPortfoliosV2Request> for app::SyncPortfoliosV2Request {
 }
 
 impl TryFrom<PortfolioV2Request> for app::PortfolioV2 {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(portfolio: PortfolioV2Request) -> Result<Self, Self::Error> {
-        let mut errors = V2ConversionError { errors: Vec::new() };
-        let mut assets = Vec::with_capacity(portfolio.assets.len());
-        for (index, asset) in portfolio.assets.into_iter().enumerate() {
-            match app::PortfolioAssetV2::try_from(asset) {
-                Ok(asset) => assets.push(asset),
-                Err(error) => errors.extend(error.prepend(&format!("assets[{index}]"))),
-            }
-        }
+        let mut errors = V2ValidationError::default();
+        let assets = convert_all(portfolio.assets, "assets", &mut errors);
         let strategic_allocation = match portfolio.strategic_allocation {
             Some(allocation) => match app::StrategicAllocationV2::try_from(allocation) {
                 Ok(allocation) => Some(allocation),
@@ -120,7 +119,7 @@ impl From<AllocationModeWire> for app::AllocationMode {
 }
 
 impl TryFrom<PortfolioAssetV2Request> for app::PortfolioAssetV2 {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(asset: PortfolioAssetV2Request) -> Result<Self, Self::Error> {
         let reference = AssetRef::try_from(asset.asset).map_err(|error| error.prepend("asset"))?;
@@ -128,7 +127,7 @@ impl TryFrom<PortfolioAssetV2Request> for app::PortfolioAssetV2 {
             .aclass_override
             .map(|value| {
                 app::AssetClass::parse(&value).ok_or_else(|| {
-                    V2ConversionError::field("aclassOverride", KNOWN_ASSET_CLASS_MESSAGE)
+                    V2ValidationError::field("aclassOverride", KNOWN_ASSET_CLASS_MESSAGE)
                 })
             })
             .transpose()?;
@@ -146,46 +145,35 @@ impl TryFrom<PortfolioAssetV2Request> for app::PortfolioAssetV2 {
 }
 
 impl TryFrom<AssetRefV2> for AssetRef {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(reference: AssetRefV2) -> Result<Self, Self::Error> {
         let provider = app::Provider::parse(&reference.provider)
-            .ok_or_else(|| V2ConversionError::field("provider", known_provider_message()))?;
-        Ok(Self {
-            provider,
-            symbol: AssetRef::canonical_symbol(&reference.symbol),
-        })
+            .ok_or_else(|| V2ValidationError::field("provider", known_provider_message()))?;
+        Ok(Self::new(provider, &reference.symbol))
     }
 }
 
 impl From<AssetRef> for AssetRefV2 {
     fn from(reference: AssetRef) -> Self {
         Self {
-            provider: reference.provider.as_str().to_string(),
+            provider: reference.provider.to_string(),
             symbol: reference.symbol,
         }
     }
 }
 
 impl TryFrom<StrategicAllocationV2Request> for app::StrategicAllocationV2 {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(allocation: StrategicAllocationV2Request) -> Result<Self, Self::Error> {
-        let mut errors = V2ConversionError { errors: Vec::new() };
-        let mut asset_class_targets = Vec::with_capacity(allocation.asset_class_targets.len());
-        for (index, target) in allocation.asset_class_targets.into_iter().enumerate() {
-            match app::StrategicAssetClassTargetV2::try_from(target) {
-                Ok(target) => asset_class_targets.push(target),
-                Err(error) => errors.extend(error.prepend(&format!("assetClassTargets[{index}]"))),
-            }
-        }
-        let mut asset_targets = Vec::with_capacity(allocation.asset_targets.len());
-        for (index, target) in allocation.asset_targets.into_iter().enumerate() {
-            match app::StrategicAssetTargetV2::try_from(target) {
-                Ok(target) => asset_targets.push(target),
-                Err(error) => errors.extend(error.prepend(&format!("assetTargets[{index}]"))),
-            }
-        }
+        let mut errors = V2ValidationError::default();
+        let asset_class_targets = convert_all(
+            allocation.asset_class_targets,
+            "assetClassTargets",
+            &mut errors,
+        );
+        let asset_targets = convert_all(allocation.asset_targets, "assetTargets", &mut errors);
         if errors.errors.is_empty() {
             Ok(Self {
                 asset_class_targets,
@@ -198,19 +186,19 @@ impl TryFrom<StrategicAllocationV2Request> for app::StrategicAllocationV2 {
 }
 
 impl TryFrom<StrategicAssetClassTargetV2Request> for app::StrategicAssetClassTargetV2 {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(target: StrategicAssetClassTargetV2Request) -> Result<Self, Self::Error> {
         Ok(Self {
             asset_class: app::AssetClass::parse(&target.asset_class)
-                .ok_or_else(|| V2ConversionError::field("assetClass", KNOWN_ASSET_CLASS_MESSAGE))?,
+                .ok_or_else(|| V2ValidationError::field("assetClass", KNOWN_ASSET_CLASS_MESSAGE))?,
             target_weight: target.target_weight,
         })
     }
 }
 
 impl TryFrom<StrategicAssetTargetV2Request> for app::StrategicAssetTargetV2 {
-    type Error = V2ConversionError;
+    type Error = V2ValidationError;
 
     fn try_from(target: StrategicAssetTargetV2Request) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -289,9 +277,7 @@ impl From<app::PortfolioAssetV2> for PortfolioAssetV2Response {
     fn from(asset: app::PortfolioAssetV2) -> Self {
         Self {
             asset: asset.asset.into(),
-            aclass_override: asset
-                .asset_class_override
-                .map(|class| class.as_str().to_string()),
+            aclass_override: asset.asset_class_override.map(|class| class.to_string()),
             quantity: asset.quantity,
             target_weight: asset.target_weight,
             manual_price: asset.manual_price,
@@ -321,7 +307,7 @@ impl From<app::StrategicAllocationV2> for StrategicAllocationV2Response {
 impl From<app::StrategicAssetClassTargetV2> for StrategicAssetClassTargetV2Response {
     fn from(target: app::StrategicAssetClassTargetV2) -> Self {
         Self {
-            asset_class: target.asset_class.as_str().to_string(),
+            asset_class: target.asset_class.to_string(),
             target_weight: target.target_weight,
         }
     }

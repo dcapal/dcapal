@@ -46,36 +46,31 @@ impl SyncPortfoliosV2Command {
         let request = validation::validate_and_normalize(request)
             .map_err(SyncPortfoliosV2CommandError::Validation)?;
 
-        let portfolio_ids = request
+        // Every submitted Portfolio id, in report order, with where it was submitted.
+        let submitted = request
             .portfolios
             .iter()
-            .map(|portfolio| portfolio.id)
-            .chain(request.deleted_portfolios.iter().copied())
+            .enumerate()
+            .map(|(index, portfolio)| (portfolio.id, OwnershipLocation::Portfolio { index }))
+            .chain(
+                request
+                    .deleted_portfolios
+                    .iter()
+                    .enumerate()
+                    .map(|(index, id)| (*id, OwnershipLocation::DeletedPortfolio { index })),
+            )
             .collect::<Vec<_>>();
+        let portfolio_ids = submitted.iter().map(|(id, _)| *id).collect::<Vec<_>>();
         let owners = portfolios
             .find_owners(&portfolio_ids)
             .await
             .map_err(SyncPortfoliosV2CommandError::Repository)?;
 
-        for (index, portfolio) in request.portfolios.iter().enumerate() {
-            if owners
-                .get(&portfolio.id)
-                .is_some_and(|owner| *owner != user_id)
-            {
-                return Err(SyncPortfoliosV2CommandError::Ownership(
-                    OwnershipLocation::Portfolio { index },
-                ));
-            }
-        }
-        for (index, portfolio_id) in request.deleted_portfolios.iter().enumerate() {
-            if owners
-                .get(portfolio_id)
-                .is_some_and(|owner| *owner != user_id)
-            {
-                return Err(SyncPortfoliosV2CommandError::Ownership(
-                    OwnershipLocation::DeletedPortfolio { index },
-                ));
-            }
+        if let Some((_, location)) = submitted
+            .iter()
+            .find(|(id, _)| owners.get(id).is_some_and(|owner| *owner != user_id))
+        {
+            return Err(SyncPortfoliosV2CommandError::Ownership(*location));
         }
 
         let has_references = request
@@ -124,12 +119,6 @@ impl SyncPortfoliosV2Command {
     /// Returns the authenticated user resolved during command construction.
     pub const fn user_id(&self) -> Uuid {
         self.user_id
-    }
-
-    /// Borrows the shared metadata of every distinct referenced asset.
-    #[cfg(test)]
-    pub fn assets(&self) -> &[ResolvedAsset] {
-        &self.assets.all
     }
 
     /// Borrows the provider-resolved assets (new or refreshed) that must be
@@ -314,8 +303,8 @@ mod tests {
     async fn keeps_the_resolved_assets_and_performs_no_writes() {
         // GIVEN a valid aggregate whose asset the provider knows,
         // WHEN the command is built,
-        // THEN it carries the resolved metadata and nothing is stored
-        // (the directory mock has no insert expectation).
+        // THEN it queues the provider-resolved metadata for upsert, has nothing to
+        // confirm, and nothing is stored (the directory mock has no insert expectation).
         let repository = repository_with_owners(Vec::new());
         let mut provider = MockAssetProvider::new();
         provider
@@ -332,7 +321,8 @@ mod tests {
         .await
         .expect("valid command");
 
-        assert_eq!(command.assets(), [resolved("VWCE")]);
+        assert_eq!(command.assets_to_upsert(), [resolved("VWCE")]);
+        assert!(command.assets_to_confirm().is_empty());
     }
 
     #[tokio::test]

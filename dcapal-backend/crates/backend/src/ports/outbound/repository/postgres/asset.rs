@@ -1,16 +1,18 @@
-use std::collections::HashSet;
-
 use async_trait::async_trait;
+use itertools::Itertools;
 use sqlx::{PgPool, QueryBuilder, query_as};
 use uuid::Uuid;
 
 use crate::{
-    app::domain::asset::{AssetRef, MetadataSource, ResolvedAsset, StoredAsset},
+    app::domain::asset::{AssetRef, ResolvedAsset, StoredAsset},
     ports::outbound::repository::{
         asset::{AssetDirectory, AssetDirectoryError},
         postgres::{
             convert::unnest_refs,
-            types::{AssetClass as DbAssetClass, Provider as DbProvider},
+            types::{
+                AssetClass as DbAssetClass, MetadataSource as DbMetadataSource,
+                Provider as DbProvider,
+            },
         },
     },
 };
@@ -35,7 +37,7 @@ struct AssetRow {
     name: String,
     currency: String,
     asset_class: DbAssetClass,
-    metadata_source: i16,
+    metadata_source: DbMetadataSource,
 }
 
 #[async_trait]
@@ -62,15 +64,14 @@ impl AssetDirectory for SqlxAssetDirectory {
         .fetch_all(&self.pool)
         .await?;
 
-        rows.into_iter().map(stored_asset).collect()
+        Ok(rows.into_iter().map(StoredAsset::from).collect())
     }
 
     async fn upsert_resolved(&self, assets: &[ResolvedAsset]) -> Result<(), AssetDirectoryError> {
         // One statement cannot touch the same row twice, so keep the first of any duplicates.
-        let mut seen = HashSet::new();
         let assets = assets
             .iter()
-            .filter(|asset| seen.insert(asset.as_ref()))
+            .unique_by(|asset| AssetRef::from(*asset))
             .collect::<Vec<_>>();
         if assets.is_empty() {
             return Ok(());
@@ -84,12 +85,12 @@ impl AssetDirectory for SqlxAssetDirectory {
         let now = chrono::Utc::now();
         builder.push_values(assets, |mut row, asset| {
             row.push_bind(Uuid::now_v7())
-                .push_bind(DbProvider::from(&asset.provider))
+                .push_bind(DbProvider::from(asset.provider))
                 .push_bind(&asset.symbol)
                 .push_bind(&asset.name)
                 .push_bind(&asset.currency)
                 .push_bind(DbAssetClass::from(asset.asset_class))
-                .push_bind(i16::from(MetadataSource::ProviderConfirmed))
+                .push_bind(DbMetadataSource::ProviderConfirmed)
                 .push_bind(now)
                 .push_bind(now);
         });
@@ -102,7 +103,7 @@ impl AssetDirectory for SqlxAssetDirectory {
                   updated_at = EXCLUDED.updated_at
               WHERE assets_data.metadata_source = ",
         );
-        builder.push_bind(i16::from(MetadataSource::ClientSupplied));
+        builder.push_bind(DbMetadataSource::ClientSupplied);
 
         builder.build().execute(&self.pool).await?;
         Ok(())
@@ -125,31 +126,26 @@ impl AssetDirectory for SqlxAssetDirectory {
         )
         .bind(providers)
         .bind(symbols)
-        .bind(i16::from(MetadataSource::ProviderConfirmed))
-        .bind(i16::from(MetadataSource::ClientSupplied))
+        .bind(DbMetadataSource::ProviderConfirmed)
+        .bind(DbMetadataSource::ClientSupplied)
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 }
 
-/// Decodes a stored row; only the metadata source is validated here, because
-/// the other enum columns are decoded by SQLx when the row is fetched.
-fn stored_asset(row: AssetRow) -> Result<StoredAsset, AssetDirectoryError> {
-    let source = MetadataSource::try_from(row.metadata_source).map_err(|_| {
-        AssetDirectoryError::CorruptData(format!(
-            "unknown metadata source code {}",
-            row.metadata_source
-        ))
-    })?;
-    Ok(StoredAsset {
-        asset: ResolvedAsset {
-            provider: row.provider.into(),
-            symbol: row.symbol,
-            name: row.name,
-            currency: row.currency,
-            asset_class: row.asset_class.into(),
-        },
-        source,
-    })
+impl From<AssetRow> for StoredAsset {
+    /// Converts a stored row, whose enum columns SQLx has already validated.
+    fn from(row: AssetRow) -> Self {
+        Self {
+            asset: ResolvedAsset {
+                provider: row.provider.into(),
+                symbol: row.symbol,
+                name: row.name,
+                currency: row.currency,
+                asset_class: row.asset_class.into(),
+            },
+            source: row.metadata_source.into(),
+        }
+    }
 }

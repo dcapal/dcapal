@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use chrono::Timelike;
+use chrono::SubsecRound;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -229,7 +229,9 @@ impl PortfolioWrite {
         Self {
             kind,
             id: submitted.id,
-            last_updated_at: store_precision(submitted.last_updated_at),
+            // Reduced to the microsecond precision of the store, so that the
+            // response of a write equals what a later read returns.
+            last_updated_at: submitted.last_updated_at.trunc_subsecs(6),
             content: PortfolioContent::from_submitted(submitted),
         }
     }
@@ -434,14 +436,6 @@ fn expected_versions(
 /// Portfolio is not a tombstone and is strictly older than the submitted one.
 fn client_is_newer(submitted: &PortfolioV2, current: &StoredPortfolio) -> bool {
     !current.is_deleted() && current.version.last_updated_at < submitted.last_updated_at
-}
-
-/// Reduces a timestamp to the microsecond precision of the store, so that the
-/// response of a write equals what a later read returns.
-fn store_precision(timestamp: DateTime) -> DateTime {
-    timestamp
-        .with_nanosecond(timestamp.nanosecond() / 1_000 * 1_000)
-        .unwrap_or(timestamp)
 }
 
 #[cfg(test)]

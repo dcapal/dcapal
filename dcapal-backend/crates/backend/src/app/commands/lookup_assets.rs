@@ -1,4 +1,6 @@
-use std::{collections::HashSet, sync::LazyLock};
+use std::sync::LazyLock;
+
+use itertools::Itertools;
 
 use crate::app::domain::{asset::AssetRef, portfolio::Provider};
 
@@ -39,15 +41,14 @@ impl LookupAssetsCommand {
             return Err(LookupAssetsCommandError::TooMany);
         }
 
-        let mut seen = HashSet::new();
-        let mut assets = Vec::with_capacity(raw_assets.len());
-        for (index, raw) in raw_assets.iter().enumerate() {
-            let reference = parse_asset_ref(raw)
-                .map_err(|reason| LookupAssetsCommandError::Invalid { index, reason })?;
-            if seen.insert(reference.clone()) {
-                assets.push(reference);
-            }
-        }
+        let assets = raw_assets
+            .iter()
+            .enumerate()
+            .map(|(index, raw)| {
+                parse_asset_ref(raw)
+                    .map_err(|reason| LookupAssetsCommandError::Invalid { index, reason })
+            })
+            .process_results(|references| references.unique().collect())?;
 
         Ok(Self { assets })
     }

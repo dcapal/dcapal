@@ -62,14 +62,19 @@ fn asset_failure(error: &AssetServiceError) -> (StatusCode, V2ErrorResponse) {
     }
 }
 
-/// Builds a response without field-level errors.
-fn plain(status: StatusCode, code: &str, message: &str) -> (StatusCode, V2ErrorResponse) {
+/// Builds a response with the given code, message and field-level errors.
+fn plain(
+    status: StatusCode,
+    code: &str,
+    message: &str,
+    errors: Vec<V2FieldError>,
+) -> (StatusCode, V2ErrorResponse) {
     (
         status,
         V2ErrorResponse {
             code: code.to_string(),
             message: message.to_string(),
-            errors: Vec::new(),
+            errors,
         },
     )
 }
@@ -79,6 +84,7 @@ fn provider_unavailable() -> (StatusCode, V2ErrorResponse) {
         StatusCode::BAD_GATEWAY,
         PROVIDER_UNAVAILABLE_CODE,
         PROVIDER_UNAVAILABLE_MESSAGE,
+        Vec::new(),
     )
 }
 
@@ -87,6 +93,7 @@ fn asset_internal() -> (StatusCode, V2ErrorResponse) {
         StatusCode::INTERNAL_SERVER_ERROR,
         INTERNAL_CODE,
         ASSET_INTERNAL_MESSAGE,
+        Vec::new(),
     )
 }
 
@@ -96,21 +103,20 @@ fn sync_internal() -> (StatusCode, V2ErrorResponse) {
         StatusCode::INTERNAL_SERVER_ERROR,
         INTERNAL_CODE,
         INTERNAL_MESSAGE,
+        Vec::new(),
     )
 }
 
 /// Builds the 403 response for a resource of another user, naming `field`.
 fn ownership(field: String) -> (StatusCode, V2ErrorResponse) {
-    (
+    plain(
         StatusCode::FORBIDDEN,
-        V2ErrorResponse {
-            code: OWNERSHIP_CODE.to_string(),
-            message: OWNERSHIP_MESSAGE.to_string(),
-            errors: vec![V2FieldError {
-                field,
-                message: OWNERSHIP_FIELD_MESSAGE.to_string(),
-            }],
-        },
+        OWNERSHIP_CODE,
+        OWNERSHIP_MESSAGE,
+        vec![V2FieldError {
+            field,
+            message: OWNERSHIP_FIELD_MESSAGE.to_string(),
+        }],
     )
 }
 
@@ -133,9 +139,12 @@ impl IntoResponse for V2HttpError {
             Self::Service(PortfolioServiceError::CannotUpdate(_)) => {
                 ownership("portfolios".to_string())
             }
-            Self::Service(PortfolioServiceError::Conflict(_)) => {
-                plain(StatusCode::CONFLICT, CONFLICT_CODE, CONFLICT_MESSAGE)
-            }
+            Self::Service(PortfolioServiceError::Conflict(_)) => plain(
+                StatusCode::CONFLICT,
+                CONFLICT_CODE,
+                CONFLICT_MESSAGE,
+                Vec::new(),
+            ),
             Self::LookupCommand(error) => {
                 let (field, message) = match error {
                     LookupAssetsCommandError::Invalid { index, reason } => {
@@ -143,13 +152,11 @@ impl IntoResponse for V2HttpError {
                     }
                     other => ("asset".to_string(), other.to_string()),
                 };
-                (
+                plain(
                     StatusCode::BAD_REQUEST,
-                    V2ErrorResponse {
-                        code: VALIDATION_CODE.to_string(),
-                        message: LOOKUP_INVALID_MESSAGE.to_string(),
-                        errors: vec![V2FieldError { field, message }],
-                    },
+                    VALIDATION_CODE,
+                    LOOKUP_INVALID_MESSAGE,
+                    vec![V2FieldError { field, message }],
                 )
             }
             Self::Asset(error) => asset_failure(&error),

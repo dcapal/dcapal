@@ -45,5 +45,13 @@ reasoning and examples.
   `match` on the provider name rather than looping over implementations.
 - Data cached from a provider records where it came from, and provider-confirmed
   data is never overwritten by client-supplied data.
+- Enums expose their names through `strum` (`IntoStaticStr`, `EnumString`,
+  `EnumIter`, `Display`) and stored codes through `sqlx::Type`; do not repeat
+  provider, asset class or fee type names as string literals (legacy v1 alias
+  tables and wire-contract tests are the exception).
+- All Yahoo traffic goes through the rate-limited `YahooProvider::get`; user
+  facing proxies answer 429 when saturated, workers and lookups wait. Custom
+  query shapes get an axum extractor (see `rest/extract.rs`), not
+  `Query<Vec<(String, String)>>`.
 - Migrations that are not merged may be edited in place; applied migrations stay
   immutable.

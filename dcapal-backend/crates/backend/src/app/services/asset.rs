@@ -1,9 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{StreamExt, stream};
+use itertools::Itertools;
 
 use crate::{
     app::{
@@ -55,11 +53,9 @@ pub struct AssetLookup {
     pub not_found: Vec<AssetRef>,
 }
 
-/// Outcome of resolving references: every asset plus what to write back.
+/// Outcome of resolving references: what to write back to the directory.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ResolvedAssets {
-    /// Metadata finally used for every distinct reference, in first-seen order.
-    pub all: Vec<ResolvedAsset>,
     /// Provider-resolved metadata to store: assets absent from the directory
     /// and client-supplied rows refreshed from their provider.
     pub to_upsert: Vec<ResolvedAsset>,
@@ -112,8 +108,8 @@ impl AssetService {
         Ok(AssetLookup { assets, not_found })
     }
 
-    /// Returns the metadata of every distinct reference, in first-seen order,
-    /// plus what must be written back to the directory.
+    /// Resolves every distinct reference, in first-seen order, and returns
+    /// what must be written back to the directory.
     ///
     /// Rows the provider already confirmed are used as they are. References
     /// missing from the directory are looked up at their provider with bounded
@@ -144,7 +140,7 @@ impl AssetService {
         let refreshes = stored
             .iter()
             .filter(|stored| stored.source == MetadataSource::ClientSupplied)
-            .map(|stored| stored.asset.as_ref())
+            .map(|stored| AssetRef::from(&stored.asset))
             .take(refresh_budget)
             .collect::<Vec<_>>();
 
@@ -167,25 +163,17 @@ impl AssetService {
             .collect::<Vec<_>>()
             .await;
 
-        let mut used = stored
-            .into_iter()
-            .map(|stored| (stored.asset.as_ref(), stored.asset))
-            .collect::<HashMap<_, _>>();
         let mut to_upsert = Vec::new();
         let mut to_confirm = Vec::new();
         let mut unresolved = Vec::new();
         let mut outage = None;
         for (reference, purpose, outcome) in lookups {
             match (purpose, outcome) {
-                (LookupPurpose::New, Ok(Some(asset))) => {
-                    used.insert(reference, asset.clone());
-                    to_upsert.push(asset);
-                }
+                (LookupPurpose::New, Ok(Some(asset))) => to_upsert.push(asset),
                 (LookupPurpose::New, Ok(None)) => unresolved.push(reference),
                 (LookupPurpose::New, Err(error)) => outage = outage.or(Some(error)),
                 (LookupPurpose::Refresh, Ok(Some(asset))) => {
                     if reference.provider.has_authoritative_metadata() {
-                        used.insert(reference, asset.clone());
                         to_upsert.push(asset);
                     } else {
                         // The provider only yields the symbol as name, which
@@ -212,14 +200,9 @@ impl AssetService {
             return Err(AssetServiceError::Unresolved(unresolved));
         }
 
-        to_upsert.sort_by_key(|asset| order.get(&asset.as_ref()).copied());
+        to_upsert.sort_by_cached_key(|asset| order.get(&AssetRef::from(asset)).copied());
         to_confirm.sort_by_key(|reference| order.get(reference).copied());
-        let all = distinct
-            .iter()
-            .filter_map(|reference| used.remove(reference))
-            .collect();
         Ok(ResolvedAssets {
-            all,
             to_upsert,
             to_confirm,
         })
@@ -245,11 +228,7 @@ impl AssetService {
 
 /// Returns the distinct references in first-seen order, cloning each only once.
 fn dedupe<'a>(refs: impl IntoIterator<Item = &'a AssetRef>) -> Vec<AssetRef> {
-    let mut seen = HashSet::new();
-    refs.into_iter()
-        .filter(|reference| seen.insert(*reference))
-        .cloned()
-        .collect()
+    refs.into_iter().unique().cloned().collect()
 }
 
 /// Splits distinct references into stored assets and the references not stored,
@@ -260,8 +239,8 @@ fn split_known(
 ) -> (Vec<StoredAsset>, Vec<AssetRef>) {
     let mut known = known
         .into_iter()
-        .map(|stored| (stored.asset.as_ref(), stored))
-        .collect::<std::collections::HashMap<_, _>>();
+        .map(|stored| (AssetRef::from(&stored.asset), stored))
+        .collect::<HashMap<_, _>>();
     let mut stored = Vec::new();
     let mut missing = Vec::new();
     for reference in distinct {
@@ -331,8 +310,7 @@ mod tests {
     async fn resolves_confirmed_assets_without_the_provider() {
         // GIVEN a directory holding provider-confirmed rows for every requested asset,
         // WHEN the references are resolved,
-        // THEN the stored metadata is returned, the provider is never called,
-        // and nothing needs writing back.
+        // THEN the provider is never called and nothing needs writing back.
         let directory = directory_with(vec![confirmed("B"), confirmed("A")]);
         let mut provider = MockAssetProvider::new();
         provider.expect_lookup().never();
@@ -342,7 +320,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![asset("A"), asset("B")]);
         assert!(resolved.is_clean());
     }
 
@@ -350,8 +327,8 @@ mod tests {
     async fn resolves_unknown_assets_through_the_provider() {
         // GIVEN a directory holding only a confirmed A and a provider that knows B,
         // WHEN A and B are resolved,
-        // THEN B comes from the provider and is queued for upsert, results keep
-        // request order, and nothing is stored by resolving.
+        // THEN only B is looked up at the provider and queued for upsert, and nothing
+        // is stored by resolving.
         let mut directory = directory_with(vec![confirmed("A")]);
         directory.expect_upsert_resolved().never();
         let mut provider = MockAssetProvider::new();
@@ -365,7 +342,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![asset("B"), asset("A")]);
         assert_eq!(resolved.to_upsert, vec![asset("B")]);
         assert!(resolved.to_confirm.is_empty());
     }
@@ -374,7 +350,7 @@ mod tests {
     async fn refreshes_unverified_assets_from_the_provider() {
         // GIVEN a client-supplied row for A and a provider reporting different metadata,
         // WHEN A is resolved,
-        // THEN the provider's metadata is used and queued for upsert instead of the cached one.
+        // THEN the provider's metadata is queued for upsert instead of the cached one.
         let directory = directory_with(vec![unverified("A")]);
         let mut provider = MockAssetProvider::new();
         provider
@@ -387,7 +363,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![provider_asset("A")]);
         assert_eq!(resolved.to_upsert, vec![provider_asset("A")]);
         assert!(resolved.to_confirm.is_empty());
     }
@@ -396,7 +371,7 @@ mod tests {
     async fn unverified_asset_falls_back_to_cache_when_the_provider_does_not_know_it() {
         // GIVEN a client-supplied row for A and a provider that answers "unknown",
         // WHEN A is resolved,
-        // THEN resolution succeeds with the cached metadata and nothing is marked.
+        // THEN resolution succeeds and nothing is queued, so the cached metadata stays.
         let directory = directory_with(vec![unverified("A")]);
         let mut provider = MockAssetProvider::new();
         provider.expect_lookup().times(1).returning(|_| Ok(None));
@@ -406,7 +381,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![asset("A")]);
         assert!(resolved.is_clean());
     }
 
@@ -414,7 +388,7 @@ mod tests {
     async fn unverified_asset_falls_back_to_cache_when_the_provider_fails() {
         // GIVEN a client-supplied row for A and a provider that is down,
         // WHEN A is resolved,
-        // THEN resolution still succeeds with the cached metadata and nothing is marked.
+        // THEN resolution still succeeds and nothing is queued, so the cached metadata stays.
         let directory = directory_with(vec![unverified("A")]);
         let mut provider = MockAssetProvider::new();
         provider
@@ -427,7 +401,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![asset("A")]);
         assert!(resolved.is_clean());
     }
 
@@ -436,7 +409,8 @@ mod tests {
         // GIVEN a client-supplied Kraken row with a descriptive name and a Kraken
         // catalog that only knows the symbol as the name,
         // WHEN it is resolved,
-        // THEN the cached metadata is kept and the reference is queued for confirmation only.
+        // THEN nothing is queued for upsert, so the cached metadata is kept, and the
+        // reference is queued for confirmation only.
         let kraken = ResolvedAsset {
             provider: Provider::Kraken,
             name: "Bitcoin".to_string(),
@@ -454,13 +428,12 @@ mod tests {
         });
 
         let resolved = service(directory, provider)
-            .resolve(&[kraken.as_ref()])
+            .resolve(&[AssetRef::from(&kraken)])
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![kraken.clone()]);
         assert!(resolved.to_upsert.is_empty());
-        assert_eq!(resolved.to_confirm, vec![kraken.as_ref()]);
+        assert_eq!(resolved.to_confirm, vec![AssetRef::from(&kraken)]);
     }
 
     #[tokio::test]
@@ -474,7 +447,7 @@ mod tests {
             .collect::<Vec<_>>();
         let mut refs = unverified_rows
             .iter()
-            .map(|row| row.asset.as_ref())
+            .map(|row| AssetRef::from(&row.asset))
             .collect::<Vec<_>>();
         refs.extend((0..10).map(|i| reference(&format!("N{i}"))));
         let directory = directory_with(unverified_rows);
@@ -486,14 +459,11 @@ mod tests {
 
         let resolved = service(directory, provider).resolve(&refs).await.unwrap();
 
-        assert_eq!(resolved.all.len(), 70);
         assert_eq!(resolved.to_upsert.len(), MAX_NEW_ASSETS_PER_RESOLUTION);
         let upserted = |symbol: &str| resolved.to_upsert.iter().any(|a| a.symbol == symbol);
         assert!(upserted("N0") && upserted("N9"));
         assert!(upserted("U00") && upserted("U39"));
         assert!(!upserted("U40") && !upserted("U59"));
-        let stale = resolved.all.iter().find(|a| a.symbol == "U59").unwrap();
-        assert_eq!(stale, &asset("U59"));
     }
 
     #[tokio::test]
@@ -513,9 +483,27 @@ mod tests {
 
         let resolved = service(directory, provider).resolve(&refs).await.unwrap();
 
-        assert_eq!(resolved.all.len(), MAX_NEW_ASSETS_PER_RESOLUTION + 1);
         assert_eq!(resolved.to_upsert.len(), MAX_NEW_ASSETS_PER_RESOLUTION);
         assert!(resolved.to_confirm.is_empty());
+    }
+
+    #[tokio::test]
+    async fn queues_resolved_assets_in_request_order() {
+        // GIVEN an empty directory and a provider that knows three assets,
+        // WHEN they are resolved in a non-alphabetical order,
+        // THEN the assets queued for upsert follow the request order.
+        let directory = directory_with(vec![]);
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .returning(|r| Ok(Some(asset(&r.symbol))));
+
+        let resolved = service(directory, provider)
+            .resolve(&[reference("C"), reference("A"), reference("B")])
+            .await
+            .unwrap();
+
+        assert_eq!(resolved.to_upsert, vec![asset("C"), asset("A"), asset("B")]);
     }
 
     #[tokio::test]
@@ -564,7 +552,7 @@ mod tests {
     async fn duplicate_references_are_resolved_once() {
         // GIVEN the same reference submitted three times in different casing,
         // WHEN it is resolved,
-        // THEN the directory and the provider see it once and one asset is returned.
+        // THEN the directory and the provider see it once and one asset is queued.
         let mut directory = MockAssetDirectory::new();
         directory
             .expect_find_by_refs()
@@ -581,7 +569,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resolved.all, vec![asset("A")]);
+        assert_eq!(resolved.to_upsert, vec![asset("A")]);
     }
 
     #[tokio::test]
@@ -615,7 +603,10 @@ mod tests {
         let known = (0..=MAX_NEW_ASSETS_PER_RESOLUTION)
             .map(|i| confirmed(&format!("K{i}")))
             .collect::<Vec<_>>();
-        let mut refs = known.iter().map(|a| a.asset.as_ref()).collect::<Vec<_>>();
+        let mut refs = known
+            .iter()
+            .map(|a| AssetRef::from(&a.asset))
+            .collect::<Vec<_>>();
         refs.push(reference("NEW"));
         let directory = directory_with(known);
         let mut provider = MockAssetProvider::new();
@@ -626,7 +617,6 @@ mod tests {
 
         let resolved = service(directory, provider).resolve(&refs).await.unwrap();
 
-        assert_eq!(resolved.all.len(), MAX_NEW_ASSETS_PER_RESOLUTION + 2);
         assert_eq!(resolved.to_upsert, vec![asset("NEW")]);
     }
 

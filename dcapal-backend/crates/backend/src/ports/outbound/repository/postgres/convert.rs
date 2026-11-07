@@ -2,14 +2,15 @@
 
 use crate::{
     app::domain::{
-        asset::AssetRef,
+        asset::{AssetRef, MetadataSource as AppMetadataSource},
         portfolio::{
             AllocationMode as AppAllocationMode, AssetClass as AppAssetClass,
             Provider as AppProvider,
         },
     },
     ports::outbound::repository::postgres::types::{
-        AllocationMode as DbAllocationMode, AssetClass as DbAssetClass, Provider as DbProvider,
+        AllocationMode as DbAllocationMode, AssetClass as DbAssetClass,
+        MetadataSource as DbMetadataSource, Provider as DbProvider,
     },
 };
 
@@ -42,12 +43,11 @@ convert_enum!(
     [Other, Equity, Bond, Cash, Crypto, Commodity]
 );
 convert_enum!(AppAllocationMode, DbAllocationMode, [Simple, Strategic]);
-
-impl From<&AppProvider> for DbProvider {
-    fn from(provider: &AppProvider) -> Self {
-        provider.clone().into()
-    }
-}
+convert_enum!(
+    AppMetadataSource,
+    DbMetadataSource,
+    [ClientSupplied, ProviderConfirmed]
+);
 
 /// Splits asset references into the parallel provider and symbol arrays
 /// that SQL `UNNEST($1::smallint[], $2::text[])` joins consume.
@@ -57,7 +57,7 @@ pub(super) fn unnest_refs<'a>(
     refs.into_iter()
         .map(|reference| {
             (
-                DbProvider::from(&reference.provider),
+                DbProvider::from(reference.provider),
                 reference.symbol.clone(),
             )
         })

@@ -312,7 +312,6 @@ impl SqlxPortfolioRepository {
 
         let existing = query_as::<_, PortfolioRow>(
             "SELECT id, user_id, name, currency, deleted, last_updated_at,
-                    allocation_mode, drift_band, strategic_allocation_present,
                     max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                     created_at, updated_at
              FROM portfolios
@@ -338,7 +337,6 @@ impl SqlxPortfolioRepository {
                      fee_rate = $9, min_fee = $10, max_fee = $11
                  WHERE id = $1
                  RETURNING id, user_id, name, currency, deleted, last_updated_at,
-                           allocation_mode, drift_band, strategic_allocation_present,
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
             )
@@ -362,7 +360,6 @@ impl SqlxPortfolioRepository {
                       max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee)
                  VALUES ($1, $2, $3, $4, FALSE, $5, $6, $7, $8, $9, $10, $11)
                  RETURNING id, user_id, name, currency, deleted, last_updated_at,
-                           allocation_mode, drift_band, strategic_allocation_present,
                            max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                            created_at, updated_at",
             )
@@ -415,7 +412,7 @@ impl PortfolioRepository for SqlxPortfolioRepository {
              FROM portfolios
              WHERE id = ANY($1)",
         )
-        .bind(portfolio_ids.to_vec())
+        .bind(portfolio_ids)
         .fetch_all(&self.pool)
         .await?;
         Ok(owners.into_iter().collect())
@@ -427,7 +424,6 @@ impl PortfolioRepository for SqlxPortfolioRepository {
     ) -> Result<Vec<(PortfolioRow, Vec<PortfolioAssetRow>)>> {
         let portfolios = query_as::<_, PortfolioRow>(
             "SELECT id, user_id, name, currency, deleted, last_updated_at,
-                    allocation_mode, drift_band, strategic_allocation_present,
                     max_fee_impact, fee_type, fee_amount, fee_rate, min_fee, max_fee,
                     created_at, updated_at
              FROM portfolios

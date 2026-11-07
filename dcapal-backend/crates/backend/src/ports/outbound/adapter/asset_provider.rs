@@ -47,7 +47,7 @@ impl ProviderRoutedAssetProvider {
 #[async_trait]
 impl AssetProvider for ProviderRoutedAssetProvider {
     async fn lookup(&self, asset: &AssetRef) -> Result<Option<ResolvedAsset>, AssetProviderError> {
-        match &asset.provider {
+        match asset.provider {
             Provider::YF => self.yahoo.lookup(asset).await,
             Provider::Kraken => self.kraken.lookup(asset).await,
         }
@@ -78,7 +78,7 @@ mod tests {
         yahoo
             .expect_lookup()
             .times(1)
-            .returning(|a| Ok(Some(resolved(a.provider.clone(), &a.symbol))));
+            .returning(|a| Ok(Some(resolved(a.provider, &a.symbol))));
         let mut kraken = MockAssetProvider::new();
         kraken.expect_lookup().times(1).returning(|_| Ok(None));
         let router = ProviderRoutedAssetProvider::new(Arc::new(yahoo), Arc::new(kraken));

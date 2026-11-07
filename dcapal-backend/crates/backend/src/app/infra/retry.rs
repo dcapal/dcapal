@@ -3,10 +3,9 @@
 use std::{future::Future, time::Duration};
 
 /// Maximum number of times a synchronisation operation may be attempted.
-pub const SYNC_MAX_ATTEMPTS: usize = 3;
+const SYNC_MAX_ATTEMPTS: usize = 3;
 
 const SYNC_INITIAL_INTERVAL: Duration = Duration::from_millis(25);
-const SYNC_MAX_INTERVAL: Duration = Duration::from_millis(50);
 
 /// Retries transient operation failures with the synchronisation backoff policy.
 ///
@@ -28,7 +27,7 @@ where
         match operation().await {
             Err(error) if attempt < SYNC_MAX_ATTEMPTS && should_retry(&error) => {
                 tokio::time::sleep(delay).await;
-                delay = (delay * 2).min(SYNC_MAX_INTERVAL);
+                delay *= 2;
                 attempt += 1;
             }
             result => return result,
