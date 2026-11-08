@@ -2,16 +2,29 @@ import * as React from "react";
 import { cn } from "../../lib/cn";
 
 export type CardDensity = "default" | "compact";
+export type CardVariant = "default" | "ghost";
 
 export interface CardProps extends React.HTMLAttributes<HTMLElement> {
   /** Controls the shared padding rhythm for the card's named slots. */
   density?: CardDensity;
+  /** Selects the shared surface treatment for the card. */
+  variant?: CardVariant;
 }
 
-export function Card({ className, density = "default", ...props }: CardProps) {
+export function Card({
+  className,
+  density = "default",
+  variant = "default",
+  ...props
+}: CardProps) {
   return (
     <section
-      className={cn("ds-card", `ds-card--${density}`, className)}
+      className={cn(
+        "ds-card",
+        `ds-card--${density}`,
+        `ds-card--${variant}`,
+        className
+      )}
       {...props}
     />
   );

@@ -10,6 +10,7 @@ const meta = {
     docs: { story: { inline: false, iframeHeight: 1100 } },
   },
   argTypes: {
+    open: { control: "boolean" },
     state: {
       control: { type: "select" },
       options: [
@@ -40,26 +41,46 @@ export const EntryPointMobile: Story = {
 };
 
 export const SearchLoading: Story = {
-  args: { state: "loading" },
+  args: { state: "loading", open: true },
   tags: ["!autodocs"],
 };
 export const SearchResults: Story = {
-  args: { state: "search-results" },
+  args: { state: "search-results", open: true },
   tags: ["!autodocs"],
 };
+export const SearchResultsMobile: Story = {
+  args: { state: "search-results", open: true },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
+};
 export const EmptyResult: Story = {
-  args: { state: "empty" },
+  args: { state: "empty", open: true },
   tags: ["!autodocs"],
 };
 export const SearchError: Story = {
-  args: { state: "error" },
+  args: { state: "error", open: true },
   tags: ["!autodocs"],
 };
 export const UnpricedResult: Story = {
-  args: { state: "unpriced" },
+  args: { state: "unpriced", open: true },
   tags: ["!autodocs"],
 };
 export const NewAssetEdit: Story = {
-  args: { state: "edit" },
+  args: { state: "edit", open: true },
   tags: ["!autodocs"],
+};
+export const NewAssetEditMobile: Story = {
+  args: { state: "edit", open: true },
+  tags: ["!autodocs"],
+  globals: {
+    viewport: {
+      value: "mobile",
+      isRotated: false,
+    },
+  },
 };

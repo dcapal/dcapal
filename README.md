@@ -85,6 +85,22 @@ The application database is separate from Supabase's PostgreSQL instance.
 Supabase provides local authentication and its signing keys; DcaPal data and
 migrations use the TimescaleDB Compose service.
 
+**View the design system in Storybook**
+
+With Node.js, pnpm, and Rust installed, run from the repository root:
+
+```bash
+make storybook
+```
+
+This prepares the local optimizer WASM package, installs pinned WASM tools when
+needed, and installs workspace dependencies using the frozen lockfile. The first
+run needs network access and can take longer; later runs reuse the generated
+package and dependency caches.
+
+Storybook opens in your browser at http://localhost:6006. It does not require the
+backend, Docker, or Supabase. Press Ctrl-C in the terminal to stop it.
+
 ## Architecture
 
 ```mermaid
