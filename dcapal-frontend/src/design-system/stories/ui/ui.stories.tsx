@@ -10,6 +10,8 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  CheckboxCard,
+  DescriptionList,
   Dialog,
   DialogClose,
   DialogContent,
@@ -78,6 +80,24 @@ export const ButtonPressedStates: Story = {
     </div>
   ),
   tags: ["!autodocs"],
+};
+
+export const CardGhost: Story = {
+  render: () => (
+    <div className="dcapal-theme" style={{ maxWidth: "32rem" }}>
+      <Card variant="ghost">
+        <CardHeader>
+          <CardTitle>Warm surface</CardTitle>
+          <CardDescription>
+            A low-emphasis card surface for first-use guidance and setup cues.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button>Continue</Button>
+        </CardContent>
+      </Card>
+    </div>
+  ),
 };
 
 export const FormStates: Story = {
@@ -151,6 +171,61 @@ export const SegmentedControls: Story = {
     </div>
   ),
   tags: ["!autodocs"],
+};
+
+export const SegmentedControlBlock: Story = {
+  render: () => (
+    <div className="dcapal-theme" style={{ maxWidth: "24rem" }}>
+      <SegmentedControl
+        block
+        defaultValue="add-money"
+        label="Investment path"
+        options={[
+          { value: "add-money", label: "Add money" },
+          { value: "rebalance", label: "Rebalance" },
+        ]}
+      />
+    </div>
+  ),
+  tags: ["!autodocs"],
+};
+
+export const CheckboxCards: Story = {
+  render: () => (
+    <div className="dcapal-theme ds-story-stack" style={{ maxWidth: "28rem" }}>
+      <CheckboxCard
+        defaultChecked
+        title="Allocate the full budget"
+        description="Anything left after whole units stays as cash."
+      />
+      <CheckboxCard
+        title="Use fractional quantities"
+        description="Equities always trade in whole units."
+      />
+      <CheckboxCard
+        disabled
+        title="Reinvest dividends"
+        description="Unavailable for this portfolio."
+      />
+    </div>
+  ),
+};
+
+export const DescriptionLists: Story = {
+  render: () => (
+    <div className="dcapal-theme" style={{ maxWidth: "20rem" }}>
+      <DescriptionList
+        aria-label="Your rules"
+        items={[
+          { label: "Strategy", value: "Add money" },
+          { label: "Amount", value: "€1,000.00" },
+          { label: "Full budget", value: "On" },
+          { label: "Fractional", value: "Off" },
+          { label: "Commission", value: "€1 per transaction" },
+        ]}
+      />
+    </div>
+  ),
 };
 
 export const RadioCardAllocationMethod: Story = {
