@@ -95,3 +95,7 @@ ON CONFLICT (portfolio_id, portfolio_asset_id) DO NOTHING;
 
 ALTER TABLE portfolio_asset
     DROP COLUMN target_weight;
+
+-- Every synchronization reads and locks all Portfolios of one user; without an
+-- index on the owner each attempt scans the whole table.
+CREATE INDEX IF NOT EXISTS idx_portfolios_user_id ON portfolios (user_id);

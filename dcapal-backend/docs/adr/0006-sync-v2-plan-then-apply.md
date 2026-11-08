@@ -43,6 +43,13 @@ and asset onboarding):
   snapshot (strictly, reporting `CorruptData`) and executes a plan. It takes no
   synchronization decisions.
 
+A plan with no writes and no tombstones (a pull-only synchronization) is not
+applied at all: the service answers with `plan.response`, which is a consistent
+view of the snapshot read in a single repeatable-read transaction. Rows that
+are only echoed therefore take part in the stale check of a write plan, but a
+plan that writes nothing has nothing to protect and skips the transaction and
+its locks.
+
 `apply_sync_plan` runs in one short transaction at the default read-committed
 isolation, replacing the serializable transaction:
 
@@ -89,3 +96,6 @@ class targets come from the same state.
   response; the adapter's only knowledge of them is the rows it is told to
   write. The v1 synchronization and its repository paths are unchanged, and no
   migration is needed.
+- `portfolios.user_id` is indexed (`idx_portfolios_user_id`, in the allocation
+  schema migration) because every attempt reads and locks all Portfolios of one
+  user.

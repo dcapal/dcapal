@@ -1,4 +1,6 @@
 -- Development/test rollback only. Production recovery remains forward-only.
+DROP INDEX IF EXISTS idx_portfolios_user_id;
+
 ALTER TABLE portfolio_asset
     ADD COLUMN target_weight NUMERIC;
 

@@ -200,6 +200,12 @@ impl PortfolioService {
                     .load_sync_snapshot(user_id)
                     .await?;
                 let plan = plan_sync(&snapshot, &request);
+                // A pull-only plan changes nothing, so there is nothing to
+                // lock or verify: the response is a consistent view of the
+                // snapshot, which was read in a single transaction.
+                if plan.writes.is_empty() && plan.tombstones.is_empty() {
+                    return Ok(plan.response);
+                }
                 self.portfolio_repository
                     .apply_sync_plan(user_id, &plan)
                     .await?;
@@ -795,7 +801,8 @@ mod tests {
         // snapshot in which the Portfolio meanwhile became a tombstone,
         // WHEN the service synchronizes a new aggregate of that Portfolio,
         // THEN assets are onboarded once, the snapshot is reloaded, the second
-        // plan writes nothing and reports the Portfolio deleted.
+        // plan writes nothing, is not applied, and reports the Portfolio
+        // deleted.
         let id = Uuid::new_v4();
         let log = Arc::new(Mutex::new(Vec::new()));
         let assets = logging_assets(&log);
@@ -815,20 +822,14 @@ mod tests {
                 };
                 Box::pin(async move { Ok(snapshot) })
             });
-        let mut applies = 0;
+        // Only the first attempt reaches the repository: the second plan has
+        // nothing to write, so it is answered without applying.
         repository
             .expect_apply_sync_plan()
-            .times(2)
+            .times(1)
             .returning(move |_, plan| {
-                applies += 1;
-                let result = if applies == 1 {
-                    assert_eq!(plan.writes.len(), 1);
-                    Err(PortfolioRepositoryError::StaleSnapshot)
-                } else {
-                    assert!(plan.writes.is_empty());
-                    Ok(())
-                };
-                Box::pin(async move { result })
+                assert_eq!(plan.writes.len(), 1);
+                Box::pin(async { Err(PortfolioRepositoryError::StaleSnapshot) })
             });
         let command = v2_command(
             &command_repository(),
@@ -847,6 +848,38 @@ mod tests {
         assert!(response.updated_portfolios.is_empty());
         assert_eq!(response.deleted_portfolios, vec![id]);
         assert_eq!(*log.lock().unwrap(), ["onboard"]);
+    }
+
+    #[tokio::test]
+    async fn v2_pull_only_sync_answers_from_the_snapshot_without_applying() {
+        // GIVEN a stored Portfolio the client does not mention, and a request
+        // that submits and deletes nothing,
+        // WHEN the service synchronizes,
+        // THEN the Portfolio is returned from the snapshot and the repository
+        // is never asked to apply a plan (no transaction, no locks).
+        let id = Uuid::new_v4();
+        let assets = unknown_free_assets();
+        let mut repository = MockPortfolioRepository::new();
+        repository
+            .expect_load_sync_snapshot()
+            .times(1)
+            .returning(move |_| {
+                let snapshot = SyncSnapshot {
+                    portfolios: vec![stored_tombstone(id)],
+                };
+                Box::pin(async move { Ok(snapshot) })
+            });
+        repository.expect_apply_sync_plan().never();
+        let command = v2_command(&command_repository(), &assets, Vec::new(), Vec::new()).await;
+        let service = PortfolioService::new(Arc::new(repository), assets.clone());
+
+        let response = service
+            .sync_portfolios_v2(command)
+            .await
+            .expect("pull-only sync should succeed");
+
+        assert!(response.updated_portfolios.is_empty());
+        assert_eq!(response.deleted_portfolios, vec![id]);
     }
 
     #[tokio::test]

@@ -457,3 +457,25 @@ async fn shared_asset_migration_has_a_development_down_path_and_can_rerun(
 
     Ok(())
 }
+
+#[sqlx::test(
+    migrations = false,
+    fixtures("pre_shared_schema", "legacy_shared_assets")
+)]
+async fn portfolios_are_indexed_by_owner_after_migrating(pool: PgPool) -> sqlx::Result<()> {
+    // GIVEN a pre-shared schema with legacy Portfolios,
+    // WHEN every migration runs,
+    // THEN Portfolios can be found by owner through an index, because each
+    // synchronization attempt reads all Portfolios of one user.
+    MIGRATOR.run(&pool).await?;
+
+    let index: Option<String> = sqlx::query_scalar(
+        "SELECT indexname FROM pg_indexes
+         WHERE tablename = 'portfolios' AND indexdef LIKE '%(user_id)%'",
+    )
+    .fetch_optional(&pool)
+    .await?;
+    assert_eq!(index.as_deref(), Some("idx_portfolios_user_id"));
+
+    Ok(())
+}
