@@ -24,9 +24,9 @@ const PROVIDER_CONCURRENCY: usize = 8;
 /// directory rows whose metadata no provider has confirmed yet.
 pub const MAX_NEW_ASSETS_PER_RESOLUTION: usize = 50;
 
-/// Errors raised while resolving or reading shared asset metadata.
+/// Errors raised while resolving asset references at their providers.
 #[derive(Debug, thiserror::Error)]
-pub enum AssetServiceError {
+pub enum AssetResolutionError {
     /// These references are unknown to the directory and to their provider.
     #[error("{} asset reference(s) cannot be resolved", .0.len())]
     Unresolved(Vec<AssetRef>),
@@ -39,7 +39,7 @@ pub enum AssetServiceError {
     /// A provider could not answer, so the references' existence is undecided.
     #[error("asset provider is unavailable")]
     ProviderUnavailable(#[source] AssetProviderError),
-    /// The shared asset directory failed.
+    /// The shared asset directory failed while checking the references.
     #[error("asset directory failed")]
     Directory(#[from] AssetDirectoryError),
 }
@@ -100,7 +100,7 @@ impl AssetService {
     pub async fn lookup_known(
         &self,
         command: LookupAssetsCommand,
-    ) -> Result<AssetLookup, AssetServiceError> {
+    ) -> Result<AssetLookup, AssetDirectoryError> {
         let known = self.directory.find_by_refs(command.assets()).await?;
         let (stored, not_found) = split_known(command.assets(), known);
         let assets = stored.into_iter().map(|stored| stored.asset).collect();
@@ -117,21 +117,22 @@ impl AssetService {
     /// missing, which fails before any provider call. Rows whose metadata was
     /// only client-supplied are refreshed from the provider, best effort: only
     /// as many as the budget left by the missing references allows are looked
-    /// up, and any failure or "unknown" answer keeps the cached metadata. For
-    /// Kraken, whose catalog has no better name than the symbol, the cached
-    /// metadata is kept and the row is only marked for confirmation.
+    /// up, and any failure or "unknown" answer keeps the cached metadata. When the
+    /// provider does not vouch for the names it reports (Kraken's catalog has
+    /// no better name than the symbol), the cached metadata is kept and the row
+    /// is only marked for confirmation.
     /// Nothing is stored; see [`Self::onboard`].
     /// A provider failure for a missing reference takes precedence over
     /// unresolved references because the failure leaves their existence undecided.
     pub async fn resolve<'a>(
         &self,
         refs: impl IntoIterator<Item = &'a AssetRef>,
-    ) -> Result<ResolvedAssets, AssetServiceError> {
+    ) -> Result<ResolvedAssets, AssetResolutionError> {
         let distinct = dedupe(refs);
         let known = self.directory.find_by_refs(&distinct).await?;
         let (stored, missing) = split_known(&distinct, known);
         if missing.len() > MAX_NEW_ASSETS_PER_RESOLUTION {
-            return Err(AssetServiceError::TooManyNewAssets {
+            return Err(AssetResolutionError::TooManyNewAssets {
                 limit: MAX_NEW_ASSETS_PER_RESOLUTION,
             });
         }
@@ -169,14 +170,14 @@ impl AssetService {
         let mut outage = None;
         for (reference, purpose, outcome) in lookups {
             match (purpose, outcome) {
-                (LookupPurpose::New, Ok(Some(asset))) => to_upsert.push(asset),
+                (LookupPurpose::New, Ok(Some(found))) => to_upsert.push(found.asset),
                 (LookupPurpose::New, Ok(None)) => unresolved.push(reference),
                 (LookupPurpose::New, Err(error)) => outage = outage.or(Some(error)),
-                (LookupPurpose::Refresh, Ok(Some(asset))) => {
-                    if reference.provider.has_authoritative_metadata() {
-                        to_upsert.push(asset);
+                (LookupPurpose::Refresh, Ok(Some(found))) => {
+                    if found.name_authoritative {
+                        to_upsert.push(found.asset);
                     } else {
-                        // The provider only yields the symbol as name, which
+                        // The provider does not vouch for the name, which
                         // would replace a possibly better cached name.
                         to_confirm.push(reference);
                     }
@@ -186,7 +187,7 @@ impl AssetService {
             }
         }
         if let Some(error) = outage {
-            return Err(AssetServiceError::ProviderUnavailable(error));
+            return Err(AssetResolutionError::ProviderUnavailable(error));
         }
 
         // Position of every distinct reference, to report results in request order.
@@ -197,7 +198,7 @@ impl AssetService {
             .collect::<HashMap<_, _>>();
         if !unresolved.is_empty() {
             unresolved.sort_by_key(|reference| order.get(reference).copied());
-            return Err(AssetServiceError::Unresolved(unresolved));
+            return Err(AssetResolutionError::Unresolved(unresolved));
         }
 
         to_upsert.sort_by_cached_key(|asset| order.get(&AssetRef::from(asset)).copied());
@@ -215,7 +216,7 @@ impl AssetService {
         &self,
         to_upsert: &[ResolvedAsset],
         to_confirm: &[AssetRef],
-    ) -> Result<(), AssetServiceError> {
+    ) -> Result<(), AssetDirectoryError> {
         if !to_upsert.is_empty() {
             self.directory.upsert_resolved(to_upsert).await?;
         }
@@ -257,7 +258,10 @@ mod tests {
     use super::*;
     use crate::{
         app::domain::portfolio::{AssetClass, Provider},
-        ports::outbound::{adapter::MockAssetProvider, repository::asset::MockAssetDirectory},
+        ports::outbound::{
+            adapter::{MockAssetProvider, ProviderAsset},
+            repository::asset::MockAssetDirectory,
+        },
     };
 
     fn reference(symbol: &str) -> AssetRef {
@@ -279,6 +283,14 @@ mod tests {
         ResolvedAsset {
             name: format!("{symbol} official"),
             ..asset(symbol)
+        }
+    }
+
+    /// A provider answer whose name is authoritative, as Yahoo's is.
+    fn vouched(asset: ResolvedAsset) -> ProviderAsset {
+        ProviderAsset {
+            asset,
+            name_authoritative: true,
         }
     }
 
@@ -335,7 +347,7 @@ mod tests {
         provider
             .expect_lookup()
             .times(1)
-            .returning(|r| Ok(Some(asset(&r.symbol))));
+            .returning(|r| Ok(Some(vouched(asset(r.symbol())))));
 
         let resolved = service(directory, provider)
             .resolve(&[reference("B"), reference("A")])
@@ -356,7 +368,7 @@ mod tests {
         provider
             .expect_lookup()
             .times(1)
-            .returning(|r| Ok(Some(provider_asset(&r.symbol))));
+            .returning(|r| Ok(Some(vouched(provider_asset(r.symbol())))));
 
         let resolved = service(directory, provider)
             .resolve(&[reference("A")])
@@ -420,10 +432,13 @@ mod tests {
             directory_with(vec![stored(kraken.clone(), MetadataSource::ClientSupplied)]);
         let mut provider = MockAssetProvider::new();
         provider.expect_lookup().times(1).returning(|r| {
-            Ok(Some(ResolvedAsset {
-                provider: Provider::Kraken,
-                name: r.symbol.clone(),
-                ..asset(&r.symbol)
+            Ok(Some(ProviderAsset {
+                asset: ResolvedAsset {
+                    provider: Provider::Kraken,
+                    name: r.symbol().to_string(),
+                    ..asset(r.symbol())
+                },
+                name_authoritative: false,
             }))
         });
 
@@ -455,7 +470,7 @@ mod tests {
         provider
             .expect_lookup()
             .times(MAX_NEW_ASSETS_PER_RESOLUTION)
-            .returning(|r| Ok(Some(provider_asset(&r.symbol))));
+            .returning(|r| Ok(Some(vouched(provider_asset(r.symbol())))));
 
         let resolved = service(directory, provider).resolve(&refs).await.unwrap();
 
@@ -476,8 +491,8 @@ mod tests {
         provider
             .expect_lookup()
             .times(MAX_NEW_ASSETS_PER_RESOLUTION)
-            .withf(|r| r.symbol != "OLD")
-            .returning(|r| Ok(Some(asset(&r.symbol))));
+            .withf(|r| r.symbol() != "OLD")
+            .returning(|r| Ok(Some(vouched(asset(r.symbol())))));
         let mut refs = vec![reference("OLD")];
         refs.extend((0..MAX_NEW_ASSETS_PER_RESOLUTION).map(|i| reference(&format!("S{i}"))));
 
@@ -496,7 +511,7 @@ mod tests {
         let mut provider = MockAssetProvider::new();
         provider
             .expect_lookup()
-            .returning(|r| Ok(Some(asset(&r.symbol))));
+            .returning(|r| Ok(Some(vouched(asset(r.symbol())))));
 
         let resolved = service(directory, provider)
             .resolve(&[reference("C"), reference("A"), reference("B")])
@@ -521,7 +536,7 @@ mod tests {
             .unwrap_err();
 
         assert!(
-            matches!(error, AssetServiceError::Unresolved(refs) if refs == vec![reference("NOPE")])
+            matches!(error, AssetResolutionError::Unresolved(refs) if refs == vec![reference("NOPE")])
         );
     }
 
@@ -533,7 +548,7 @@ mod tests {
         let directory = directory_with(vec![]);
         let mut provider = MockAssetProvider::new();
         provider.expect_lookup().returning(|r| {
-            if r.symbol == "DOWN" {
+            if r.symbol() == "DOWN" {
                 Err(AssetProviderError::Malformed("boom".into()))
             } else {
                 Ok(None)
@@ -545,7 +560,10 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(matches!(error, AssetServiceError::ProviderUnavailable(_)));
+        assert!(matches!(
+            error,
+            AssetResolutionError::ProviderUnavailable(_)
+        ));
     }
 
     #[tokio::test]
@@ -562,7 +580,7 @@ mod tests {
         provider
             .expect_lookup()
             .times(1)
-            .returning(|r| Ok(Some(asset(&r.symbol))));
+            .returning(|r| Ok(Some(vouched(asset(r.symbol())))));
 
         let resolved = service(directory, provider)
             .resolve(&[reference("a"), reference("A"), reference(" a ")])
@@ -591,7 +609,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            AssetServiceError::TooManyNewAssets { limit } if limit == MAX_NEW_ASSETS_PER_RESOLUTION
+            AssetResolutionError::TooManyNewAssets { limit } if limit == MAX_NEW_ASSETS_PER_RESOLUTION
         ));
     }
 
@@ -613,7 +631,7 @@ mod tests {
         provider
             .expect_lookup()
             .times(1)
-            .returning(|r| Ok(Some(asset(&r.symbol))));
+            .returning(|r| Ok(Some(vouched(asset(r.symbol())))));
 
         let resolved = service(directory, provider).resolve(&refs).await.unwrap();
 

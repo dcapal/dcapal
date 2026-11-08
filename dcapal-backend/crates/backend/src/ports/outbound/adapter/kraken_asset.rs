@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::asset_provider::{AssetProvider, AssetProviderError};
+use super::asset_provider::{AssetProvider, AssetProviderError, ProviderAsset};
 use crate::{
     app::domain::{
         asset::{AssetRef, ResolvedAsset},
@@ -32,8 +32,8 @@ impl KrakenAssetProvider {
 
 #[async_trait]
 impl AssetProvider for KrakenAssetProvider {
-    async fn lookup(&self, asset: &AssetRef) -> Result<Option<ResolvedAsset>, AssetProviderError> {
-        let id = asset.symbol.to_ascii_lowercase();
+    async fn lookup(&self, asset: &AssetRef) -> Result<Option<ProviderAsset>, AssetProviderError> {
+        let id = asset.symbol().to_ascii_lowercase();
         let found = self
             .catalog
             .find_asset(&id)
@@ -41,7 +41,12 @@ impl AssetProvider for KrakenAssetProvider {
             .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
 
         if let Some(catalog_asset) = found {
-            return Ok(Some(resolved_from_catalog(asset, &catalog_asset)));
+            // The catalog has no display name better than the symbol, so no
+            // entry may rename an asset a client already named.
+            return Ok(Some(ProviderAsset {
+                asset: resolved_from_catalog(asset, &catalog_asset),
+                name_authoritative: false,
+            }));
         }
 
         // A catalog that was never loaded (cold start) cannot tell an unknown
@@ -70,16 +75,16 @@ impl KrakenAssetProvider {
 /// Builds the shared asset metadata for a catalog entry of the referenced symbol.
 fn resolved_from_catalog(reference: &AssetRef, catalog_asset: &Asset) -> ResolvedAsset {
     let (name, asset_class) = match catalog_asset {
-        Asset::Crypto(_) => (reference.symbol.clone(), AssetClass::Crypto),
+        Asset::Crypto(_) => (reference.symbol().to_string(), AssetClass::Crypto),
         // The catalog stores the fiat display name in the `symbol` field.
         Asset::Fiat(fiat) => (fiat.symbol.clone(), AssetClass::Cash),
     };
 
     ResolvedAsset {
         provider: Provider::Kraken,
-        symbol: reference.symbol.clone(),
+        symbol: reference.symbol().to_string(),
         name,
-        currency: reference.symbol.clone(),
+        currency: reference.symbol().to_string(),
         asset_class,
     }
 }

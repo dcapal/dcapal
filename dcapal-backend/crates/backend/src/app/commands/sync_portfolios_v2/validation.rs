@@ -170,10 +170,11 @@ impl OwnershipLocation {
     }
 }
 
-/// Validates and normalizes a complete v2 synchronization request.
-pub(crate) fn validate_and_normalize(
-    mut request: SyncPortfoliosV2Request,
-) -> Result<SyncPortfoliosV2Request, ValidationError> {
+/// Validates the semantic rules of a complete v2 synchronization request.
+///
+/// Asset references are already canonical, as [`AssetRef`] can only be built
+/// through its normalizing constructor.
+pub(crate) fn validate(request: &SyncPortfoliosV2Request) -> Result<(), ValidationError> {
     let mut visitor = ValidationVisitor::default();
 
     if request.schema_version != SCHEMA_VERSION {
@@ -195,14 +196,14 @@ pub(crate) fn validate_and_normalize(
 
     {
         let mut portfolios_path = visitor.enter_field(FIELD_PORTFOLIOS);
-        for (portfolio_index, portfolio) in request.portfolios.iter_mut().enumerate() {
+        for (portfolio_index, portfolio) in request.portfolios.iter().enumerate() {
             let mut index_path = portfolios_path.enter_index(portfolio_index);
             validate_portfolio(portfolio, &mut index_path, &mut portfolio_ids, &deleted_ids);
         }
     }
 
     if visitor.issues.is_empty() {
-        Ok(request)
+        Ok(())
     } else {
         Err(ValidationError {
             issues: visitor.issues,
@@ -271,7 +272,7 @@ impl Drop for PathGuard<'_> {
 }
 
 fn validate_portfolio(
-    portfolio: &mut PortfolioV2,
+    portfolio: &PortfolioV2,
     visitor: &mut PathGuard<'_>,
     portfolio_ids: &mut HashSet<Uuid>,
     deleted_ids: &HashSet<Uuid>,
@@ -299,10 +300,9 @@ fn validate_portfolio(
 
     {
         let mut assets_path = visitor.enter_field(FIELD_ASSETS);
-        for (asset_index, asset) in portfolio.assets.iter_mut().enumerate() {
+        for (asset_index, asset) in portfolio.assets.iter().enumerate() {
             let mut asset_path = assets_path.enter_index(asset_index);
-            normalize_symbol(&mut asset.asset);
-            if asset.asset.symbol.is_empty() {
+            if asset.asset.symbol().is_empty() {
                 let mut reference_path = asset_path.enter_field(FIELD_ASSET);
                 reference_path.issue_field(FIELD_SYMBOL, MESSAGE_NOT_EMPTY);
             }
@@ -329,12 +329,6 @@ fn validate_portfolio(
                 asset_path.issue_field(FIELD_TARGET_WEIGHT, message);
             }
             validate_fees(asset.fees.as_ref(), &mut asset_path);
-        }
-    }
-
-    if let Some(strategic) = portfolio.strategic_allocation.as_mut() {
-        for target in &mut strategic.asset_targets {
-            normalize_symbol(&mut target.asset);
         }
     }
 
@@ -381,11 +375,6 @@ fn validate_portfolio(
     if let Some(strategic) = &portfolio.strategic_allocation {
         validate_strategic(strategic, visitor, &asset_refs);
     }
-}
-
-/// Puts an asset reference's symbol in its canonical trimmed upper-case form.
-fn normalize_symbol(reference: &mut AssetRef) {
-    *reference = AssetRef::new(reference.provider, &reference.symbol);
 }
 
 fn validate_strategic(
@@ -507,10 +496,7 @@ mod tests {
     }
 
     fn reference(symbol: &str) -> AssetRef {
-        AssetRef {
-            provider: Provider::YF,
-            symbol: symbol.to_string(),
-        }
+        AssetRef::new(Provider::YF, symbol)
     }
 
     fn asset(symbol: &str) -> PortfolioAssetV2 {
@@ -562,12 +548,13 @@ mod tests {
     }
 
     #[test]
-    fn normalizes_symbols_without_changing_decimal_scale() {
-        // GIVEN a supported aggregate whose symbol has stray whitespace and lower case,
+    fn accepts_a_supported_aggregate_and_leaves_decimals_untouched() {
+        // GIVEN a supported aggregate whose symbol was supplied with stray whitespace
+        // and lower case,
         // WHEN validation runs,
-        // THEN the symbol is canonical and exact Decimal values remain.
-        let request = validate_and_normalize(request(vec![asset(" vwce ")]))
-            .expect("request should be valid");
+        // THEN it passes, the reference is already canonical and exact Decimal values remain.
+        let request = request(vec![asset(" vwce ")]);
+        validate(&request).expect("request should be valid");
         assert_eq!(request.portfolios[0].assets[0].asset, reference("VWCE"));
         assert_eq!(request.portfolios[0].assets[0].quantity, dec!(1.20));
     }
@@ -578,7 +565,7 @@ mod tests {
         // THEN each issue carries its real nested path.
         let mut request = request(vec![asset("  ")]);
         request.portfolios[0].assets[0].quantity = dec!(-1);
-        let error = validate_and_normalize(request).expect_err("invalid request");
+        let error = validate(&request).expect_err("invalid request");
         let fields = fields(&error);
         assert!(fields.contains(&"portfolios[0].assets[0].asset.symbol".to_string()));
         assert!(fields.contains(&"portfolios[0].assets[0].quantity".to_string()));
@@ -588,7 +575,7 @@ mod tests {
     fn rejects_duplicate_references_after_normalization() {
         // GIVEN two assets that differ only by symbol case, WHEN validation runs,
         // THEN the second one is reported as a duplicate reference.
-        let error = validate_and_normalize(request(vec![asset("vwce"), asset("VWCE")]))
+        let error = validate(&request(vec![asset("vwce"), asset("VWCE")]))
             .expect_err("duplicate reference");
         assert!(error.issues.iter().any(|issue| {
             issue.path.render() == "portfolios[0].assets[1].asset"
@@ -604,7 +591,7 @@ mod tests {
         let mut second = request.portfolios[0].clone();
         second.id = id(11);
         request.portfolios.push(second);
-        validate_and_normalize(request).expect("same asset in two Portfolios");
+        validate(&request).expect("same asset in two Portfolios");
     }
 
     #[test]
@@ -619,7 +606,7 @@ mod tests {
                 relative_target_weight: dec!(100),
             }],
         );
-        let error = validate_and_normalize(request).expect_err("unknown reference");
+        let error = validate(&request).expect_err("unknown reference");
         assert!(
             fields(&error)
                 .contains(&"portfolios[0].strategicAllocation.assetTargets[0].asset".to_string())
@@ -638,7 +625,7 @@ mod tests {
                 relative_target_weight: dec!(100),
             }],
         );
-        validate_and_normalize(request).expect("normalized target reference");
+        validate(&request).expect("normalized target reference");
     }
 
     #[test]
@@ -651,7 +638,7 @@ mod tests {
             relative_target_weight: dec!(50),
         };
         strategic(&mut request, vec![target.clone(), target]);
-        let error = validate_and_normalize(request).expect_err("duplicate target");
+        let error = validate(&request).expect_err("duplicate target");
         assert!(error.issues.iter().any(|issue| {
             issue.path.render() == "portfolios[0].strategicAllocation.assetTargets[1].asset"
                 && issue.message == MESSAGE_DUPLICATE_ASSET_TARGET
@@ -667,7 +654,7 @@ mod tests {
             asset_class_targets: Vec::new(),
             asset_targets: Vec::new(),
         });
-        let request = validate_and_normalize(request).expect("empty strategy is valid");
+        validate(&request).expect("empty strategy is valid");
         assert!(request.portfolios[0].strategic_allocation.is_some());
     }
 
@@ -682,7 +669,7 @@ mod tests {
             }],
             asset_targets: Vec::new(),
         });
-        let error = validate_and_normalize(request).expect_err("class target is invalid");
+        let error = validate(&request).expect_err("class target is invalid");
         assert!(error.issues.iter().any(|issue| {
             issue.path.render() == "portfolios[0].strategicAllocation.assetClassTargets"
         }));
@@ -709,7 +696,7 @@ mod tests {
             asset_targets: Vec::new(),
         });
 
-        let error = validate_and_normalize(request).expect_err("duplicate class target");
+        let error = validate(&request).expect_err("duplicate class target");
         assert!(error.issues.iter().any(|issue| {
             issue.path.render()
                 == "portfolios[0].strategicAllocation.assetClassTargets[1].assetClass"

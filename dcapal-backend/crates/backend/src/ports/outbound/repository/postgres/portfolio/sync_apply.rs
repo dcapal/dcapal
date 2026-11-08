@@ -301,12 +301,13 @@ async fn resolve_asset_ids<'a>(
         .zip(providers)
         .map(|(reference, provider)| {
             stored
-                .get(&(provider, reference.symbol.clone()))
+                .get(&(provider, reference.symbol().to_string()))
                 .map(|id| (reference, *id))
                 .ok_or_else(|| {
                     PortfolioRepositoryError::AssetNotOnboarded(format!(
                         "{}:{}",
-                        reference.provider, reference.symbol
+                        reference.provider(),
+                        reference.symbol()
                     ))
                 })
         })

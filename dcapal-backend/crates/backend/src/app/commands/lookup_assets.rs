@@ -72,7 +72,7 @@ fn parse_asset_ref(raw: &str) -> Result<AssetRef, &'static str> {
         .ok_or("must have the form <provider>:<symbol>")?;
     let provider = Provider::parse(provider).ok_or_else(unknown_provider_message)?;
     let reference = AssetRef::new(provider, symbol);
-    if reference.symbol.is_empty() {
+    if reference.symbol().is_empty() {
         return Err("symbol must not be empty");
     }
     Ok(reference)
@@ -101,7 +101,7 @@ mod tests {
             ]
         );
         let colon = LookupAssetsCommand::try_new(&raw(&["yf:a:b"])).unwrap();
-        assert_eq!(colon.assets()[0].symbol, "A:B");
+        assert_eq!(colon.assets()[0].symbol(), "A:B");
     }
 
     #[test]
@@ -113,7 +113,7 @@ mod tests {
             LookupAssetsCommand::try_new(&raw(&["yf:aapl", "kraken:btc", "yf:AAPL"])).unwrap();
 
         assert_eq!(command.assets().len(), 2);
-        assert_eq!(command.assets()[0].symbol, "AAPL");
+        assert_eq!(command.assets()[0].symbol(), "AAPL");
     }
 
     #[test]

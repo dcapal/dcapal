@@ -11,6 +11,7 @@ use dcapal_backend::app::domain::portfolio::{
 };
 use dcapal_backend::app::domain::portfolio_sync::{WriteKind, plan_sync};
 use dcapal_backend::app::services::{asset::AssetService, portfolio::PortfolioService};
+use dcapal_backend::ports::outbound::adapter::ProviderAsset;
 use dcapal_backend::ports::{
     inbound::rest::{
         FeeStructure,
@@ -151,14 +152,17 @@ impl dcapal_backend::ports::outbound::adapter::AssetProvider for NewcoProvider {
     async fn lookup(
         &self,
         asset: &AssetRef,
-    ) -> Result<Option<ResolvedAsset>, dcapal_backend::ports::outbound::adapter::AssetProviderError>
+    ) -> Result<Option<ProviderAsset>, dcapal_backend::ports::outbound::adapter::AssetProviderError>
     {
-        Ok((asset.symbol == "NEWCO").then(|| ResolvedAsset {
-            provider: asset.provider,
-            symbol: asset.symbol.clone(),
-            name: "New company".to_string(),
-            currency: "USD".to_string(),
-            asset_class: AssetClass::Equity,
+        Ok((asset.symbol() == "NEWCO").then(|| ProviderAsset {
+            asset: ResolvedAsset {
+                provider: asset.provider(),
+                symbol: asset.symbol().to_string(),
+                name: "New company".to_string(),
+                currency: "USD".to_string(),
+                asset_class: AssetClass::Equity,
+            },
+            name_authoritative: true,
         }))
     }
 }

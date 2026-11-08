@@ -8,12 +8,15 @@ use crate::{
     app::{
         commands::{
             lookup_assets::LookupAssetsCommandError,
-            sync_portfolios_v2::{SyncPortfoliosV2CommandError, too_many_new_assets},
+            sync_portfolios_v2::SyncPortfoliosV2CommandError,
         },
-        services::{asset::AssetServiceError, portfolio::PortfolioServiceError},
+        services::portfolio::PortfolioServiceError,
     },
-    ports::inbound::rest::types::sync_portfolio_v2::{
-        V2ErrorResponse, V2FieldError, V2ValidationError, VALIDATION_CODE,
+    ports::{
+        inbound::rest::types::sync_portfolio_v2::{
+            V2ErrorResponse, V2FieldError, V2ValidationError, VALIDATION_CODE,
+        },
+        outbound::repository::asset::AssetDirectoryError,
     },
 };
 
@@ -42,24 +45,8 @@ pub enum V2HttpError {
     Service(#[from] PortfolioServiceError),
     #[error("v2 asset lookup request is invalid")]
     LookupCommand(#[from] LookupAssetsCommandError),
-    #[error("v2 asset service failed")]
-    Asset(#[from] AssetServiceError),
-}
-
-/// Maps an asset-service failure to its response.
-///
-/// `Unresolved` is reported with real field paths by the sync command, so it
-/// only reaches here if a caller bypassed that mapping, which is a server bug.
-/// `TooManyNewAssets` is a client error reported as a validation failure.
-fn asset_failure(error: &AssetServiceError) -> (StatusCode, V2ErrorResponse) {
-    match error {
-        AssetServiceError::ProviderUnavailable(_) => provider_unavailable(),
-        AssetServiceError::TooManyNewAssets { .. } => (
-            StatusCode::BAD_REQUEST,
-            V2ValidationError::from(too_many_new_assets()).response(),
-        ),
-        AssetServiceError::Directory(_) | AssetServiceError::Unresolved(_) => asset_internal(),
-    }
+    #[error("v2 asset directory failed")]
+    Asset(#[from] AssetDirectoryError),
 }
 
 /// Builds a response with the given code, message and field-level errors.
@@ -134,8 +121,9 @@ impl IntoResponse for V2HttpError {
             Self::Command(SyncPortfoliosV2CommandError::ProviderUnavailable(_)) => {
                 provider_unavailable()
             }
-            Self::Command(SyncPortfoliosV2CommandError::Directory(_)) => asset_internal(),
-            Self::Service(PortfolioServiceError::Asset(error)) => asset_failure(&error),
+            Self::Command(SyncPortfoliosV2CommandError::Directory(_))
+            | Self::Service(PortfolioServiceError::Asset(_))
+            | Self::Asset(_) => asset_internal(),
             Self::Service(PortfolioServiceError::CannotUpdate(_)) => {
                 ownership("portfolios".to_string())
             }
@@ -159,7 +147,6 @@ impl IntoResponse for V2HttpError {
                     vec![V2FieldError { field, message }],
                 )
             }
-            Self::Asset(error) => asset_failure(&error),
             Self::Command(SyncPortfoliosV2CommandError::Repository(_)) | Self::Service(_) => {
                 sync_internal()
             }
@@ -204,22 +191,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn too_many_new_assets_is_a_validation_error() {
-        // GIVEN an asset-service failure for too many new assets,
-        // WHEN the v2 boundary adapts it,
-        // THEN the response is a 400 validation_error at `portfolios`.
-        let (status, body) =
-            response_body(V2HttpError::Asset(AssetServiceError::TooManyNewAssets {
-                limit: 50,
-            }))
-            .await;
-
-        assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(body["code"], "validation_error");
-        assert_eq!(body["errors"][0]["field"], "portfolios");
-    }
-
-    #[tokio::test]
     async fn lookup_validation_points_at_the_offending_asset() {
         // GIVEN an invalid asset reference at index 2, WHEN the lookup command error is
         // adapted, THEN the 400 body names `asset[2]` with the reason.
@@ -249,38 +220,29 @@ mod tests {
 
     #[tokio::test]
     async fn asset_failures_keep_distinct_statuses() {
-        // GIVEN a provider outage and a directory failure, raised either by the
-        // sync command, by onboarding, or by the lookup endpoint,
+        // GIVEN a provider outage raised by the sync command and a directory
+        // failure raised by the sync command, by onboarding, or by the lookup endpoint,
         // WHEN each is adapted,
-        // THEN outages are 502 provider_unavailable and directory failures are 500.
-        use crate::ports::outbound::{
-            adapter::AssetProviderError, repository::asset::AssetDirectoryError,
-        };
+        // THEN the outage is 502 provider_unavailable and directory failures are 500.
+        use crate::ports::outbound::adapter::AssetProviderError;
 
-        let outages = [
-            V2HttpError::Command(SyncPortfoliosV2CommandError::ProviderUnavailable(
-                AssetProviderError::Malformed("x".into()),
+        let (status, body) = response_body(V2HttpError::Command(
+            SyncPortfoliosV2CommandError::ProviderUnavailable(AssetProviderError::Malformed(
+                "x".into(),
             )),
-            V2HttpError::Service(PortfolioServiceError::Asset(
-                AssetServiceError::ProviderUnavailable(AssetProviderError::Malformed("x".into())),
-            )),
-            V2HttpError::Asset(AssetServiceError::ProviderUnavailable(
-                AssetProviderError::Malformed("x".into()),
-            )),
-        ];
-        for outage in outages {
-            let (status, body) = response_body(outage).await;
-            assert_eq!(status, StatusCode::BAD_GATEWAY);
-            assert_eq!(body["code"], PROVIDER_UNAVAILABLE_CODE);
-        }
+        ))
+        .await;
+        assert_eq!(status, StatusCode::BAD_GATEWAY);
+        assert_eq!(body["code"], PROVIDER_UNAVAILABLE_CODE);
 
         let failures = [
             V2HttpError::Command(SyncPortfoliosV2CommandError::Directory(
                 AssetDirectoryError::CorruptData("x".into()),
             )),
-            V2HttpError::Asset(AssetServiceError::Directory(
+            V2HttpError::Service(PortfolioServiceError::Asset(
                 AssetDirectoryError::CorruptData("x".into()),
             )),
+            V2HttpError::Asset(AssetDirectoryError::CorruptData("x".into())),
         ];
         for failure in failures {
             let (status, body) = response_body(failure).await;

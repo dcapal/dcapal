@@ -8,7 +8,7 @@ use crate::{
             asset::{AssetRef, ResolvedAsset},
             portfolio::SyncPortfoliosV2Request,
         },
-        services::asset::{AssetService, AssetServiceError, ResolvedAssets},
+        services::asset::{AssetResolutionError, AssetService, ResolvedAssets},
     },
     ports::outbound::{
         adapter::AssetProviderError,
@@ -23,7 +23,7 @@ pub mod validation;
 
 pub use validation::{FieldPath, OwnershipLocation, ValidationError, ValidationIssue};
 
-/// Validated and normalized v2 synchronization command.
+/// Validated v2 synchronization command.
 ///
 /// Besides the canonical request it carries the shared metadata of every
 /// referenced asset, so the service can onboard them before any write.
@@ -43,8 +43,7 @@ impl SyncPortfoliosV2Command {
         portfolios: &dyn PortfolioRepository,
         assets: &AssetService,
     ) -> Result<Self, SyncPortfoliosV2CommandError> {
-        let request = validation::validate_and_normalize(request)
-            .map_err(SyncPortfoliosV2CommandError::Validation)?;
+        validation::validate(&request).map_err(SyncPortfoliosV2CommandError::Validation)?;
 
         // Every submitted Portfolio id, in report order, with where it was submitted.
         let submitted = request
@@ -89,19 +88,19 @@ impl SyncPortfoliosV2Command {
                 .resolve(references)
                 .await
                 .map_err(|error| match error {
-                    AssetServiceError::Unresolved(unresolved) => {
+                    AssetResolutionError::Unresolved(unresolved) => {
                         SyncPortfoliosV2CommandError::Validation(unresolved_issues(
                             &request,
                             &unresolved,
                         ))
                     }
-                    AssetServiceError::TooManyNewAssets { .. } => {
+                    AssetResolutionError::TooManyNewAssets { .. } => {
                         SyncPortfoliosV2CommandError::Validation(too_many_new_assets())
                     }
-                    AssetServiceError::ProviderUnavailable(error) => {
+                    AssetResolutionError::ProviderUnavailable(error) => {
                         SyncPortfoliosV2CommandError::ProviderUnavailable(error)
                     }
-                    AssetServiceError::Directory(error) => {
+                    AssetResolutionError::Directory(error) => {
                         SyncPortfoliosV2CommandError::Directory(error)
                     }
                 })?
@@ -140,7 +139,7 @@ impl SyncPortfoliosV2Command {
 }
 
 /// Builds the validation error for a sync that introduces too many new assets.
-pub(crate) fn too_many_new_assets() -> ValidationError {
+fn too_many_new_assets() -> ValidationError {
     ValidationError::single(
         FieldPath::root().field("portfolios"),
         validation::MESSAGE_TOO_MANY_NEW_ASSETS,
@@ -212,7 +211,7 @@ mod tests {
             AllocationMode, AssetClass, PortfolioAssetV2, PortfolioV2, Provider,
         },
         ports::outbound::{
-            adapter::MockAssetProvider,
+            adapter::{MockAssetProvider, ProviderAsset},
             repository::{asset::MockAssetDirectory, portfolio::MockPortfolioRepository},
         },
     };
@@ -228,6 +227,14 @@ mod tests {
             name: format!("{symbol} name"),
             currency: "EUR".to_string(),
             asset_class: AssetClass::Equity,
+        }
+    }
+
+    /// A provider answer carrying the resolved asset with an authoritative name.
+    fn provided(symbol: &str) -> ProviderAsset {
+        ProviderAsset {
+            asset: resolved(symbol),
+            name_authoritative: true,
         }
     }
 
@@ -309,7 +316,7 @@ mod tests {
         let mut provider = MockAssetProvider::new();
         provider
             .expect_lookup()
-            .returning(|reference| Ok(Some(resolved(&reference.symbol))));
+            .returning(|reference| Ok(Some(provided(reference.symbol()))));
         let assets = assets_service(empty_directory(), provider);
 
         let command = SyncPortfoliosV2Command::try_new(
@@ -335,7 +342,7 @@ mod tests {
         let mut provider = MockAssetProvider::new();
         provider
             .expect_lookup()
-            .returning(|reference| Ok((reference.symbol == "VWCE").then(|| resolved("VWCE"))));
+            .returning(|reference| Ok((reference.symbol() == "VWCE").then(|| provided("VWCE"))));
         let assets = assets_service(empty_directory(), provider);
         let mut request = request(vec![asset("VWCE"), asset("NOPE")]);
         let mut second = request.portfolios[0].clone();
@@ -418,10 +425,7 @@ mod tests {
 
     fn asset(symbol: &str) -> PortfolioAssetV2 {
         PortfolioAssetV2 {
-            asset: AssetRef {
-                provider: Provider::YF,
-                symbol: symbol.to_string(),
-            },
+            asset: AssetRef::new(Provider::YF, symbol),
             asset_class_override: None,
             quantity: dec!(1),
             target_weight: Some(dec!(100)),

@@ -7,7 +7,7 @@ use crate::{
         commands::sync_portfolios_v2::SyncPortfoliosV2Command,
         domain::{portfolio::SyncPortfoliosV2Response, portfolio_sync::plan_sync},
         infra::retry::retry_sync,
-        services::asset::{AssetService, AssetServiceError},
+        services::asset::AssetService,
     },
     error::DcaError,
     ports::{
@@ -16,6 +16,7 @@ use crate::{
             response::{PortfolioResponse, SyncPortfoliosResponse},
         },
         outbound::repository::{
+            asset::AssetDirectoryError,
             portfolio::{PortfolioRepository, PortfolioRepositoryError},
             postgres::types::{AssetClass, Provider},
         },
@@ -34,7 +35,7 @@ pub enum PortfolioServiceError {
     #[error("portfolio synchronization conflict")]
     Conflict(#[source] PortfolioRepositoryError),
     #[error("referenced assets could not be onboarded")]
-    Asset(#[source] AssetServiceError),
+    Asset(#[source] AssetDirectoryError),
 }
 
 impl From<PortfolioRepositoryError> for PortfolioServiceError {
@@ -276,7 +277,8 @@ mod tests {
         postgres::types::{FeeFields, PortfolioAssetRow, PortfolioRow},
     };
     use crate::ports::outbound::{
-        adapter::MockAssetProvider, repository::asset::MockAssetDirectory,
+        adapter::{MockAssetProvider, ProviderAsset},
+        repository::asset::MockAssetDirectory,
     };
 
     #[test]
@@ -354,9 +356,12 @@ mod tests {
     /// Provider that knows VWCE, used when the directory lacks it.
     fn vwce_provider() -> MockAssetProvider {
         let mut provider = MockAssetProvider::new();
-        provider
-            .expect_lookup()
-            .returning(|_| Ok(Some(resolved_vwce())));
+        provider.expect_lookup().returning(|_| {
+            Ok(Some(ProviderAsset {
+                asset: resolved_vwce(),
+                name_authoritative: true,
+            }))
+        });
         provider
     }
 

@@ -157,8 +157,8 @@ impl TryFrom<AssetRefV2> for AssetRef {
 impl From<AssetRef> for AssetRefV2 {
     fn from(reference: AssetRef) -> Self {
         Self {
-            provider: reference.provider.to_string(),
-            symbol: reference.symbol,
+            provider: reference.provider().to_string(),
+            symbol: reference.symbol().to_string(),
         }
     }
 }

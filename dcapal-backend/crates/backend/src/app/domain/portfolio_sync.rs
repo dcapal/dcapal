@@ -130,8 +130,8 @@ impl PortfolioContent {
         let simple = self.allocation_mode == AllocationMode::Simple;
         let mut assets = self.assets.clone();
         assets.sort_by(|a, b| {
-            (a.asset.asset.provider.as_str(), &a.asset.asset.symbol)
-                .cmp(&(b.asset.asset.provider.as_str(), &b.asset.asset.symbol))
+            (a.asset.asset.provider().as_str(), a.asset.asset.symbol())
+                .cmp(&(b.asset.asset.provider().as_str(), b.asset.asset.symbol()))
         });
         let mut class_targets = self.class_targets.clone();
         class_targets.sort_by_key(|target| target.asset_class);
@@ -876,19 +876,19 @@ mod tests {
             .content
             .assets
             .iter()
-            .map(|stored| (stored.asset.asset.symbol.as_str(), stored.weight))
+            .map(|stored| (stored.asset.asset.symbol(), stored.weight))
             .collect();
         assert_eq!(weights, vec![("VWCE", dec!(100.00)), ("CASH", dec!(0))]);
         let response = &plan.response.updated_portfolios[0];
         assert!(response.assets.iter().all(|a| a.target_weight.is_none()));
-        let symbols: Vec<_> = response.assets.iter().map(|a| &a.asset.symbol).collect();
+        let symbols: Vec<_> = response.assets.iter().map(|a| a.asset.symbol()).collect();
         assert_eq!(symbols, ["CASH", "VWCE"]);
         let allocation = response.strategic_allocation.as_ref().unwrap();
         assert_eq!(
             allocation
                 .asset_targets
                 .iter()
-                .map(|t| (t.asset.symbol.as_str(), t.relative_target_weight))
+                .map(|t| (t.asset.symbol(), t.relative_target_weight))
                 .collect::<Vec<_>>(),
             vec![("CASH", dec!(0)), ("VWCE", dec!(100.00))]
         );
@@ -978,10 +978,10 @@ mod tests {
         let ordered: Vec<_> = plan.response.updated_portfolios[0]
             .assets
             .iter()
-            .map(|a| (a.asset.provider.as_str(), a.asset.symbol.as_str()))
+            .map(|a| (a.asset.provider().as_str(), a.asset.symbol()))
             .collect();
         assert_eq!(ordered, [("kraken", "BTC"), ("yf", "AAA"), ("yf", "ZZZ")]);
-        assert_eq!(plan.writes[0].content.assets[0].asset.asset.symbol, "ZZZ");
+        assert_eq!(plan.writes[0].content.assets[0].asset.asset.symbol(), "ZZZ");
     }
 
     #[test]

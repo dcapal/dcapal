@@ -20,6 +20,17 @@ pub enum AssetProviderError {
     Malformed(String),
 }
 
+/// Metadata a provider resolved for one asset, with what it vouches for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderAsset {
+    /// The metadata the provider resolved.
+    pub asset: ResolvedAsset,
+    /// Whether `asset.name` is a real display name that may replace a name a
+    /// client cached earlier. Providers that only echo the symbol as name
+    /// report `false`, so their lookups confirm existence but never rename.
+    pub name_authoritative: bool,
+}
+
 /// Looks up the metadata of a single asset at its provider.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -28,7 +39,7 @@ pub trait AssetProvider: Send + Sync {
     ///
     /// `Ok(None)` means the provider does not know the asset; `Err` means the
     /// provider is unavailable or answered with unusable data.
-    async fn lookup(&self, asset: &AssetRef) -> Result<Option<ResolvedAsset>, AssetProviderError>;
+    async fn lookup(&self, asset: &AssetRef) -> Result<Option<ProviderAsset>, AssetProviderError>;
 }
 
 /// Dispatches each lookup to the adapter serving the reference's provider.
@@ -46,8 +57,8 @@ impl ProviderRoutedAssetProvider {
 
 #[async_trait]
 impl AssetProvider for ProviderRoutedAssetProvider {
-    async fn lookup(&self, asset: &AssetRef) -> Result<Option<ResolvedAsset>, AssetProviderError> {
-        match asset.provider {
+    async fn lookup(&self, asset: &AssetRef) -> Result<Option<ProviderAsset>, AssetProviderError> {
+        match asset.provider() {
             Provider::YF => self.yahoo.lookup(asset).await,
             Provider::Kraken => self.kraken.lookup(asset).await,
         }
@@ -59,13 +70,16 @@ mod tests {
     use super::*;
     use crate::app::domain::portfolio::AssetClass;
 
-    fn resolved(provider: Provider, symbol: &str) -> ResolvedAsset {
-        ResolvedAsset {
-            provider,
-            symbol: symbol.to_string(),
-            name: symbol.to_string(),
-            currency: "USD".to_string(),
-            asset_class: AssetClass::Other,
+    fn resolved(provider: Provider, symbol: &str) -> ProviderAsset {
+        ProviderAsset {
+            asset: ResolvedAsset {
+                provider,
+                symbol: symbol.to_string(),
+                name: symbol.to_string(),
+                currency: "USD".to_string(),
+                asset_class: AssetClass::Other,
+            },
+            name_authoritative: true,
         }
     }
 
@@ -78,7 +92,7 @@ mod tests {
         yahoo
             .expect_lookup()
             .times(1)
-            .returning(|a| Ok(Some(resolved(a.provider, &a.symbol))));
+            .returning(|a| Ok(Some(resolved(a.provider(), a.symbol()))));
         let mut kraken = MockAssetProvider::new();
         kraken.expect_lookup().times(1).returning(|_| Ok(None));
         let router = ProviderRoutedAssetProvider::new(Arc::new(yahoo), Arc::new(kraken));

@@ -201,10 +201,7 @@ fn decode_asset(row: &mut SnapshotRow) -> Result<Option<StoredAsset>> {
     })?;
     Ok(Some(StoredAsset {
         asset: PortfolioAssetV2 {
-            asset: AssetRef {
-                provider: provider.into(),
-                symbol,
-            },
+            asset: AssetRef::new(provider.into(), &symbol),
             asset_class_override: row.asset_class_override.map(Into::into),
             quantity,
             target_weight: None,

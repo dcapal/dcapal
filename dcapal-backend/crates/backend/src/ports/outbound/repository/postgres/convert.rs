@@ -58,8 +58,8 @@ pub(super) fn unnest_refs<'a>(
     refs.into_iter()
         .map(|reference| {
             (
-                DbProvider::from(reference.provider),
-                reference.symbol.clone(),
+                DbProvider::from(reference.provider()),
+                reference.symbol().to_string(),
             )
         })
         .unzip()

@@ -8,8 +8,8 @@ use crate::app::domain::portfolio::{AssetClass, Provider};
 /// persisted for shared asset metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssetRef {
-    pub provider: Provider,
-    pub symbol: String,
+    provider: Provider,
+    symbol: String,
 }
 
 impl AssetRef {
@@ -21,8 +21,18 @@ impl AssetRef {
         }
     }
 
+    /// Returns the provider listing the asset.
+    pub const fn provider(&self) -> Provider {
+        self.provider
+    }
+
+    /// Returns the canonical provider symbol.
+    pub fn symbol(&self) -> &str {
+        &self.symbol
+    }
+
     /// Returns the canonical form of a provider symbol: trimmed and upper-cased.
-    pub fn canonical_symbol(symbol: &str) -> String {
+    fn canonical_symbol(symbol: &str) -> String {
         symbol.trim().to_ascii_uppercase()
     }
 }
@@ -40,10 +50,7 @@ pub struct ResolvedAsset {
 impl From<&ResolvedAsset> for AssetRef {
     /// Returns the reference identifying the asset.
     fn from(asset: &ResolvedAsset) -> Self {
-        Self {
-            provider: asset.provider,
-            symbol: asset.symbol.clone(),
-        }
+        Self::new(asset.provider, &asset.symbol)
     }
 }
 
@@ -77,6 +84,6 @@ mod tests {
         // THEN the symbol is trimmed and upper-cased.
         let reference = AssetRef::new(Provider::YF, "  vwce.de ");
 
-        assert_eq!(reference.symbol, "VWCE.DE");
+        assert_eq!(reference.symbol(), "VWCE.DE");
     }
 }

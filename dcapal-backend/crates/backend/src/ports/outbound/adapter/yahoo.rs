@@ -8,7 +8,7 @@ use axum::{
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use tracing::{debug, error, warn};
 
-use super::asset_provider::{AssetProvider, AssetProviderError};
+use super::asset_provider::{AssetProvider, AssetProviderError, ProviderAsset};
 use crate::{
     DateTime,
     app::domain::{
@@ -250,8 +250,8 @@ impl AssetProvider for YahooProvider {
     async fn lookup(
         &self,
         asset: &AssetRef,
-    ) -> std::result::Result<Option<ResolvedAsset>, AssetProviderError> {
-        let url = lookup_url(&asset.symbol)?;
+    ) -> std::result::Result<Option<ProviderAsset>, AssetProviderError> {
+        let url = lookup_url(asset.symbol())?;
         let (status, body) = tokio::time::timeout(LOOKUP_TIMEOUT, async {
             let response = self
                 .get(url.as_str(), LOOKUP_TIMEOUT, Admission::Wait)
@@ -267,7 +267,13 @@ impl AssetProvider for YahooProvider {
         .await
         .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))??;
 
-        parse_lookup_response(asset, status, &body)
+        // Yahoo reports real display names, so they may replace cached ones.
+        Ok(
+            parse_lookup_response(asset, status, &body)?.map(|asset| ProviderAsset {
+                asset,
+                name_authoritative: true,
+            }),
+        )
     }
 }
 
@@ -343,7 +349,7 @@ fn parse_lookup_response(
 
     Ok(Some(ResolvedAsset {
         provider: Provider::YF,
-        symbol: reference.symbol.clone(),
+        symbol: reference.symbol().to_string(),
         name,
         currency,
         asset_class: asset_class_of(meta.instrument_type.as_deref()),
