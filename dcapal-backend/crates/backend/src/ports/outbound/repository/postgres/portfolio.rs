@@ -11,7 +11,7 @@ use crate::app::domain::{
     portfolio_sync::{LEGACY_WRITE_ALLOCATION, SyncPlan, SyncSnapshot},
 };
 use crate::ports::{
-    inbound::rest::request::{PortfolioRequest, TransactionFeesRequest},
+    inbound::rest::types::sync_portfolios::{PortfolioRequest, TransactionFeesRequest},
     outbound::repository::{
         portfolio::{PortfolioRepository, PortfolioRepositoryError, Result},
         postgres::types::{

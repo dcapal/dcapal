@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     app::domain::portfolio_sync::{SyncPlan, SyncSnapshot},
     ports::{
-        inbound::rest::request::PortfolioRequest,
+        inbound::rest::types::sync_portfolios::PortfolioRequest,
         outbound::repository::postgres::types::{PortfolioAssetRow, PortfolioRow},
     },
 };

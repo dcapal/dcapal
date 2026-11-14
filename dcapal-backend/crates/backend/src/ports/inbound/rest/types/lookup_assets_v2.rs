@@ -3,7 +3,7 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use super::sync_portfolio_v2::{AssetRefV2, v2_asset_class_schema, v2_provider_schema};
+use super::v2_common::{AssetRefV2, v2_asset_class_schema, v2_provider_schema};
 use crate::app::{domain::asset::ResolvedAsset, services::asset::AssetLookup};
 
 /// Shared metadata of one cached asset returned by the lookup.

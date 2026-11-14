@@ -1,3 +1,5 @@
+//! `GET /markets/v2/assets/lookup`: cached asset metadata lookup.
+
 use axum::{
     Json,
     extract::State,
@@ -8,10 +10,10 @@ use crate::{
     AppContext, app::commands::lookup_assets::LookupAssetsCommand, app::infra::claim::Claims,
 };
 
-use super::{
+use crate::ports::inbound::rest::{
     error::V2HttpError,
     extract::LookupAssetRefs,
-    types::{lookup_assets_v2::LookupAssetsV2Response, sync_portfolio_v2::V2ErrorResponse},
+    types::{lookup_assets_v2::LookupAssetsV2Response, v2_common::V2ErrorResponse},
 };
 
 /// Reads the cached metadata of up to 20 assets without contacting providers.

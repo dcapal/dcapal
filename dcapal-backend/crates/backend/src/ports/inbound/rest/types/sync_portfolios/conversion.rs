@@ -1,111 +1,42 @@
-use rust_decimal::Decimal;
-use serde::Serialize;
-use utoipa::{
-    ToSchema,
-    openapi::schema::{Object, ObjectBuilder, Type},
-};
-use uuid::Uuid;
+//! Conversions between the v1 sync wire types and domain or storage types.
 
+use rust_decimal::Decimal;
+
+use super::{
+    FeeStructure, PortfolioAssetResponse, PortfolioResponse, TransactionFeesRequest,
+    TransactionFeesResponse,
+};
 use crate::{
-    DateTime,
     app::domain::portfolio::FeeStructure as AppFeeStructure,
     error::DcaError,
-    ports::{
-        inbound::rest::FeeStructure,
-        outbound::repository::postgres::types::{FeeFields, PortfolioAssetRow, PortfolioRow},
-    },
+    ports::outbound::repository::postgres::types::{FeeFields, PortfolioAssetRow, PortfolioRow},
 };
 
-#[derive(Debug, Serialize, ToSchema, PartialEq)]
-#[serde(rename_all = "camelCase")]
-/// The result of synchronizing the client's portfolio set.
-pub struct SyncPortfoliosResponse {
-    /// Portfolios whose server state should be applied by the client.
-    pub updated_portfolios: Vec<PortfolioResponse>,
-    /// Portfolio identifiers that the client should remove.
-    pub deleted_portfolios: Vec<Uuid>,
+impl From<FeeStructure> for crate::app::domain::portfolio::FeeStructure {
+    fn from(fees: FeeStructure) -> Self {
+        match fees {
+            FeeStructure::ZeroFee => Self::ZeroFee,
+            FeeStructure::Fixed { fee_amount } => Self::Fixed { fee_amount },
+            FeeStructure::Variable {
+                fee_rate,
+                min_fee,
+                max_fee,
+            } => Self::Variable {
+                fee_rate,
+                min_fee: Some(min_fee),
+                max_fee,
+            },
+        }
+    }
 }
 
-#[derive(Debug, Serialize, ToSchema, PartialEq)]
-#[serde(rename_all = "camelCase")]
-/// A portfolio returned by the synchronization endpoint.
-pub struct PortfolioResponse {
-    /// The portfolio identifier.
-    pub id: Uuid,
-    /// The portfolio display name.
-    pub name: String,
-    /// The portfolio quote currency.
-    pub quote_ccy: String,
-    /// The portfolio-level transaction fee settings.
-    pub fees: Option<TransactionFeesResponse>,
-    /// The assets held by the portfolio.
-    pub assets: Vec<PortfolioAssetResponse>,
-    /// The timestamp used to compare this state with a client copy.
-    pub last_updated_at: DateTime,
-}
-
-#[derive(Debug, Serialize, ToSchema, PartialEq)]
-#[serde(rename_all = "camelCase")]
-/// An asset held by a portfolio.
-///
-/// Decimal values are serialized as JSON strings to preserve precision.
-pub struct PortfolioAssetResponse {
-    /// The provider symbol for the asset.
-    pub symbol: String,
-    /// The asset display name.
-    pub name: String,
-    /// The asset class.
-    #[schema(schema_with = v1_response_asset_class_schema)]
-    pub aclass: String,
-    /// The asset currency.
-    pub base_ccy: String,
-    /// The data provider for the asset.
-    #[schema(schema_with = v1_response_provider_schema)]
-    pub provider: String,
-    #[serde(with = "rust_decimal::serde::str")]
-    /// The quantity held.
-    pub qty: Decimal,
-    #[serde(with = "rust_decimal::serde::str")]
-    /// The target portfolio weight.
-    pub target_weight: Decimal,
-    #[serde(with = "rust_decimal::serde::str")]
-    /// The latest known price.
-    pub price: Decimal,
-    #[serde(with = "rust_decimal::serde::str")]
-    /// The average price paid for the holding.
-    pub average_buy_price: Decimal,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// The asset-level transaction fee settings.
-    pub fees: Option<TransactionFeesResponse>,
-}
-
-/// Documents the canonical provider names emitted by the v1 synchronization response.
-fn v1_response_provider_schema() -> Object {
-    ObjectBuilder::new()
-        .schema_type(Type::String)
-        .enum_values(Some(["DCAPal", "YF"]))
-        .description(Some(
-            "Canonical v1 provider name. Kraken-backed assets are returned as DCAPal and Yahoo Finance assets as YF.",
-        ))
-        .build()
-}
-
-/// Documents the canonical Asset Class names emitted by the v1 synchronization response.
-fn v1_response_asset_class_schema() -> Object {
-    ObjectBuilder::new()
-        .schema_type(Type::String)
-        .enum_values(Some([
-            "EQUITY",
-            "BOND",
-            "CURRENCY",
-            "CRYPTO",
-            "COMMODITY",
-            "OTHER",
-        ]))
-        .description(Some(
-            "Canonical v1 Asset Class name. Cash and Currency are returned as CURRENCY.",
-        ))
-        .build()
+impl From<TransactionFeesRequest> for crate::app::domain::portfolio::TransactionFees {
+    fn from(fees: TransactionFeesRequest) -> Self {
+        Self {
+            max_fee_impact: fees.max_fee_impact,
+            fee_structure: fees.fee_structure.into(),
+        }
+    }
 }
 
 /// Builds the v1 fee settings from the stored fee columns of a portfolio or
@@ -186,26 +117,12 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
     }
 }
 
-#[derive(Debug, Serialize, ToSchema, PartialEq)]
-#[serde(rename_all = "camelCase")]
-/// Transaction fee settings returned by the API.
-pub struct TransactionFeesResponse {
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        default,
-        with = "rust_decimal::serde::str_option"
-    )]
-    /// The maximum allowed fee impact, when configured.
-    pub max_fee_impact: Option<Decimal>,
-    /// The fee calculation model.
-    pub fee_structure: FeeStructure,
-}
-
 #[cfg(test)]
 mod test {
 
     use chrono::Utc;
     use rust_decimal::dec;
+    use uuid::Uuid;
 
     use super::*;
     use crate::ports::outbound::repository::postgres::types::{

@@ -54,6 +54,21 @@ Keep REST request and response types at the inbound boundary. Services and
 outbound ports use application or domain types instead of `axum::Json`,
 `axum::response::Response`, HTTP extractors, or other transport types.
 
+### REST module layout
+
+Under `crates/backend/src/ports/inbound/rest/`, every handler lives in
+`handlers/`, one module per endpoint nested like the URL path (for example
+`handlers/assets/fiat.rs` for `/assets/fiat` and `handlers/import/portfolio.rs`
+for `/import/portfolio`). Each handler module holds the `#[utoipa::path]` and
+the handler function only. Its wire types (path/query parameters, request and
+response DTOs, schema helpers, conversions) live in the mirrored module under
+`types/`; a larger endpoint keeps its conversions in a child `conversion.rs`.
+Wire types shared by several endpoints go in a common module such as
+`types/v2_common.rs`. Modules common to all endpoints (`mod.rs` router wiring,
+`error.rs`, `extract.rs`, `openapi.rs`) stay directly in `rest/`. A new
+endpoint adds one handler module, one types module and one route in
+`rest/mod.rs`.
+
 ### Commands validate and resolve context
 
 Create one command for each meaningful application action. Use a fallible

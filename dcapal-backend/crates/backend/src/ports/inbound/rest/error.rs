@@ -13,7 +13,7 @@ use crate::{
         services::portfolio::PortfolioServiceError,
     },
     ports::{
-        inbound::rest::types::sync_portfolio_v2::{
+        inbound::rest::types::v2_common::{
             V2ErrorResponse, V2FieldError, V2ValidationError, VALIDATION_CODE,
         },
         outbound::repository::asset::AssetDirectoryError,

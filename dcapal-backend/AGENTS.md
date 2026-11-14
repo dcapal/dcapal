@@ -55,3 +55,7 @@ reasoning and examples.
   `Query<Vec<(String, String)>>`.
 - Migrations that are not merged may be edited in place; applied migrations stay
   immutable.
+- REST layout: handlers live under `rest/handlers/`, one module per endpoint
+  nested like the URL path; their DTOs are mirrored under `rest/types/`; common
+  REST modules (`mod.rs` router wiring, `error.rs`, `extract.rs`, `openapi.rs`)
+  stay in `rest/`. See the "REST module layout" section of `CODING_STANDARDS.md`.

@@ -1,8 +1,7 @@
-use std::sync::LazyLock;
+//! Wire types of the v2 portfolio synchronization endpoint.
 
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
 use utoipa::{
     ToSchema,
     openapi::schema::{Object, ObjectBuilder, SchemaType, Type},
@@ -13,6 +12,8 @@ use crate::app::{
     commands::sync_portfolios_v2::{ValidationError, validation::SCHEMA_VERSION},
     domain::portfolio as app,
 };
+
+use super::v2_common::{AssetRefV2, asset_class_names, v2_asset_class_schema};
 
 mod conversion;
 
@@ -52,16 +53,6 @@ pub struct PortfolioV2Request {
 pub enum AllocationModeWire {
     Simple,
     Strategic,
-}
-
-/// Reference to a provider-listed asset; shared metadata is resolved server-side.
-#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetRefV2 {
-    #[schema(schema_with = v2_provider_schema)]
-    pub provider: String,
-    /// Provider symbol; stored trimmed and upper-cased.
-    pub symbol: String,
 }
 
 /// Portfolio-specific holding and allocation values for one referenced asset.
@@ -254,81 +245,12 @@ pub struct TransactionFeesV2Response {
     pub fee_structure: FeeStructureV2,
 }
 
-/// One readable v2 validation issue.
-#[derive(Debug, Serialize, ToSchema, Clone, PartialEq)]
-pub struct V2FieldError {
-    pub field: String,
-    pub message: String,
-}
-
-/// Structured v2 error response.
-#[derive(Debug, Serialize, ToSchema, Clone, PartialEq)]
-pub struct V2ErrorResponse {
-    pub code: String,
-    pub message: String,
-    pub errors: Vec<V2FieldError>,
-}
-
-/// Validation failure reported by the v2 REST boundary as a 400 response.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("The Portfolio aggregate is invalid.")]
-pub struct V2ValidationError {
-    pub errors: Vec<V2FieldError>,
-}
-
-/// Error code of every v2 validation failure.
-pub(crate) const VALIDATION_CODE: &str = "validation_error";
-const VALIDATION_MESSAGE: &str = "The Portfolio aggregate is invalid.";
-const KNOWN_ASSET_CLASS_MESSAGE: &str = "must be a known Asset Class";
-
-/// Validation message listing the accepted provider identifiers.
-fn known_provider_message() -> &'static str {
-    static MESSAGE: LazyLock<String> =
-        LazyLock::new(|| format!("must be one of {}", app::Provider::names()));
-    MESSAGE.as_str()
-}
-
-impl V2ValidationError {
-    /// Converts the validation failure into the wire response body.
-    pub fn response(self) -> V2ErrorResponse {
-        V2ErrorResponse {
-            code: VALIDATION_CODE.to_string(),
-            message: VALIDATION_MESSAGE.to_string(),
-            errors: self.errors,
-        }
-    }
-}
-
-pub(crate) fn v2_provider_schema() -> Object {
-    ObjectBuilder::new()
-        .schema_type(Type::String)
-        .enum_values(Some(
-            app::Provider::iter().map(|provider| provider.as_str()),
-        ))
-        .build()
-}
-
 fn v2_schema_version_schema() -> Object {
     ObjectBuilder::new()
         .schema_type(Type::Integer)
         .minimum(Some(SCHEMA_VERSION))
         .maximum(Some(SCHEMA_VERSION))
         .enum_values(Some([SCHEMA_VERSION]))
-        .build()
-}
-
-/// Asset-class identifiers in schema order: `other` is documented last.
-fn asset_class_names() -> impl Iterator<Item = &'static str> {
-    app::AssetClass::iter()
-        .filter(|class| *class != app::AssetClass::Other)
-        .chain([app::AssetClass::Other])
-        .map(app::AssetClass::as_str)
-}
-
-pub(crate) fn v2_asset_class_schema() -> Object {
-    ObjectBuilder::new()
-        .schema_type(Type::String)
-        .enum_values(Some(asset_class_names()))
         .build()
 }
 

@@ -11,9 +11,8 @@ use crate::{
     },
     error::DcaError,
     ports::{
-        inbound::rest::{
-            request::{PortfolioRequest, SyncPortfoliosRequest},
-            response::{PortfolioResponse, SyncPortfoliosResponse},
+        inbound::rest::types::sync_portfolios::{
+            PortfolioRequest, PortfolioResponse, SyncPortfoliosRequest, SyncPortfoliosResponse,
         },
         outbound::repository::{
             asset::AssetDirectoryError,
@@ -281,7 +280,7 @@ mod tests {
             TombstoneKind, WriteKind,
         },
     };
-    use crate::ports::inbound::rest::request::PortfolioAssetRequest;
+    use crate::ports::inbound::rest::types::sync_portfolios::PortfolioAssetRequest;
     use crate::ports::outbound::repository::{
         portfolio::{MockPortfolioRepository, PortfolioRepository},
         postgres::types::{FeeFields, PortfolioAssetRow, PortfolioRow},

@@ -73,7 +73,7 @@ fn inline_import_portfolio_request_schema(openapi: &mut Value) {
         .pointer_mut(schema_path)
         .unwrap_or_else(|| panic!("missing OpenAPI schema path: {schema_path}"));
 
-    let mut schema = super::PORTFOLIO_JSON_SCHEMA.clone();
+    let mut schema = super::handlers::import::portfolio::PORTFOLIO_JSON_SCHEMA.clone();
     let definitions = schema
         .get("$defs")
         .and_then(Value::as_object)

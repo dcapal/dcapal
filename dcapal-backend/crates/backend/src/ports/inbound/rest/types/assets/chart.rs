@@ -1,19 +1,25 @@
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+//! Wire types of `GET /assets/chart/{symbol}`.
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct YahooSearchResponse {
-    pub quotes: Option<Vec<YahooSearchQuote>>,
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+#[into_params(parameter_in = Query)]
+/// Time range parameters for a historical asset chart.
+pub struct GetAssetChartQuery {
+    /// Chart start timestamp (unix seconds).
+    pub start_period: i64,
+    /// Chart end timestamp (unix seconds).
+    pub end_period: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct YahooSearchQuote {
-    #[serde(rename = "quoteType")]
-    pub quote_type: Option<String>,
-    pub longname: Option<String>,
-    pub shortname: Option<String>,
-    pub symbol: Option<String>,
-    pub exchange: Option<String>,
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Path)]
+/// Path parameters identifying a charted asset.
+pub struct GetAssetChartPath {
+    /// Asset symbol.
+    pub symbol: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

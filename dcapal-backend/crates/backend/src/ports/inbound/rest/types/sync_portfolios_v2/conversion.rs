@@ -1,3 +1,6 @@
+use super::super::v2_common::{
+    KNOWN_ASSET_CLASS_MESSAGE, V2FieldError, V2ValidationError, known_provider_message,
+};
 use super::*;
 use crate::app::domain::asset::AssetRef;
 

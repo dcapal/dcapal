@@ -1,3 +1,5 @@
+//! `POST /v2/sync/portfolios`: full-aggregate Portfolio synchronization.
+
 use axum::{
     Json,
     extract::State,
@@ -14,10 +16,11 @@ use crate::{
     infra::claim::Claims,
 };
 
-use super::{
+use crate::ports::inbound::rest::{
     error::V2HttpError,
-    types::sync_portfolio_v2::{
-        SyncPortfoliosV2Request, SyncPortfoliosV2Response, V2ErrorResponse,
+    types::{
+        sync_portfolios_v2::{SyncPortfoliosV2Request, SyncPortfoliosV2Response},
+        v2_common::V2ErrorResponse,
     },
 };
 

@@ -13,9 +13,8 @@ use dcapal_backend::app::domain::portfolio_sync::{WriteKind, plan_sync};
 use dcapal_backend::app::services::{asset::AssetService, portfolio::PortfolioService};
 use dcapal_backend::ports::outbound::adapter::ProviderAsset;
 use dcapal_backend::ports::{
-    inbound::rest::{
-        FeeStructure,
-        request::{PortfolioAssetRequest, PortfolioRequest, SyncPortfoliosRequest},
+    inbound::rest::types::sync_portfolios::{
+        FeeStructure, PortfolioAssetRequest, PortfolioRequest, SyncPortfoliosRequest,
     },
     outbound::repository::{
         asset::AssetDirectory,
@@ -47,7 +46,7 @@ fn asset(symbol: &str) -> PortfolioAssetRequest {
         price: dec!(120),
         average_buy_price: dec!(110),
         fees: Some(
-            dcapal_backend::ports::inbound::rest::request::TransactionFeesRequest {
+            dcapal_backend::ports::inbound::rest::types::sync_portfolios::TransactionFeesRequest {
                 max_fee_impact: None,
                 fee_structure: FeeStructure::ZeroFee,
             },
@@ -61,7 +60,7 @@ fn portfolio_request(assets: Vec<PortfolioAssetRequest>) -> PortfolioRequest {
         name: "Updated portfolio".to_string(),
         quote_ccy: "USD".to_string(),
         fees: Some(
-            dcapal_backend::ports::inbound::rest::request::TransactionFeesRequest {
+            dcapal_backend::ports::inbound::rest::types::sync_portfolios::TransactionFeesRequest {
                 max_fee_impact: Some(dec!(0.5)),
                 fee_structure: FeeStructure::Fixed {
                     fee_amount: dec!(1.25),
@@ -770,7 +769,7 @@ async fn v2_sync_persists_strategic_descendants_and_exact_decimals(
         dec!(100.00)
     );
     let serialized = serde_json::to_value(
-        dcapal_backend::ports::inbound::rest::types::sync_portfolio_v2::PortfolioV2Response::from(
+        dcapal_backend::ports::inbound::rest::types::sync_portfolios_v2::PortfolioV2Response::from(
             portfolio.clone(),
         ),
     )?;
@@ -950,7 +949,7 @@ async fn v2_sync_stores_class_overrides_verbatim_and_hides_relationship_ids(
         Some(AssetClass::Equity)
     );
     let wire = serde_json::to_value(
-        dcapal_backend::ports::inbound::rest::types::sync_portfolio_v2::PortfolioV2Response::from(
+        dcapal_backend::ports::inbound::rest::types::sync_portfolios_v2::PortfolioV2Response::from(
             portfolio,
         ),
     )?;
@@ -1413,9 +1412,10 @@ async fn v1_target_weights(
     repository: &SqlxPortfolioRepository,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let portfolios = repository.get_user_portfolios_with_assets(USER_ID).await?;
-    let response = dcapal_backend::ports::inbound::rest::response::PortfolioResponse::try_from(
-        portfolios.into_iter().next().expect("fixture portfolio"),
-    )?;
+    let response =
+        dcapal_backend::ports::inbound::rest::types::sync_portfolios::PortfolioResponse::try_from(
+            portfolios.into_iter().next().expect("fixture portfolio"),
+        )?;
     let json = serde_json::to_value(response)?;
     Ok(json["assets"]
         .as_array()

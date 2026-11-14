@@ -4,7 +4,7 @@ use axum::{extract::FromRequestParts, http::request::Parts};
 
 use super::{
     error::V2HttpError,
-    types::sync_portfolio_v2::{V2FieldError, V2ValidationError},
+    types::v2_common::{V2FieldError, V2ValidationError},
 };
 
 /// Query parameter that carries one asset reference per occurrence.
