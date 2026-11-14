@@ -9,6 +9,22 @@ use crate::{
     error::{DcaError, Result},
 };
 
+/// Summarizes whether cached markets can resolve both of their catalog assets.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MarketAssetIntegrity {
+    /// Number of valid market records with a missing base or quote asset.
+    pub markets_with_missing_assets: usize,
+    /// Number of malformed market records that could not be checked.
+    pub malformed_market_records: usize,
+}
+
+impl MarketAssetIntegrity {
+    /// Reports whether discovery should retry to repair market data.
+    pub fn requires_recovery(self) -> bool {
+        self.markets_with_missing_assets > 0 || self.malformed_market_records > 0
+    }
+}
+
 #[derive(Clone)]
 pub struct MarketDataRepository {
     redis: deadpool_redis::Pool,
@@ -58,6 +74,13 @@ impl MarketDataRepository {
         let mut redis = self.redis.get().await?;
 
         Market::find_by_id(id, &mut redis, self).await
+    }
+
+    /// Summarizes stored market records whose catalog references are incomplete.
+    pub async fn market_asset_integrity(&self) -> Result<MarketAssetIntegrity> {
+        let mut redis = self.redis.get().await?;
+
+        Market::asset_integrity(&mut redis).await
     }
 
     pub async fn find_markets(&self, ids: &[&MarketId]) -> Result<Vec<Option<Market>>> {

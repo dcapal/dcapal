@@ -9,102 +9,40 @@
       {
         "kind": "AnnotationQuery",
         "spec": {
-          "builtIn": true,
-          "enable": true,
-          "hide": true,
-          "iconColor": "rgba(0, 211, 255, 1)",
-          "name": "Annotations \u0026 Alerts",
           "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
             "datasource": {
               "name": "-- Grafana --"
             },
-            "group": "grafana",
-            "kind": "DataQuery",
             "spec": {
               "limit": 100,
               "matchAny": false,
               "tags": [],
               "type": "dashboard"
-            },
-            "version": "v0"
+            }
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "builtIn": true,
+          "legacyOptions": {
+            "type": "dashboard"
           }
         }
       }
     ],
     "cursorSync": "Off",
-    "description": "Dcapal Dashboard",
     "editable": true,
     "elements": {
       "panel-1": {
         "kind": "Panel",
         "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-logs"
-                      },
-                      "group": "loki",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "{job=\"$envs\"} |= `` | json | level != `DEBUG` | level != `INFO`",
-                        "key": "Q-c05ddf76-58a1-479a-a1db-2476a9326c25-0",
-                        "queryType": "range"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
           "id": 1,
+          "title": "API request rate",
           "links": [],
-          "title": "Warnings / Errors",
-          "vizConfig": {
-            "group": "logs",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              },
-              "options": {
-                "dedupStrategy": "none",
-                "enableInfiniteScrolling": false,
-                "enableLogDetails": true,
-                "prettifyLogMessage": false,
-                "showCommonLabels": false,
-                "showControls": false,
-                "showFieldSelector": false,
-                "showLabels": false,
-                "showLevel": true,
-                "showLogAttributes": true,
-                "showTime": false,
-                "sortOrder": "Descending",
-                "timestampResolution": "ms",
-                "unwrappedColumns": false,
-                "wrapLogMessage": false
-              }
-            },
-            "version": "13.4.0-42974521621"
-          }
-        }
-      },
-      "panel-10": {
-        "kind": "Panel",
-        "spec": {
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -112,57 +50,42 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
                       "datasource": {
                         "name": "grafanacloud-prom"
                       },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (time) (increase(dcapal_requests_total{job=\"$envs\"}[10y]))",
-                        "legendFormat": "__auto",
-                        "range": true
-                      },
-                      "version": "v0"
+                        "exemplar": false,
+                        "expr": "sum(rate(dcapal_requests_total{job=\"$envs\"}[$__rate_interval]))",
+                        "instant": true,
+                        "interval": "",
+                        "legendFormat": "Others",
+                        "range": false
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 10,
-          "links": [],
-          "title": "Total requests",
           "vizConfig": {
-            "group": "stat",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "12.0.0-85820.patch2-86140",
             "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "short"
-                },
-                "overrides": []
-              },
               "options": {
                 "colorMode": "value",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto",
-                "orientation": "auto",
+                "orientation": "horizontal",
                 "percentChangeColorMode": "standard",
                 "reduceOptions": {
                   "calcs": [
@@ -172,181 +95,35 @@
                   "values": false
                 },
                 "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "13.4.0-42974521621"
-          }
-        }
-      },
-      "panel-11": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "avg by(job) (rate(dcapal_requests_total{job=\"$envs\"}[$__rate_interval]) * 60 \u003e 0)",
-                        "interval": "",
-                        "legendFormat": "{{named_quantile}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 11,
-          "links": [],
-          "title": "Average reqs/min",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
+                "textMode": "value",
+                "wideLayout": false
+              },
               "fieldConfig": {
                 "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
+                  "unit": "short",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
-                        "value": 0
+                        "value": -1E+308,
+                        "color": "green"
                       }
                     ]
-                  },
-                  "unit": "none"
+                  }
                 },
                 "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "mean"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
               }
-            },
-            "version": "13.4.0-42974521621"
-          }
-        }
-      },
-      "panel-12": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "avg (dcapal_latency_summary{job=\"$envs\", quantile=\"0.5\"} \u003e 0)",
-                        "interval": "",
-                        "legendFormat": "{{named_quantile}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
             }
           },
-          "description": "",
-          "id": 12,
-          "links": [],
-          "title": "Average Response Time",
-          "vizConfig": {
-            "group": "stat",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "unit": "µs"
-                },
-                "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "mean"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
-              }
-            },
-            "version": "13.4.0-42974521621"
-          }
+          "description": "Incoming API requests per second. No traffic is not proof of uptime."
         }
       },
-      "panel-13": {
+      "panel-2": {
         "kind": "Panel",
         "spec": {
+          "id": 2,
+          "title": "Requests without server errors",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -354,378 +131,100 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
                       "datasource": {
                         "name": "grafanacloud-prom"
                       },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "exemplar": false,
-                        "expr": "max by (ip, latitude, longitude) (dcapal_visitors_total{job=\"$envs\", latitude!='0', longitude!='0'})",
-                        "format": "table",
+                        "expr": "((1 - (sum(rate(dcapal_requests_total{job=\"$envs\",status=\"5xx\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(dcapal_requests_total{job=\"$envs\"}[$__rate_interval])), 1e-9)) * 100) and (sum(rate(dcapal_requests_total{job=\"$envs\"}[$__rate_interval])) > 0)",
                         "instant": true,
-                        "legendFormat": "__auto",
-                        "range": false
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 13,
-          "links": [],
-          "title": "Visitors location",
-          "vizConfig": {
-            "group": "geomap",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "continuous-greens"
-                  },
-                  "custom": {
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    }
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "dark-green",
-                        "value": 0
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "basemap": {
-                  "config": {},
-                  "name": "Layer 0",
-                  "type": "default"
-                },
-                "controls": {
-                  "mouseWheelZoom": true,
-                  "showAttribution": true,
-                  "showDebug": false,
-                  "showMeasure": false,
-                  "showScale": false,
-                  "showZoom": true
-                },
-                "layers": [
-                  {
-                    "config": {
-                      "showLegend": false,
-                      "style": {
-                        "color": {
-                          "fixed": "dark-green"
-                        },
-                        "opacity": 0,
-                        "rotation": {
-                          "fixed": 0,
-                          "max": 360,
-                          "min": -360,
-                          "mode": "mod"
-                        },
-                        "size": {
-                          "fixed": 5,
-                          "max": 15,
-                          "min": 2
-                        },
-                        "symbol": {
-                          "fixed": "img/icons/marker/circle.svg",
-                          "mode": "fixed"
-                        },
-                        "textConfig": {
-                          "fontSize": 12,
-                          "offsetX": 0,
-                          "offsetY": 0,
-                          "textAlign": "center",
-                          "textBaseline": "middle"
-                        }
-                      }
-                    },
-                    "filterData": {
-                      "id": "byRefId",
-                      "options": "A"
-                    },
-                    "location": {
-                      "mode": "auto"
-                    },
-                    "name": "Layer 1",
-                    "tooltip": true,
-                    "type": "markers"
-                  }
-                ],
-                "tooltip": {
-                  "mode": "none"
-                },
-                "view": {
-                  "allLayers": true,
-                  "dashboardVariable": false,
-                  "id": "fit",
-                  "lat": 0,
-                  "lon": 0,
-                  "noRepeat": false,
-                  "shared": true,
-                  "zoom": 15
-                }
-              }
-            },
-            "version": "13.4.0-42974521621"
-          }
-        }
-      },
-      "panel-14": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "label_replace(avg by(quantile) (dcapal_latency_summary{job=\"$envs\", path=~\"/v1/sync/portfolios\", quantile=~\"0|0.5|0.95|1\"}), \"named_quantile\", \"/sync/portfolios* (q=$1)\", \"quantile\", \"(.*)\")",
-                        "interval": "",
-                        "legendFormat": "{{named_quantile}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "",
-          "id": 14,
-          "links": [],
-          "title": "Response time",
-          "vizConfig": {
-            "group": "timeseries",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  },
-                  "unit": "µs"
-                },
-                "overrides": []
-              },
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
-              }
-            },
-            "version": "13.4.0-42974521621"
-          }
-        }
-      },
-      "panel-15": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "exemplar": false,
-                        "expr": "sum by(job) (rate(dcapal_requests_total{job=\"$envs\", path!~\"/assets/.*|/price/.*\"}[$__rate_interval])) * 60",
-                        "instant": false,
                         "interval": "",
                         "legendFormat": "Others",
-                        "range": true
-                      },
-                      "version": "v0"
+                        "range": false
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 15,
-          "links": [],
-          "title": "API Requests",
           "vizConfig": {
-            "group": "timeseries",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "12.0.0-85820.patch2-86140",
             "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": false
+              },
               "fieldConfig": {
                 "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "Req / min",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "bars",
-                    "fillOpacity": 100,
-                    "gradientMode": "hue",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "normal"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
+                  "unit": "percent",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
-                        "value": 0
+                        "value": -1E+308,
+                        "color": "red"
                       },
                       {
-                        "color": "red",
-                        "value": 80
+                        "value": 95,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 99,
+                        "color": "green"
                       }
                     ]
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "special",
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "text": "No samples",
+                          "color": "gray"
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
-              },
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
               }
-            },
-            "version": "13.4.0-42974521621"
-          }
+            }
+          },
+          "description": "Share of observed requests that did not return HTTP 5xx. No data when there is no traffic; this is not a synthetic availability check."
         }
       },
       "panel-3": {
         "kind": "Panel",
         "spec": {
+          "id": 3,
+          "title": "HTTP 5xx rate",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -733,143 +232,212 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
                       "datasource": {
                         "name": "grafanacloud-prom"
                       },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
                         "exemplar": false,
-                        "expr": "sum by(job) (rate(dcapal_requests_total{job=\"$envs\", path=\"/assets/fiat\"}[$__rate_interval])) * 60",
-                        "instant": false,
+                        "expr": "sum(rate(dcapal_requests_total{job=\"$envs\",status=\"5xx\"}[$__rate_interval]))",
+                        "instant": true,
                         "interval": "",
-                        "legendFormat": "/assets/fiat",
-                        "range": true
-                      },
-                      "version": "v0"
+                        "legendFormat": "Others",
+                        "range": false
+                      }
                     },
-                    "refId": "B"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "exemplar": false,
-                        "expr": "sum by(job) (rate(dcapal_requests_total{job=\"$envs\", path=\"/assets/crypto\"}[$__rate_interval])) * 60",
-                        "instant": false,
-                        "interval": "",
-                        "legendFormat": "/assets/crypto",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "C"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "exemplar": false,
-                        "expr": "sum by(job) (rate(dcapal_requests_total{job=\"$envs\", path=~\"/price/.+\"}[$__rate_interval])) * 60",
-                        "instant": false,
-                        "interval": "",
-                        "legendFormat": "/price/*",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "D"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 3,
-          "links": [],
-          "title": "API Requests",
           "vizConfig": {
-            "group": "timeseries",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "12.0.0-85820.patch2-86140",
             "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": false
+              },
               "fieldConfig": {
                 "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "Req / min",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "bars",
-                    "fillOpacity": 100,
-                    "gradientMode": "hue",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "normal"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
+                  "unit": "reqps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
-                        "value": 0
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "mappings": [
+                    {
+                      "type": "special",
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "text": "No samples",
+                          "color": "gray"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "overrides": []
+              }
+            }
+          },
+          "description": "Requests labeled status=5xx per second. No data means no matching samples, not verified uptime."
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "Provider rate limited",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
                       },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "((sum(rate(dcapal_yahoo_limiter_rejections_total{job=\"$envs\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_yahoo_upstream_rate_limits_total{job=\"$envs\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_provider_requests_total{job=\"$envs\",provider=\"kraken\",outcome=\"rate_limited\"}[$__rate_interval])) or vector(0))) and on() (count(up{job=\"$envs\"} == 1) > 0)",
+                        "instant": true,
+                        "interval": "",
+                        "legendFormat": "Others",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
                       {
-                        "color": "red",
-                        "value": 80
+                        "value": -1E+308,
+                        "color": "green"
                       }
                     ]
                   }
                 },
                 "overrides": []
-              },
+              }
+            }
+          },
+          "description": "Rate of local Yahoo rejections and upstream HTTP 429 responses, plus Kraken HTTP 429s. Shows 0 only while a selected backend scrape is up; No data means Grafana has no live target/sample."
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "API traffic by response class",
+          "description": "Requests per second by literal status class (2xx, 4xx, 5xx, other). No data means no samples were scraped.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum by (status) (rate(dcapal_requests_total{job=\"$envs\"}[$__rate_interval]))",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "HTTP {{status}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
               "options": {
                 "legend": {
                   "calcs": [],
@@ -882,15 +450,181 @@
                   "mode": "single",
                   "sort": "none"
                 }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Requests / sec",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "reqps"
+                },
+                "overrides": []
               }
-            },
-            "version": "13.4.0-42974521621"
+            }
+          }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "API latency p50 / p95",
+          "description": "Endpoint latency summary is exported in microseconds. Quantiles are per instance; do not aggregate quantiles across instances.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "dcapal_latency_summary{job=\"$envs\",quantile=~\"0.5|0.95\"} / 1000000",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{path}} p{{quantile}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
           }
         }
       },
       "panel-7": {
         "kind": "Panel",
         "spec": {
+          "id": 7,
+          "title": "Visitor requests · selected period",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -898,136 +632,200 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
                       "datasource": {
                         "name": "grafanacloud-prom"
                       },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "label_replace(avg by(quantile) (dcapal_latency_summary{job=\"$envs\", path=~\"/price/.*\", quantile=~\"0|0.5|0.95|1\"}), \"named_quantile\", \"/price/* (q=$1)\", \"quantile\", \"(.*)\")",
+                        "exemplar": false,
+                        "expr": "sum(increase(dcapal_visitors_total{job=\"$envs\"}[$__range]))",
+                        "instant": true,
                         "interval": "",
-                        "legendFormat": "{{named_quantile}}",
-                        "range": true
-                      },
-                      "version": "v0"
+                        "legendFormat": "Others",
+                        "range": false
+                      }
                     },
-                    "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "label_replace(dcapal_latency_summary{job=\"$envs\", path=\"/assets/fiat\", quantile=\"0.99\"}, \"named_quantile\", \"/assets/fiat (q=$1)\", \"quantile\", \"(.*)\")",
-                        "legendFormat": "{{named_quantile}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "grafanacloud-prom"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "label_replace(dcapal_latency_summary{job=\"$envs\", path=\"/assets/crypto\", quantile=\"0.99\"}, \"named_quantile\", \"/assets/crypto (q=$1)\", \"quantile\", \"(.*)\")",
-                        "legendFormat": "{{named_quantile}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "C"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 7,
-          "links": [],
-          "title": "Response time",
           "vizConfig": {
-            "group": "timeseries",
             "kind": "VizConfig",
+            "group": "stat",
+            "version": "12.0.0-85820.patch2-86140",
             "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": false
+              },
               "fieldConfig": {
                 "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
+                  "unit": "short",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
+                        "value": -1E+308,
+                        "color": "green"
                       }
                     ]
-                  },
-                  "unit": "µs"
+                  }
                 },
                 "overrides": []
+              }
+            }
+          },
+          "description": "Count of non-loopback requests recorded by the visitor counter in the selected range; this is request count, not distinct visits."
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "id": 8,
+          "title": "Unique visitors · all time",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "max(dcapal_unique_visitors_total{job=\"$envs\"})",
+                        "instant": true,
+                        "interval": "",
+                        "legendFormat": "Others",
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": false
               },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            }
+          },
+          "description": "Lifetime unique visitor total, not unique visitors within the selected time range."
+        }
+      },
+      "panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "id": 9,
+          "title": "Provider request rate",
+          "description": "Provider calls per second by provider, operation and outcome.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum by (provider,op,outcome) (rate(dcapal_provider_requests_total{job=\"$envs\"}[$__rate_interval]))",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{provider}} · {{op}} · {{outcome}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
               "options": {
                 "legend": {
                   "calcs": [],
@@ -1040,15 +838,69 @@
                   "mode": "single",
                   "sort": "none"
                 }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Requests / sec",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "reqps"
+                },
+                "overrides": []
               }
-            },
-            "version": "13.4.0-42974521621"
+            }
           }
         }
       },
-      "panel-9": {
+      "panel-10": {
         "kind": "Panel",
         "spec": {
+          "id": 10,
+          "title": "Provider call duration p50 / p95",
+          "description": "Duration includes limiter wait. Summary quantiles remain per instance and must not be averaged across instances.",
+          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -1056,75 +908,846 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
-                    "hidden": false,
                     "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
                       "datasource": {
                         "name": "grafanacloud-prom"
                       },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count by (time) (dcapal_visitors_total{job=\"$envs\"})",
-                        "legendFormat": "__auto",
+                        "exemplar": false,
+                        "expr": "dcapal_provider_request_seconds{job=\"$envs\",quantile=~\"0.5|0.95\"}",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{provider}} · {{op}} · p{{quantile}} · {{instance}}",
                         "range": true
-                      },
-                      "version": "v0"
+                      }
                     },
-                    "refId": "A"
+                    "refId": "A",
+                    "hidden": false
                   }
                 }
               ],
-              "queryOptions": {},
-              "transformations": []
+              "transformations": [],
+              "queryOptions": {}
             }
           },
-          "description": "",
-          "id": 9,
-          "links": [],
-          "title": "Total visitors",
           "vizConfig": {
-            "group": "stat",
             "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
             "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
               "fieldConfig": {
                 "defaults": {
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
+                        "value": -1E+308,
+                        "color": "green"
                       }
                     ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-11": {
+        "kind": "Panel",
+        "spec": {
+          "id": 11,
+          "title": "Yahoo local limiter pressure",
+          "description": "p95 wait per backend instance from the limiter-wait summary. The 10 requests/s figure is the app-local configured ceiling, not Yahoo’s published quota.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "dcapal_yahoo_limiter_wait_seconds{job=\"$envs\",quantile=\"0.95\"}",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "p95 wait · {{instance}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "Yahoo local limiter rejections",
+          "description": "Locally rejected Yahoo calls per second. Distinct from upstream HTTP 429 responses.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum(rate(dcapal_yahoo_limiter_rejections_total{job=\"$envs\"}[$__rate_interval]))",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "local rejects",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Requests / sec",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "reqps"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-13": {
+        "kind": "Panel",
+        "spec": {
+          "id": 13,
+          "title": "Portfolio sync stage duration p50 / p95",
+          "description": "Per-stage latency summary. Quantiles are per instance; inspect the individual instance series.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "dcapal_sync_stage_seconds{job=\"$envs\",quantile=~\"0.5|0.95\"}",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{stage}} p{{quantile}} · {{instance}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-14": {
+        "kind": "Panel",
+        "spec": {
+          "id": 14,
+          "title": "Portfolio sync events",
+          "description": "Sync event occurrences per minute, excluding new_assets_resolved because that counter increments by the number of assets resolved.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum by (event) (rate(dcapal_sync_events_total{job=\"$envs\",event!=\"new_assets_resolved\"}[$__rate_interval])) * 60",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{event}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Events / min",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
                   },
                   "unit": "short"
                 },
                 "overrides": []
-              },
-              "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
               }
-            },
-            "version": "13.4.0-42974521621"
+            }
+          }
+        }
+      },
+      "panel-15": {
+        "kind": "Panel",
+        "spec": {
+          "id": 15,
+          "title": "Warnings and errors",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-logs"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "{job=\"$envs\"} |= `` | json | level != `DEBUG` | level != `INFO`",
+                        "key": "Q-c05ddf76-58a1-479a-a1db-2476a9326c25-0",
+                        "queryType": "range"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "dedupStrategy": "none",
+                "enableInfiniteScrolling": false,
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          },
+          "description": "Loki application logs above INFO. Requires the existing Grafana Cloud Loki datasource."
+        }
+      },
+      "panel-16": {
+        "kind": "Panel",
+        "spec": {
+          "id": 16,
+          "title": "Assets resolved · per minute",
+          "description": "Number of newly resolved assets per minute. This is an asset count, not a sync event count.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum(rate(dcapal_sync_events_total{job=\"$envs\",event=\"new_assets_resolved\"}[$__rate_interval])) * 60",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "assets/min",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Assets / min",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-17": {
+        "kind": "Panel",
+        "spec": {
+          "id": 17,
+          "title": "Yahoo call rate vs app limit · per instance",
+          "description": "Yahoo calls actually sent upstream per backend instance, reconstructed from non-limiter-rejected provider outcomes plus upstream HTTP 429s. Red threshold is the application-configured local limiter ceiling (10 req/s per instance), not Yahoo’s external quota. No data means no samples or an old backend without the required counters.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum by (instance) (rate(dcapal_provider_requests_total{job=\"$envs\",provider=\"yahoo\",outcome!=\"rate_limited\"}[$__rate_interval])) + on(instance) (sum by (instance) (rate(dcapal_yahoo_upstream_rate_limits_total{job=\"$envs\"}[$__rate_interval])) or on(instance) (0 * sum by (instance) (rate(dcapal_provider_requests_total{job=\"$envs\",provider=\"yahoo\"}[$__rate_interval]))))",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "Yahoo · {{instance}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      },
+                      {
+                        "value": 10,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Requests / sec",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "line"
+                    }
+                  },
+                  "unit": "reqps",
+                  "min": 0
+                },
+                "overrides": []
+              }
+            }
           }
         }
       }
@@ -1136,131 +1759,222 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-13"
-              },
-              "height": 8,
-              "width": 12,
               "x": 0,
-              "y": 0
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-9"
-              },
-              "height": 4,
-              "width": 6,
-              "x": 12,
-              "y": 0
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-10"
-              },
-              "height": 4,
-              "width": 6,
-              "x": 18,
-              "y": 0
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-11"
-              },
-              "height": 4,
-              "width": 6,
-              "x": 12,
-              "y": 4
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-12"
-              },
-              "height": 4,
-              "width": 6,
-              "x": 18,
-              "y": 4
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-3"
-              },
-              "height": 8,
-              "width": 12,
-              "x": 0,
-              "y": 8
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-15"
-              },
-              "height": 8,
-              "width": 12,
-              "x": 12,
-              "y": 8
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-7"
-              },
-              "height": 8,
-              "width": 12,
-              "x": 0,
-              "y": 16
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-14"
-              },
-              "height": 8,
-              "width": 12,
-              "x": 12,
-              "y": 16
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
+              "y": 0,
+              "width": 4,
+              "height": 3,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-1"
-              },
-              "height": 14,
-              "width": 24,
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 4,
+              "y": 0,
+              "width": 4,
+              "height": 3,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-2"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 8,
+              "y": 0,
+              "width": 4,
+              "height": 3,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-3"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 20,
+              "y": 0,
+              "width": 4,
+              "height": 3,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-4"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
               "x": 0,
-              "y": 24
+              "y": 3,
+              "width": 12,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-5"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 3,
+              "width": 12,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-6"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 0,
+              "width": 4,
+              "height": 3,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-7"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 16,
+              "y": 0,
+              "width": 4,
+              "height": 3,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-8"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 10,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-9"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 8,
+              "y": 10,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-10"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 17,
+              "width": 12,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-11"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 17,
+              "width": 12,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-12"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 22,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-13"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 8,
+              "y": 22,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-14"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 29,
+              "width": 24,
+              "height": 9,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-15"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 16,
+              "y": 10,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-17"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 16,
+              "y": 22,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-16"
+              }
             }
           }
         ]
@@ -1268,56 +1982,50 @@
     },
     "links": [
       {
-        "asDropdown": false,
-        "icon": "dashboard",
-        "includeVars": true,
-        "keepTime": false,
-        "tags": [],
-        "targetBlank": false,
         "title": "Logs",
+        "type": "link",
+        "icon": "dashboard",
         "tooltip": "DcaPal Logs",
-        "type": "link",
-        "url": "https://leonardoarcari.grafana.net/explore?orgId=1\u0026left=%7B%22datasource%22:%22grafanacloud-logs%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bjob%3D%5C%22dcapal%2Fbackend%5C%22%7D%20%7C%3D%20%60%60%7C%20json%20%7C%20level%20%21%3D%20%60DEBUG%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22grafanacloud-logs%22%7D,%22editorMode%22:%22code%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D"
+        "url": "https://leonardoarcari.grafana.net/explore?orgId=1&left=%7B%22datasource%22:%22grafanacloud-logs%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bjob%3D%5C%22dcapal%2Fbackend%5C%22%7D%20%7C%3D%20%60%60%7C%20json%20%7C%20level%20%21%3D%20%60DEBUG%60%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22grafanacloud-logs%22%7D,%22editorMode%22:%22code%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": true,
+        "keepTime": false
       },
       {
-        "asDropdown": false,
-        "icon": "dashboard",
-        "includeVars": false,
-        "keepTime": true,
-        "tags": [],
-        "targetBlank": false,
         "title": "NGINX",
-        "tooltip": "NGNIX",
         "type": "link",
-        "url": "https://leonardoarcari.grafana.net/d/Nz6kKgtGj/ngnix?orgId=1\u0026refresh=30s\u0026var-datasource=grafanacloud-leonardoarcari-logs\u0026var-job=dcapal%2Fnginx\u0026var-instance=dcapal-0\u0026var-label_name=instance\u0026var-label_value=dcapal-0"
+        "icon": "dashboard",
+        "tooltip": "NGNIX",
+        "url": "https://leonardoarcari.grafana.net/d/Nz6kKgtGj/ngnix?orgId=1&refresh=30s&var-datasource=grafanacloud-leonardoarcari-logs&var-job=dcapal%2Fnginx&var-instance=dcapal-0&var-label_name=instance&var-label_value=dcapal-0",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
       },
       {
-        "asDropdown": false,
-        "icon": "dashboard",
-        "includeVars": false,
-        "keepTime": true,
-        "tags": [],
-        "targetBlank": false,
         "title": "Containers",
-        "tooltip": "Containers",
         "type": "link",
-        "url": "https://leonardoarcari.grafana.net/d/integration-docker-overview/docker-overview?orgId=1\u0026refresh=30s"
+        "icon": "dashboard",
+        "tooltip": "Containers",
+        "url": "https://leonardoarcari.grafana.net/d/integration-docker-overview/docker-overview?orgId=1&refresh=30s",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": false,
+        "keepTime": true
       }
     ],
     "liveNow": false,
-    "preferences": {
-      "layout": {
-        "kind": "GridLayout",
-        "spec": {
-          "items": []
-        }
-      }
-    },
     "preload": false,
     "tags": [
       "dcapal"
     ],
     "timeSettings": {
+      "from": "now-24h",
+      "to": "now",
       "autoRefresh": "30s",
       "autoRefreshIntervals": [
         "5s",
@@ -1331,46 +2039,50 @@
         "2h",
         "1d"
       ],
-      "fiscalYearStartMonth": 0,
-      "from": "now-24h",
       "hideTimepicker": false,
-      "timezone": "browser",
-      "to": "now"
+      "fiscalYearStartMonth": 0
     },
     "title": "DcaPal",
     "variables": [
       {
         "kind": "QueryVariable",
         "spec": {
-          "allowCustomValue": true,
+          "name": "envs",
           "current": {
             "text": "dcapal/backend",
             "value": "dcapal/backend"
           },
-          "definition": "label_values(dcapal_visitors_total,job)",
-          "hide": "dontHide",
-          "includeAll": false,
           "label": "Environment",
-          "multi": false,
-          "name": "envs",
-          "options": [],
+          "hide": "dontHide",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": false,
           "query": {
-            "group": "prometheus",
             "kind": "DataQuery",
+            "group": "prometheus",
+            "version": "v0",
             "spec": {
               "qryType": 1,
               "query": "label_values(dcapal_visitors_total,job)",
               "refId": "PrometheusVariableQueryEditor-VariableQuery"
-            },
-            "version": "v0"
+            }
           },
-          "refresh": "onDashboardLoad",
           "regex": "",
-          "regexApplyTo": "value",
-          "skipUrlSync": false,
-          "sort": "disabled"
+          "sort": "disabled",
+          "definition": "label_values(dcapal_visitors_total,job)",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": true
         }
       }
-    ]
+    ],
+    "preferences": {
+      "layout": {
+        "kind": "GridLayout",
+        "spec": {
+          "items": []
+        }
+      }
+    }
   }
 }

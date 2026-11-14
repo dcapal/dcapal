@@ -15,13 +15,13 @@ pub struct ConversionRateQuery {
 
 impl ConversionRateQuery {
     pub async fn try_new(base: &str, quote: &str, repo: &MarketDataRepository) -> Result<Self> {
-        let base = AssetId::from(base);
+        let base = normalize_asset_id(base);
         let base_asset = repo.find_asset(&base).await?;
         if base_asset.is_none() {
             return Err(DcaError::BadRequest(format!("Unknown base asset: {base}")));
         }
 
-        let quote = AssetId::from(quote);
+        let quote = normalize_asset_id(quote);
         let quote_asset = repo.find_asset(&quote).await?;
         if quote_asset.is_none() {
             return Err(DcaError::BadRequest(format!(
@@ -34,6 +34,12 @@ impl ConversionRateQuery {
             quote: quote_asset.unwrap(),
         })
     }
+}
+
+/// Normalizes public asset identifiers to the lower-case keys used by the
+/// market-data catalog.
+fn normalize_asset_id(id: &str) -> AssetId {
+    id.trim().to_ascii_lowercase()
 }
 
 pub struct ImportPortfolioCmd {
@@ -102,6 +108,15 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn conversion_asset_identifiers_match_catalog_case() {
+        // GIVEN Kraken asset ids are stored in lower case, WHEN a public
+        // conversion request uses uppercase symbols, THEN both ids match the
+        // catalog key format.
+        assert_eq!(normalize_asset_id("BTC"), "btc");
+        assert_eq!(normalize_asset_id(" ETH "), "eth");
+    }
 
     fn validator() -> Validator {
         draft7::new(&json!({

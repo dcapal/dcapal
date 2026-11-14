@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{future::Future, sync::Arc, time::Duration};
 
 use chrono::{NaiveDate, TimeZone, Utc};
 use tokio::time::Instant;
@@ -7,12 +7,13 @@ use tracing::{debug, error, info};
 use crate::{
     AppContext, DateTime,
     app::{
+        domain::entity::Asset,
         domain::market_data_utils::fetch_market_price,
         infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
-    error::Result,
+    error::{DcaError, Result},
     ports::outbound::{
         adapter::PriceProviders,
         repository::{MiscRepository, market_data::MarketDataRepository},
@@ -22,6 +23,8 @@ use crate::{
 const INITIAL_DELAY: Duration = Duration::from_millis(50);
 const DAILY_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 const HOURLY_INTERVAL: Duration = Duration::from_secs(60 * 60);
+const INITIAL_RECOVERY_BACKOFF: Duration = Duration::from_secs(60);
+const MAX_RECOVERY_BACKOFF: Duration = Duration::from_secs(60 * 60);
 
 /// Worker that reconciles Kraken markets hourly and discovers new assets daily.
 pub struct MarketDiscoveryWorker {
@@ -76,6 +79,18 @@ impl MarketDiscoveryWorker {
     async fn run_market_discovery(&self, stop_token: &mut StopToken) {
         let mut interval =
             tokio::time::interval_at(Instant::now() + INITIAL_DELAY, DAILY_CHECK_INTERVAL);
+        let initial_integrity = self.market_data_repo.market_asset_integrity().await;
+        let mut recovery_backoff = Duration::ZERO;
+        let mut next_recovery_attempt = Instant::now();
+        let mut recovery_pending = match initial_integrity {
+            Ok(integrity) => integrity.requires_recovery(),
+            Err(error) => {
+                error!("Failed to check Kraken market asset references: {error}");
+                recovery_backoff = INITIAL_RECOVERY_BACKOFF;
+                next_recovery_attempt = Instant::now() + recovery_backoff;
+                true
+            }
+        };
 
         loop {
             tokio::select! {
@@ -90,7 +105,17 @@ impl MarketDiscoveryWorker {
             }
 
             let (is_outdated, last_fetched_ts) = res.unwrap();
-            if !is_outdated {
+            let recovery_due = recovery_pending && Instant::now() >= next_recovery_attempt;
+            if recovery_pending && !recovery_due {
+                debug!(
+                    "Kraken asset recovery is waiting for its next retry ({})",
+                    next_recovery_attempt
+                        .saturating_duration_since(Instant::now())
+                        .as_secs()
+                );
+                continue;
+            }
+            if !recovery_pending && !is_outdated {
                 debug!(
                     "Kraken assets already fetched today ({})",
                     last_fetched_ts.map(|t| t.to_string()).unwrap_or_default()
@@ -98,13 +123,26 @@ impl MarketDiscoveryWorker {
                 continue;
             }
 
-            if let Err(e) = self.discover_new_markets().await {
-                error!("Failed to update Kraken Assets and Markets data: {:?}", e);
-            } else {
-                let now = Utc::now();
-                if let Err(e) = self.misc_repo.set_cw_last_fetched(now).await {
-                    error!("Failed to update last update time: {:?}", e);
+            match self.discover_new_markets().await {
+                Err(e) => {
+                    error!("Failed to update Kraken Assets and Markets data: {:?}", e);
+                    recovery_pending = true;
+                    recovery_backoff = next_recovery_backoff(recovery_backoff);
+                    next_recovery_attempt = Instant::now() + recovery_backoff;
                 }
+                Ok(()) => match self.misc_repo.set_cw_last_fetched(Utc::now()).await {
+                    Ok(()) => {
+                        recovery_pending = false;
+                        recovery_backoff = Duration::ZERO;
+                        next_recovery_attempt = Instant::now();
+                    }
+                    Err(e) => {
+                        error!("Failed to update last update time: {:?}", e);
+                        recovery_pending = true;
+                        recovery_backoff = next_recovery_backoff(recovery_backoff);
+                        next_recovery_attempt = Instant::now() + recovery_backoff;
+                    }
+                },
             }
         }
     }
@@ -136,21 +174,13 @@ impl MarketDiscoveryWorker {
             .fetch_assets(&self.market_data_repo)
             .await?;
 
-        // Store assets in repository
-        for a in assets {
-            info!("Storing asset '{}'", a.id());
-            self.market_data_repo
-                .store_asset(&a)
-                .await
-                .unwrap_or_else(|e| {
-                    error!(
-                        "Failed to store asset '{}': {} ({})",
-                        a.id(),
-                        e,
-                        serde_json::to_string(&a).unwrap()
-                    );
-                })
-        }
+        // All market assets must be present before any market record is written.
+        let asset_result = store_discovered_assets(assets, |asset| async move {
+            self.market_data_repo.store_asset(&asset).await
+        })
+        .await;
+        self.market_data_service.invalidate_asset_cache();
+        asset_result?;
 
         // Store markets in repository
         for mut m in markets {
@@ -163,21 +193,55 @@ impl MarketDiscoveryWorker {
             m.set_price(price);
 
             info!("Storing market '{}'", m.id);
-            if let Err(e) = self.market_data_repo.store_market(&m).await {
-                error!(
-                    "Failed to store market '{}': {} ({})",
-                    m.id,
-                    e,
-                    serde_json::to_string(&m).unwrap()
-                );
+            if let Err(error) = self.market_data_repo.store_market(&m).await {
+                self.market_data_service.invalidate_market_cache();
+                return Err(error);
             }
         }
 
-        self.market_data_service.invalidate_asset_cache();
         self.market_data_service.invalidate_market_cache();
+
+        let integrity = self.market_data_repo.market_asset_integrity().await?;
+        if integrity.requires_recovery() {
+            return Err(DcaError::Generic(format!(
+                "Kraken discovery left {} markets with missing assets and {} malformed market records",
+                integrity.markets_with_missing_assets, integrity.malformed_market_records,
+            )));
+        }
 
         Ok(())
     }
+}
+
+fn next_recovery_backoff(previous: Duration) -> Duration {
+    if previous.is_zero() {
+        return INITIAL_RECOVERY_BACKOFF;
+    }
+
+    previous.saturating_mul(2).min(MAX_RECOVERY_BACKOFF)
+}
+
+async fn store_discovered_assets<F, Fut>(assets: Vec<Asset>, mut store: F) -> Result<()>
+where
+    F: FnMut(Asset) -> Fut,
+    Fut: Future<Output = Result<()>>,
+{
+    for asset in assets {
+        let asset_id = asset.id().clone();
+        let serialized = serde_json::to_string(&asset).unwrap();
+        info!("Storing asset '{}'", asset_id);
+        if let Err(error) = store(asset).await {
+            error!(
+                asset_id,
+                error = %error,
+                asset = %serialized,
+                "Failed to store discovered asset"
+            );
+            return Err(error);
+        }
+    }
+
+    Ok(())
 }
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
@@ -195,8 +259,17 @@ fn is_outdated_at(last_fetched: Option<DateTime>, today: NaiveDate) -> bool {
 #[cfg(test)]
 mod tests {
     use chrono::{NaiveDate, TimeZone, Utc};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use super::{HOURLY_INTERVAL, is_outdated_at};
+    use crate::{
+        app::domain::entity::{Asset, Crypto},
+        error::DcaError,
+    };
+
+    use super::{
+        HOURLY_INTERVAL, INITIAL_RECOVERY_BACKOFF, MAX_RECOVERY_BACKOFF, is_outdated_at,
+        next_recovery_backoff, store_discovered_assets,
+    };
 
     #[test]
     fn missing_daily_marker_is_outdated() {
@@ -238,5 +311,41 @@ mod tests {
         // WHEN its interval is read
         // THEN the worker waits one hour between runs
         assert_eq!(HOURLY_INTERVAL, std::time::Duration::from_secs(3600));
+    }
+
+    #[tokio::test]
+    async fn failed_asset_store_stops_remaining_asset_writes() {
+        // GIVEN discovery has multiple assets to persist and one write fails
+        let attempted_writes = AtomicUsize::new(0);
+        let assets = vec![
+            Asset::Crypto(Crypto::new_with_id("pearl".to_string())),
+            Asset::Crypto(Crypto::new_with_id("other".to_string())),
+        ];
+
+        // WHEN the asset write sequence runs
+        let result = store_discovered_assets(assets, |_| {
+            attempted_writes.fetch_add(1, Ordering::SeqCst);
+            async { Err(DcaError::Generic("Redis write failed".to_string())) }
+        })
+        .await;
+
+        // THEN the failure propagates and subsequent writes are not attempted
+        assert!(result.is_err());
+        assert_eq!(attempted_writes.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn recovery_backoff_grows_exponentially_and_is_capped() {
+        // GIVEN a failed recovery attempt
+        let first = next_recovery_backoff(std::time::Duration::ZERO);
+        let second = next_recovery_backoff(first);
+
+        // WHEN repeated failures extend the retry delay
+        let capped = (0..16).fold(second, |delay, _| next_recovery_backoff(delay));
+
+        // THEN retries become less frequent but never exceed the one-hour cap
+        assert_eq!(first, INITIAL_RECOVERY_BACKOFF);
+        assert_eq!(second, INITIAL_RECOVERY_BACKOFF * 2);
+        assert_eq!(capped, MAX_RECOVERY_BACKOFF);
     }
 }

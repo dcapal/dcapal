@@ -7,7 +7,7 @@ use crate::{
     ports::outbound::repository::REDIS_BASE,
 };
 
-const ASSET_KEY: &str = concatcp!(REDIS_BASE, ':', "asset");
+pub(super) const ASSET_KEY: &str = concatcp!(REDIS_BASE, ':', "asset");
 const ASSET_INDEX_TYPE: &str = concatcp!(ASSET_KEY, ":", "index", ":", "type");
 
 #[async_trait]

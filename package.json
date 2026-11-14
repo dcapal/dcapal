@@ -4,6 +4,8 @@
   "packageManager": "pnpm@10.31.0",
   "pnpm": {
     "overrides": {
+      "@supabase/auth-ui-react>react": "^19.3.1",
+      "@supabase/auth-ui-react>react-dom": "^19.3.1",
       "qs": "^6.16.1",
       "minimatch@>=7.0.0 <11.0.1": "^11.0.1",
       "webpack-dev-middleware@<7.4.6": "^7.4.6"

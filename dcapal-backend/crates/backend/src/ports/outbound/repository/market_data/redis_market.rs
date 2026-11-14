@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use tracing::{debug, error};
 
-use super::MarketDataRepository;
+use super::{MarketAssetIntegrity, MarketDataRepository, redis_asset::ASSET_KEY};
 use crate::{
     app::domain::entity::{Market, MarketId},
     error::{DcaError, Result},
@@ -12,6 +12,22 @@ use crate::{
 };
 
 const MARKET_KEY: &str = concatcp!(REDIS_BASE, ':', "market");
+const MARKET_ASSET_INTEGRITY_SCRIPT: &str = r#"
+local missing = 0
+local malformed = 0
+for _, value in ipairs(redis.call('HVALS', KEYS[1])) do
+    local ok, market = pcall(cjson.decode, value)
+    if not ok or type(market) ~= 'table'
+        or type(market.base) ~= 'string' or type(market.quote) ~= 'string' then
+        malformed = malformed + 1
+    elseif redis.call('HEXISTS', KEYS[2], market.base) == 0
+        or redis.call('HEXISTS', KEYS[2], market.quote) == 0 then
+        missing = missing + 1
+    end
+end
+
+return {missing, malformed}
+"#;
 const DELETE_STALE_MARKETS_SCRIPT: &str = r#"
 local existing = redis.call('HKEYS', KEYS[1])
 local keep = {}
@@ -36,6 +52,8 @@ return stale
 #[async_trait]
 pub trait RedisMarket {
     async fn store(&self, conn: &mut impl redis::AsyncCommands) -> Result<bool>;
+
+    async fn asset_integrity(conn: &mut impl redis::AsyncCommands) -> Result<MarketAssetIntegrity>;
 
     async fn delete_not_in(
         market_ids: &HashSet<MarketId>,
@@ -69,6 +87,21 @@ impl RedisMarket for Market {
 
         debug!("Successfully stored '{} {}': {}", MARKET_KEY, self.id, json);
         Ok(true)
+    }
+
+    async fn asset_integrity(conn: &mut impl redis::AsyncCommands) -> Result<MarketAssetIntegrity> {
+        let counts: (i64, i64) = redis::cmd("EVAL")
+            .arg(MARKET_ASSET_INTEGRITY_SCRIPT)
+            .arg(2)
+            .arg(MARKET_KEY)
+            .arg(ASSET_KEY)
+            .query_async(conn)
+            .await?;
+
+        Ok(MarketAssetIntegrity {
+            markets_with_missing_assets: counts.0 as usize,
+            malformed_market_records: counts.1 as usize,
+        })
     }
 
     async fn delete_not_in(
