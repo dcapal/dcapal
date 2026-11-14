@@ -71,6 +71,9 @@ family in `init_metrics()` (`src/lib.rs`).
 | `dcapal_requests_total` | `path` (route template), `status` (`2xx`, `4xx`, `5xx`, `other`) |
 | `dcapal_provider_requests_total` | `provider` (`yahoo`, `kraken`), `op` (`lookup`, `price`, `proxy`), `outcome` (`ok`, `not_found`, `rate_limited`, `timeout`, `error`) |
 | `dcapal_provider_request_seconds` | `provider`, `op` (no `outcome`); seconds, includes limiter wait |
+| `dcapal_yahoo_limiter_wait_seconds` | no labels; seconds spent waiting for a local Yahoo request slot |
+| `dcapal_yahoo_limiter_rejections_total` | no labels; Yahoo calls rejected before reaching the provider |
+| `dcapal_yahoo_upstream_rate_limits_total` | no labels; HTTP 429 responses returned by Yahoo |
 | `dcapal_sync_stage_seconds` | `stage` (`resolve`, `onboard`, `load`, `apply`); seconds |
 | `dcapal_sync_events_total` | `event` (`stale_retry`, `conflict`, `pull_only`, `new_assets_resolved`, `refresh_attempted`, `too_many_new_assets`) |
 

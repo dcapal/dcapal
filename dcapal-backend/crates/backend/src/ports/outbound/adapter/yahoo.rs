@@ -16,7 +16,10 @@ use crate::{
         entity::{Market, OHLCFrequency},
         portfolio::{AssetClass, Provider},
     },
-    app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
+    app::infra::stats::{
+        MetricProvider, ProviderOp, ProviderOutcome, observe_provider,
+        record_yahoo_limiter_rejection, record_yahoo_limiter_wait, record_yahoo_upstream_response,
+    },
     error::{DcaError, Result},
 };
 
@@ -95,14 +98,21 @@ impl YahooProvider {
         admission: Admission,
     ) -> std::result::Result<rquest::Response, GetError> {
         match admission {
-            Admission::Wait => self.limiter.until_ready().await,
+            Admission::Wait => {
+                let start = std::time::Instant::now();
+                self.limiter.until_ready().await;
+                record_yahoo_limiter_wait(start.elapsed());
+            }
             Admission::Reject => {
                 if self.limiter.check().is_err() {
+                    record_yahoo_limiter_rejection();
                     return Err(GetError::RateLimited);
                 }
             }
         }
-        Ok(self.http.get(url).timeout(timeout).send().await?)
+        let response = self.http.get(url).timeout(timeout).send().await?;
+        record_yahoo_upstream_response(response.status());
+        Ok(response)
     }
 
     /// Fetches the latest price of a market, falling back from 5-minute to daily
@@ -685,6 +695,11 @@ mod lookup_tests {
 #[cfg(test)]
 mod rate_limit_tests {
     use super::*;
+    use crate::app::infra::stats::{
+        YAHOO_LIMITER_REJECTIONS_TOTAL, YAHOO_LIMITER_WAIT_SECONDS,
+        YAHOO_UPSTREAM_RATE_LIMITS_TOTAL, test_metrics::TestRecorder,
+    };
+    use tokio::io::AsyncWriteExt;
 
     /// Unroutable-in-practice local URL: connecting is refused immediately, so no
     /// test depends on the network.
@@ -711,11 +726,13 @@ mod rate_limit_tests {
         assert_eq!(chart.status(), StatusCode::TOO_MANY_REQUESTS);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "current_thread")]
     async fn rejecting_get_only_fails_once_capacity_is_spent() {
         // GIVEN a limiter with a single slot,
         // WHEN two non-waiting requests are made,
         // THEN the first reaches the (refused) connection and the second is rate limited.
+        let recorder = TestRecorder::default();
+        let _recorder_guard = metrics::set_default_local_recorder(&recorder);
         let provider = single_request_provider();
 
         let first = provider
@@ -727,6 +744,54 @@ mod rate_limit_tests {
 
         assert!(matches!(first, Err(GetError::Request(_))));
         assert!(matches!(second, Err(GetError::RateLimited)));
+        assert_eq!(recorder.counter_value(YAHOO_LIMITER_REJECTIONS_TOTAL), 1);
+        assert_eq!(recorder.counter_value(YAHOO_UPSTREAM_RATE_LIMITS_TOTAL), 0);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn waiting_get_records_wait_duration_and_upstream_429_separately() {
+        // GIVEN a spent local quota and a local HTTP server that answers 429,
+        // WHEN an admitted Yahoo request waits for capacity and receives the reply,
+        // THEN its wait is measured and the upstream limit counter increments once.
+        let recorder = TestRecorder::default();
+        let _recorder_guard = metrics::set_default_local_recorder(&recorder);
+        let quota = Quota::with_period(Duration::from_millis(100)).unwrap();
+        let provider = YahooProvider::with_quota(rquest::Client::new(), quota);
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0_u8; 1024];
+            let _ = tokio::io::AsyncReadExt::read(&mut socket, &mut request).await;
+            socket
+                .write_all(
+                    b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .await
+                .unwrap();
+        });
+
+        // Start the refill period only after the listener is ready to accept the request.
+        provider.limiter.check().unwrap();
+        let response = tokio::time::timeout(
+            Duration::from_secs(1),
+            provider.get(
+                &format!("http://{address}/"),
+                REQUEST_TIMEOUT,
+                Admission::Wait,
+            ),
+        )
+        .await
+        .expect("the limiter should refill promptly")
+        .unwrap();
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        let wait = recorder.histogram_values(YAHOO_LIMITER_WAIT_SECONDS);
+        assert_eq!(wait.len(), 1);
+        assert!(wait[0] >= 0.05, "expected limiter wait, got {}s", wait[0]);
+        assert_eq!(recorder.counter_value(YAHOO_UPSTREAM_RATE_LIMITS_TOTAL), 1);
+        assert_eq!(recorder.counter_value(YAHOO_LIMITER_REJECTIONS_TOTAL), 0);
     }
 
     #[tokio::test]
