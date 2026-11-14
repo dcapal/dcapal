@@ -98,6 +98,33 @@ pub struct TransactionFeesRequest {
     pub fee_structure: FeeStructure,
 }
 
+impl From<FeeStructure> for crate::app::domain::portfolio::FeeStructure {
+    fn from(fees: FeeStructure) -> Self {
+        match fees {
+            FeeStructure::ZeroFee => Self::ZeroFee,
+            FeeStructure::Fixed { fee_amount } => Self::Fixed { fee_amount },
+            FeeStructure::Variable {
+                fee_rate,
+                min_fee,
+                max_fee,
+            } => Self::Variable {
+                fee_rate,
+                min_fee: Some(min_fee),
+                max_fee,
+            },
+        }
+    }
+}
+
+impl From<TransactionFeesRequest> for crate::app::domain::portfolio::TransactionFees {
+    fn from(fees: TransactionFeesRequest) -> Self {
+        Self {
+            max_fee_impact: fees.max_fee_impact,
+            fee_structure: fees.fee_structure.into(),
+        }
+    }
+}
+
 #[utoipa::path(
     post,
     path = "/sync/portfolios",

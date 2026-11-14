@@ -8,6 +8,7 @@ use redis::AsyncCommands;
 use uuid::Uuid;
 
 use crate::{DateTime, app::services::ip2location::GeoData, error::Result};
+pub mod asset;
 pub mod dto;
 pub mod market_data;
 pub mod portfolio;

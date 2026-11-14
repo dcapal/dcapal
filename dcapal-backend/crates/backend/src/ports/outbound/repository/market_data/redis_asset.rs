@@ -23,6 +23,9 @@ pub trait RedisAsset {
         kind: AssetKind,
         conn: &mut impl redis::AsyncCommands,
     ) -> Result<Vec<Asset>>;
+
+    /// Tells whether at least one asset of the kind is indexed, without loading any.
+    async fn exists_by_type(kind: AssetKind, conn: &mut impl redis::AsyncCommands) -> Result<bool>;
 }
 
 #[async_trait]
@@ -101,6 +104,11 @@ impl RedisAsset for Asset {
             .collect();
 
         Ok(assets)
+    }
+
+    async fn exists_by_type(kind: AssetKind, conn: &mut impl redis::AsyncCommands) -> Result<bool> {
+        // Redis drops an emptied sorted set, so the key exists iff it has members.
+        Ok(conn.exists(kind.as_index()).await?)
     }
 }
 

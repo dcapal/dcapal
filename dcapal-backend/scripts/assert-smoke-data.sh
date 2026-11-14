@@ -75,6 +75,9 @@ assert_value \
   "$(query "
     SELECT COUNT(*)
     FROM portfolio_asset AS a
+    JOIN portfolio_asset_allocation AS allocation
+      ON allocation.portfolio_id = a.portfolio_id
+     AND allocation.portfolio_asset_id = a.id
     JOIN assets_data AS d ON d.id = a.assets_data_id
     JOIN portfolios AS p ON p.id = a.portfolio_id
     JOIN users AS u ON u.id = p.user_id
@@ -85,7 +88,7 @@ assert_value \
       AND d.currency = 'usd'
       AND d.provider = 2
       AND a.quantity = 1
-      AND a.target_weight = 100
+      AND allocation.weight = 100
       AND a.manual_price = 100
   ")"
 

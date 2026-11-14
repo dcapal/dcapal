@@ -77,8 +77,9 @@ impl PriceUpdaterWorker {
 
             self.market_data_service.set_price(&m.id, price);
 
-            // Please the rate limiter
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Space out markets (~2 requests per second) so a pass leaves most of the
+            // shared Yahoo rate-limit budget to user-driven lookups.
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
         Ok(())

@@ -1,12 +1,15 @@
 //! The [`adapter`](self) module contains adapters to third-party services
 
+mod asset_provider;
 mod cw;
 mod ipapi;
 mod kraken;
+mod kraken_asset;
 mod yahoo;
 
 use std::sync::Arc;
 
+pub use asset_provider::*;
 pub use cw::*;
 use failsafe::{
     StateMachine,
@@ -15,6 +18,7 @@ use failsafe::{
 };
 pub use ipapi::*;
 pub use kraken::*;
+pub use kraken_asset::KrakenAssetProvider;
 pub use yahoo::*;
 
 type DefaultCircuitBreaker = StateMachine<
