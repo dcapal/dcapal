@@ -1,17 +1,21 @@
 use std::{
+    future::Future,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use crate::{AppContext, error::Result, ports::outbound::repository::StatsRepository};
 use axum::{
     extract::{ConnectInfo, MatchedPath, Request, State},
+    http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use hyper::HeaderMap;
 use metrics::{counter, histogram};
+use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
+use strum_macros::IntoStaticStr;
 
 const BASE: &str = "dcapal";
 
@@ -19,9 +23,198 @@ const BASE: &str = "dcapal";
 pub const VISITORS_TOTAL: &str = concatcp!(BASE, '_', "visitors_total");
 /// Total number of distinct IP addresses recorded as visitors.
 pub const UNIQUE_VISITORS_TOTAL: &str = concatcp!(BASE, '_', "unique_visitors_total");
+/// Requests processed, labelled by route template (`path`) and response status
+/// class (`status`: `2xx`, `4xx`, `5xx` or `other`).
 pub const REQUESTS_TOTAL: &str = concatcp!(BASE, '_', "requests_total");
 pub const LATENCY_SUMMARY: &str = concatcp!(BASE, '_', "latency_summary");
 pub const IMPORTED_PORTFOLIOS_TOTAL: &str = concatcp!(BASE, '_', "imported_portfolios_total");
+
+/// Outbound provider calls, labelled by `provider`, `op` and `outcome`.
+pub const PROVIDER_REQUESTS_TOTAL: &str = concatcp!(BASE, '_', "provider_requests_total");
+/// Duration in seconds of outbound provider calls, labelled by `provider` and
+/// `op` (deliberately without `outcome`).
+pub const PROVIDER_REQUEST_SECONDS: &str = concatcp!(BASE, '_', "provider_request_seconds");
+/// Duration in seconds of the v2 synchronization stages, labelled by `stage`.
+pub const SYNC_STAGE_SECONDS: &str = concatcp!(BASE, '_', "sync_stage_seconds");
+/// Notable v2 synchronization events, labelled by `event`.
+pub const SYNC_EVENTS_TOTAL: &str = concatcp!(BASE, '_', "sync_events_total");
+
+/// Histogram buckets, in seconds, shared by every `*_seconds` family above.
+pub const SECONDS_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0,
+];
+
+/// Histogram families that must be exported with explicit [`SECONDS_BUCKETS`]
+/// instead of the exporter's default summary rendering.
+///
+/// `LATENCY_SUMMARY` is intentionally absent: it stays a summary in
+/// microseconds.
+pub const BUCKETED_HISTOGRAMS: [&str; 2] = [PROVIDER_REQUEST_SECONDS, SYNC_STAGE_SECONDS];
+
+/// Configures [`SECONDS_BUCKETS`] for [`BUCKETED_HISTOGRAMS`] on a Prometheus builder.
+pub fn with_histogram_buckets(
+    builder: PrometheusBuilder,
+) -> std::result::Result<PrometheusBuilder, BuildError> {
+    BUCKETED_HISTOGRAMS
+        .into_iter()
+        .try_fold(builder, |builder, name| {
+            builder.set_buckets_for_metric(Matcher::Full(name.to_owned()), SECONDS_BUCKETS)
+        })
+}
+
+/// External provider behind an outbound call (`provider` label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum MetricProvider {
+    Yahoo,
+    Kraken,
+}
+
+/// Kind of outbound provider call (`op` label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum ProviderOp {
+    /// Asset metadata or directory resolution.
+    Lookup,
+    /// Market price retrieval.
+    Price,
+    /// Pass-through of a user-facing search or chart request.
+    Proxy,
+}
+
+/// Result of an outbound provider call (`outcome` label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum ProviderOutcome {
+    Ok,
+    /// The provider does not know the requested symbol or market.
+    NotFound,
+    /// Our limiter rejected the call, or the provider answered HTTP 429.
+    RateLimited,
+    Timeout,
+    Error,
+}
+
+impl ProviderOutcome {
+    /// Classifies an HTTP status answered by a provider: 404 is `not_found`,
+    /// 429 is `rate_limited`, other 2xx/3xx are `ok`, everything else is `error`.
+    pub fn from_status(status: StatusCode) -> Self {
+        match status {
+            StatusCode::NOT_FOUND => Self::NotFound,
+            StatusCode::TOO_MANY_REQUESTS => Self::RateLimited,
+            s if s.is_success() || s.is_redirection() => Self::Ok,
+            _ => Self::Error,
+        }
+    }
+}
+
+/// Records one provider call: the `outcome` counter and the duration histogram.
+pub fn record_provider_request(
+    provider: MetricProvider,
+    op: ProviderOp,
+    outcome: ProviderOutcome,
+    elapsed: Duration,
+) {
+    let (provider, op): (&'static str, &'static str) = (provider.into(), op.into());
+    counter!(
+        PROVIDER_REQUESTS_TOTAL,
+        "provider" => provider,
+        "op" => op,
+        "outcome" => <&'static str>::from(outcome)
+    )
+    .increment(1);
+    histogram!(PROVIDER_REQUEST_SECONDS, "provider" => provider, "op" => op)
+        .record(elapsed.as_secs_f64());
+}
+
+/// Runs a provider call and records its outcome and duration.
+///
+/// The duration covers the whole future, including any wait for a rate limiter.
+/// `classify` maps the call's result to its outcome.
+pub async fn observe_provider<T>(
+    provider: MetricProvider,
+    op: ProviderOp,
+    call: impl Future<Output = T>,
+    classify: impl FnOnce(&T) -> ProviderOutcome,
+) -> T {
+    let start = Instant::now();
+    let result = call.await;
+    record_provider_request(provider, op, classify(&result), start.elapsed());
+    result
+}
+
+/// Stage of a v2 synchronization (`stage` label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum SyncStage {
+    /// Resolving asset references against the directory and providers.
+    Resolve,
+    /// Writing resolved assets to the directory.
+    Onboard,
+    /// Loading the stored portfolio snapshot.
+    Load,
+    /// Applying the computed plan transactionally.
+    Apply,
+}
+
+impl SyncStage {
+    /// Starts timing this stage; the duration is recorded when the guard drops,
+    /// including on early returns and errors.
+    pub fn timer(self) -> SyncStageTimer {
+        SyncStageTimer {
+            stage: self,
+            start: Instant::now(),
+        }
+    }
+}
+
+/// RAII guard recording a [`SyncStage`] duration into [`SYNC_STAGE_SECONDS`] on drop.
+#[must_use = "the stage duration is recorded when the timer is dropped"]
+pub struct SyncStageTimer {
+    stage: SyncStage,
+    start: Instant,
+}
+
+impl Drop for SyncStageTimer {
+    fn drop(&mut self) {
+        let stage: &'static str = self.stage.into();
+        histogram!(SYNC_STAGE_SECONDS, "stage" => stage).record(self.start.elapsed().as_secs_f64());
+    }
+}
+
+/// Notable v2 synchronization event (`event` label).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum SyncEvent {
+    /// A stale snapshot made the plan be recomputed (one per actual retry).
+    StaleRetry,
+    /// Retries were exhausted and the synchronization failed with a conflict.
+    Conflict,
+    /// The plan had no writes or tombstones, so nothing was applied.
+    PullOnly,
+    /// Unknown references that a provider resolved (incremented by their count).
+    NewAssetsResolved,
+    /// Provider refresh lookups started for client-supplied rows (incremented by their count).
+    RefreshAttempted,
+    /// A resolution was refused for referencing too many unknown assets.
+    TooManyNewAssets,
+}
+
+/// Increments [`SYNC_EVENTS_TOTAL`] for `event` by `count`.
+pub fn record_sync_event(event: SyncEvent, count: u64) {
+    let event: &'static str = event.into();
+    counter!(SYNC_EVENTS_TOTAL, "event" => event).increment(count);
+}
+
+/// Maps a response status to its low-cardinality class label.
+pub fn status_class(status: StatusCode) -> &'static str {
+    match status.as_u16() {
+        200..=299 => "2xx",
+        400..=499 => "4xx",
+        500..=599 => "5xx",
+        _ => "other",
+    }
+}
 
 pub async fn latency_stats(req: Request, next: Next) -> Response {
     let path = metric_path(&req);
@@ -38,24 +231,38 @@ pub async fn latency_stats(req: Request, next: Next) -> Response {
     res
 }
 
+/// Counts requests per route template and response status class and records
+/// visitor statistics.
+///
+/// The counter is incremented after the response is known. A failure of the
+/// visitor bookkeeping aborts the request with the error's response, which is
+/// counted with its own status class.
 pub async fn requests_stats(
     State(state): State<AppContext>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     req: Request,
     next: Next,
-) -> Result<Response> {
+) -> Response {
     let path = metric_path(&req);
     if path == "/" {
-        return Ok(next.run(req).await);
+        return next.run(req).await;
     }
 
-    // Request stats
-    counter!(REQUESTS_TOTAL, &[("path", path)]).increment(1);
-
     // Visitors stats
-    record_visitors_stats(req.headers(), addr, state.repos.stats.clone()).await?;
+    let response = match record_visitors_stats(req.headers(), addr, state.repos.stats.clone()).await
+    {
+        Ok(()) => next.run(req).await,
+        Err(e) => e.into_response(),
+    };
 
-    Ok(next.run(req).await)
+    counter!(
+        REQUESTS_TOTAL,
+        "path" => path,
+        "status" => status_class(response.status())
+    )
+    .increment(1);
+
+    response
 }
 
 /// Returns the matched route template, or the request path when no template is available.
@@ -200,5 +407,156 @@ mod tests {
             .expect("router should respond");
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    /// Renders the Prometheus text produced by `emit` against a local recorder
+    /// configured like the production exporter.
+    fn render(emit: impl FnOnce()) -> String {
+        let recorder = with_histogram_buckets(PrometheusBuilder::new())
+            .expect("bucket configuration should be valid")
+            .build_recorder();
+        let handle = recorder.handle();
+        metrics::with_local_recorder(&recorder, emit);
+        handle.render()
+    }
+
+    #[test]
+    fn maps_status_codes_to_classes() {
+        // GIVEN response statuses of every class, WHEN they are mapped,
+        // THEN 2xx, 4xx and 5xx keep their class and the rest is "other".
+        assert_eq!(status_class(StatusCode::OK), "2xx");
+        assert_eq!(status_class(StatusCode::NO_CONTENT), "2xx");
+        assert_eq!(status_class(StatusCode::NOT_FOUND), "4xx");
+        assert_eq!(status_class(StatusCode::TOO_MANY_REQUESTS), "4xx");
+        assert_eq!(status_class(StatusCode::BAD_GATEWAY), "5xx");
+        assert_eq!(status_class(StatusCode::SWITCHING_PROTOCOLS), "other");
+        assert_eq!(status_class(StatusCode::FOUND), "other");
+    }
+
+    #[test]
+    fn maps_provider_http_statuses_to_outcomes() {
+        // GIVEN HTTP statuses answered by a provider, WHEN they are classified,
+        // THEN 404 is not_found, 429 is rate_limited and failures are errors.
+        use ProviderOutcome::*;
+        assert_eq!(ProviderOutcome::from_status(StatusCode::OK), Ok);
+        assert_eq!(
+            ProviderOutcome::from_status(StatusCode::NOT_FOUND),
+            NotFound
+        );
+        assert_eq!(
+            ProviderOutcome::from_status(StatusCode::TOO_MANY_REQUESTS),
+            RateLimited
+        );
+        assert_eq!(
+            ProviderOutcome::from_status(StatusCode::INTERNAL_SERVER_ERROR),
+            Error
+        );
+    }
+
+    #[test]
+    fn label_values_are_snake_case() {
+        // GIVEN the label enums, WHEN they are converted to strings, THEN the
+        // values match the documented label vocabulary.
+        assert_eq!(<&str>::from(ProviderOutcome::NotFound), "not_found");
+        assert_eq!(<&str>::from(ProviderOutcome::RateLimited), "rate_limited");
+        assert_eq!(<&str>::from(MetricProvider::Kraken), "kraken");
+        assert_eq!(<&str>::from(ProviderOp::Proxy), "proxy");
+        assert_eq!(
+            <&str>::from(SyncEvent::NewAssetsResolved),
+            "new_assets_resolved"
+        );
+        assert_eq!(
+            <&str>::from(SyncEvent::TooManyNewAssets),
+            "too_many_new_assets"
+        );
+        assert_eq!(<&str>::from(SyncStage::Onboard), "onboard");
+    }
+
+    #[test]
+    fn exposes_new_families_with_labels_and_buckets() {
+        // GIVEN a recorder configured like the exporter, WHEN a provider call,
+        // a sync stage and sync events are recorded, THEN the rendered text has
+        // the counters with their labels and the histograms as `_bucket` lines
+        // (not summaries), and no outcome label on the duration histogram.
+        let text = render(|| {
+            record_provider_request(
+                MetricProvider::Yahoo,
+                ProviderOp::Lookup,
+                ProviderOutcome::NotFound,
+                Duration::from_millis(30),
+            );
+            drop(SyncStage::Load.timer());
+            record_sync_event(SyncEvent::NewAssetsResolved, 3);
+            counter!(
+                REQUESTS_TOTAL,
+                "path" => "/health",
+                "status" => status_class(StatusCode::OK)
+            )
+            .increment(1);
+            histogram!(LATENCY_SUMMARY, "path" => "/health").record(1500.0);
+        });
+
+        assert!(text.contains(
+            "dcapal_provider_requests_total{provider=\"yahoo\",op=\"lookup\",outcome=\"not_found\"} 1"
+        ), "{text}");
+        assert!(text.contains(
+            "dcapal_provider_request_seconds_bucket{provider=\"yahoo\",op=\"lookup\",le=\"0.05\"} 1"
+        ), "{text}");
+        assert!(text.contains(
+            "dcapal_provider_request_seconds_bucket{provider=\"yahoo\",op=\"lookup\",le=\"+Inf\"} 1"
+        ), "{text}");
+        assert!(
+            text.contains(
+                "dcapal_provider_request_seconds_count{provider=\"yahoo\",op=\"lookup\"} 1"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("dcapal_sync_stage_seconds_bucket{stage=\"load\",le=\"0.005\"}"),
+            "{text}"
+        );
+        assert!(
+            text.contains("dcapal_sync_events_total{event=\"new_assets_resolved\"} 3"),
+            "{text}"
+        );
+        assert!(
+            text.contains("dcapal_requests_total{path=\"/health\",status=\"2xx\"} 1"),
+            "{text}"
+        );
+        // The pre-existing latency metric is untouched: still a summary.
+        assert!(
+            text.contains("dcapal_latency_summary{path=\"/health\",quantile=\"0.5\"}"),
+            "{text}"
+        );
+        assert!(!text.contains("dcapal_latency_summary_bucket"), "{text}");
+    }
+
+    #[tokio::test]
+    async fn observe_provider_records_the_classified_outcome() {
+        // GIVEN a provider call that fails, WHEN it is observed, THEN its result
+        // is returned unchanged and one error outcome and duration are recorded.
+        let recorder = with_histogram_buckets(PrometheusBuilder::new())
+            .expect("bucket configuration should be valid")
+            .build_recorder();
+        let handle = recorder.handle();
+        let result = {
+            let _guard = metrics::set_default_local_recorder(&recorder);
+            observe_provider(
+                MetricProvider::Kraken,
+                ProviderOp::Price,
+                async { Err::<(), _>("boom") },
+                |r| match r {
+                    Ok(_) => ProviderOutcome::Ok,
+                    Err(_) => ProviderOutcome::Error,
+                },
+            )
+            .await
+        };
+
+        assert_eq!(result, Err("boom"));
+        let text = handle.render();
+        assert!(text.contains(
+            "dcapal_provider_requests_total{provider=\"kraken\",op=\"price\",outcome=\"error\"} 1"
+        ), "{text}");
     }
 }

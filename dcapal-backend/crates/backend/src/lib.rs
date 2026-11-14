@@ -290,7 +290,27 @@ impl DcaServer {
         describe_counter!(
             infra::stats::REQUESTS_TOTAL,
             Unit::Count,
-            "Number of requests processed"
+            "Number of requests processed, by route template and response status class"
+        );
+        describe_counter!(
+            infra::stats::PROVIDER_REQUESTS_TOTAL,
+            Unit::Count,
+            "Outbound provider calls by provider, operation and outcome"
+        );
+        describe_histogram!(
+            infra::stats::PROVIDER_REQUEST_SECONDS,
+            Unit::Seconds,
+            "Duration of outbound provider calls, rate-limiter wait included"
+        );
+        describe_histogram!(
+            infra::stats::SYNC_STAGE_SECONDS,
+            Unit::Seconds,
+            "Duration of the v2 portfolio synchronization stages"
+        );
+        describe_counter!(
+            infra::stats::SYNC_EVENTS_TOTAL,
+            Unit::Count,
+            "Notable v2 portfolio synchronization events"
         );
         describe_histogram!(
             infra::stats::LATENCY_SUMMARY,

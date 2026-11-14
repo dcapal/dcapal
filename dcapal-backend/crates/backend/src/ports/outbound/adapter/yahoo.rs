@@ -16,6 +16,7 @@ use crate::{
         entity::{Market, OHLCFrequency},
         portfolio::{AssetClass, Provider},
     },
+    app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
     error::{DcaError, Result},
 };
 
@@ -104,7 +105,23 @@ impl YahooProvider {
         Ok(self.http.get(url).timeout(timeout).send().await?)
     }
 
+    /// Fetches the latest price of a market, falling back from 5-minute to daily
+    /// candles. Recorded as one `price` provider call (both attempts included).
     pub async fn fetch_market_price(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
+        observe_provider(
+            MetricProvider::Yahoo,
+            ProviderOp::Price,
+            self.fetch_market_price_inner(mkt, ts),
+            |result| match result {
+                Ok(Some(_)) => ProviderOutcome::Ok,
+                Ok(None) => ProviderOutcome::NotFound,
+                Err(e) => outcome_of_error(e),
+            },
+        )
+        .await
+    }
+
+    async fn fetch_market_price_inner(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
         if let Some(px) = self.fetch_price(mkt, OHLCFrequency::Minutes5, ts).await? {
             Ok(Some(px))
         } else if let Some(px) = self.fetch_price(mkt, OHLCFrequency::Daily, ts).await? {
@@ -213,8 +230,23 @@ impl YahooProvider {
 
     /// Streams the Yahoo reply to the caller, answering 429 when the shared rate
     /// limiter has no capacity.
+    ///
+    /// Recorded as one `proxy` provider call, timed until the response headers
+    /// arrive (the body is streamed afterwards).
     async fn forward(&self, url: String) -> Response {
-        match self.get(&url, REQUEST_TIMEOUT, Admission::Reject).await {
+        let result = observe_provider(
+            MetricProvider::Yahoo,
+            ProviderOp::Proxy,
+            self.get(&url, REQUEST_TIMEOUT, Admission::Reject),
+            |result| match result {
+                Ok(res) => ProviderOutcome::from_status(res.status()),
+                Err(GetError::RateLimited) => ProviderOutcome::RateLimited,
+                Err(GetError::Request(e)) if e.is_timeout() => ProviderOutcome::Timeout,
+                Err(GetError::Request(_)) => ProviderOutcome::Error,
+            },
+        )
+        .await;
+        match result {
             Ok(res) => {
                 let mut response = Response::builder().status(res.status());
 
@@ -247,7 +279,29 @@ const LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
 #[async_trait]
 impl AssetProvider for YahooProvider {
     /// Resolves an asset from the `meta` block of a one-day Yahoo chart.
+    ///
+    /// Recorded as one `lookup` provider call that includes the rate-limiter
+    /// wait and the response body.
     async fn lookup(
+        &self,
+        asset: &AssetRef,
+    ) -> std::result::Result<Option<ProviderAsset>, AssetProviderError> {
+        observe_provider(
+            MetricProvider::Yahoo,
+            ProviderOp::Lookup,
+            self.lookup_inner(asset),
+            |result| match result {
+                Ok(Some(_)) => ProviderOutcome::Ok,
+                Ok(None) => ProviderOutcome::NotFound,
+                Err(e) => outcome_of_lookup_error(e),
+            },
+        )
+        .await
+    }
+}
+
+impl YahooProvider {
+    async fn lookup_inner(
         &self,
         asset: &AssetRef,
     ) -> std::result::Result<Option<ProviderAsset>, AssetProviderError> {
@@ -274,6 +328,32 @@ impl AssetProvider for YahooProvider {
                 name_authoritative: true,
             }),
         )
+    }
+}
+
+/// Classifies a failed price call for the provider metrics.
+fn outcome_of_error(error: &DcaError) -> ProviderOutcome {
+    match error {
+        DcaError::Rquest(e) if e.is_timeout() => ProviderOutcome::Timeout,
+        _ => ProviderOutcome::Error,
+    }
+}
+
+/// Classifies a failed lookup for the provider metrics: request or overall
+/// lookup timeouts are `timeout`, everything else is `error`.
+fn outcome_of_lookup_error(error: &AssetProviderError) -> ProviderOutcome {
+    let AssetProviderError::Unavailable(source) = error else {
+        return ProviderOutcome::Error;
+    };
+    let timed_out = source.is::<tokio::time::error::Elapsed>()
+        || matches!(
+            source.downcast_ref::<GetError>(),
+            Some(GetError::Request(e)) if e.is_timeout()
+        );
+    if timed_out {
+        ProviderOutcome::Timeout
+    } else {
+        ProviderOutcome::Error
     }
 }
 
@@ -412,6 +492,39 @@ mod lookup {
 #[cfg(test)]
 mod lookup_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn lookup_timeouts_and_failures_map_to_provider_outcomes() {
+        // GIVEN lookup failures of each kind, WHEN they are classified for the
+        // provider metrics, THEN an elapsed lookup deadline is a timeout and
+        // other failures (status errors, malformed data) are errors.
+        let elapsed = tokio::time::timeout(Duration::ZERO, std::future::pending::<()>())
+            .await
+            .expect_err("a pending future must time out");
+        assert_eq!(
+            outcome_of_lookup_error(&AssetProviderError::Unavailable(Box::new(elapsed))),
+            ProviderOutcome::Timeout
+        );
+        assert_eq!(
+            outcome_of_lookup_error(&AssetProviderError::Unavailable(Box::new(
+                GetError::RateLimited
+            ))),
+            ProviderOutcome::Error
+        );
+        assert_eq!(
+            outcome_of_lookup_error(&AssetProviderError::Malformed("x".into())),
+            ProviderOutcome::Error
+        );
+    }
+
+    #[test]
+    fn non_timeout_price_errors_map_to_error() {
+        // GIVEN a generic price failure, WHEN it is classified, THEN it is an error.
+        assert_eq!(
+            outcome_of_error(&DcaError::Generic("boom".into())),
+            ProviderOutcome::Error
+        );
+    }
 
     fn reference(symbol: &str) -> AssetRef {
         AssetRef::new(Provider::YF, symbol)

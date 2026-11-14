@@ -6,7 +6,10 @@ use crate::{
     app::{
         commands::sync_portfolios_v2::SyncPortfoliosV2Command,
         domain::{portfolio::SyncPortfoliosV2Response, portfolio_sync::plan_sync},
-        infra::retry::retry_sync,
+        infra::{
+            retry::retry_sync,
+            stats::{SyncEvent, SyncStage, record_sync_event},
+        },
         services::asset::AssetService,
     },
     error::DcaError,
@@ -176,6 +179,11 @@ impl PortfolioService {
 
     /// Synchronizes validated complete v2 Portfolio aggregates by planning the
     /// outcome from a stored snapshot and applying that plan atomically.
+    ///
+    /// Emits the `load` and `apply` stage durations once per attempt of the
+    /// retried cycle (`resolve` and `onboard` come from the asset service) and
+    /// the sync events `stale_retry` (per stale-snapshot retry), `pull_only`
+    /// and `conflict` (retries exhausted).
     pub async fn sync_portfolios_v2(
         &self,
         command: SyncPortfoliosV2Command,
@@ -198,29 +206,44 @@ impl PortfolioService {
         // snapshot or a serialization conflict re-plans from fresh data.
         let response = retry_sync(
             || async {
-                let snapshot = self
-                    .portfolio_repository
-                    .load_sync_snapshot(user_id)
-                    .await?;
+                let snapshot = {
+                    let _timer = SyncStage::Load.timer();
+                    self.portfolio_repository
+                        .load_sync_snapshot(user_id)
+                        .await?
+                };
                 let plan = plan_sync(&snapshot, &request);
                 // A pull-only plan changes nothing, so there is nothing to
                 // lock or verify: the response is a consistent view of the
                 // snapshot, which was read in a single transaction.
                 if plan.writes.is_empty() && plan.tombstones.is_empty() {
+                    record_sync_event(SyncEvent::PullOnly, 1);
                     return Ok(plan.response);
                 }
-                self.portfolio_repository
-                    .apply_sync_plan(user_id, &plan)
-                    .await?;
+                {
+                    let _timer = SyncStage::Apply.timer();
+                    self.portfolio_repository
+                        .apply_sync_plan(user_id, &plan)
+                        .await?;
+                }
                 Ok(plan.response)
             },
-            PortfolioRepositoryError::is_retryable_concurrency,
+            // The retry helper only asks this when another attempt will
+            // follow, so a stale snapshot counted here is a real retry.
+            |error: &PortfolioRepositoryError| {
+                let retry = error.is_retryable_concurrency();
+                if retry && matches!(error, PortfolioRepositoryError::StaleSnapshot) {
+                    record_sync_event(SyncEvent::StaleRetry, 1);
+                }
+                retry
+            },
         )
         .await;
 
         match response {
             Ok(response) => Ok(response),
             Err(error) if error.is_retryable_concurrency() => {
+                record_sync_event(SyncEvent::Conflict, 1);
                 Err(PortfolioServiceError::Conflict(error))
             }
             Err(error) => Err(PortfolioServiceError::from(error)),
@@ -853,6 +876,74 @@ mod tests {
         assert!(response.updated_portfolios.is_empty());
         assert_eq!(response.deleted_portfolios, vec![id]);
         assert_eq!(*log.lock().unwrap(), ["onboard"]);
+    }
+
+    #[tokio::test]
+    async fn v2_stale_retry_and_pull_only_emit_sync_events() {
+        // GIVEN an apply that fails once with a stale snapshot and a second
+        // snapshot whose plan writes nothing,
+        // WHEN the service synchronizes under a local metrics recorder,
+        // THEN one stale_retry and one pull_only event, and load and apply
+        // stage durations, are exported.
+        let recorder = crate::app::infra::stats::with_histogram_buckets(
+            metrics_exporter_prometheus::PrometheusBuilder::new(),
+        )
+        .unwrap()
+        .build_recorder();
+        let handle = recorder.handle();
+        let _guard = metrics::set_default_local_recorder(&recorder);
+
+        let id = Uuid::new_v4();
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let assets = logging_assets(&log);
+        let mut repository = MockPortfolioRepository::new();
+        let mut loads = 0;
+        repository
+            .expect_load_sync_snapshot()
+            .times(2)
+            .returning(move |_| {
+                loads += 1;
+                let snapshot = if loads == 1 {
+                    SyncSnapshot::default()
+                } else {
+                    SyncSnapshot {
+                        portfolios: vec![stored_tombstone(id)],
+                    }
+                };
+                Box::pin(async move { Ok(snapshot) })
+            });
+        repository
+            .expect_apply_sync_plan()
+            .times(1)
+            .returning(|_, _| Box::pin(async { Err(PortfolioRepositoryError::StaleSnapshot) }));
+        let command = v2_command(
+            &command_repository(),
+            &assets,
+            vec![v2_portfolio(id, Utc::now())],
+            Vec::new(),
+        )
+        .await;
+        let service = PortfolioService::new(Arc::new(repository), assets.clone());
+
+        service.sync_portfolios_v2(command).await.unwrap();
+
+        let text = handle.render();
+        assert!(
+            text.contains("dcapal_sync_events_total{event=\"stale_retry\"} 1"),
+            "{text}"
+        );
+        assert!(
+            text.contains("dcapal_sync_events_total{event=\"pull_only\"} 1"),
+            "{text}"
+        );
+        assert!(
+            text.contains("dcapal_sync_stage_seconds_count{stage=\"load\"} 2"),
+            "{text}"
+        );
+        assert!(
+            text.contains("dcapal_sync_stage_seconds_count{stage=\"apply\"} 1"),
+            "{text}"
+        );
     }
 
     #[tokio::test]

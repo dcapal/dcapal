@@ -15,6 +15,7 @@ use super::DefaultCircuitBreaker;
 use crate::{
     DateTime,
     app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+    app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
     config,
     error::{DcaError, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
@@ -41,7 +42,22 @@ impl KrakenProvider {
         }
     }
 
+    /// Discovers new Kraken markets and their assets. Recorded as one `lookup`
+    /// provider call covering the Kraken and CoinMarketCap requests it makes.
     pub async fn fetch_assets(
+        &self,
+        repo: &MarketDataRepository,
+    ) -> Result<(Vec<Asset>, Vec<Market>)> {
+        observe_provider(
+            MetricProvider::Kraken,
+            ProviderOp::Lookup,
+            self.fetch_assets_inner(repo),
+            outcome_of_result,
+        )
+        .await
+    }
+
+    async fn fetch_assets_inner(
         &self,
         repo: &MarketDataRepository,
     ) -> Result<(Vec<Asset>, Vec<Market>)> {
@@ -68,7 +84,18 @@ impl KrakenProvider {
     }
 
     /// Fetches the complete set of currently online Kraken market ids.
+    /// Recorded as one `lookup` provider call.
     pub async fn fetch_tradable_market_ids(&self) -> Result<HashSet<MarketId>> {
+        observe_provider(
+            MetricProvider::Kraken,
+            ProviderOp::Lookup,
+            self.fetch_tradable_market_ids_inner(),
+            outcome_of_result,
+        )
+        .await
+    }
+
+    async fn fetch_tradable_market_ids_inner(&self) -> Result<HashSet<MarketId>> {
         static URL: &str = "https://api.kraken.com/0/public/AssetPairs";
 
         debug!(url = URL, "Fetching market snapshot from Kraken");
@@ -89,7 +116,23 @@ impl KrakenProvider {
         parse_online_market_symbols(&res)
     }
 
+    /// Fetches the latest price of a market, falling back from 5-minute to daily
+    /// candles. Recorded as one `price` provider call (both attempts included).
     pub async fn fetch_market_price(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
+        observe_provider(
+            MetricProvider::Kraken,
+            ProviderOp::Price,
+            self.fetch_market_price_inner(mkt, ts),
+            |result| match result {
+                Ok(Some(_)) => ProviderOutcome::Ok,
+                Ok(None) => ProviderOutcome::NotFound,
+                Err(e) => outcome_of_error(e),
+            },
+        )
+        .await
+    }
+
+    async fn fetch_market_price_inner(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
         if let Some(px) = self
             .fetch_price(&mkt.id, OHLCFrequency::Minutes5, ts)
             .await?
@@ -392,6 +435,22 @@ struct Pair {
 struct AssetPairsResponse {
     error: Vec<String>,
     result: HashMap<String, Pair>,
+}
+
+/// Classifies a failed Kraken call for the provider metrics.
+fn outcome_of_error(error: &DcaError) -> ProviderOutcome {
+    match error {
+        DcaError::Reqwest(e) if e.is_timeout() => ProviderOutcome::Timeout,
+        _ => ProviderOutcome::Error,
+    }
+}
+
+/// Classifies a call that either succeeds or fails, with no "not found" case.
+fn outcome_of_result<T>(result: &Result<T>) -> ProviderOutcome {
+    match result {
+        Ok(_) => ProviderOutcome::Ok,
+        Err(e) => outcome_of_error(e),
+    }
 }
 
 async fn resolve_assets_data_kraken_only(

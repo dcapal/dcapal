@@ -289,3 +289,26 @@ thin pass-through that forwards raw requests to a repository.
 - Clients send references (provider and symbol), not copies of provider data;
   the backend resolves and stores the data and serves it through a read-only
   lookup endpoint that never contacts a provider.
+
+## Metrics conventions
+
+Prometheus metrics use the `metrics` macros; names and label vocabularies live
+in `crates/backend/src/app/infra/stats.rs` (prefix `dcapal_`). Describe each
+family in `init_metrics()` (`src/lib.rs`).
+
+| Family | Labels and values |
+| --- | --- |
+| `dcapal_requests_total` | `path` (route template), `status` (`2xx`, `4xx`, `5xx`, `other`) |
+| `dcapal_provider_requests_total` | `provider` (`yahoo`, `kraken`), `op` (`lookup`, `price`, `proxy`), `outcome` (`ok`, `not_found`, `rate_limited`, `timeout`, `error`) |
+| `dcapal_provider_request_seconds` | `provider`, `op` (no `outcome`); seconds, includes limiter wait |
+| `dcapal_sync_stage_seconds` | `stage` (`resolve`, `onboard`, `load`, `apply`); seconds |
+| `dcapal_sync_events_total` | `event` (`stale_retry`, `conflict`, `pull_only`, `new_assets_resolved`, `refresh_attempted`, `too_many_new_assets`) |
+
+- Labels are low cardinality: never a ticker, symbol, user id or raw URL. Use
+  `&'static str` values from strum enums, not literals at call sites.
+- Emit where the fact is known: HTTP metrics in the stats middleware, provider
+  metrics in outbound adapters (`observe_provider`), sync metrics in services
+  (`SyncStage::timer`, `record_sync_event`). Never emit the same call twice.
+- New `*_seconds` histograms need `SECONDS_BUCKETS` via `BUCKETED_HISTOGRAMS`;
+  otherwise the exporter renders a summary. `dcapal_latency_summary` stays a
+  summary in microseconds.

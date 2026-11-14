@@ -8,6 +8,7 @@ use crate::{
     app::{
         commands::lookup_assets::LookupAssetsCommand,
         domain::asset::{AssetRef, MetadataSource, ResolvedAsset, StoredAsset},
+        infra::stats::{SyncEvent, SyncStage, record_sync_event},
     },
     ports::outbound::{
         adapter::{AssetProvider, AssetProviderError},
@@ -135,16 +136,23 @@ impl AssetService {
     /// no better name than the symbol), the cached metadata is kept and the row
     /// is only marked for confirmation.
     /// Nothing is stored; see [`Self::onboard`].
+    ///
+    /// Emits the `resolve` stage duration and the sync events
+    /// `too_many_new_assets`, `refresh_attempted` (number of refresh lookups
+    /// started) and `new_assets_resolved` (number of unknown references a
+    /// provider resolved).
     /// A provider failure for a missing reference takes precedence over
     /// unresolved references because the failure leaves their existence undecided.
     pub async fn resolve<'a>(
         &self,
         refs: impl IntoIterator<Item = &'a AssetRef>,
     ) -> Result<ResolvedAssets, AssetResolutionError> {
+        let _timer = SyncStage::Resolve.timer();
         let distinct = dedupe(refs);
         let known = self.directory.find_by_refs(&distinct).await?;
         let (stored, missing) = split_known(&distinct, known);
         if missing.len() > MAX_NEW_ASSETS_PER_RESOLUTION {
+            record_sync_event(SyncEvent::TooManyNewAssets, 1);
             return Err(AssetResolutionError::TooManyNewAssets {
                 limit: MAX_NEW_ASSETS_PER_RESOLUTION,
             });
@@ -159,6 +167,8 @@ impl AssetService {
             .map(|stored| AssetRef::from(&stored.asset))
             .take(refresh_budget)
             .collect::<Vec<_>>();
+
+        record_sync_event(SyncEvent::RefreshAttempted, refreshes.len() as u64);
 
         // Owned references keep the lookup futures free of borrowed closure
         // arguments, which would make them unusable inside Axum handlers.
@@ -184,9 +194,13 @@ impl AssetService {
         let mut attempted = Vec::new();
         let mut unresolved = Vec::new();
         let mut outage = None;
+        let mut new_resolved = 0u64;
         for (reference, purpose, outcome) in lookups {
             match (purpose, outcome) {
-                (LookupPurpose::New, Ok(Some(found))) => to_upsert.push(found.asset),
+                (LookupPurpose::New, Ok(Some(found))) => {
+                    new_resolved += 1;
+                    to_upsert.push(found.asset);
+                }
                 (LookupPurpose::New, Ok(None)) => unresolved.push(reference),
                 (LookupPurpose::New, Err(error)) => outage = outage.or(Some(error)),
                 (LookupPurpose::Refresh, Ok(Some(found))) => {
@@ -206,6 +220,7 @@ impl AssetService {
                 (LookupPurpose::Refresh, Err(_)) => {}
             }
         }
+        record_sync_event(SyncEvent::NewAssetsResolved, new_resolved);
         if let Some(error) = outage {
             return Err(AssetResolutionError::ProviderUnavailable(error));
         }
@@ -241,6 +256,7 @@ impl AssetService {
         to_confirm: &[AssetRef],
         attempted: &[AssetRef],
     ) -> Result<(), AssetDirectoryError> {
+        let _timer = SyncStage::Onboard.timer();
         if !to_upsert.is_empty() {
             self.directory.upsert_resolved(to_upsert).await?;
         }
