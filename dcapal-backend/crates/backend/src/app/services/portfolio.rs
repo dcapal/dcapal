@@ -885,11 +885,7 @@ mod tests {
         // WHEN the service synchronizes under a local metrics recorder,
         // THEN one stale_retry and one pull_only event, and load and apply
         // stage durations, are exported.
-        let recorder = crate::app::infra::stats::with_histogram_buckets(
-            metrics_exporter_prometheus::PrometheusBuilder::new(),
-        )
-        .unwrap()
-        .build_recorder();
+        let recorder = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
         let handle = recorder.handle();
         let _guard = metrics::set_default_local_recorder(&recorder);
 

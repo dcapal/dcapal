@@ -14,7 +14,6 @@ use axum::{
 };
 use hyper::HeaderMap;
 use metrics::{counter, histogram};
-use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
 use strum_macros::IntoStaticStr;
 
 const BASE: &str = "dcapal";
@@ -38,29 +37,6 @@ pub const PROVIDER_REQUEST_SECONDS: &str = concatcp!(BASE, '_', "provider_reques
 pub const SYNC_STAGE_SECONDS: &str = concatcp!(BASE, '_', "sync_stage_seconds");
 /// Notable v2 synchronization events, labelled by `event`.
 pub const SYNC_EVENTS_TOTAL: &str = concatcp!(BASE, '_', "sync_events_total");
-
-/// Histogram buckets, in seconds, shared by every `*_seconds` family above.
-pub const SECONDS_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0,
-];
-
-/// Histogram families that must be exported with explicit [`SECONDS_BUCKETS`]
-/// instead of the exporter's default summary rendering.
-///
-/// `LATENCY_SUMMARY` is intentionally absent: it stays a summary in
-/// microseconds.
-pub const BUCKETED_HISTOGRAMS: [&str; 2] = [PROVIDER_REQUEST_SECONDS, SYNC_STAGE_SECONDS];
-
-/// Configures [`SECONDS_BUCKETS`] for [`BUCKETED_HISTOGRAMS`] on a Prometheus builder.
-pub fn with_histogram_buckets(
-    builder: PrometheusBuilder,
-) -> std::result::Result<PrometheusBuilder, BuildError> {
-    BUCKETED_HISTOGRAMS
-        .into_iter()
-        .try_fold(builder, |builder, name| {
-            builder.set_buckets_for_metric(Matcher::Full(name.to_owned()), SECONDS_BUCKETS)
-        })
-}
 
 /// External provider behind an outbound call (`provider` label).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
@@ -412,9 +388,7 @@ mod tests {
     /// Renders the Prometheus text produced by `emit` against a local recorder
     /// configured like the production exporter.
     fn render(emit: impl FnOnce()) -> String {
-        let recorder = with_histogram_buckets(PrometheusBuilder::new())
-            .expect("bucket configuration should be valid")
-            .build_recorder();
+        let recorder = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
         let handle = recorder.handle();
         metrics::with_local_recorder(&recorder, emit);
         handle.render()
@@ -473,11 +447,12 @@ mod tests {
     }
 
     #[test]
-    fn exposes_new_families_with_labels_and_buckets() {
+    fn exposes_new_families_with_labels_and_summaries() {
         // GIVEN a recorder configured like the exporter, WHEN a provider call,
         // a sync stage and sync events are recorded, THEN the rendered text has
-        // the counters with their labels and the histograms as `_bucket` lines
-        // (not summaries), and no outcome label on the duration histogram.
+        // the counters with their labels and the duration families as summaries
+        // (quantile lines plus `_sum` and `_count`, no `_bucket` lines), and no
+        // outcome label on the provider duration.
         let text = render(|| {
             record_provider_request(
                 MetricProvider::Yahoo,
@@ -499,22 +474,27 @@ mod tests {
         assert!(text.contains(
             "dcapal_provider_requests_total{provider=\"yahoo\",op=\"lookup\",outcome=\"not_found\"} 1"
         ), "{text}");
-        assert!(text.contains(
-            "dcapal_provider_request_seconds_bucket{provider=\"yahoo\",op=\"lookup\",le=\"0.05\"} 1"
-        ), "{text}");
-        assert!(text.contains(
-            "dcapal_provider_request_seconds_bucket{provider=\"yahoo\",op=\"lookup\",le=\"+Inf\"} 1"
-        ), "{text}");
-        assert!(
-            text.contains(
-                "dcapal_provider_request_seconds_count{provider=\"yahoo\",op=\"lookup\"} 1"
-            ),
-            "{text}"
-        );
-        assert!(
-            text.contains("dcapal_sync_stage_seconds_bucket{stage=\"load\",le=\"0.005\"}"),
-            "{text}"
-        );
+        for q in ["0", "0.5", "0.9", "0.95", "0.99", "0.999", "1"] {
+            let provider = format!(
+                "dcapal_provider_request_seconds{{provider=\"yahoo\",op=\"lookup\",quantile=\"{q}\"}}"
+            );
+            assert!(text.contains(&provider), "{provider}\n{text}");
+            let stage = format!("dcapal_sync_stage_seconds{{stage=\"load\",quantile=\"{q}\"}}");
+            assert!(text.contains(&stage), "{stage}\n{text}");
+        }
+        for line in [
+            "dcapal_provider_request_seconds_count{provider=\"yahoo\",op=\"lookup\"} 1",
+            "dcapal_sync_stage_seconds_count{stage=\"load\"} 1",
+        ] {
+            assert!(text.contains(line), "{line}\n{text}");
+        }
+        for prefix in [
+            "dcapal_provider_request_seconds_sum{provider=\"yahoo\",op=\"lookup\"}",
+            "dcapal_sync_stage_seconds_sum{stage=\"load\"}",
+        ] {
+            assert!(text.contains(prefix), "{prefix}\n{text}");
+        }
+        assert!(!text.contains("_bucket"), "{text}");
         assert!(
             text.contains("dcapal_sync_events_total{event=\"new_assets_resolved\"} 3"),
             "{text}"
@@ -535,9 +515,7 @@ mod tests {
     async fn observe_provider_records_the_classified_outcome() {
         // GIVEN a provider call that fails, WHEN it is observed, THEN its result
         // is returned unchanged and one error outcome and duration are recorded.
-        let recorder = with_histogram_buckets(PrometheusBuilder::new())
-            .expect("bucket configuration should be valid")
-            .build_recorder();
+        let recorder = metrics_exporter_prometheus::PrometheusBuilder::new().build_recorder();
         let handle = recorder.handle();
         let result = {
             let _guard = metrics::set_default_local_recorder(&recorder);

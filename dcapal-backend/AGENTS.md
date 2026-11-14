@@ -79,6 +79,9 @@ family in `init_metrics()` (`src/lib.rs`).
 - Emit where the fact is known: HTTP metrics in the stats middleware, provider
   metrics in outbound adapters (`observe_provider`), sync metrics in services
   (`SyncStage::timer`, `record_sync_event`). Never emit the same call twice.
-- New `*_seconds` histograms need `SECONDS_BUCKETS` via `BUCKETED_HISTOGRAMS`;
-  otherwise the exporter renders a summary. `dcapal_latency_summary` stays a
-  summary in microseconds.
+- `*_seconds` families are exported as summaries (the exporter default, no
+  explicit buckets): per label set they emit 7 quantile series (`0`, `0.5`,
+  `0.9`, `0.95`, `0.99`, `0.999`, `1`) plus `_sum` and `_count`, i.e. 9 series.
+  Quantiles are computed per instance and cannot be aggregated across replicas;
+  aggregate only `_sum` and `_count`. Keep label sets small. `dcapal_latency_summary`
+  is a summary in microseconds.

@@ -3,9 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use dcapal_backend::{
-    DcaServer, app::infra::stats::with_histogram_buckets, config::Config, error::DcaError,
-};
+use dcapal_backend::{DcaServer, config::Config, error::DcaError};
 use futures::FutureExt;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::signal;
@@ -83,7 +81,7 @@ fn init_tracing(config: &dcapal_backend::config::Log) -> anyhow::Result<Option<W
 fn init_prometheus_exporter(config: &dcapal_backend::config::Metrics) -> anyhow::Result<()> {
     let addr: SocketAddr = format!("{}:{}", config.hostname, config.port).parse()?;
 
-    with_histogram_buckets(PrometheusBuilder::new())?
+    PrometheusBuilder::new()
         .add_global_label("job", "dcapal-backend")
         .with_http_listener(addr)
         .install()?;
