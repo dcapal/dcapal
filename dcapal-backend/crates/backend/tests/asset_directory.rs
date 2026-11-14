@@ -22,7 +22,11 @@ fn asset(provider: Provider, symbol: &str, name: &str) -> ResolvedAsset {
 }
 
 fn stored(asset: ResolvedAsset, source: MetadataSource) -> StoredAsset {
-    StoredAsset { asset, source }
+    StoredAsset {
+        asset,
+        source,
+        last_confirm_attempt: None,
+    }
 }
 
 /// Inserts a row the way a v1 (or pre-provenance) backend does: without naming
@@ -169,6 +173,43 @@ async fn confirm_flips_the_source_without_touching_metadata(
     assert_eq!(
         find(&directory, &client).await?,
         stored(client, MetadataSource::ProviderConfirmed)
+    );
+    assert_eq!(
+        find(&directory, &verified).await?,
+        stored(verified, MetadataSource::ProviderConfirmed)
+    );
+    Ok(())
+}
+
+/// GIVEN a client-supplied row and a provider-confirmed row, WHEN attempts are
+/// recorded for both,
+/// THEN only the client-supplied row gets the timestamp, its metadata and source
+/// are untouched, and an empty list is a no-op.
+#[sqlx::test(migrations = "../../migrations")]
+async fn record_confirm_attempts_stamps_only_client_supplied_rows(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = SqlxAssetDirectory::new(pool.clone());
+    let client = asset(Provider::Kraken, "ETH", "Ether (client)");
+    let verified = asset(Provider::YF, "AAPL", "Apple Inc.");
+    insert_client_supplied(&pool, &client).await?;
+    directory
+        .upsert_resolved(std::slice::from_ref(&verified))
+        .await?;
+    assert_eq!(find(&directory, &client).await?.last_confirm_attempt, None);
+    let at = chrono::DateTime::from_timestamp(1_700_000_000, 0).expect("valid timestamp");
+
+    directory
+        .record_confirm_attempts(&[AssetRef::from(&client), AssetRef::from(&verified)], at)
+        .await?;
+    directory.record_confirm_attempts(&[], at).await?;
+
+    assert_eq!(
+        find(&directory, &client).await?,
+        StoredAsset {
+            last_confirm_attempt: Some(at),
+            ..stored(client, MetadataSource::ClientSupplied)
+        }
     );
     assert_eq!(
         find(&directory, &verified).await?,

@@ -4,6 +4,7 @@ use sqlx::{PgPool, QueryBuilder, query_as};
 use uuid::Uuid;
 
 use crate::{
+    DateTime,
     app::domain::asset::{AssetRef, ResolvedAsset, StoredAsset},
     ports::outbound::repository::{
         asset::{AssetDirectory, AssetDirectoryError},
@@ -38,6 +39,7 @@ struct AssetRow {
     currency: String,
     asset_class: DbAssetClass,
     metadata_source: DbMetadataSource,
+    last_confirm_attempt: Option<DateTime>,
 }
 
 #[async_trait]
@@ -54,7 +56,7 @@ impl AssetDirectory for SqlxAssetDirectory {
 
         let rows = query_as::<_, AssetRow>(
             "SELECT ad.provider, ad.symbol, ad.name, ad.currency, ad.asset_class,
-                    ad.metadata_source
+                    ad.metadata_source, ad.last_confirm_attempt
              FROM assets_data AS ad
              JOIN UNNEST($1::smallint[], $2::text[]) AS wanted(provider, symbol)
                ON ad.provider = wanted.provider AND ad.symbol = wanted.symbol",
@@ -132,6 +134,34 @@ impl AssetDirectory for SqlxAssetDirectory {
         .await?;
         Ok(())
     }
+
+    async fn record_confirm_attempts(
+        &self,
+        refs: &[AssetRef],
+        at: DateTime,
+    ) -> Result<(), AssetDirectoryError> {
+        if refs.is_empty() {
+            return Ok(());
+        }
+
+        let (providers, symbols) = unnest_refs(refs);
+
+        sqlx::query(
+            "UPDATE assets_data AS ad
+             SET last_confirm_attempt = $3
+             FROM UNNEST($1::smallint[], $2::text[]) AS wanted(provider, symbol)
+             WHERE ad.provider = wanted.provider
+               AND ad.symbol = wanted.symbol
+               AND ad.metadata_source = $4",
+        )
+        .bind(providers)
+        .bind(symbols)
+        .bind(at)
+        .bind(DbMetadataSource::ClientSupplied)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 impl From<AssetRow> for StoredAsset {
@@ -146,6 +176,7 @@ impl From<AssetRow> for StoredAsset {
                 asset_class: row.asset_class.into(),
             },
             source: row.metadata_source.into(),
+            last_confirm_attempt: row.last_confirm_attempt,
         }
     }
 }

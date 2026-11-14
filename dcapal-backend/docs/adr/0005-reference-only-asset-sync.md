@@ -61,8 +61,13 @@ therefore treats rows by source:
 - Source `0` ("unverified"): refreshed on use. The provider is asked and an
   answer replaces the cached metadata (`upsert_resolved`, which overwrites only
   rows still at source `0` and marks them `1`). If the provider answers
-  "unknown" or fails, the cached metadata is used, the sync does not fail and
-  nothing is marked, so a later sync retries.
+  "unknown", the cached metadata is used, the sync does not fail and
+  `assets_data.last_confirm_attempt` (`TIMESTAMPTZ NULL`; `NULL` means never
+  attempted, and older binaries that omit it keep working) is stamped. A row
+  is refreshed only when that stamp is missing or older than
+  `CONFIRM_RETRY_COOLDOWN` (24 hours), so rows the provider cannot confirm are
+  not looked up on every sync. If the provider fails, nothing is stamped and a
+  later sync retries.
 - Kraken exception: its catalog only yields the symbol as name, which is worse
   than a v1 name. An unverified Kraken row keeps its cached metadata and is
   only marked confirmed (`confirm`) when the catalog knows the symbol.

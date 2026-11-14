@@ -4,6 +4,7 @@ use futures::{StreamExt, stream};
 use itertools::Itertools;
 
 use crate::{
+    DateTime,
     app::{
         commands::lookup_assets::LookupAssetsCommand,
         domain::asset::{AssetRef, MetadataSource, ResolvedAsset, StoredAsset},
@@ -23,6 +24,11 @@ const PROVIDER_CONCURRENCY: usize = 8;
 /// fails. Whatever budget they leave over is used, best effort, to refresh
 /// directory rows whose metadata no provider has confirmed yet.
 pub const MAX_NEW_ASSETS_PER_RESOLUTION: usize = 50;
+
+/// How long a client-supplied row is left alone after a provider answered a
+/// refresh without confirming it, so rows the provider cannot confirm are not
+/// looked up again on every synchronization.
+pub const CONFIRM_RETRY_COOLDOWN: chrono::Duration = chrono::Duration::hours(24);
 
 /// Errors raised while resolving asset references at their providers.
 #[derive(Debug, thiserror::Error)]
@@ -62,13 +68,17 @@ pub struct ResolvedAssets {
     /// Client-supplied rows whose provider knows them but whose cached
     /// metadata is kept, so they only need marking as provider-confirmed.
     pub to_confirm: Vec<AssetRef>,
+    /// Client-supplied rows whose provider answered "unknown", so the attempt
+    /// is recorded and the row is not retried before [`CONFIRM_RETRY_COOLDOWN`].
+    /// Provider outages are not recorded.
+    pub attempted: Vec<AssetRef>,
 }
 
 impl ResolvedAssets {
     /// Tells whether the directory has nothing to be told.
     #[cfg(test)]
     pub fn is_clean(&self) -> bool {
-        self.to_upsert.is_empty() && self.to_confirm.is_empty()
+        self.to_upsert.is_empty() && self.to_confirm.is_empty() && self.attempted.is_empty()
     }
 }
 
@@ -117,7 +127,10 @@ impl AssetService {
     /// missing, which fails before any provider call. Rows whose metadata was
     /// only client-supplied are refreshed from the provider, best effort: only
     /// as many as the budget left by the missing references allows are looked
-    /// up, and any failure or "unknown" answer keeps the cached metadata. When the
+    /// up, and any failure or "unknown" answer keeps the cached metadata. A row
+    /// whose last answered attempt is younger than [`CONFIRM_RETRY_COOLDOWN`] is
+    /// not looked up again; an "unknown" answer starts that cooldown, a failure
+    /// does not. When the
     /// provider does not vouch for the names it reports (Kraken's catalog has
     /// no better name than the symbol), the cached metadata is kept and the row
     /// is only marked for confirmation.
@@ -138,9 +151,11 @@ impl AssetService {
         }
 
         let refresh_budget = MAX_NEW_ASSETS_PER_RESOLUTION - missing.len();
+        let now = chrono::Utc::now();
         let refreshes = stored
             .iter()
             .filter(|stored| stored.source == MetadataSource::ClientSupplied)
+            .filter(|stored| is_due_for_retry(stored.last_confirm_attempt, now))
             .map(|stored| AssetRef::from(&stored.asset))
             .take(refresh_budget)
             .collect::<Vec<_>>();
@@ -166,6 +181,7 @@ impl AssetService {
 
         let mut to_upsert = Vec::new();
         let mut to_confirm = Vec::new();
+        let mut attempted = Vec::new();
         let mut unresolved = Vec::new();
         let mut outage = None;
         for (reference, purpose, outcome) in lookups {
@@ -182,8 +198,12 @@ impl AssetService {
                         to_confirm.push(reference);
                     }
                 }
-                // A refresh is best effort: keep the cached metadata.
-                (LookupPurpose::Refresh, Ok(None) | Err(_)) => {}
+                // The provider does not know it: keep the cached metadata and
+                // do not ask again before the cooldown elapsed.
+                (LookupPurpose::Refresh, Ok(None)) => attempted.push(reference),
+                // A refresh is best effort: keep the cached metadata. The
+                // attempt is not recorded so the next sync retries.
+                (LookupPurpose::Refresh, Err(_)) => {}
             }
         }
         if let Some(error) = outage {
@@ -203,19 +223,23 @@ impl AssetService {
 
         to_upsert.sort_by_cached_key(|asset| order.get(&AssetRef::from(asset)).copied());
         to_confirm.sort_by_key(|reference| order.get(reference).copied());
+        attempted.sort_by_key(|reference| order.get(reference).copied());
         Ok(ResolvedAssets {
             to_upsert,
             to_confirm,
+            attempted,
         })
     }
 
     /// Writes resolution results to the directory: provider-resolved metadata
     /// is upserted (never over provider-confirmed rows) and kept client-supplied
-    /// rows are marked confirmed. Empty inputs cause no directory call.
+    /// rows are marked confirmed; refresh attempts the provider answered
+    /// without confirming are timestamped. Empty inputs cause no directory call.
     pub async fn onboard(
         &self,
         to_upsert: &[ResolvedAsset],
         to_confirm: &[AssetRef],
+        attempted: &[AssetRef],
     ) -> Result<(), AssetDirectoryError> {
         if !to_upsert.is_empty() {
             self.directory.upsert_resolved(to_upsert).await?;
@@ -223,8 +247,19 @@ impl AssetService {
         if !to_confirm.is_empty() {
             self.directory.confirm(to_confirm).await?;
         }
+        if !attempted.is_empty() {
+            self.directory
+                .record_confirm_attempts(attempted, chrono::Utc::now())
+                .await?;
+        }
         Ok(())
     }
+}
+
+/// Tells whether a client-supplied row may be refreshed now: it was never
+/// attempted, or its last answered attempt is older than the cooldown.
+fn is_due_for_retry(last_attempt: Option<DateTime>, now: DateTime) -> bool {
+    last_attempt.is_none_or(|attempt| now - attempt >= CONFIRM_RETRY_COOLDOWN)
 }
 
 /// Returns the distinct references in first-seen order, cloning each only once.
@@ -295,7 +330,19 @@ mod tests {
     }
 
     fn stored(asset: ResolvedAsset, source: MetadataSource) -> StoredAsset {
-        StoredAsset { asset, source }
+        StoredAsset {
+            asset,
+            source,
+            last_confirm_attempt: None,
+        }
+    }
+
+    /// A client-supplied row whose provider last answered `age` ago.
+    fn attempted_ago(symbol: &str, age: chrono::Duration) -> StoredAsset {
+        StoredAsset {
+            last_confirm_attempt: Some(chrono::Utc::now() - age),
+            ..unverified(symbol)
+        }
     }
 
     fn confirmed(symbol: &str) -> StoredAsset {
@@ -383,7 +430,8 @@ mod tests {
     async fn unverified_asset_falls_back_to_cache_when_the_provider_does_not_know_it() {
         // GIVEN a client-supplied row for A and a provider that answers "unknown",
         // WHEN A is resolved,
-        // THEN resolution succeeds and nothing is queued, so the cached metadata stays.
+        // THEN resolution succeeds, nothing is queued for upsert, so the cached metadata
+        // stays, and the attempt is queued for recording.
         let directory = directory_with(vec![unverified("A")]);
         let mut provider = MockAssetProvider::new();
         provider.expect_lookup().times(1).returning(|_| Ok(None));
@@ -393,7 +441,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(resolved.is_clean());
+        assert!(resolved.to_upsert.is_empty() && resolved.to_confirm.is_empty());
+        assert_eq!(resolved.attempted, vec![reference("A")]);
     }
 
     #[tokio::test]
@@ -660,7 +709,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn onboard_upserts_and_confirms_only_what_is_given() {
+    async fn onboard_persists_only_what_is_given() {
         // GIVEN resolved assets to upsert and references to confirm,
         // WHEN they are onboarded,
         // THEN the directory receives each list once; an empty list causes no call.
@@ -675,12 +724,129 @@ mod tests {
             .withf(|refs| refs == [reference("C")])
             .times(1)
             .returning(|_| Ok(()));
+        directory
+            .expect_record_confirm_attempts()
+            .withf(|refs, _| refs == [reference("D")])
+            .times(1)
+            .returning(|_, _| Ok(()));
         let service = service(directory, MockAssetProvider::new());
 
         service
-            .onboard(&[asset("A")], &[reference("C")])
+            .onboard(&[asset("A")], &[reference("C")], &[reference("D")])
             .await
             .unwrap();
-        service.onboard(&[], &[]).await.unwrap();
+        service.onboard(&[], &[], &[]).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn recent_attempts_are_skipped_and_old_ones_retried_after_the_cooldown() {
+        // GIVEN client-supplied rows last attempted 1h ago (A) and 25h ago (B),
+        // plus one never attempted (C),
+        // WHEN they are resolved,
+        // THEN only B and C reach the provider; A is left alone.
+        let directory = directory_with(vec![
+            attempted_ago("A", chrono::Duration::hours(1)),
+            attempted_ago("B", chrono::Duration::hours(25)),
+            unverified("C"),
+        ]);
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .times(2)
+            .withf(|r| r.symbol() != "A")
+            .returning(|_| Ok(None));
+
+        let resolved = service(directory, provider)
+            .resolve(&[reference("A"), reference("B"), reference("C")])
+            .await
+            .unwrap();
+
+        assert_eq!(resolved.attempted, vec![reference("B"), reference("C")]);
+    }
+
+    #[tokio::test]
+    async fn recent_attempts_do_not_consume_the_refresh_budget() {
+        // GIVEN 50 recently attempted rows and one never attempted row,
+        // WHEN they are resolved,
+        // THEN the never attempted row is still looked up.
+        let mut rows = (0..MAX_NEW_ASSETS_PER_RESOLUTION)
+            .map(|i| attempted_ago(&format!("R{i:02}"), chrono::Duration::hours(1)))
+            .collect::<Vec<_>>();
+        rows.push(unverified("FRESH"));
+        let refs = rows
+            .iter()
+            .map(|row| AssetRef::from(&row.asset))
+            .collect::<Vec<_>>();
+        let directory = directory_with(rows);
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .times(1)
+            .withf(|r| r.symbol() == "FRESH")
+            .returning(|_| Ok(None));
+
+        let resolved = service(directory, provider).resolve(&refs).await.unwrap();
+
+        assert_eq!(resolved.attempted, vec![reference("FRESH")]);
+    }
+
+    #[tokio::test]
+    async fn provider_outage_during_refresh_is_not_recorded_as_an_attempt() {
+        // GIVEN a never attempted client-supplied row and a provider that is down,
+        // WHEN it is resolved,
+        // THEN resolution succeeds and no attempt is recorded, so the next sync retries.
+        let directory = directory_with(vec![unverified("A")]);
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .times(1)
+            .returning(|_| Err(AssetProviderError::Malformed("boom".into())));
+
+        let resolved = service(directory, provider)
+            .resolve(&[reference("A")])
+            .await
+            .unwrap();
+
+        assert!(resolved.attempted.is_empty());
+    }
+
+    #[tokio::test]
+    async fn confirmed_and_refreshed_rows_are_not_recorded_as_attempts() {
+        // GIVEN a client-supplied row the provider knows and vouches for,
+        // WHEN it is resolved,
+        // THEN it is upserted as confirmed and no attempt is recorded.
+        let directory = directory_with(vec![unverified("A")]);
+        let mut provider = MockAssetProvider::new();
+        provider
+            .expect_lookup()
+            .returning(|r| Ok(Some(vouched(provider_asset(r.symbol())))));
+
+        let resolved = service(directory, provider)
+            .resolve(&[reference("A")])
+            .await
+            .unwrap();
+
+        assert!(resolved.attempted.is_empty());
+        assert_eq!(resolved.to_upsert.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn onboard_records_attempts_in_one_call_only_when_there_are_any() {
+        // GIVEN two attempted references,
+        // WHEN they are onboarded,
+        // THEN the directory records both in a single call; with none, no call is made.
+        let mut directory = MockAssetDirectory::new();
+        directory
+            .expect_record_confirm_attempts()
+            .withf(|refs, _| refs == [reference("A"), reference("B")])
+            .times(1)
+            .returning(|_, _| Ok(()));
+        let service = service(directory, MockAssetProvider::new());
+
+        service
+            .onboard(&[], &[], &[reference("A"), reference("B")])
+            .await
+            .unwrap();
+        service.onboard(&[], &[], &[]).await.unwrap();
     }
 }

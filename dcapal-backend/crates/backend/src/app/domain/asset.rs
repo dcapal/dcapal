@@ -1,6 +1,9 @@
 //! Provider-bound asset references and their resolved shared metadata.
 
-use crate::app::domain::portfolio::{AssetClass, Provider};
+use crate::{
+    DateTime,
+    app::domain::portfolio::{AssetClass, Provider},
+};
 
 /// Reference to an asset by the provider that lists it and its provider symbol.
 ///
@@ -71,6 +74,9 @@ pub struct StoredAsset {
     pub asset: ResolvedAsset,
     /// Whether the provider has confirmed that metadata.
     pub source: MetadataSource,
+    /// When a provider was last asked to confirm this row and answered, or
+    /// `None` if it never was. Only meaningful while the row is client-supplied.
+    pub last_confirm_attempt: Option<DateTime>,
 }
 
 #[cfg(test)]

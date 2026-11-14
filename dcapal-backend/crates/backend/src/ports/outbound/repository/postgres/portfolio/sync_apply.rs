@@ -12,13 +12,7 @@ use chrono::Utc;
 use const_format::formatcp;
 use itertools::Itertools;
 use rust_decimal::Decimal;
-use sqlx::{
-    FromRow, Postgres, Transaction,
-    postgres::{PgArguments, PgRow},
-    query,
-    query::Query,
-    query_as,
-};
+use sqlx::{Postgres, Transaction, postgres::PgArguments, query, query::Query, query_as};
 use uuid::Uuid;
 
 use crate::app::domain::{
@@ -47,14 +41,6 @@ struct LockedRow {
     deleted: bool,
     last_updated_at: chrono::DateTime<Utc>,
     updated_at: chrono::DateTime<Utc>,
-}
-
-/// A Portfolio Asset relationship as persisted by the upsert.
-#[derive(sqlx::FromRow)]
-struct PersistedRelationship {
-    id: Uuid,
-    portfolio_id: Uuid,
-    assets_data_id: Uuid,
 }
 
 /// The name of the unique index on `portfolios.id`.
@@ -371,8 +357,8 @@ async fn update_portfolios(
 }
 
 /// Reconciles the Portfolio Asset relationships of all written Portfolios and
-/// stores their allocation rows: one delete, one upsert of the relationships
-/// and one upsert of the allocations.
+/// stores their allocation rows: one delete and one statement
+/// upserting the relationships and their allocations.
 ///
 /// Relationships are identified by (Portfolio, shared asset). Rows whose asset
 /// is no longer submitted are deleted (their allocation rows cascade), kept
@@ -403,6 +389,7 @@ async fn write_assets(
             relationships
                 .average_buy_prices
                 .push(asset.average_buy_price);
+            relationships.weights.push(stored.weight);
         }
     }
 
@@ -427,69 +414,44 @@ async fn write_assets(
     }
 
     let now = Utc::now();
-    let persisted: Vec<PersistedRelationship> = relationships
+    relationships
         .bind(query(formatcp!(
-            "INSERT INTO portfolio_asset
-                 ({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
-                  quantity, manual_price, average_buy_price, created_at, updated_at)
-             SELECT r.*, $14, $14
-             FROM UNNEST({FEE_ARRAYS}, $7::uuid[], $8::uuid[], $9::uuid[], $10::smallint[],
-                         $11::numeric[], $12::numeric[], $13::numeric[])
-                  AS r({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
-                       quantity, manual_price, average_buy_price)
-             ON CONFLICT (portfolio_id, assets_data_id) DO UPDATE
-             SET {},
-                 asset_class_override = EXCLUDED.asset_class_override,
-                 quantity = EXCLUDED.quantity,
-                 manual_price = EXCLUDED.manual_price,
-                 average_buy_price = EXCLUDED.average_buy_price,
-                 updated_at = EXCLUDED.updated_at
-             RETURNING id, portfolio_id, assets_data_id",
+            "WITH rel AS (
+                 INSERT INTO portfolio_asset
+                     ({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
+                      quantity, manual_price, average_buy_price, created_at, updated_at)
+                 SELECT r.*, $15, $15
+                 FROM UNNEST({FEE_ARRAYS}, $7::uuid[], $8::uuid[], $9::uuid[], $10::smallint[],
+                             $11::numeric[], $12::numeric[], $13::numeric[])
+                      AS r({FEE_COLUMNS}, id, portfolio_id, assets_data_id, asset_class_override,
+                           quantity, manual_price, average_buy_price)
+                 ON CONFLICT (portfolio_id, assets_data_id) DO UPDATE
+                 SET {},
+                     asset_class_override = EXCLUDED.asset_class_override,
+                     quantity = EXCLUDED.quantity,
+                     manual_price = EXCLUDED.manual_price,
+                     average_buy_price = EXCLUDED.average_buy_price,
+                     updated_at = EXCLUDED.updated_at
+                 RETURNING id, portfolio_id, assets_data_id)
+             INSERT INTO portfolio_asset_allocation
+                 (portfolio_id, portfolio_asset_id, weight, created_at, updated_at)
+             SELECT rel.portfolio_id, rel.id, w.weight, $15, $15
+             FROM rel
+             JOIN UNNEST($8::uuid[], $9::uuid[], $14::numeric[])
+                  AS w(portfolio_id, assets_data_id, weight)
+               ON (w.portfolio_id, w.assets_data_id) = (rel.portfolio_id, rel.assets_data_id)
+             ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
+             SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
             fee_set!("EXCLUDED")
         )))
         .bind(now)
-        .try_map(|row: PgRow| PersistedRelationship::from_row(&row))
-        .fetch_all(&mut **tx)
+        .execute(&mut **tx)
         .await?;
-    let relationship_ids: HashMap<(Uuid, Uuid), Uuid> = persisted
-        .into_iter()
-        .map(|row| ((row.portfolio_id, row.assets_data_id), row.id))
-        .collect();
-
-    let mut allocation_portfolios = Vec::new();
-    let mut allocation_relationships = Vec::new();
-    let mut weights = Vec::new();
-    for write in writes {
-        for stored in &write.content.assets {
-            let key = (write.id, asset_ids[&stored.asset.asset]);
-            let relationship_id = relationship_ids.get(&key).ok_or_else(|| {
-                PortfolioRepositoryError::CorruptData("relationship was not persisted".into())
-            })?;
-            allocation_portfolios.push(write.id);
-            allocation_relationships.push(*relationship_id);
-            weights.push(stored.weight);
-        }
-    }
-    query(
-        "INSERT INTO portfolio_asset_allocation
-             (portfolio_id, portfolio_asset_id, weight, updated_at)
-         SELECT a.portfolio_id, a.portfolio_asset_id, a.weight, $4
-         FROM UNNEST($1::uuid[], $2::uuid[], $3::numeric[])
-              AS a(portfolio_id, portfolio_asset_id, weight)
-         ON CONFLICT (portfolio_id, portfolio_asset_id) DO UPDATE
-         SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
-    )
-    .bind(&allocation_portfolios)
-    .bind(&allocation_relationships)
-    .bind(&weights)
-    .bind(now)
-    .execute(&mut **tx)
-    .await?;
     Ok(())
 }
 
 /// The columns of the Portfolio Asset relationships to upsert, bound as
-/// `$1` to `$13` (fees first).
+/// `$1` to `$14` (fees first, weights last).
 #[derive(Default)]
 struct RelationshipColumns {
     fees: FeeColumns,
@@ -500,6 +462,7 @@ struct RelationshipColumns {
     quantities: Vec<Decimal>,
     manual_prices: Vec<Option<Decimal>>,
     average_buy_prices: Vec<Option<Decimal>>,
+    weights: Vec<Decimal>,
 }
 
 impl RelationshipColumns {
@@ -516,6 +479,7 @@ impl RelationshipColumns {
             .bind(&self.quantities)
             .bind(&self.manual_prices)
             .bind(&self.average_buy_prices)
+            .bind(&self.weights)
     }
 }
 
@@ -620,8 +584,6 @@ impl SqlxPortfolioRepository {
     /// identifier expected to be absent is caught by the unique index.
     pub(super) async fn apply_plan(&self, user_id: Uuid, plan: &SyncPlan) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        lock_and_verify(&mut tx, user_id, &plan.expected).await?;
-
         let writes = plan.writes.as_slice();
         let updated_ids: Vec<Uuid> = writes
             .iter()
@@ -640,7 +602,10 @@ impl SqlxPortfolioRepository {
                     .map(|stored| &stored.asset.asset)
             })
             .collect();
+        // Resolved before taking row locks to keep them held for fewer round
+        // trips; onboarded assets are never deleted, so the result is the same.
         let asset_ids = resolve_asset_ids(&mut tx, referenced).await?;
+        lock_and_verify(&mut tx, user_id, &plan.expected).await?;
 
         insert_portfolios(
             &mut tx,

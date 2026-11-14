@@ -132,6 +132,12 @@ impl SyncPortfoliosV2Command {
         &self.assets.to_confirm
     }
 
+    /// Borrows the references of client-supplied directory rows whose provider
+    /// answered a refresh without confirming them, so the attempt is recorded.
+    pub fn assets_to_record_attempts(&self) -> &[AssetRef] {
+        &self.assets.attempted
+    }
+
     /// Consumes the command and returns its normalized request.
     pub fn into_request(self) -> SyncPortfoliosV2Request {
         self.request

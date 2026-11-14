@@ -187,7 +187,11 @@ impl PortfolioService {
         // Only assets the directory lacked or held unconfirmed need writing;
         // provider-confirmed ones are skipped.
         self.assets
-            .onboard(command.assets_to_upsert(), command.assets_to_confirm())
+            .onboard(
+                command.assets_to_upsert(),
+                command.assets_to_confirm(),
+                command.assets_to_record_attempts(),
+            )
             .await
             .map_err(PortfolioServiceError::Asset)?;
         let request = command.into_request();
@@ -402,6 +406,7 @@ mod tests {
             Ok(vec![crate::app::domain::asset::StoredAsset {
                 asset: resolved_vwce(),
                 source: crate::app::domain::asset::MetadataSource::ProviderConfirmed,
+                last_confirm_attempt: None,
             }])
         });
         directory.expect_upsert_resolved().never();
@@ -786,6 +791,7 @@ mod tests {
             Ok(vec![crate::app::domain::asset::StoredAsset {
                 asset: resolved_vwce(),
                 source: crate::app::domain::asset::MetadataSource::ProviderConfirmed,
+                last_confirm_attempt: None,
             }])
         });
         directory.expect_upsert_resolved().never();

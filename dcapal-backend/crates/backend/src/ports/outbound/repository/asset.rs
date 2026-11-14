@@ -2,7 +2,10 @@
 
 use async_trait::async_trait;
 
-use crate::app::domain::asset::{AssetRef, ResolvedAsset, StoredAsset};
+use crate::{
+    DateTime,
+    app::domain::asset::{AssetRef, ResolvedAsset, StoredAsset},
+};
 
 /// Errors raised while reading or writing shared asset metadata.
 #[derive(Debug, thiserror::Error)]
@@ -37,4 +40,13 @@ pub trait AssetDirectory: Send + Sync {
     /// Marks the referenced client-supplied assets as provider-confirmed
     /// without changing their metadata.
     async fn confirm(&self, refs: &[AssetRef]) -> Result<(), AssetDirectoryError>;
+
+    /// Records that a provider was asked about the referenced assets and
+    /// answered at `at`. Only client-supplied rows are touched; other
+    /// references are ignored. Metadata is left unchanged.
+    async fn record_confirm_attempts(
+        &self,
+        refs: &[AssetRef],
+        at: DateTime,
+    ) -> Result<(), AssetDirectoryError>;
 }

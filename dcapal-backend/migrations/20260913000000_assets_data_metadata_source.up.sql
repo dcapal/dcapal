@@ -4,3 +4,10 @@
 -- backend binaries, whose INSERTs omit the column, working against this schema.
 ALTER TABLE assets_data
     ADD COLUMN metadata_source SMALLINT NOT NULL DEFAULT 0;
+
+-- When the backend last asked the provider to confirm a client-supplied row and
+-- got an answer (found or unknown; outages are not recorded). NULL = never
+-- attempted. Nullable without a default so older backend binaries, whose
+-- INSERTs omit the column, keep working.
+ALTER TABLE assets_data
+    ADD COLUMN last_confirm_attempt TIMESTAMPTZ NULL;
