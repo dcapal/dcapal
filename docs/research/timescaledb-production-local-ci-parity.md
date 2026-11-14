@@ -77,10 +77,10 @@ acceptance criteria where the implementation update above says otherwise.
    and [SQLx `migrate!` documentation](https://docs.rs/sqlx/0.9.0/sqlx/macro.migrate.html)
 
 6. **The current SQLx compatibility boundary is valuable and should remain.**
-   The repository has a migration-compatibility test that starts from a fixture
-   representing the existing SeaORM schema, runs the SQLx migrator, checks
-   `_sqlx_migrations`, preserves `seaql_migrations`, and verifies the numeric
-   column type. A Timescale migration should add the same kind of adoption test:
+   The repository has migration-compatibility tests that start from fixtures
+   representing supported pre-shared-asset schemas, run the SQLx migrator, and
+   verify canonical columns and data types. A Timescale migration should add the
+   same kind of compatibility test:
    verify extension availability, hypertable status, partition column, indexes,
    and application metadata without assuming an empty database. [Migration
    compatibility test](https://github.com/dcapal/dcapal/blob/f652260de11204971f95b6235ffc40cf812911a1/dcapal-backend/tests/migration_compatibility.rs#L1-L30)
@@ -164,8 +164,8 @@ the following:
    reports `timescaledb`.
 2. The migration runner succeeds against the Timescale Compose database and a
    second run reports no pending migration.
-3. The migration-compatibility test preserves the existing SeaORM metadata and
-   the new Timescale test proves the intended hypertable and index metadata.
+3. The migration-compatibility test preserves the supported schema data and the
+   new Timescale test proves the intended hypertable and index metadata.
 4. `cargo test -p dcapal-backend -p migration -- --nocapture` passes with
    `DATABASE_URL` pointing at TimescaleDB and without starting Supabase or Redis.
 5. The named Supabase smoke job still starts its own Supabase services and the

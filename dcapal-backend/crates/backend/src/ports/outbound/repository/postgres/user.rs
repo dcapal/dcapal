@@ -35,6 +35,16 @@ impl UserRepository for SqlxUserRepository {
 
         let now = Utc::now();
 
+        // Every authenticated request lands here, so an unchanged profile must
+        // not cost a write (and its dead tuple and WAL record).
+        if let Some(user) = existing.as_ref().filter(|user| {
+            user.username == claims.user_metadata.full_name
+                && user.email == claims.user_metadata.email
+                && user.role == claims.role
+        }) {
+            return Ok(user.clone());
+        }
+
         if existing.is_some() {
             Ok(query_as::<_, UserRow>(
                 "UPDATE users

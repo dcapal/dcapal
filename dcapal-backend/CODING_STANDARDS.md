@@ -20,6 +20,14 @@ This standard applies to new and modified code. Existing code may still be on
 an older path; this document does not require a broad migration when adding
 these files.
 
+Rust conventions: keep application seams typed rather than passing REST DTOs
+or storage strings; use `thiserror` for error types, `derive_more` for small
+mechanical trait implementations, and `mockall` in test-only dependencies for
+outbound-port mocks. Use RAII guards for scoped path/stack mutation. Bind all
+SQL values, including enum discriminants, instead of embedding numeric or
+string literals. Treat applied migration files and checksums as immutable;
+add forward migrations and use fixtures that model supported production states.
+
 ### REST handlers adapt HTTP
 
 Keep an Axum handler as a short orchestration boundary. It should:
@@ -45,6 +53,21 @@ construction, service invocation, and response adaptation.
 Keep REST request and response types at the inbound boundary. Services and
 outbound ports use application or domain types instead of `axum::Json`,
 `axum::response::Response`, HTTP extractors, or other transport types.
+
+### REST module layout
+
+Under `crates/backend/src/ports/inbound/rest/`, every handler lives in
+`handlers/`, one module per endpoint nested like the URL path (for example
+`handlers/assets/fiat.rs` for `/assets/fiat` and `handlers/import/portfolio.rs`
+for `/import/portfolio`). Each handler module holds the `#[utoipa::path]` and
+the handler function only. Its wire types (path/query parameters, request and
+response DTOs, schema helpers, conversions) live in the mirrored module under
+`types/`; a larger endpoint keeps its conversions in a child `conversion.rs`.
+Wire types shared by several endpoints go in a common module such as
+`types/v2_common.rs`. Modules common to all endpoints (`mod.rs` router wiring,
+`error.rs`, `extract.rs`, `openapi.rs`) stay directly in `rest/`. A new
+endpoint adds one handler module, one types module and one route in
+`rest/mod.rs`.
 
 ### Commands validate and resolve context
 
@@ -218,3 +241,77 @@ converts them into the appropriate HTTP status and body. Preserve the
 difference between a client validation error, a missing resource, an external
 service failure, and an internal persistence failure; do not collapse every
 service error into `400 Bad Request`.
+
+## 2. Plan, then apply
+
+When one request writes several rows or aggregates, keep decisions out of the
+adapter:
+
+1. The command validates, normalises and resolves references (read-only).
+2. The service loads a snapshot through a read port, runs a pure planner
+   (`plan_sync`-style functions in `app/domain`) that decides what to write,
+   what to return and which versions it expects, then calls one `apply` port
+   method. The whole read-plan-apply cycle is the retried unit.
+3. The adapter locks the rows named by the plan, verifies their versions
+   (returning a retryable stale-snapshot error on mismatch), and writes with a
+   constant number of set-based statements (`UNNEST` arrays, multi-row upserts)
+   in one transaction. It maps rows to domain types and back and nothing else.
+
+Test the planner as a pure function (GIVEN/WHEN/THEN) and the adapter against
+PostgreSQL for atomicity, rollback and stale versions. Do not make a service a
+thin pass-through that forwards raw requests to a repository.
+
+## 3. Validation and storage
+
+- Range, enum and format validation is application code that reports field
+  paths. Do not duplicate it as database `CHECK` constraints; database
+  constraints are for structure (primary and foreign keys, uniqueness,
+  `NOT NULL`). Legacy rows that would violate a rule are dropped by the
+  migration that introduces the rule, not guarded by a constraint.
+- Decode stored values with fallible conversions and report corrupt data as an
+  error rather than silently correcting it.
+- Keep one canonical copy of each application/storage enum conversion in the
+  Postgres `convert` module.
+
+## 4. External providers
+
+- Define the provider interface as an outbound trait. Select the
+  implementation with an explicit `match` on the provider name in one router
+  type. Unknown providers are rejected at the REST boundary.
+- Every outbound request sets a timeout. Work a request can trigger against a
+  provider is bounded by a documented constant, and exceeding it is a client
+  error, not a silent truncation.
+- Distinguish "the provider does not list this" (a client validation error with
+  the field path) from "the provider could not answer" (a 502).
+- Cached provider data carries its source. Client-supplied values may be
+  refreshed from the provider on use; provider-confirmed values are not
+  overwritten by clients.
+- Clients send references (provider and symbol), not copies of provider data;
+  the backend resolves and stores the data and serves it through a read-only
+  lookup endpoint that never contacts a provider.
+
+## Metrics conventions
+
+Prometheus metrics use the `metrics` macros; names and label vocabularies live
+in `crates/backend/src/app/infra/stats.rs` (prefix `dcapal_`). Describe each
+family in `init_metrics()` (`src/lib.rs`).
+
+| Family | Labels and values |
+| --- | --- |
+| `dcapal_requests_total` | `path` (route template), `status` (`2xx`, `4xx`, `5xx`, `other`) |
+| `dcapal_provider_requests_total` | `provider` (`yahoo`, `kraken`), `op` (`lookup`, `price`, `proxy`), `outcome` (`ok`, `not_found`, `rate_limited`, `timeout`, `error`) |
+| `dcapal_provider_request_seconds` | `provider`, `op` (no `outcome`); seconds, includes limiter wait |
+| `dcapal_sync_stage_seconds` | `stage` (`resolve`, `onboard`, `load`, `apply`); seconds |
+| `dcapal_sync_events_total` | `event` (`stale_retry`, `conflict`, `pull_only`, `new_assets_resolved`, `refresh_attempted`, `too_many_new_assets`) |
+
+- Labels are low cardinality: never a ticker, symbol, user id or raw URL. Use
+  `&'static str` values from strum enums, not literals at call sites.
+- Emit where the fact is known: HTTP metrics in the stats middleware, provider
+  metrics in outbound adapters (`observe_provider`), sync metrics in services
+  (`SyncStage::timer`, `record_sync_event`). Never emit the same call twice.
+- `*_seconds` families are exported as summaries (the exporter default, no
+  explicit buckets): per label set they emit 7 quantile series (`0`, `0.5`,
+  `0.9`, `0.95`, `0.99`, `0.999`, `1`) plus `_sum` and `_count`, i.e. 9 series.
+  Quantiles are computed per instance and cannot be aggregated across replicas;
+  aggregate only `_sum` and `_count`. Keep label sets small. `dcapal_latency_summary`
+  is a summary in microseconds.

@@ -1,6 +1,18 @@
 use chrono::{DateTime, Utc};
-use rust_decimal::Decimal;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
+
+use super::FeeFields;
+
+/// Portfolio-wide allocation semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
+#[repr(i16)]
+pub enum AllocationMode {
+    /// Every Portfolio Asset allocation is an absolute Portfolio target.
+    Simple = 1,
+    /// Asset Class targets are absolute and Portfolio Asset allocations are relative within a class.
+    Strategic = 2,
+}
 
 /// A row from the `portfolios` table.
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -17,18 +29,9 @@ pub struct PortfolioRow {
     pub deleted: bool,
     /// The timestamp supplied by the client for synchronization.
     pub last_updated_at: DateTime<Utc>,
-    /// The maximum fee impact configured for transactions.
-    pub max_fee_impact: Option<Decimal>,
-    /// The persisted fee structure name.
-    pub fee_type: Option<String>,
-    /// The fixed fee amount, when the fee structure is fixed.
-    pub fee_amount: Option<Decimal>,
-    /// The variable fee rate, when the fee structure is variable.
-    pub fee_rate: Option<Decimal>,
-    /// The minimum variable fee, when configured.
-    pub min_fee: Option<Decimal>,
-    /// The maximum variable fee, when configured.
-    pub max_fee: Option<Decimal>,
+    /// The stored fee policy columns.
+    #[sqlx(flatten)]
+    pub fees: FeeFields,
     /// When the database row was created.
     pub created_at: DateTime<Utc>,
     /// When the database row was last changed.

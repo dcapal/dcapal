@@ -1,102 +1,17 @@
+//! `POST /v1/sync/portfolios`: legacy portfolio synchronization.
+
 use axum::{
     Json,
     extract::State,
     response::{IntoResponse, Response},
 };
-use rust_decimal::Decimal;
-use serde::Deserialize;
 use tracing::info;
-use utoipa::{
-    ToSchema,
-    openapi::schema::{Object, ObjectBuilder, Type},
+
+use crate::{
+    AppContext,
+    app::infra::claim::Claims,
+    ports::inbound::rest::types::sync_portfolios::{SyncPortfoliosRequest, SyncPortfoliosResponse},
 };
-use uuid::Uuid;
-
-use crate::{AppContext, DateTime, app::infra::claim::Claims, ports::inbound::rest::FeeStructure};
-
-#[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-/// Authenticated request containing local portfolio changes and deletions.
-pub struct SyncPortfoliosRequest {
-    pub portfolios: Vec<PortfolioRequest>,
-    pub deleted_portfolios: Vec<Uuid>,
-}
-
-#[derive(Debug, Deserialize, ToSchema, Clone)]
-#[serde(rename_all = "camelCase")]
-/// A portfolio submitted as part of an authenticated synchronization.
-pub struct PortfolioRequest {
-    pub id: Uuid,
-    pub name: String,
-    pub quote_ccy: String,
-    pub fees: Option<TransactionFeesRequest>,
-    pub assets: Vec<PortfolioAssetRequest>,
-    pub last_updated_at: DateTime,
-}
-
-#[derive(Debug, Deserialize, ToSchema, Clone)]
-#[serde(rename_all = "camelCase")]
-/// An asset and its allocation values submitted for synchronization.
-pub struct PortfolioAssetRequest {
-    pub symbol: String,
-    pub name: String,
-    #[schema(schema_with = v1_asset_class_schema)]
-    pub aclass: String,
-    pub base_ccy: String,
-    #[schema(schema_with = v1_provider_schema)]
-    pub provider: String,
-    pub qty: Decimal,
-    pub target_weight: Decimal,
-    pub price: Decimal,
-    pub average_buy_price: Decimal,
-    pub fees: Option<TransactionFeesRequest>,
-}
-
-/// Documents the provider aliases accepted by the v1 synchronization request.
-fn v1_provider_schema() -> Object {
-    ObjectBuilder::new()
-        .schema_type(Type::String)
-        .enum_values(Some(["DCAPal", "Kraken", "YF", "Yahoo"]))
-        .description(Some(
-            "Provider matching is case-insensitive; DCAPal and Kraken map to Kraken, while YF and Yahoo map to YF.",
-        ))
-        .build()
-}
-
-/// Documents the Asset Class aliases accepted by the v1 synchronization request.
-fn v1_asset_class_schema() -> Object {
-    ObjectBuilder::new()
-        .schema_type(Type::String)
-        .enum_values(Some([
-            "EQUITY",
-            "BOND",
-            "CURRENCY",
-            "CASH",
-            "CRYPTO",
-            "COMMODITY",
-            "OTHER",
-            "Equity",
-            "Bond",
-            "Currency",
-            "Cash",
-            "Crypto",
-            "Commodity",
-            "Other",
-        ]))
-        .description(Some(
-            "Asset Class matching is case-insensitive; Currency and Cash map to CURRENCY, and unknown values map to OTHER.",
-        ))
-        .build()
-}
-
-#[derive(Debug, Deserialize, ToSchema, Clone)]
-#[serde(rename_all = "camelCase")]
-/// Portfolio- or asset-level transaction-fee settings.
-pub struct TransactionFeesRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_impact: Option<Decimal>,
-    pub fee_structure: FeeStructure,
-}
 
 #[utoipa::path(
     post,
@@ -109,7 +24,7 @@ pub struct TransactionFeesRequest {
         (
             status = 200,
             description = "Portfolios synchronized",
-            body = crate::ports::inbound::rest::response::SyncPortfoliosResponse
+            body = SyncPortfoliosResponse
         ),
         (status = 400, description = "Bad request")
     )
@@ -132,21 +47,6 @@ pub async fn sync_portfolios(
         claims.sub
     );
     Ok(Json(resp).into_response())
-}
-
-#[test]
-fn test_fee_structure_deserialization() {
-    let json = r#"{
-        "feeStructure": {
-            "type": "variable",
-            "feeRate": "0.19",
-            "minFee": "2.95"
-        },
-        "maxFeeImpact": "0.5"
-    }"#;
-
-    let fees: TransactionFeesRequest = serde_json::from_str(json).unwrap();
-    assert!(matches!(fees.fee_structure, FeeStructure::Variable { .. }));
 }
 
 #[cfg(test)]

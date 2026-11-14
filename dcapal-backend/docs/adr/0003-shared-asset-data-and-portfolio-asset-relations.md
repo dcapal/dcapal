@@ -19,15 +19,20 @@ provider and upper-case symbol, enforced by `UNIQUE (provider, symbol)`.
 currency, shared default Asset Class, and timestamps.
 
 Keep `portfolio_asset` as the Portfolio Asset relationship table. A row links
-one Portfolio to one `assets_data` row and owns the quantity, target weight,
-manual price, average buy price, fee fields, timestamps, and nullable
-`asset_class_override`. Enforce `UNIQUE (portfolio_id, assets_data_id)`.
+one Portfolio to one `assets_data` row and owns the quantity, manual price,
+average buy price, fee fields, timestamps, and nullable
+`asset_class_override`. Allocation targets are stored in the unified
+`portfolio_asset_allocation` table described by ADR 0004. Enforce
+`UNIQUE (portfolio_id, assets_data_id)`.
 
 An absent Asset Class override means that the Portfolio inherits the shared
 default. A present override is Portfolio-specific. Portfolio synchronization
-may create a missing shared record, but it does not replace an existing
-record's name, currency, or shared default class. Later writes return the
-canonical stored metadata and update only the relationship row.
+may create a missing shared record, but v1 synchronization does not replace
+an existing record's name, currency, or shared default class. Later writes
+return the canonical stored metadata and update only the relationship row.
+The only writer that may replace metadata is v2 asset resolution, and only
+for rows whose `metadata_source` says the provider has not confirmed them
+(see [ADR 0005](0005-reference-only-asset-sync.md)).
 
 The forward-only migration after `20260814000000` backfills shared records
 from the oldest surviving row, reports duplicate and metadata-conflict
@@ -38,8 +43,8 @@ one Portfolio, and rewrites both table identities with PostgreSQL 18
 
 The current v1 synchronization payload remains unchanged: it is a legacy flat
 projection that returns the effective class and existing provider/class
-aliases. The v2 synchronization contract is out of scope for this decision
-and remains owned by issue #773.
+aliases. The v2 synchronization contract is out of scope for this decision;
+it is described by [ADR 0005](0005-reference-only-asset-sync.md).
 
 ## Consequences
 
