@@ -315,7 +315,7 @@ jobs:
   frontend-e2e-tests:
     name: test:e2e:frontend (${{ matrix.lane }})
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright WebKit needs the 24.04 ICU libs
     needs: optimizer-build-test
     strategy:
       fail-fast: false
@@ -391,7 +391,7 @@ jobs:
   frontend-storybook-tests:
     name: test:storybook:frontend
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright WebKit needs the 24.04 ICU libs
     needs: optimizer-build-test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -437,7 +437,7 @@ jobs:
   test-e2e-smoke:
     name: test:e2e:smoke
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright WebKit needs the 24.04 ICU libs
     needs: optimizer-build-test
     env:
       POSTGRES_HOST: db

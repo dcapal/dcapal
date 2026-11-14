@@ -59,7 +59,7 @@ impl Claims {
     ) -> Result<TokenData<Self>, jsonwebtoken::errors::Error> {
         let header = decode_header(token)?;
         let key = match header.alg {
-            Algorithm::HS256 => DecodingKey::from_secret(jwt_secret.as_ref()),
+            Algorithm::HS256 => DecodingKey::from_secret(jwt_secret.as_ref())?,
             Algorithm::ES256 => {
                 let kid = header.kid.ok_or(ErrorKind::InvalidToken)?;
                 let jwk = jwks.find(&kid).ok_or(ErrorKind::InvalidToken)?;
@@ -129,7 +129,7 @@ mod tests {
         let token = encode(
             &Header::new(Algorithm::HS256),
             &claims,
-            &EncodingKey::from_secret(b"test-secret"),
+            &EncodingKey::from_secret(b"test-secret").unwrap(),
         )
         .unwrap();
 
@@ -184,7 +184,7 @@ mod tests {
         let token = encode(
             &Header::new(Algorithm::HS384),
             &sample_claims(),
-            &EncodingKey::from_secret(b"test-secret"),
+            &EncodingKey::from_secret(b"test-secret").unwrap(),
         )
         .unwrap();
 

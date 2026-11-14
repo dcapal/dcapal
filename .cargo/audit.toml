@@ -1,0 +1,6 @@
+[advisories]
+# libsqlite3-sys 0.37 is only pulled into Cargo.lock by sqlx's optional SQLite
+# driver; no backend target compiles it (`cargo tree -i libsqlite3-sys --target
+# all` is empty). The fixed 0.39 needs a newer sqlx than the latest release.
+# Remove this entry once sqlx ships a release that allows libsqlite3-sys >= 0.39.
+ignore = ["RUSTSEC-2026-0459"]
