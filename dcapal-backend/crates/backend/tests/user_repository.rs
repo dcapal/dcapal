@@ -62,3 +62,34 @@ async fn inserts_a_missing_user(pool: PgPool) -> dcapal_backend::error::Result<(
 
     Ok(())
 }
+
+/// GIVEN an existing user whose name, email and role match the token claims,
+/// WHEN the user is saved again (as happens on every authenticated request),
+/// THEN the stored row is returned untouched and `updated_at` does not move.
+#[sqlx::test(migrations = "../../migrations", fixtures("users"))]
+async fn leaves_an_unchanged_user_untouched(pool: PgPool) -> dcapal_backend::error::Result<()> {
+    let repository = SqlxUserRepository::new(pool.clone());
+    let before: chrono::DateTime<Utc> =
+        sqlx::query_scalar("SELECT updated_at FROM users WHERE id = $1")
+            .bind(Uuid::from_u128(1))
+            .fetch_one(&pool)
+            .await?;
+
+    let user = repository
+        .save_user_if_not_present(&claims(
+            Uuid::from_u128(1),
+            "existing@example.com",
+            Some("Existing User"),
+        ))
+        .await?;
+
+    assert_eq!(user.updated_at, before);
+    let after: chrono::DateTime<Utc> =
+        sqlx::query_scalar("SELECT updated_at FROM users WHERE id = $1")
+            .bind(Uuid::from_u128(1))
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(after, before);
+
+    Ok(())
+}
