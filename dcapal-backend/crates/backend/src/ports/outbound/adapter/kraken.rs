@@ -750,7 +750,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use crate::{
-        app::domain::entity::{Asset, Crypto, Fiat, Market},
+        app::domain::entity::{Asset, Fiat, Market},
         ports::outbound::repository::market_data::MarketDataRepository,
     };
 
