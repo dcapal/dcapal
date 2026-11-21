@@ -750,7 +750,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use crate::{
-        app::domain::entity::{Asset, Crypto, Fiat, Market},
+        app::domain::entity::{Asset, Fiat, Market},
         ports::outbound::repository::market_data::MarketDataRepository,
     };
 
@@ -759,88 +759,46 @@ mod tests {
         market_ids_from_symbols, parse_market_symbol, parse_online_market_symbols,
     };
 
-    #[tokio::test]
-    #[ignore = "requires a disposable Redis instance; set DCAPAL_TEST_REDIS_URL"]
-    async fn discovery_repairs_an_existing_market_with_a_missing_asset() {
-        // GIVEN Redis contains pearlusd, but only its quote asset is in the catalog
-        let url = std::env::var("DCAPAL_TEST_REDIS_URL")
-            .expect("DCAPAL_TEST_REDIS_URL must point to a disposable Redis instance");
-        let pool = deadpool_redis::Config::from_url(url)
-            .builder()
-            .expect("Redis pool config should be valid")
-            .build()
-            .expect("Redis pool should be constructible");
-        let repo = MarketDataRepository::new(pool.clone());
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn discovery_selects_a_market_whose_base_asset_is_missing(pool: sqlx::PgPool) {
+        // GIVEN only the USD quote asset is in the catalog and PEARL/USD has no market
+        let repo = MarketDataRepository::new(pool);
         let quote = Asset::Fiat(Fiat::new("usd".to_string(), "US Dollar".to_string()));
         repo.store_asset(&quote)
             .await
             .expect("USD should be stored");
-        let market = Market::new(
-            "pearlusd".to_string(),
-            Asset::Crypto(Crypto::new_with_id("pearl".to_string())),
-            quote,
-            None,
-        );
-        repo.store_market(&market)
-            .await
-            .expect("incomplete PEARL/USD market record should be stored");
-        let mut connection = pool.get().await.expect("Redis should be available");
-        let _: () = redis::cmd("HSET")
-            .arg("dcapal:be:market")
-            .arg("malformed")
-            .arg("{invalid json")
-            .query_async(&mut connection)
-            .await
-            .expect("malformed fixture should be stored");
-        let integrity = repo
-            .market_asset_integrity()
-            .await
-            .expect("integrity scan should tolerate malformed market data");
-        assert_eq!(integrity.markets_with_missing_assets, 1);
-        assert_eq!(integrity.malformed_market_records, 1);
 
         // WHEN the current Kraken snapshot is reconciled and missing currencies are loaded
         let pairs = get_new_markets(&["pearl/usd".to_string()], &repo).await;
         let assets = fetch_assets(&super::get_unique_ccys(&pairs), &repo).await;
 
-        // THEN the incomplete market is selected and its missing base is reconstructed
+        // THEN the missing market is selected and its missing base is reconstructed
         assert_eq!(pairs, vec![("pearl".to_string(), "usd".to_string())]);
         assert_eq!(
             assets.get("pearl").map(Asset::id).map(String::as_str),
             Some("pearl")
         );
 
+        // AND storing the discovered assets and market leaves the catalog consistent
         for asset in assets.values() {
             repo.store_asset(asset)
                 .await
-                .expect("discovered asset should be restored");
+                .expect("discovered asset should be stored");
         }
-        let repaired_market = Market::new(
+        let market = Market::new(
             "pearlusd".to_string(),
             assets.get("pearl").unwrap().clone(),
             assets.get("usd").unwrap().clone(),
             None,
         );
-        repo.store_market(&repaired_market)
+        repo.store_market(&market, crate::config::PriceProvider::Kraken)
             .await
-            .expect("repaired market should be stored");
+            .expect("market should be stored");
         assert!(
             repo.find_market(&"pearlusd".to_string())
                 .await
-                .expect("repaired market should resolve")
+                .expect("market should resolve")
                 .is_some()
-        );
-        let _: () = redis::cmd("HDEL")
-            .arg("dcapal:be:market")
-            .arg("malformed")
-            .query_async(&mut connection)
-            .await
-            .expect("malformed fixture should be removed");
-        assert_eq!(
-            repo.market_asset_integrity()
-                .await
-                .expect("integrity scan should succeed after repair"),
-            Default::default()
         );
     }
 

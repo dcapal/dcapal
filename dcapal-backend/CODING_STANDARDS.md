@@ -208,7 +208,7 @@ pub trait PortfolioRepository: Send + Sync {
 
 Place the trait at the outbound port boundary, such as
 `crates/backend/src/ports/outbound/repository` or
-`crates/backend/src/ports/outbound/adapter`. Put SQLx, Redis, and concrete
+`crates/backend/src/ports/outbound/adapter`. Put SQLx and concrete
 HTTP implementations below the appropriate repository or adapter module.
 The service depends on the trait; application startup supplies the production
 implementation.
@@ -221,7 +221,7 @@ meaning of the operation.
 
 Use `mockall` in test-only dependencies for traits that commands or services
 consume. Unit tests can then set expectations on `MockPortfolioRepository` or
-the corresponding generated mock without starting PostgreSQL, Redis, or a
+the corresponding generated mock without starting PostgreSQL or a
 real provider. Production code continues to depend on the trait rather than
 on the mock.
 

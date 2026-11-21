@@ -27,7 +27,7 @@ make backend-migrate
 ## Local development modes
 
 The root Makefile owns the complete local setup. It bootstraps the pinned
-tooling, starts local Supabase, Redis, and TimescaleDB, applies migrations, and
+tooling, starts local Supabase and TimescaleDB, applies migrations, and
 renders the ignored `dcapal.yml`. It does not read configuration from another
 checkout.
 
@@ -75,9 +75,8 @@ The default host ports are:
 | Backend HTTP | 8080 |
 | Backend metrics | 9000 |
 | TimescaleDB | 5433 |
-| Redis | 6379 |
 
 Set these values in the ignored `dcapal-backend/docker/local.env` when another
-local service uses one of the ports. The backend receives `db:5432` and
-`redis:6379` inside the Docker network, while a host-run backend uses the
+local service uses one of the ports. The backend receives `db:5432`
+inside the Docker network, while a host-run backend uses the
 published host ports.

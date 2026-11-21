@@ -41,8 +41,8 @@ machine.
 **Run the local application environment**
 
 The first run bootstraps the pinned Supabase and WASM tools, installs the
-workspace dependencies, creates ignored local configuration, starts Supabase,
-Redis, and TimescaleDB, and applies migrations. Later runs reuse the generated
+workspace dependencies, creates ignored local configuration, starts Supabase
+and TimescaleDB, and applies migrations. Later runs reuse the generated
 package, dependencies, database volume, and build caches.
 
 Choose the backend process that matches your work:
@@ -110,7 +110,7 @@ flowchart LR
         nginx---TradFiProvider[TradFi Provider]
         nginx---Backend[Backend]
         Backend---CryptoProvider[Crypto Provider REST API]
-        Backend---|"/assets/fiat<br>/assets/crypto<br>/price/{base}?quote={quote}"|Redis[Redis]
+        Backend---|"/assets/fiat<br>/assets/crypto<br>/price/{base}?quote={quote}"|Postgres[(PostgreSQL)]
     end
 ```
 

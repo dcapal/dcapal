@@ -2,9 +2,7 @@ use std::fmt::Debug;
 
 use axum::response::IntoResponse;
 use config::ConfigError;
-use deadpool_redis::PoolError;
 use hyper::StatusCode;
-use redis::RedisError;
 use tracing::error;
 
 use crate::app::domain::entity::{AssetId, MarketId};
@@ -47,10 +45,6 @@ pub enum DcaError {
     InvalidLogPath2(String, #[source] std::io::Error),
     #[error("Failed to deserialized into {1}: {0}")]
     JsonDeserializationFailure(String, String, #[source] serde_json::Error),
-    #[error("Failed to obtain Redis connection")]
-    RedisPool(#[from] PoolError),
-    #[error(transparent)]
-    Redis(#[from] RedisError),
     #[error("Third-party API reqwest failed")]
     Reqwest(#[from] reqwest::Error),
     #[error("IP2Location internal error: {0:?}")]

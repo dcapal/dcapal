@@ -45,6 +45,10 @@ _Avoid_: Portfolio asset; asset, when referring to the pair
 A time-stamped observation of the value of one unit of a market's base asset expressed in its quote asset.
 _Avoid_: Conversion rate, when the price belongs to a specific market
 
+**Latest price**:
+The most recent market price stored for a market, one row per market, with its provider, observation time and storage time. It is replaced in place and is not part of the price series (see ADR 0007).
+_Avoid_: Price series; historical price
+
 **Conversion rate**:
 The price of one known asset in another known asset, obtained from a direct market or from intermediary markets. When the two assets are the same, the conversion rate is one.
 _Avoid_: Market price, when the value is not tied to one specific market; trade price

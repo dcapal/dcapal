@@ -16,10 +16,6 @@ updates:
       - "A-backend"
       - "A-optimizer"
       - "C-dependency"
-    groups:
-      redis:
-        patterns:
-          - "*redis*"
 
     # Enable version updates for npm
   - package-ecosystem: "npm"

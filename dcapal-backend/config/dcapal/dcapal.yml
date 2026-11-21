@@ -22,11 +22,6 @@ server:
   metrics:
     hostname: @@DCAPAL_METRICS_HOSTNAME@@
     port: @@DCAPAL_METRICS_PORT@@
-  redis:
-    hostname: @@DCAPAL_REDIS_HOSTNAME@@
-    port: @@DCAPAL_REDIS_PORT@@
-    user: @@DCAPAL_REDIS_USER@@
-    password: @@DCAPAL_REDIS_PASSWORD@@
   postgres:
     hostname: @@DCAPAL_POSTGRES_HOSTNAME@@
     port: @@DCAPAL_POSTGRES_PORT@@

@@ -11,7 +11,6 @@ use axum::{
     Router, extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get,
 };
 use chrono::prelude::*;
-use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use hyper::header;
 use metrics::{Unit, counter, describe_counter, describe_histogram};
@@ -54,24 +53,17 @@ pub mod app;
 pub mod config;
 pub mod error;
 pub mod ports;
+#[cfg(test)]
+mod v1_regression;
 
 /// The timestamp type shared by API and persistence models.
 pub type DateTime = chrono::DateTime<Utc>;
-
-/// Redis connection settings used by backend integrations.
-pub struct RedisConfig {
-    /// Redis host name.
-    pub hostname: String,
-    /// Redis port.
-    pub port: u32,
-}
 
 #[allow(dead_code)]
 /// Shared application state made available to HTTP handlers and workers.
 pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
-    redis: Pool,
     postgres: PgPool,
     openapi_value: serde_json::Value,
     services: Services,
@@ -143,15 +135,13 @@ impl DcaServer {
 
         let rquest = rquest::Client::builder().default_headers(headers).build()?;
 
-        let redis = build_redis_pool(&config.server.redis)?;
-
         let postgres = build_postgres_pool(&config.server.postgres).await?;
 
         let repos = Arc::new(Repository {
-            misc: Arc::new(MiscRepository::new(redis.clone())),
-            mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
-            stats: Arc::new(StatsRepository::new(redis.clone())),
-            imported: Arc::new(ImportedRepository::new(redis.clone())),
+            misc: Arc::new(MiscRepository::new(postgres.clone())),
+            mkt_data: Arc::new(MarketDataRepository::new(postgres.clone())),
+            stats: Arc::new(StatsRepository::new(postgres.clone())),
+            imported: Arc::new(ImportedRepository::new(postgres.clone())),
             portfolio: Arc::new(SqlxPortfolioRepository::new(postgres.clone())),
             asset: Arc::new(SqlxAssetDirectory::new(postgres.clone())),
             user: Arc::new(SqlxUserRepository::new(postgres.clone())),
@@ -190,7 +180,6 @@ impl DcaServer {
         let ctx = Arc::new(AppContextInner {
             config: config.clone(),
             http,
-            redis,
             postgres,
             openapi_value,
             services,
@@ -275,7 +264,7 @@ impl DcaServer {
         Ok(())
     }
 
-    /// Registers backend metrics and refreshes counters stored in Redis.
+    /// Registers backend metrics and refreshes counters stored in PostgreSQL.
     pub async fn init_metrics(&self) {
         describe_counter!(
             infra::stats::VISITORS_TOTAL,
@@ -351,28 +340,6 @@ impl DcaServer {
     }
 }
 
-fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
-    let url = config.connection_url();
-    let redis_pool = deadpool_redis::Config::from_url(url)
-        .builder()
-        .map_err(|e| {
-            DcaError::StartupFailure(
-                format!(
-                    "Error in building Redis poll config (user={}, hostname={}, port={})",
-                    config.user, config.hostname, config.port
-                ),
-                e.into(),
-            )
-        })?
-        .runtime(Runtime::Tokio1)
-        .build()
-        .map_err(|e| {
-            DcaError::StartupFailure("Failed to build Redis connection pool".into(), e.into())
-        })?;
-
-    Ok(redis_pool)
-}
-
 async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
     let url = config.connection_url();
     let pool = PgPoolOptions::new()
@@ -400,7 +367,7 @@ async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
     Ok(pool)
 }
 
-/// Restores aggregate visitor counters from the persisted per-IP visit hash.
+/// Restores aggregate visitor counters from the persisted per-IP visit counts.
 async fn refresh_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
     let visitors = stats_repo.fetch_all_visitors().await?;
     let (total_visits, unique_visitors) = visitors.values().fold(

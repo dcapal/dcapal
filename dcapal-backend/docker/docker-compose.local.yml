@@ -19,8 +19,6 @@ services:
       - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml:ro
       - dcapal_data:/var/dcapal/dcapal-backend/data/dcapal
     depends_on:
-      redis:
-        condition: service_healthy
       db:
         condition: service_healthy
     healthcheck:

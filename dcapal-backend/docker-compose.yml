@@ -1,18 +1,4 @@
 services:
-  redis:
-    image: redis/redis-stack-server:7.2.0-v0
-    restart: unless-stopped
-    networks:
-      - dcapalnetwork
-    volumes:
-      - ./config/redis/redis-stack.conf:/redis-stack.conf:ro
-      - ./config/redis/users.acl:/etc/redis/users.acl:ro
-    healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=dcapal redis-cli --user dcapal ping | grep -q PONG"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-
   db:
     image: timescale/timescaledb-ha:pg18.4-ts2.28.3-all-oss
     restart: unless-stopped
