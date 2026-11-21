@@ -1,10 +1,4 @@
 services:
-  redis:
-    ports:
-      - "${REDIS_HOST_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-
   db:
     ports:
       - "${POSTGRES_HOST_PORT:-5433}:5432"
@@ -14,4 +8,3 @@ services:
 
 volumes:
   db_data:
-  redis_data:

@@ -6,14 +6,23 @@ use tracing::{error, info, warn};
 use crate::{
     AppContext,
     app::{
-        domain::market_data_utils::fetch_market_price,
+        domain::{
+            entity::{MarketId, Price},
+            market_data_utils::fetch_market_price,
+        },
         infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
     error::Result,
-    ports::outbound::{adapter::PriceProviders, repository::market_data::MarketDataRepository},
+    ports::outbound::{
+        adapter::PriceProviders,
+        repository::market_data::{MarketDataRepository, MarketPriceUpdate},
+    },
 };
+
+/// Number of fetched prices written to the database by a single flush.
+const FLUSH_BATCH_SIZE: usize = 50;
 
 /// Worker periodically updating market prices. As of today, prices are
 /// refreshed every 5 minutes.
@@ -59,29 +68,62 @@ impl PriceUpdaterWorker {
         }
     }
 
+    /// Fetches the price of every known market and stores the results in batches.
+    ///
+    /// Prices are flushed every [`FLUSH_BATCH_SIZE`] markets instead of one write per
+    /// market, so a pass costs a handful of statements rather than hundreds.
     async fn update_prices(&self) -> Result<()> {
         // Get all known markets
         let markets = self.market_data_repo.load_markets().await?;
 
-        for mut m in markets {
+        let mut batch: Vec<(MarketId, Price)> = Vec::with_capacity(FLUSH_BATCH_SIZE);
+        for m in markets {
             let Some(price) = fetch_market_price(&m, &self.providers, self.price_provider).await
             else {
                 warn!("Failed to fetch price update for market {}", m.id);
                 continue;
             };
 
-            m.set_price(price);
-            if let Err(e) = self.market_data_repo.update_mkt_price(&m).await {
-                error!("Failed to store market price update {m:?}: {e:?}");
-            }
-
             self.market_data_service.set_price(&m.id, price);
+            batch.push((m.id, price));
+
+            if batch.len() >= FLUSH_BATCH_SIZE {
+                self.flush(&mut batch).await;
+            }
 
             // Space out markets (~2 requests per second) so a pass leaves most of the
             // shared Yahoo rate-limit budget to user-driven lookups.
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
+        self.flush(&mut batch).await;
 
         Ok(())
+    }
+
+    /// Stores and clears the pending prices, logging instead of failing the pass.
+    async fn flush(&self, batch: &mut Vec<(MarketId, Price)>) {
+        if batch.is_empty() {
+            return;
+        }
+
+        let updates = batch
+            .iter()
+            .map(|(market_id, price)| MarketPriceUpdate {
+                market_id,
+                price: *price,
+            })
+            .collect::<Vec<_>>();
+
+        if let Err(e) = self
+            .market_data_repo
+            .upsert_prices(&updates, self.price_provider)
+            .await
+        {
+            error!(
+                "Failed to store {} market price updates: {e:?}",
+                batch.len()
+            );
+        }
+        batch.clear();
     }
 }

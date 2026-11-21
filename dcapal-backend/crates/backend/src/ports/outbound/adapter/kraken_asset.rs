@@ -12,12 +12,12 @@ use crate::{
     ports::outbound::repository::market_data::MarketDataRepository,
 };
 
-/// Resolves Kraken assets from the Redis asset catalog kept by market discovery.
+/// Resolves Kraken assets from the market-asset catalog kept by market discovery.
 ///
 /// The catalog stores no display name for cryptocurrencies, so the symbol as
 /// submitted serves as name and as trading currency (a placeholder name). An
 /// empty catalog (cold start) is reported as a provider outage rather than as
-/// an unknown symbol; this path needs Redis and is not unit tested. Fiat catalog entries carry
+/// an unknown symbol; this path needs PostgreSQL and is covered by the repository integration tests. Fiat catalog entries carry
 /// their English name and resolve to cash in their own currency.
 pub struct KrakenAssetProvider {
     catalog: Arc<MarketDataRepository>,

@@ -15,7 +15,6 @@ axum-extra = { workspace = true }
 config = { workspace = true }
 const_format = { workspace = true }
 chrono = { workspace = true }
-deadpool-redis = { workspace = true }
 derive_more = { workspace = true }
 failsafe = { workspace = true }
 futures = { workspace = true }
@@ -28,9 +27,9 @@ jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
+moka = { workspace = true }
 num_enum = { workspace = true }
 parking_lot = { workspace = true }
-redis = { workspace = true }
 reqwest = { workspace = true }
 rust_decimal = { workspace = true }
 rustls = { workspace = true }

@@ -1,8 +1,4 @@
 services:
-  redis:
-    volumes:
-      - ./data/redis:/data
-
   dcapal:
     image: ${DCAPAL_IMAGE:-leonardoarcari/dcapal:latest}
     env_file: ${DCAPAL_ENV_FILE:-dcapal.env}
@@ -16,8 +12,6 @@ services:
       - ./dcapal.yml:/var/dcapal/dcapal-backend/dcapal.yml
       - ./data/dcapal:/var/dcapal/dcapal-backend/data
     depends_on:
-      redis:
-        condition: service_healthy
       db:
         condition: service_healthy
     healthcheck:

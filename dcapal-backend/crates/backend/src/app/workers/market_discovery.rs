@@ -118,7 +118,7 @@ impl MarketDiscoveryWorker {
 
         if !deleted.is_empty() {
             info!(
-                "Removed {} stale Kraken markets from Redis: {:?}",
+                "Removed {} stale Kraken markets from the database: {:?}",
                 deleted.len(),
                 deleted
             );
@@ -163,7 +163,11 @@ impl MarketDiscoveryWorker {
             m.set_price(price);
 
             info!("Storing market '{}'", m.id);
-            if let Err(e) = self.market_data_repo.store_market(&m).await {
+            if let Err(e) = self
+                .market_data_repo
+                .store_market(&m, self.price_provider)
+                .await
+            {
                 error!(
                     "Failed to store market '{}': {} ({})",
                     m.id,

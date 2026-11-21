@@ -44,7 +44,6 @@ load_local_env() {
   local inherited_postgres_password="${POSTGRES_PASSWORD-}"
   local inherited_postgres_db="${POSTGRES_DB-}"
   local inherited_postgres_host_port="${POSTGRES_HOST_PORT-}"
-  local inherited_redis_host_port="${REDIS_HOST_PORT-}"
   local inherited_backend_port="${BACKEND_PORT-}"
   local inherited_metrics_port="${METRICS_PORT-}"
   local inherited_frontend_port="${FRONTEND_PORT-}"
@@ -59,7 +58,6 @@ load_local_env() {
   [[ -n "$inherited_postgres_password" ]] && POSTGRES_PASSWORD="$inherited_postgres_password"
   [[ -n "$inherited_postgres_db" ]] && POSTGRES_DB="$inherited_postgres_db"
   [[ -n "$inherited_postgres_host_port" ]] && POSTGRES_HOST_PORT="$inherited_postgres_host_port"
-  [[ -n "$inherited_redis_host_port" ]] && REDIS_HOST_PORT="$inherited_redis_host_port"
   [[ -n "$inherited_backend_port" ]] && BACKEND_PORT="$inherited_backend_port"
   [[ -n "$inherited_metrics_port" ]] && METRICS_PORT="$inherited_metrics_port"
   [[ -n "$inherited_frontend_port" ]] && FRONTEND_PORT="$inherited_frontend_port"
@@ -68,7 +66,6 @@ load_local_env() {
   POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
   POSTGRES_DB="${POSTGRES_DB:-postgres}"
   POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-5433}"
-  REDIS_HOST_PORT="${REDIS_HOST_PORT:-6379}"
   BACKEND_PORT="${BACKEND_PORT:-8080}"
   METRICS_PORT="${METRICS_PORT:-9000}"
   FRONTEND_PORT="${FRONTEND_PORT:-3000}"
@@ -81,7 +78,7 @@ load_local_env() {
   COMPOSE_PROJECT_NAME="${inherited_project_name:-dcapal-${project_parent}}"
 
   export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_HOST_PORT
-  export REDIS_HOST_PORT BACKEND_PORT METRICS_PORT FRONTEND_PORT GRAFANA_PORT
+  export BACKEND_PORT METRICS_PORT FRONTEND_PORT GRAFANA_PORT
   export BACKEND_READY_TIMEOUT
   export COMPOSE_PROJECT_NAME
   export LOCAL_STATE_DIR LOCAL_ENV_FILE
@@ -194,8 +191,8 @@ compose_observability() {
 }
 
 start_core() {
-  log "Starting Redis and TimescaleDB"
-  compose_core up -d --wait --wait-timeout 180 db redis
+  log "Starting TimescaleDB"
+  compose_core up -d --wait --wait-timeout 180 db
 }
 
 start_dependencies() {
@@ -218,8 +215,6 @@ start_dependencies() {
 
 render_config() {
   local mode="${1:-host}"
-  local redis_hostname="127.0.0.1"
-  local redis_port="$REDIS_HOST_PORT"
   local postgres_hostname="127.0.0.1"
   local postgres_port="$POSTGRES_HOST_PORT"
   local web_hostname="127.0.0.1"
@@ -228,8 +223,6 @@ render_config() {
   local metrics_port="$METRICS_PORT"
 
   if [[ "$mode" == "container" ]]; then
-    redis_hostname="redis"
-    redis_port="6379"
     postgres_hostname="db"
     postgres_port="5432"
     web_hostname="0.0.0.0"
@@ -246,10 +239,6 @@ render_config() {
   export DCAPAL_WEB_PORT="$web_port"
   export DCAPAL_METRICS_HOSTNAME="$metrics_hostname"
   export DCAPAL_METRICS_PORT="$metrics_port"
-  export DCAPAL_REDIS_HOSTNAME="$redis_hostname"
-  export DCAPAL_REDIS_PORT="$redis_port"
-  export DCAPAL_REDIS_USER=dcapal
-  export DCAPAL_REDIS_PASSWORD=dcapal
   export DCAPAL_POSTGRES_HOSTNAME="$postgres_hostname"
   export DCAPAL_POSTGRES_PORT="$postgres_port"
   export DCAPAL_POSTGRES_USER="$POSTGRES_USER"
@@ -319,7 +308,7 @@ start_host() {
   render_config host
   # A previous Docker-mode run may still own the published backend port.
   # Remove only this project's backend container before starting the host
-  # process; the database, Redis, and Supabase services remain available.
+  # process; the database and Supabase services remain available.
   compose_docker rm --force --stop dcapal >/dev/null 2>&1 || true
   run_migrations
 
