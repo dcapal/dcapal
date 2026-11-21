@@ -3,7 +3,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use chrono::{TimeZone, Utc};
+use jiff::Timestamp;
 use redis::AsyncCommands;
 use uuid::Uuid;
 
@@ -39,14 +39,14 @@ impl MiscRepository {
             return Ok(None);
         }
 
-        let last_fetched = Utc.timestamp_opt(last_fetched.unwrap(), 0).unwrap();
+        let last_fetched = Timestamp::from_second(last_fetched.unwrap()).unwrap();
         Ok(Some(last_fetched))
     }
 
     pub async fn set_cw_last_fetched(&self, ts: DateTime) -> Result<()> {
         let mut redis = self.redis.get().await?;
 
-        let ts = ts.timestamp();
+        let ts = ts.as_second();
         let _: () = redis.hset(Self::ENTITY, Self::CW_LAST_FETCHED, ts).await?;
 
         Ok(())
@@ -158,7 +158,7 @@ impl ImportedRepository {
             .query_async(&mut redis)
             .await?;
 
-        let expires_at = DateTime::from_timestamp(expires_at, 0).unwrap_or_else(Utc::now);
+        let expires_at = DateTime::from_second(expires_at).unwrap_or_else(|_| Timestamp::now());
 
         Ok(ImportedPortfolio { id, expires_at })
     }

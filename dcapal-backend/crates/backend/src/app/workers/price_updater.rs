@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use chrono::Utc;
+use jiff::Timestamp;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -54,7 +54,7 @@ impl PriceUpdaterWorker {
             }
 
             sleep = tokio::time::sleep(self.period);
-            let next = Utc::now() + chrono::Duration::from_std(self.period).unwrap();
+            let next = Timestamp::now() + jiff::Span::try_from(self.period).unwrap();
             info!("Next PriceUpdaterWorker execution: {next}");
         }
     }

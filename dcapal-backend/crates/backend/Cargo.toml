@@ -14,7 +14,8 @@ axum = { workspace = true }
 axum-extra = { workspace = true }
 config = { workspace = true }
 const_format = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
+jiff-sqlx = { workspace = true }
 deadpool-redis = { workspace = true }
 derive_more = { workspace = true }
 failsafe = { workspace = true }

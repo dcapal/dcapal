@@ -208,7 +208,7 @@ pub enum SyncPortfoliosV2CommandError {
 mod tests {
     use std::sync::Arc;
 
-    use chrono::Utc;
+    use jiff::Timestamp;
     use rust_decimal::dec;
 
     use super::*;
@@ -453,7 +453,7 @@ mod tests {
                 fees: None,
                 assets,
                 strategic_allocation: None,
-                last_updated_at: Utc::now(),
+                last_updated_at: Timestamp::now(),
             }],
             deleted_portfolios: Vec::new(),
         }

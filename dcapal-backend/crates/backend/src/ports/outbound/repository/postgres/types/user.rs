@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use uuid::Uuid;
 
 /// A row from the `users` table.
@@ -13,7 +13,9 @@ pub struct UserRow {
     /// The role assigned to the user.
     pub role: String,
     /// When the database row was created.
-    pub created_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub created_at: Timestamp,
     /// When the database row was last changed.
-    pub updated_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub updated_at: Timestamp,
 }

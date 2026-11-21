@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use dcapal_backend::app::commands::sync_portfolios_v2::SyncPortfoliosV2Command;
 use dcapal_backend::app::domain::asset::{AssetRef, ResolvedAsset};
 use dcapal_backend::app::domain::portfolio::{
@@ -25,6 +24,7 @@ use dcapal_backend::ports::{
         },
     },
 };
+use jiff::Timestamp;
 use rust_decimal::{Decimal, dec};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -68,7 +68,7 @@ fn portfolio_request(assets: Vec<PortfolioAssetRequest>) -> PortfolioRequest {
             },
         ),
         assets,
-        last_updated_at: Utc::now(),
+        last_updated_at: Timestamp::now(),
     }
 }
 
@@ -110,7 +110,7 @@ fn v2_simple_request(assets: Vec<(PortfolioAssetV2, Decimal)>) -> SyncPortfolios
                 })
                 .collect(),
             strategic_allocation: None,
-            last_updated_at: Utc::now(),
+            last_updated_at: Timestamp::now(),
         }],
         deleted_portfolios: Vec::new(),
     }
@@ -744,7 +744,7 @@ async fn v2_sync_persists_strategic_descendants_and_exact_decimals(
                     },
                 ],
             }),
-            last_updated_at: Utc::now(),
+            last_updated_at: Timestamp::now(),
         }],
         deleted_portfolios: Vec::new(),
     };
@@ -1019,7 +1019,7 @@ async fn v2_sync_rejects_a_portfolio_owned_by_another_user(
             fees: None,
             assets: Vec::new(),
             strategic_allocation: None,
-            last_updated_at: Utc::now(),
+            last_updated_at: Timestamp::now(),
         }],
         deleted_portfolios: Vec::new(),
     };
@@ -1076,7 +1076,7 @@ async fn v2_sync_keeps_unknown_deletions_as_terminal_tombstones(
             fees: None,
             assets: Vec::new(),
             strategic_allocation: None,
-            last_updated_at: Utc::now(),
+            last_updated_at: Timestamp::now(),
         }],
         deleted_portfolios: Vec::new(),
     };
@@ -1135,7 +1135,7 @@ fn simple_aggregate(id: Uuid, name: &str, assets: &[(&str, Decimal)]) -> Portfol
             })
             .collect(),
         strategic_allocation: None,
-        last_updated_at: Utc::now(),
+        last_updated_at: Timestamp::now(),
     }
 }
 
@@ -1302,7 +1302,7 @@ async fn one_plan_writes_several_portfolios_sharing_assets_and_matches_a_reload(
         "Simple",
         &[("VWCE", dec!(60.50)), ("CASH", dec!(39.50))],
     );
-    simple_portfolio.last_updated_at += chrono::Duration::nanoseconds(789);
+    simple_portfolio.last_updated_at += jiff::Span::new().nanoseconds(789);
     simple_portfolio.strategic_allocation = Some(StrategicAllocationV2 {
         asset_class_targets: vec![StrategicAssetClassTargetV2 {
             asset_class: AssetClass::Equity,

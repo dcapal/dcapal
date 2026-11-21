@@ -7,6 +7,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
+use jiff_sqlx::Timestamp as SqlTimestamp;
 use rust_decimal::Decimal;
 use sqlx::query_as;
 use uuid::Uuid;
@@ -38,8 +39,8 @@ struct SnapshotRow {
     portfolio_name: String,
     portfolio_currency: String,
     portfolio_deleted: bool,
-    portfolio_last_updated_at: chrono::DateTime<chrono::Utc>,
-    portfolio_updated_at: chrono::DateTime<chrono::Utc>,
+    portfolio_last_updated_at: SqlTimestamp,
+    portfolio_updated_at: SqlTimestamp,
     portfolio_allocation_mode: DbAllocationMode,
     portfolio_drift_band: Option<Decimal>,
     portfolio_strategic_allocation_present: bool,
@@ -222,8 +223,8 @@ fn finish_portfolio(
 ) -> Result<StoredPortfolio> {
     let version = PortfolioVersion {
         deleted: head.portfolio_deleted,
-        last_updated_at: head.portfolio_last_updated_at,
-        updated_at: head.portfolio_updated_at,
+        last_updated_at: head.portfolio_last_updated_at.to_jiff(),
+        updated_at: head.portfolio_updated_at.to_jiff(),
     };
     if head.portfolio_deleted {
         return Ok(StoredPortfolio {

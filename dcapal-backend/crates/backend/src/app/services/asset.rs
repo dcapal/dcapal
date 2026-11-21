@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use futures::{StreamExt, stream};
 use itertools::Itertools;
+use jiff::Timestamp;
 
 use crate::{
     DateTime,
@@ -29,7 +30,8 @@ pub const MAX_NEW_ASSETS_PER_RESOLUTION: usize = 50;
 /// How long a client-supplied row is left alone after a provider answered a
 /// refresh without confirming it, so rows the provider cannot confirm are not
 /// looked up again on every synchronization.
-pub const CONFIRM_RETRY_COOLDOWN: chrono::Duration = chrono::Duration::hours(24);
+pub const CONFIRM_RETRY_COOLDOWN: std::time::Duration =
+    std::time::Duration::from_secs(24 * 60 * 60);
 
 /// Errors raised while resolving asset references at their providers.
 #[derive(Debug, thiserror::Error)]
@@ -159,7 +161,7 @@ impl AssetService {
         }
 
         let refresh_budget = MAX_NEW_ASSETS_PER_RESOLUTION - missing.len();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let refreshes = stored
             .iter()
             .filter(|stored| stored.source == MetadataSource::ClientSupplied)
@@ -265,7 +267,7 @@ impl AssetService {
         }
         if !attempted.is_empty() {
             self.directory
-                .record_confirm_attempts(attempted, chrono::Utc::now())
+                .record_confirm_attempts(attempted, Timestamp::now())
                 .await?;
         }
         Ok(())
@@ -275,7 +277,9 @@ impl AssetService {
 /// Tells whether a client-supplied row may be refreshed now: it was never
 /// attempted, or its last answered attempt is older than the cooldown.
 fn is_due_for_retry(last_attempt: Option<DateTime>, now: DateTime) -> bool {
-    last_attempt.is_none_or(|attempt| now - attempt >= CONFIRM_RETRY_COOLDOWN)
+    last_attempt.is_none_or(|attempt| {
+        attempt <= now - jiff::Span::try_from(CONFIRM_RETRY_COOLDOWN).unwrap()
+    })
 }
 
 /// Returns the distinct references in first-seen order, cloning each only once.
@@ -354,9 +358,9 @@ mod tests {
     }
 
     /// A client-supplied row whose provider last answered `age` ago.
-    fn attempted_ago(symbol: &str, age: chrono::Duration) -> StoredAsset {
+    fn attempted_ago(symbol: &str, age: jiff::Span) -> StoredAsset {
         StoredAsset {
-            last_confirm_attempt: Some(chrono::Utc::now() - age),
+            last_confirm_attempt: Some(Timestamp::now() - age),
             ..unverified(symbol)
         }
     }
@@ -761,8 +765,8 @@ mod tests {
         // WHEN they are resolved,
         // THEN only B and C reach the provider; A is left alone.
         let directory = directory_with(vec![
-            attempted_ago("A", chrono::Duration::hours(1)),
-            attempted_ago("B", chrono::Duration::hours(25)),
+            attempted_ago("A", jiff::Span::new().hours(1)),
+            attempted_ago("B", jiff::Span::new().hours(25)),
             unverified("C"),
         ]);
         let mut provider = MockAssetProvider::new();
@@ -786,7 +790,7 @@ mod tests {
         // WHEN they are resolved,
         // THEN the never attempted row is still looked up.
         let mut rows = (0..MAX_NEW_ASSETS_PER_RESOLUTION)
-            .map(|i| attempted_ago(&format!("R{i:02}"), chrono::Duration::hours(1)))
+            .map(|i| attempted_ago(&format!("R{i:02}"), jiff::Span::new().hours(1)))
             .collect::<Vec<_>>();
         rows.push(unverified("FRESH"));
         let refs = rows

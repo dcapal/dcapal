@@ -1,6 +1,6 @@
 use std::{future::Future, sync::Arc, time::Duration};
 
-use chrono::{NaiveDate, TimeZone, Utc};
+use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use tokio::time::Instant;
 use tracing::{debug, error, info};
 
@@ -130,7 +130,7 @@ impl MarketDiscoveryWorker {
                     recovery_backoff = next_recovery_backoff(recovery_backoff);
                     next_recovery_attempt = Instant::now() + recovery_backoff;
                 }
-                Ok(()) => match self.misc_repo.set_cw_last_fetched(Utc::now()).await {
+                Ok(()) => match self.misc_repo.set_cw_last_fetched(Timestamp::now()).await {
                     Ok(()) => {
                         recovery_pending = false;
                         recovery_backoff = Duration::ZERO;
@@ -246,19 +246,19 @@ where
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
     let last_fetched = misc.get_cw_last_fetched().await?;
-    let today = Utc::now().date_naive();
+    let today = Timestamp::now().to_zoned(TimeZone::UTC).date();
     Ok((is_outdated_at(last_fetched, today), last_fetched))
 }
 
-fn is_outdated_at(last_fetched: Option<DateTime>, today: NaiveDate) -> bool {
+fn is_outdated_at(last_fetched: Option<DateTime>, today: Date) -> bool {
     last_fetched
-        .map(|ts| Utc.from_utc_datetime(&ts.naive_utc()).date_naive() < today)
+        .map(|ts| ts.to_zoned(TimeZone::UTC).date() < today)
         .unwrap_or(true)
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{NaiveDate, TimeZone, Utc};
+    use jiff::{civil::date, tz::TimeZone};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::{
@@ -275,7 +275,7 @@ mod tests {
     fn missing_daily_marker_is_outdated() {
         // GIVEN daily discovery has never completed
         // WHEN the worker checks the marker
-        let outdated = is_outdated_at(None, NaiveDate::from_ymd_opt(2026, 9, 2).unwrap());
+        let outdated = is_outdated_at(None, date(2026, 9, 2));
 
         // THEN discovery is due
         assert!(outdated);
@@ -284,10 +284,14 @@ mod tests {
     #[test]
     fn same_day_daily_marker_is_not_outdated() {
         // GIVEN daily discovery completed earlier on the current UTC date
-        let last_fetched = Utc.with_ymd_and_hms(2026, 9, 2, 1, 2, 3).single();
+        let last_fetched = date(2026, 9, 2)
+            .at(1, 2, 3, 0)
+            .to_zoned(TimeZone::UTC)
+            .unwrap()
+            .timestamp();
 
         // WHEN the worker checks the marker
-        let outdated = is_outdated_at(last_fetched, NaiveDate::from_ymd_opt(2026, 9, 2).unwrap());
+        let outdated = is_outdated_at(Some(last_fetched), date(2026, 9, 2));
 
         // THEN discovery is not repeated until the next UTC date
         assert!(!outdated);
@@ -296,10 +300,14 @@ mod tests {
     #[test]
     fn previous_day_daily_marker_is_outdated() {
         // GIVEN daily discovery completed on the previous UTC date
-        let last_fetched = Utc.with_ymd_and_hms(2026, 9, 1, 23, 59, 59).single();
+        let last_fetched = date(2026, 9, 1)
+            .at(23, 59, 59, 0)
+            .to_zoned(TimeZone::UTC)
+            .unwrap()
+            .timestamp();
 
         // WHEN the worker checks the marker
-        let outdated = is_outdated_at(last_fetched, NaiveDate::from_ymd_opt(2026, 9, 2).unwrap());
+        let outdated = is_outdated_at(Some(last_fetched), date(2026, 9, 2));
 
         // THEN discovery is due again
         assert!(outdated);

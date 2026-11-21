@@ -9,6 +9,7 @@ use dcapal_backend::ports::outbound::repository::{
         types::{AssetClass as DbAssetClass, Provider as DbProvider},
     },
 };
+use jiff::Timestamp;
 use sqlx::PgPool;
 
 fn asset(provider: Provider, symbol: &str, name: &str) -> ResolvedAsset {
@@ -197,7 +198,7 @@ async fn record_confirm_attempts_stamps_only_client_supplied_rows(
         .upsert_resolved(std::slice::from_ref(&verified))
         .await?;
     assert_eq!(find(&directory, &client).await?.last_confirm_attempt, None);
-    let at = chrono::DateTime::from_timestamp(1_700_000_000, 0).expect("valid timestamp");
+    let at = Timestamp::from_second(1_700_000_000).expect("valid timestamp");
 
     directory
         .record_confirm_attempts(&[AssetRef::from(&client), AssetRef::from(&verified)], at)

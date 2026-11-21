@@ -9,11 +9,6 @@
       "qs": "^6.16.1",
       "minimatch@>=7.0.0 <11.0.1": "^11.0.1",
       "webpack-dev-middleware@<7.4.6": "^7.4.6"
-    },
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-gcqx-w48m-w2h4"
-      ]
     }
   },
   "scripts": {

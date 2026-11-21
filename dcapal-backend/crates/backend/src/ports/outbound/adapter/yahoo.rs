@@ -156,7 +156,7 @@ impl YahooProvider {
         let symbol = mkt.as_yahoo();
         let interval = get_api_interval(freq);
         let (r_lo, r_hi) = freq.ohlc_range(ts);
-        let (period_1, period_2) = (r_lo.timestamp(), r_hi.timestamp());
+        let (period_1, period_2) = (r_lo.as_second(), r_hi.as_second());
         let url = format!(
             "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={period_1}&period2={period_2}&interval={interval}"
         );

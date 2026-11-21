@@ -8,9 +8,10 @@
 
 use std::collections::HashMap;
 
-use chrono::Utc;
 use const_format::formatcp;
 use itertools::Itertools;
+use jiff::Timestamp;
+use jiff_sqlx::{Timestamp as SqlTimestamp, ToSqlx};
 use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, postgres::PgArguments, query, query::Query, query_as};
 use uuid::Uuid;
@@ -39,8 +40,8 @@ struct LockedRow {
     id: Uuid,
     user_id: Uuid,
     deleted: bool,
-    last_updated_at: chrono::DateTime<Utc>,
-    updated_at: chrono::DateTime<Utc>,
+    last_updated_at: SqlTimestamp,
+    updated_at: SqlTimestamp,
 }
 
 /// The name of the unique index on `portfolios.id`.
@@ -118,7 +119,7 @@ struct PortfolioColumns {
     ids: Vec<Uuid>,
     names: Vec<String>,
     currencies: Vec<String>,
-    last_updated_at: Vec<chrono::DateTime<Utc>>,
+    last_updated_at: Vec<SqlTimestamp>,
     allocation_modes: Vec<DbAllocationMode>,
     drift_bands: Vec<Option<Decimal>>,
     strategic_present: Vec<bool>,
@@ -150,7 +151,9 @@ impl PortfolioColumns {
             columns.ids.push(write.id);
             columns.names.push(content.name.clone());
             columns.currencies.push(content.quote_currency.clone());
-            columns.last_updated_at.push(write.last_updated_at);
+            columns
+                .last_updated_at
+                .push(write.last_updated_at.to_sqlx());
             columns
                 .allocation_modes
                 .push(content.allocation_mode.into());
@@ -226,8 +229,8 @@ async fn lock_and_verify(
                     row.user_id,
                     PortfolioVersion {
                         deleted: row.deleted,
-                        last_updated_at: row.last_updated_at,
-                        updated_at: row.updated_at,
+                        last_updated_at: row.last_updated_at.to_jiff(),
+                        updated_at: row.updated_at.to_jiff(),
                     },
                 ),
             )
@@ -413,7 +416,7 @@ async fn write_assets(
         return Ok(());
     }
 
-    let now = Utc::now();
+    let now = Timestamp::now();
     relationships
         .bind(query(formatcp!(
             "WITH rel AS (
@@ -444,7 +447,7 @@ async fn write_assets(
              SET weight = EXCLUDED.weight, updated_at = EXCLUDED.updated_at",
             fee_set!("EXCLUDED")
         )))
-        .bind(now)
+        .bind(now.to_sqlx())
         .execute(&mut **tx)
         .await?;
     Ok(())
