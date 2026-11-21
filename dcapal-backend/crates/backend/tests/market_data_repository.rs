@@ -57,9 +57,9 @@ async fn seed_market(
 }
 
 /// GIVEN an empty catalog, WHEN crypto and fiat assets are stored,
-/// THEN reads are per kind, ordered by id, and a re-stored asset replaces the old one.
+/// THEN reads are per kind (in no guaranteed order), and a re-stored asset replaces the old one.
 #[sqlx::test(migrations = "../../migrations")]
-async fn catalog_reads_are_per_kind_and_ordered(pool: PgPool) -> TestResult {
+async fn catalog_reads_are_per_kind(pool: PgPool) -> TestResult {
     let repo = MarketDataRepository::new(pool);
     assert!(!repo.has_assets().await?);
 
@@ -68,10 +68,12 @@ async fn catalog_reads_are_per_kind_and_ordered(pool: PgPool) -> TestResult {
 
     assert!(repo.has_assets().await?);
     let cryptos = repo.load_assets_by_type(AssetKind::Crypto).await?;
-    let ids = cryptos.iter().map(|a| a.id().as_str()).collect::<Vec<_>>();
+    let mut ids = cryptos.iter().map(|a| a.id().as_str()).collect::<Vec<_>>();
+    ids.sort_unstable();
     assert_eq!(ids, ["btc", "eth"]);
 
-    let fiats = repo.load_assets_by_type(AssetKind::Fiat).await?;
+    let mut fiats = repo.load_assets_by_type(AssetKind::Fiat).await?;
+    fiats.sort_by(|a, b| a.id().cmp(b.id()));
     assert_eq!(
         serde_json::to_value(&fiats)?,
         serde_json::json!([

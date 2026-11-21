@@ -767,12 +767,6 @@ mod tests {
         repo.store_asset(&quote)
             .await
             .expect("USD should be stored");
-        assert_eq!(
-            repo.market_asset_integrity()
-                .await
-                .expect("integrity scan should succeed"),
-            Default::default()
-        );
 
         // WHEN the current Kraken snapshot is reconciled and missing currencies are loaded
         let pairs = get_new_markets(&["pearl/usd".to_string()], &repo).await;
@@ -805,12 +799,6 @@ mod tests {
                 .await
                 .expect("market should resolve")
                 .is_some()
-        );
-        assert_eq!(
-            repo.market_asset_integrity()
-                .await
-                .expect("integrity scan should succeed after discovery"),
-            Default::default()
         );
     }
 

@@ -18,25 +18,6 @@ use crate::{
     error::{DcaError, Result},
 };
 
-/// Summarizes whether stored markets can resolve both of their catalog assets.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct MarketAssetIntegrity {
-    /// Number of markets with a missing base or quote asset.
-    pub markets_with_missing_assets: usize,
-    /// Number of malformed market records that could not be checked.
-    ///
-    /// Always zero for PostgreSQL storage, where rows are typed; kept so the
-    /// discovery recovery logic stays storage-agnostic.
-    pub malformed_market_records: usize,
-}
-
-impl MarketAssetIntegrity {
-    /// Reports whether discovery should retry to repair market data.
-    pub fn requires_recovery(self) -> bool {
-        self.markets_with_missing_assets > 0 || self.malformed_market_records > 0
-    }
-}
-
 /// The asset-kind codes persisted in `market_asset.kind`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
 #[repr(i16)]
@@ -116,21 +97,18 @@ impl MarketDataRepository {
                 .fetch_optional(&self.pool)
                 .await?;
 
-        row.map(asset_from_row).transpose()
+        row.map(Asset::try_from).transpose()
     }
 
-    /// Loads every catalog asset of a kind, ordered by id in byte order.
+    /// Loads every catalog asset of a kind, in no particular order.
     pub async fn load_assets_by_type(&self, kind: AssetKind) -> Result<Vec<Asset>> {
-        let rows = query_as::<_, AssetRow>(
-            r#"SELECT id, kind, symbol FROM market_asset
-               WHERE kind = $1
-               ORDER BY id COLLATE "C""#,
-        )
-        .bind(DbAssetKind::from(kind))
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            query_as::<_, AssetRow>("SELECT id, kind, symbol FROM market_asset WHERE kind = $1")
+                .bind(DbAssetKind::from(kind))
+                .fetch_all(&self.pool)
+                .await?;
 
-        rows.into_iter().map(asset_from_row).collect()
+        rows.into_iter().map(Asset::try_from).collect()
     }
 
     /// Tells whether the catalog holds at least one crypto or fiat asset.
@@ -172,23 +150,7 @@ impl MarketDataRepository {
                 .fetch_optional(&self.pool)
                 .await?;
 
-        row.map(market_from_row).transpose()
-    }
-
-    /// Summarizes stored markets whose catalog references are incomplete.
-    pub async fn market_asset_integrity(&self) -> Result<MarketAssetIntegrity> {
-        let missing = query_scalar::<_, i64>(
-            r#"SELECT COUNT(*) FROM market AS m
-               WHERE NOT EXISTS (SELECT 1 FROM market_asset WHERE id = m.base_asset_id)
-                  OR NOT EXISTS (SELECT 1 FROM market_asset WHERE id = m.quote_asset_id)"#,
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(MarketAssetIntegrity {
-            markets_with_missing_assets: missing as usize,
-            malformed_market_records: 0,
-        })
+        row.map(Market::try_from).transpose()
     }
 
     /// Finds several markets at once.
@@ -205,7 +167,7 @@ impl MarketDataRepository {
 
         let mut found = rows
             .into_iter()
-            .map(|row| market_from_row(row).map(|m| (m.id.clone(), m)))
+            .map(|row| Market::try_from(row).map(|m| (m.id.clone(), m)))
             .collect::<Result<std::collections::HashMap<_, _>>>()?;
 
         Ok(ids.iter().map(|id| found.remove(*id)).collect())
@@ -296,15 +258,13 @@ impl MarketDataRepository {
         Ok(stored)
     }
 
-    /// Loads every market with its latest price, ordered by id.
+    /// Loads every market with its latest price, in no particular order.
     pub async fn load_markets(&self) -> Result<Vec<Market>> {
-        let rows = query_as::<_, MarketRow>(const_format::formatcp!(
-            r#"{SELECT_MARKETS} ORDER BY m.id COLLATE "C""#
-        ))
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = query_as::<_, MarketRow>(SELECT_MARKETS)
+            .fetch_all(&self.pool)
+            .await?;
 
-        rows.into_iter().map(market_from_row).collect()
+        rows.into_iter().map(Market::try_from).collect()
     }
 }
 
@@ -369,10 +329,16 @@ async fn upsert_prices(
     Ok(stored)
 }
 
-fn asset_from_row(row: AssetRow) -> Result<Asset> {
-    asset_from_parts(row.id, row.kind, row.symbol)
+impl TryFrom<AssetRow> for Asset {
+    type Error = DcaError;
+
+    /// Builds a catalog asset from a stored row, rejecting unknown kind codes.
+    fn try_from(row: AssetRow) -> Result<Self> {
+        asset_from_parts(row.id, row.kind, row.symbol)
+    }
 }
 
+/// Builds a catalog asset from its stored columns, rejecting unknown kind codes.
 fn asset_from_parts(id: String, kind: i16, symbol: String) -> Result<Asset> {
     match DbAssetKind::try_from(kind) {
         Ok(DbAssetKind::Crypto) => Ok(Asset::Crypto(Crypto { id, symbol })),
@@ -383,15 +349,20 @@ fn asset_from_parts(id: String, kind: i16, symbol: String) -> Result<Asset> {
     }
 }
 
-fn market_from_row(row: MarketRow) -> Result<Market> {
-    let base = asset_from_parts(row.base_id, row.base_kind, row.base_symbol)?;
-    let quote = asset_from_parts(row.quote_id, row.quote_kind, row.quote_symbol)?;
-    let price = row
-        .price
-        .zip(row.observed_at)
-        .map(|(price, ts)| Price::new(price, ts));
+impl TryFrom<MarketRow> for Market {
+    type Error = DcaError;
 
-    let mut market = Market::new(row.id, base, quote, price);
-    market.pair = row.pair;
-    Ok(market)
+    /// Builds a market, with its catalog assets and latest price, from a joined row.
+    fn try_from(row: MarketRow) -> Result<Self> {
+        let base = asset_from_parts(row.base_id, row.base_kind, row.base_symbol)?;
+        let quote = asset_from_parts(row.quote_id, row.quote_kind, row.quote_symbol)?;
+        let price = row
+            .price
+            .zip(row.observed_at)
+            .map(|(price, ts)| Price::new(price, ts));
+
+        let mut market = Market::new(row.id, base, quote, price);
+        market.pair = row.pair;
+        Ok(market)
+    }
 }

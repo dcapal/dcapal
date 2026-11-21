@@ -20,9 +20,6 @@ CREATE TABLE market_asset (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Serves the per-kind catalog reads behind /assets/crypto and /assets/fiat.
-CREATE INDEX market_asset_kind_idx ON market_asset (kind, id);
-
 -- Markets: tradable base/quote pairs of market assets.
 CREATE TABLE market (
     -- Lower-case market identifier, the concatenation of base and quote ids.
@@ -34,6 +31,10 @@ CREATE TABLE market (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Tables updated in place frequently (latest prices, worker markers, counters,
+-- visitors) leave 20% free space per page (`fillfactor = 80`) so updates can stay
+-- on the same page (HOT) and avoid index and table bloat.
 
 -- Latest price of each market: a plain table with one row per market, replaced
 -- in place by the price workers. It is deliberately not a hypertable; the
@@ -51,25 +52,25 @@ CREATE TABLE market_price (
     -- Most recent failure to refresh the price, kept next to the last known value.
     last_error TEXT NULL,
     last_error_at TIMESTAMPTZ NULL
-);
+) WITH (fillfactor = 80);
 
 -- Last completion time of periodic workers, keyed by worker name.
 CREATE TABLE worker_marker (
     name TEXT NOT NULL PRIMARY KEY,
     completed_at TIMESTAMPTZ NOT NULL
-);
+) WITH (fillfactor = 80);
 
 -- Named monotonic counters, for example the number of imported portfolios.
 CREATE TABLE app_counter (
     name TEXT NOT NULL PRIMARY KEY,
     value BIGINT NOT NULL DEFAULT 0
-);
+) WITH (fillfactor = 80);
 
 -- Number of requests seen per visitor IP address.
 CREATE TABLE visitor (
     ip TEXT NOT NULL PRIMARY KEY,
     visits BIGINT NOT NULL DEFAULT 0
-);
+) WITH (fillfactor = 80);
 
 -- Short-lived portfolio transfers created by the v1 import endpoint. Readers
 -- ignore rows past `expires_at`; writers purge them.

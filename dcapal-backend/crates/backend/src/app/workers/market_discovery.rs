@@ -13,7 +13,7 @@ use crate::{
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
-    error::{DcaError, Result},
+    error::Result,
     ports::outbound::{
         adapter::PriceProviders,
         repository::{MiscRepository, market_data::MarketDataRepository},
@@ -79,18 +79,10 @@ impl MarketDiscoveryWorker {
     async fn run_market_discovery(&self, stop_token: &mut StopToken) {
         let mut interval =
             tokio::time::interval_at(Instant::now() + INITIAL_DELAY, DAILY_CHECK_INTERVAL);
-        let initial_integrity = self.market_data_repo.market_asset_integrity().await;
         let mut recovery_backoff = Duration::ZERO;
         let mut next_recovery_attempt = Instant::now();
-        let mut recovery_pending = match initial_integrity {
-            Ok(integrity) => integrity.requires_recovery(),
-            Err(error) => {
-                error!("Failed to check Kraken market asset references: {error}");
-                recovery_backoff = INITIAL_RECOVERY_BACKOFF;
-                next_recovery_attempt = Instant::now() + recovery_backoff;
-                true
-            }
-        };
+        // Set while a failed discovery waits to be retried with backoff.
+        let mut recovery_pending = false;
 
         loop {
             tokio::select! {
@@ -204,14 +196,6 @@ impl MarketDiscoveryWorker {
         }
 
         self.market_data_service.invalidate_market_cache();
-
-        let integrity = self.market_data_repo.market_asset_integrity().await?;
-        if integrity.requires_recovery() {
-            return Err(DcaError::Generic(format!(
-                "Kraken discovery left {} markets with missing assets and {} malformed market records",
-                integrity.markets_with_missing_assets, integrity.malformed_market_records,
-            )));
-        }
 
         Ok(())
     }
