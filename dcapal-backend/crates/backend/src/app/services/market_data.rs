@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use chrono::Utc;
+use jiff::Timestamp;
 use parking_lot::RwLock;
 use tracing::{error, info, warn};
 
@@ -246,7 +246,7 @@ impl MarketDataService {
     ) -> Result<Option<(Price, Vec<MarketId>)>> {
         // Base/base => 1.
         if base == quote {
-            return Ok(Some((Price::new(1., Utc::now()), vec![])));
+            return Ok(Some((Price::new(1., Timestamp::now()), vec![])));
         }
 
         let base = normalized_asset(base);
@@ -438,7 +438,7 @@ mod tests {
         service
             .pricers
             .write()
-            .insert(dependency.clone(), Some(Price::new(1., Utc::now())));
+            .insert(dependency.clone(), Some(Price::new(1., Timestamp::now())));
         service
             .price_deps
             .write()

@@ -10,7 +10,6 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use chrono::SubsecRound;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -329,7 +328,10 @@ impl PortfolioWrite {
             id: submitted.id,
             // Reduced to the microsecond precision of the store, so that the
             // response of a write equals what a later read returns.
-            last_updated_at: submitted.last_updated_at.trunc_subsecs(6),
+            last_updated_at: jiff::Timestamp::from_nanosecond(
+                submitted.last_updated_at.as_nanosecond().div_euclid(1_000) * 1_000,
+            )
+            .expect("truncating timestamp precision preserves range"),
             content: PortfolioContent::from_submitted(submitted),
         }
     }
@@ -538,7 +540,7 @@ fn client_is_newer(submitted: &PortfolioV2, current: &StoredPortfolio) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Duration, TimeZone, Utc};
+    use jiff::civil::date;
     use rust_decimal::dec;
 
     use super::*;
@@ -549,7 +551,11 @@ mod tests {
     const C: Uuid = Uuid::from_u128(0xC);
 
     fn at(day: u32) -> DateTime {
-        Utc.with_ymd_and_hms(2026, 1, day, 0, 0, 0).unwrap()
+        date(2026, 1, day as i8)
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp()
     }
 
     fn version(day: u32, deleted: bool) -> PortfolioVersion {
@@ -1018,11 +1024,29 @@ mod tests {
         // THEN the written and returned timestamp keep only microseconds, as a
         // later read would, while the comparison used the submitted value.
         let mut submitted = simple(A, 2, vec![]);
-        submitted.last_updated_at = at(2) + Duration::nanoseconds(123_456_789);
+        submitted.last_updated_at = at(2) + jiff::Span::new().nanoseconds(123_456_789);
 
         let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
 
-        let expected = at(2) + Duration::nanoseconds(123_456_000);
+        let expected = at(2) + jiff::Span::new().nanoseconds(123_456_000);
+        assert_eq!(plan.writes[0].last_updated_at, expected);
+        assert_eq!(
+            plan.response.updated_portfolios[0].last_updated_at,
+            expected
+        );
+    }
+
+    #[test]
+    fn pre_epoch_timestamp_is_truncated_to_store_precision() {
+        // GIVEN a submitted timestamp before the Unix epoch with sub-microsecond
+        // precision, WHEN the sync is planned, THEN it floors to the same stored
+        // microsecond value that PostgreSQL returns.
+        let mut submitted = simple(A, 2, vec![]);
+        submitted.last_updated_at = jiff::Timestamp::from_nanosecond(-1_500).unwrap();
+
+        let plan = plan_sync(&SyncSnapshot::default(), &request(vec![submitted], vec![]));
+
+        let expected = jiff::Timestamp::from_nanosecond(-2_000).unwrap();
         assert_eq!(plan.writes[0].last_updated_at, expected);
         assert_eq!(
             plan.response.updated_portfolios[0].last_updated_at,
@@ -1036,7 +1060,7 @@ mod tests {
         // WHEN the sync is planned,
         // THEN the submitted Portfolio is treated as newer (raw comparison).
         let mut submitted = simple(A, 2, vec![]);
-        submitted.last_updated_at = at(2) + Duration::nanoseconds(1_500);
+        submitted.last_updated_at = at(2) + jiff::Span::new().nanoseconds(1_500);
         let snapshot = SyncSnapshot {
             portfolios: vec![stored(&simple(A, 2, vec![]), version(2, false))],
         };

@@ -10,10 +10,10 @@ use std::{
 use axum::{
     Router, extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get,
 };
-use chrono::prelude::*;
 use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use hyper::header;
+use jiff::Timestamp;
 use metrics::{Unit, counter, describe_counter, describe_histogram};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -56,7 +56,7 @@ pub mod error;
 pub mod ports;
 
 /// The timestamp type shared by API and persistence models.
-pub type DateTime = chrono::DateTime<Utc>;
+pub type DateTime = Timestamp;
 
 /// Redis connection settings used by backend integrations.
 pub struct RedisConfig {

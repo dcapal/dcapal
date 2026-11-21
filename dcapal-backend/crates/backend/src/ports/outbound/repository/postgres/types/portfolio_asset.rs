@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rust_decimal::Decimal;
 use uuid::Uuid;
@@ -131,9 +131,11 @@ pub struct PortfolioAssetRow {
     /// The average price paid for the current holding.
     pub average_buy_price: Option<Decimal>,
     /// When the database row was created.
-    pub created_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub created_at: Timestamp,
     /// When the database row was last changed.
-    pub updated_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub updated_at: Timestamp,
 }
 
 impl PortfolioAssetRow {

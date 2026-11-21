@@ -29,6 +29,7 @@ pub struct PortfolioRequest {
     pub quote_ccy: String,
     pub fees: Option<TransactionFeesRequest>,
     pub assets: Vec<PortfolioAssetRequest>,
+    #[schema(value_type = String, format = DateTime)]
     pub last_updated_at: DateTime,
 }
 
@@ -121,6 +122,7 @@ pub struct PortfolioResponse {
     /// The assets held by the portfolio.
     pub assets: Vec<PortfolioAssetResponse>,
     /// The timestamp used to compare this state with a client copy.
+    #[schema(value_type = String, format = DateTime)]
     pub last_updated_at: DateTime,
 }
 
