@@ -18,6 +18,25 @@ use crate::{
     error::{DcaError, Result},
 };
 
+/// Summarizes whether stored markets can resolve both of their catalog assets.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MarketAssetIntegrity {
+    /// Number of markets with a missing base or quote asset.
+    pub markets_with_missing_assets: usize,
+    /// Number of malformed market records that could not be checked.
+    ///
+    /// Always zero for PostgreSQL storage, where rows are typed; kept so the
+    /// discovery recovery logic stays storage-agnostic.
+    pub malformed_market_records: usize,
+}
+
+impl MarketAssetIntegrity {
+    /// Reports whether discovery should retry to repair market data.
+    pub fn requires_recovery(self) -> bool {
+        self.markets_with_missing_assets > 0 || self.malformed_market_records > 0
+    }
+}
+
 /// The asset-kind codes persisted in `market_asset.kind`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, sqlx::Type)]
 #[repr(i16)]
@@ -154,6 +173,22 @@ impl MarketDataRepository {
                 .await?;
 
         row.map(market_from_row).transpose()
+    }
+
+    /// Summarizes stored markets whose catalog references are incomplete.
+    pub async fn market_asset_integrity(&self) -> Result<MarketAssetIntegrity> {
+        let missing = query_scalar::<_, i64>(
+            r#"SELECT COUNT(*) FROM market AS m
+               WHERE NOT EXISTS (SELECT 1 FROM market_asset WHERE id = m.base_asset_id)
+                  OR NOT EXISTS (SELECT 1 FROM market_asset WHERE id = m.quote_asset_id)"#,
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(MarketAssetIntegrity {
+            markets_with_missing_assets: missing as usize,
+            malformed_market_records: 0,
+        })
     }
 
     /// Finds several markets at once.

@@ -30,6 +30,14 @@ pub const IMPORTED_PORTFOLIOS_TOTAL: &str = concatcp!(BASE, '_', "imported_portf
 
 /// Outbound provider calls, labelled by `provider`, `op` and `outcome`.
 pub const PROVIDER_REQUESTS_TOTAL: &str = concatcp!(BASE, '_', "provider_requests_total");
+/// Time in seconds spent waiting for Yahoo request capacity.
+pub const YAHOO_LIMITER_WAIT_SECONDS: &str = concatcp!(BASE, '_', "yahoo_limiter_wait_seconds");
+/// Yahoo proxy calls rejected locally because the shared limiter was full.
+pub const YAHOO_LIMITER_REJECTIONS_TOTAL: &str =
+    concatcp!(BASE, '_', "yahoo_limiter_rejections_total");
+/// HTTP 429 responses received from Yahoo.
+pub const YAHOO_UPSTREAM_RATE_LIMITS_TOTAL: &str =
+    concatcp!(BASE, '_', "yahoo_upstream_rate_limits_total");
 /// Duration in seconds of outbound provider calls, labelled by `provider` and
 /// `op` (deliberately without `outcome`).
 pub const PROVIDER_REQUEST_SECONDS: &str = concatcp!(BASE, '_', "provider_request_seconds");
@@ -69,6 +77,141 @@ pub enum ProviderOutcome {
     RateLimited,
     Timeout,
     Error,
+}
+
+/// Records time spent waiting for an available Yahoo request slot.
+pub fn record_yahoo_limiter_wait(elapsed: Duration) {
+    histogram!(YAHOO_LIMITER_WAIT_SECONDS).record(elapsed.as_secs_f64());
+}
+
+/// Records a Yahoo request rejected by the local rate limiter.
+pub fn record_yahoo_limiter_rejection() {
+    counter!(YAHOO_LIMITER_REJECTIONS_TOTAL).increment(1);
+}
+
+/// Records an HTTP 429 response received from Yahoo, ignoring other replies.
+pub fn record_yahoo_upstream_response(status: StatusCode) {
+    if status == StatusCode::TOO_MANY_REQUESTS {
+        counter!(YAHOO_UPSTREAM_RATE_LIMITS_TOTAL).increment(1);
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_metrics {
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicU64, Ordering},
+        },
+        time::Duration,
+    };
+
+    use metrics::{
+        Counter, CounterFn, Gauge, Histogram, HistogramFn, Key, KeyName, Metadata, Recorder,
+        SharedString, Unit,
+    };
+
+    use super::*;
+
+    #[derive(Default)]
+    pub(crate) struct TestRecorder {
+        counters: Mutex<HashMap<String, Arc<TestCounter>>>,
+        histograms: Mutex<HashMap<String, Arc<TestHistogram>>>,
+    }
+
+    #[derive(Default)]
+    struct TestCounter(AtomicU64);
+
+    #[derive(Default)]
+    struct TestHistogram(Mutex<Vec<f64>>);
+
+    impl Recorder for TestRecorder {
+        fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
+        fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
+        fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
+
+        fn register_counter(&self, key: &Key, _: &Metadata<'_>) -> Counter {
+            let metric = self
+                .counters
+                .lock()
+                .unwrap()
+                .entry(key.name().to_owned())
+                .or_default()
+                .clone();
+            Counter::from_arc(metric)
+        }
+
+        fn register_gauge(&self, _: &Key, _: &Metadata<'_>) -> Gauge {
+            Gauge::noop()
+        }
+
+        fn register_histogram(&self, key: &Key, _: &Metadata<'_>) -> Histogram {
+            let metric = self
+                .histograms
+                .lock()
+                .unwrap()
+                .entry(key.name().to_owned())
+                .or_default()
+                .clone();
+            Histogram::from_arc(metric)
+        }
+    }
+
+    impl CounterFn for TestCounter {
+        fn increment(&self, value: u64) {
+            self.0.fetch_add(value, Ordering::Relaxed);
+        }
+
+        fn absolute(&self, value: u64) {
+            self.0.fetch_max(value, Ordering::Relaxed);
+        }
+    }
+
+    impl HistogramFn for TestHistogram {
+        fn record(&self, value: f64) {
+            self.0.lock().unwrap().push(value);
+        }
+    }
+
+    impl TestRecorder {
+        pub(crate) fn counter_value(&self, name: &str) -> u64 {
+            self.counters
+                .lock()
+                .unwrap()
+                .get(name)
+                .map_or(0, |counter| counter.0.load(Ordering::Relaxed))
+        }
+
+        pub(crate) fn histogram_values(&self, name: &str) -> Vec<f64> {
+            self.histograms
+                .lock()
+                .unwrap()
+                .get(name)
+                .map_or_else(Vec::new, |histogram| histogram.0.lock().unwrap().clone())
+        }
+    }
+
+    #[test]
+    fn yahoo_limiter_metric_recorders_capture_the_dedicated_signals() {
+        // GIVEN an isolated metrics recorder,
+        // WHEN Yahoo limiter signals are emitted,
+        // THEN each signal is stored under its own metric family.
+        let recorder = TestRecorder::default();
+        metrics::with_local_recorder(&recorder, || {
+            record_yahoo_limiter_wait(Duration::from_millis(250));
+            record_yahoo_limiter_rejection();
+            record_yahoo_upstream_response(StatusCode::TOO_MANY_REQUESTS);
+            record_yahoo_upstream_response(StatusCode::OK);
+        });
+
+        assert_eq!(
+            recorder.histogram_values(YAHOO_LIMITER_WAIT_SECONDS),
+            vec![0.25]
+        );
+        assert_eq!(recorder.counter_value(YAHOO_LIMITER_REJECTIONS_TOTAL), 1);
+        assert_eq!(recorder.counter_value(YAHOO_UPSTREAM_RATE_LIMITS_TOTAL), 1);
+    }
 }
 
 impl ProviderOutcome {

@@ -287,6 +287,21 @@ impl DcaServer {
             "Outbound provider calls by provider, operation and outcome"
         );
         describe_histogram!(
+            infra::stats::YAHOO_LIMITER_WAIT_SECONDS,
+            Unit::Seconds,
+            "Time Yahoo calls wait for a local rate-limiter slot"
+        );
+        describe_counter!(
+            infra::stats::YAHOO_LIMITER_REJECTIONS_TOTAL,
+            Unit::Count,
+            "Yahoo calls rejected by the local rate limiter"
+        );
+        describe_counter!(
+            infra::stats::YAHOO_UPSTREAM_RATE_LIMITS_TOTAL,
+            Unit::Count,
+            "HTTP 429 responses received from Yahoo"
+        );
+        describe_histogram!(
             infra::stats::PROVIDER_REQUEST_SECONDS,
             Unit::Seconds,
             "Duration of outbound provider calls, rate-limiter wait included"

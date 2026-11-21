@@ -749,10 +749,70 @@ struct CMCInfoData {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use super::{
-        AssetPairsResponse, MarketSymbol, Pair, market_ids_from_symbols, parse_market_symbol,
-        parse_online_market_symbols,
+    use crate::{
+        app::domain::entity::{Asset, Crypto, Fiat, Market},
+        ports::outbound::repository::market_data::MarketDataRepository,
     };
+
+    use super::{
+        AssetPairsResponse, MarketSymbol, Pair, fetch_assets, get_new_markets,
+        market_ids_from_symbols, parse_market_symbol, parse_online_market_symbols,
+    };
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn discovery_selects_a_market_whose_base_asset_is_missing(pool: sqlx::PgPool) {
+        // GIVEN only the USD quote asset is in the catalog and PEARL/USD has no market
+        let repo = MarketDataRepository::new(pool);
+        let quote = Asset::Fiat(Fiat::new("usd".to_string(), "US Dollar".to_string()));
+        repo.store_asset(&quote)
+            .await
+            .expect("USD should be stored");
+        assert_eq!(
+            repo.market_asset_integrity()
+                .await
+                .expect("integrity scan should succeed"),
+            Default::default()
+        );
+
+        // WHEN the current Kraken snapshot is reconciled and missing currencies are loaded
+        let pairs = get_new_markets(&["pearl/usd".to_string()], &repo).await;
+        let assets = fetch_assets(&super::get_unique_ccys(&pairs), &repo).await;
+
+        // THEN the missing market is selected and its missing base is reconstructed
+        assert_eq!(pairs, vec![("pearl".to_string(), "usd".to_string())]);
+        assert_eq!(
+            assets.get("pearl").map(Asset::id).map(String::as_str),
+            Some("pearl")
+        );
+
+        // AND storing the discovered assets and market leaves the catalog consistent
+        for asset in assets.values() {
+            repo.store_asset(asset)
+                .await
+                .expect("discovered asset should be stored");
+        }
+        let market = Market::new(
+            "pearlusd".to_string(),
+            assets.get("pearl").unwrap().clone(),
+            assets.get("usd").unwrap().clone(),
+            None,
+        );
+        repo.store_market(&market, crate::config::PriceProvider::Kraken)
+            .await
+            .expect("market should be stored");
+        assert!(
+            repo.find_market(&"pearlusd".to_string())
+                .await
+                .expect("market should resolve")
+                .is_some()
+        );
+        assert_eq!(
+            repo.market_asset_integrity()
+                .await
+                .expect("integrity scan should succeed after discovery"),
+            Default::default()
+        );
+    }
 
     #[test]
     fn online_pair_snapshot_is_normalized_and_filters_offline_pairs() {
