@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate const_format;
 
+// Keep derive_more available for the backend's standard trait-derivation conventions.
+use derive_more as _;
+
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
