@@ -1962,11 +1962,11 @@ dependencies = [
 
 [[package]]
 name = "jiff-sqlx"
-version = "0.2.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6639870bba69eee8eb23555a5fe8c554f7731c5692c1a4abf834eba77414491"
+checksum = "a4996ad290ff7f7081becdda47e28556fbebb81618c599eac5d09182b5a60e38"
 dependencies = [
- "jiff 0.2.46",
+ "jiff 1.0.1",
  "sqlx",
 ]
 
