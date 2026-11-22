@@ -57,6 +57,8 @@ pub mod config;
 pub mod error;
 pub mod ports;
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod v1_regression;
 
 /// The timestamp type shared by API and persistence models.
@@ -156,7 +158,10 @@ impl DcaServer {
                 &config.app.providers,
             )),
             kraken: Arc::new(KrakenProvider::new(http.clone(), &config.app.providers)),
-            yahoo: Arc::new(YahooProvider::new(rquest.clone())),
+            yahoo: Arc::new(match &config.app.providers.yahoo_base_url {
+                Some(base) => YahooProvider::new(rquest.clone()).with_base_url(base),
+                None => YahooProvider::new(rquest.clone()),
+            }),
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 

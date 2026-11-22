@@ -31,13 +31,18 @@ pub async fn fetch_market_price(
     provider: PriceProvider,
 ) -> Result<Price, PriceFailure> {
     let now = Timestamp::now();
+    // The provider is chosen explicitly: a failure is reported, never retried elsewhere.
     let fetched = match provider {
-        PriceProvider::CryptoWatch => providers.cw.fetch_market_price(market, now).await,
+        PriceProvider::CryptoWatch => {
+            classify_price(providers.cw.fetch_market_price(market, now).await)
+        }
         PriceProvider::Kraken => providers.kraken.fetch_market_price(market, now).await,
         PriceProvider::Yahoo => providers.yahoo.fetch_market_price(market, now).await,
     };
 
-    let outcome = classify_price(fetched).map(|px| Price::new(px, now));
+    let outcome = fetched
+        .and_then(validate_price)
+        .map(|px| Price::new(px, now));
     match &outcome {
         Ok(_) => {}
         Err(failure) if failure.kind == FailureKind::Unavailable => {
@@ -112,5 +117,55 @@ mod tests {
             price_provider_for(&market(btc, eur), PriceProvider::Kraken),
             PriceProvider::Kraken
         ));
+    }
+
+    /// GIVEN a Kraken that fails and a Yahoo that would answer any request,
+    /// WHEN the price of a crypto market is fetched from Kraken,
+    /// THEN the failure is reported as is and Yahoo is never contacted.
+    #[tokio::test]
+    async fn a_failing_provider_is_never_replaced_by_another() {
+        use std::sync::Arc;
+
+        use crate::{
+            ports::outbound::adapter::{
+                CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider,
+            },
+            test_support::{FakeProvider, Reply, install_crypto_provider},
+        };
+
+        install_crypto_provider();
+        let kraken = FakeProvider::start(|_| Reply::status(503, "down")).await;
+        let yahoo = FakeProvider::start(|_| {
+            Reply::ok(
+                r#"{"chart":{"result":[{"indicators":{"quote":[{"close":[1.0]}]}}],"error":null}}"#,
+            )
+        })
+        .await;
+        let config: crate::config::Providers = serde_json::from_value(serde_json::json!({
+            "priceProvider": "kraken",
+            "cwApiKey": "",
+            "ipApiKey": "",
+            "krakenBaseUrl": kraken.base_url(),
+        }))
+        .unwrap();
+        let http = reqwest::Client::new();
+        let providers = PriceProviders {
+            cw: Arc::new(CryptoWatchProvider::new(http.clone(), &config)),
+            kraken: Arc::new(KrakenProvider::new(http.clone(), &config)),
+            yahoo: Arc::new(
+                YahooProvider::new(rquest::Client::new()).with_base_url(&yahoo.base_url()),
+            ),
+            ipapi: Arc::new(IpApi::new(http, &config)),
+        };
+        let btc = Asset::Crypto(Crypto::new_with_id("btc".into()));
+        let eur = Asset::Fiat(Fiat::new("eur".into(), "Euro".into()));
+
+        let failure = fetch_market_price(&market(btc, eur), &providers, PriceProvider::Kraken)
+            .await
+            .unwrap_err();
+
+        assert_eq!(failure.kind, FailureKind::ProviderError);
+        assert!(yahoo.requests().is_empty());
+        assert!(!kraken.requests().is_empty());
     }
 }

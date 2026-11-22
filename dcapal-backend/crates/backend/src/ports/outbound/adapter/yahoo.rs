@@ -13,19 +13,23 @@ use axum::{
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use tracing::{debug, error, warn};
 
-use super::asset_provider::{AssetProvider, AssetProviderError, ProviderAsset};
+use super::{
+    PriceCallError,
+    asset_provider::{AssetProvider, AssetProviderError, ProviderAsset},
+};
 use crate::{
     DateTime,
     app::domain::{
         asset::{AssetRef, ResolvedAsset},
         entity::{Market, OHLCFrequency},
+        market_quote::{FailureKind, PriceFailure},
         portfolio::{AssetClass, Provider},
     },
     app::infra::stats::{
         MetricProvider, ProviderOp, ProviderOutcome, observe_provider,
         record_yahoo_limiter_rejection, record_yahoo_limiter_wait, record_yahoo_upstream_response,
     },
-    error::{DcaError, Result},
+    error::DcaError,
 };
 
 /// Sustained and burst budget of requests per second shared by every Yahoo call.
@@ -76,6 +80,56 @@ impl From<GetError> for DcaError {
 pub struct YahooProvider {
     http: rquest::Client,
     limiter: Arc<DefaultDirectRateLimiter>,
+    endpoints: Arc<YahooEndpoints>,
+}
+
+/// Root URLs of the Yahoo chart and search endpoints, without a trailing slash.
+#[derive(Debug, Clone)]
+struct YahooEndpoints {
+    chart: String,
+    search: String,
+}
+
+impl Default for YahooEndpoints {
+    fn default() -> Self {
+        Self {
+            chart: "https://query1.finance.yahoo.com/v8/finance/chart".to_string(),
+            search: "https://query2.finance.yahoo.com/v1/finance/search".to_string(),
+        }
+    }
+}
+
+impl YahooEndpoints {
+    /// Serves both endpoints from one host, such as a local fake or a proxy.
+    fn rooted_at(base: &str) -> Self {
+        let base = base.trim_end_matches('/');
+        Self {
+            chart: format!("{base}/v8/finance/chart"),
+            search: format!("{base}/v1/finance/search"),
+        }
+    }
+
+    /// Builds the chart URL of a symbol, percent-encoding it as one path segment.
+    fn chart_url(
+        &self,
+        symbol: &str,
+        params: &[(&str, &str)],
+    ) -> std::result::Result<url::Url, String> {
+        let mut url = url::Url::parse(&self.chart).map_err(|e| e.to_string())?;
+        url.path_segments_mut()
+            .map_err(|_| "chart URL cannot be a base".to_string())?
+            .pop_if_empty()
+            .push(symbol);
+        url.query_pairs_mut().extend_pairs(params);
+        Ok(url)
+    }
+
+    /// Builds the search URL, percent-encoding the free-text query.
+    fn search_url(&self, query: &str) -> std::result::Result<url::Url, String> {
+        let mut url = url::Url::parse(&self.search).map_err(|e| e.to_string())?;
+        url.query_pairs_mut().append_pair("q", query);
+        Ok(url)
+    }
 }
 
 impl YahooProvider {
@@ -89,7 +143,16 @@ impl YahooProvider {
         Self {
             http,
             limiter: Arc::new(RateLimiter::direct(quota)),
+            endpoints: Arc::new(YahooEndpoints::default()),
         }
+    }
+
+    /// Sends every request to `base` instead of the Yahoo hosts.
+    ///
+    /// Used by local fakes in tests and by deployments behind a proxy.
+    pub fn with_base_url(mut self, base: &str) -> Self {
+        self.endpoints = Arc::new(YahooEndpoints::rooted_at(base));
+        self
     }
 
     /// Sends a GET to Yahoo once the rate limiter admits it.
@@ -122,128 +185,120 @@ impl YahooProvider {
 
     /// Fetches the latest price of a market, falling back from 5-minute to daily
     /// candles. Recorded as one `price` provider call (both attempts included).
-    pub async fn fetch_market_price(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
+    ///
+    /// The daily fallback only follows a 5-minute answer that carries no price. A
+    /// provider error or a malformed reply is reported as is.
+    pub async fn fetch_market_price(
+        &self,
+        mkt: &Market,
+        ts: DateTime,
+    ) -> std::result::Result<f64, PriceFailure> {
         observe_provider(
             MetricProvider::Yahoo,
             ProviderOp::Price,
             self.fetch_market_price_inner(mkt, ts),
-            |result| match result {
-                Ok(Some(_)) => ProviderOutcome::Ok,
-                Ok(None) => ProviderOutcome::NotFound,
-                Err(e) => outcome_of_error(e),
-            },
+            PriceCallError::outcome,
         )
         .await
+        .map_err(|e| e.failure)
     }
 
-    async fn fetch_market_price_inner(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
-        if let Some(px) = self.fetch_price(mkt, OHLCFrequency::Minutes5, ts).await? {
-            Ok(Some(px))
-        } else if let Some(px) = self.fetch_price(mkt, OHLCFrequency::Daily, ts).await? {
-            debug!(
-                "Cannot fetch price for '{}' with '{}' frequency. Retrying with '{}'",
-                mkt.id,
-                OHLCFrequency::Minutes5,
-                OHLCFrequency::Daily
-            );
-            Ok(Some(px))
-        } else {
-            Ok(None)
+    async fn fetch_market_price_inner(
+        &self,
+        mkt: &Market,
+        ts: DateTime,
+    ) -> std::result::Result<f64, PriceCallError> {
+        let Some(symbol) = mkt.as_yahoo() else {
+            warn!(mkt = mkt.id, "No Yahoo ticker for market");
+            return Err(PriceFailure::unavailable("Yahoo does not price this market").into());
+        };
+
+        match self.fetch_price(&symbol, OHLCFrequency::Minutes5, ts).await {
+            Err(e) if e.failure.kind == FailureKind::Unavailable => {
+                debug!(
+                    "Cannot fetch price for '{}' with '{}' frequency. Retrying with '{}'",
+                    mkt.id,
+                    OHLCFrequency::Minutes5,
+                    OHLCFrequency::Daily
+                );
+                self.fetch_price(&symbol, OHLCFrequency::Daily, ts).await
+            }
+            other => other,
         }
     }
 
     async fn fetch_price(
         &self,
-        mkt: &Market,
+        symbol: &str,
         freq: OHLCFrequency,
         ts: DateTime,
-    ) -> Result<Option<f64>> {
-        let Some(symbol) = mkt.as_yahoo() else {
-            warn!(mkt = mkt.id, "No Yahoo ticker for market");
-            return Ok(None);
-        };
+    ) -> std::result::Result<f64, PriceCallError> {
         let interval = get_api_interval(freq);
         let (r_lo, r_hi) = freq.ohlc_range(ts);
-        let (period_1, period_2) = (r_lo.as_second(), r_hi.as_second());
-        let url = format!(
-            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={period_1}&period2={period_2}&interval={interval}"
-        );
+        let (period_1, period_2) = (r_lo.as_second().to_string(), r_hi.as_second().to_string());
+        let url = self
+            .endpoints
+            .chart_url(
+                symbol,
+                &[
+                    ("period1", &period_1),
+                    ("period2", &period_2),
+                    ("interval", interval),
+                ],
+            )
+            .map_err(PriceFailure::malformed)?;
 
         debug!(
-            url = url,
-            "Fetching {} OHLC candlestick for market '{}' in range [{}, {}]",
-            freq,
-            mkt.id,
-            r_lo,
-            r_hi
+            url = url.as_str(),
+            "Fetching {} OHLC candlestick for '{}' in range [{}, {}]", freq, symbol, r_lo, r_hi
         );
 
-        let res = self.get(&url, REQUEST_TIMEOUT, Admission::Wait).await?;
-        if !res.status().is_success() {
-            if res.status() == reqwest::StatusCode::NOT_FOUND {
-                let res = res.json::<chart::ChartResponse>().await?;
-
-                if let Some(e) = res.chart.error {
-                    warn!(
-                        url = url,
-                        "Unsuccessful request. Code: {}. Description: {}", e.code, e.description
-                    );
-                }
-                return Ok(None);
-            }
-
-            return Err(res.error_for_status().unwrap_err().into());
-        }
-
-        let res = res.json::<chart::ChartResponse>().await?;
-
-        if let Some(e) = res.chart.error {
-            warn!(
-                url = url,
-                "Unsuccessful request. Code: {}. Description: {}", e.code, e.description
-            );
-            return Ok(None);
-        }
-
-        let result = res.chart.result;
-        if result.is_none() || result.as_ref().unwrap().is_empty() {
-            return Err(DcaError::Generic(
-                "Malformed response. Unexpected empty chart.result".to_owned(),
-            ));
-        }
-        let result = result.unwrap();
-        let result = &result[0];
-        if result.indicators.quote.is_empty() {
-            return Err(DcaError::Generic(
-                "Malformed response. Unexpected empty chart.result.indicators.quote".to_owned(),
-            ));
-        }
-
-        let quote = &result.indicators.quote[0];
-        match quote {
-            chart::QuotesKind::Empty {} => Ok(None),
-            chart::QuotesKind::Quotes(q) => {
-                let price = if q.close.is_empty() {
-                    None
-                } else {
-                    q.close.iter().rev().find_map(|p| *p)
-                };
-
-                Ok(price)
-            }
-        }
+        let (status, body) = self.read_body(url.as_str(), REQUEST_TIMEOUT).await?;
+        Ok(parse_chart_price(status, &body)?)
     }
 
+    /// Sends a waiting GET and reads the whole reply, mapping transport problems to failures.
+    async fn read_body(
+        &self,
+        url: &str,
+        timeout: Duration,
+    ) -> std::result::Result<(u16, Vec<u8>), PriceCallError> {
+        let response = self
+            .get(url, timeout, Admission::Wait)
+            .await
+            .map_err(|e| call_error_of(&e))?;
+        let status = response.status().as_u16();
+        let body = response
+            .bytes()
+            .await
+            .map_err(|e| call_error_of(&GetError::Request(e)))?;
+        Ok((status, body.to_vec()))
+    }
+
+    /// Proxies a free-text search, percent-encoding the query.
     pub async fn search(&self, request_param: String) -> Response {
-        let url = format!("https://query2.finance.yahoo.com/v1/finance/search?q={request_param}");
-        self.forward(url).await
+        match self.endpoints.search_url(&request_param) {
+            Ok(url) => self.forward(url.to_string()).await,
+            Err(e) => bad_gateway(&e),
+        }
     }
 
+    /// Proxies the 5-minute chart of a symbol, percent-encoding it as one path segment.
     pub async fn chart(&self, symbol: String, start_period: i64, end_period: i64) -> Response {
-        let url = format!(
-            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={start_period}&period2={end_period}&interval=5m&close=adjusted"
+        let (start, end) = (start_period.to_string(), end_period.to_string());
+        let url = self.endpoints.chart_url(
+            &symbol,
+            &[
+                ("period1", &start),
+                ("period2", &end),
+                ("interval", "5m"),
+                ("close", "adjusted"),
+            ],
         );
-        self.forward(url).await
+        match url {
+            Ok(url) => self.forward(url.to_string()).await,
+            Err(e) => bad_gateway(&e),
+        }
     }
 
     /// Streams the Yahoo reply to the caller, answering 429 when the shared rate
@@ -288,7 +343,11 @@ impl YahooProvider {
     }
 }
 
-const CHART_BASE_URL: &str = "https://query1.finance.yahoo.com/v8/finance/chart/";
+/// Answers 502 for a request that could not even be built.
+fn bad_gateway(reason: &str) -> Response {
+    error!("Cannot build Yahoo proxy request: {reason}");
+    StatusCode::BAD_GATEWAY.into_response()
+}
 
 /// Upper bound on one Yahoo asset lookup (rate-limiter wait included), so a
 /// stalled request cannot hold a synchronization open.
@@ -323,7 +382,7 @@ impl YahooProvider {
         &self,
         asset: &AssetRef,
     ) -> std::result::Result<Option<ProviderAsset>, AssetProviderError> {
-        let url = lookup_url(asset.symbol())?;
+        let url = lookup_url(&self.endpoints, asset.symbol())?;
         let (status, body) = tokio::time::timeout(LOOKUP_TIMEOUT, async {
             let response = self
                 .get(url.as_str(), LOOKUP_TIMEOUT, Admission::Wait)
@@ -349,11 +408,71 @@ impl YahooProvider {
     }
 }
 
-/// Classifies a failed price call for the provider metrics.
-fn outcome_of_error(error: &DcaError) -> ProviderOutcome {
+/// Describes a failed Yahoo request as a visible provider error.
+fn call_error_of(error: &GetError) -> PriceCallError {
     match error {
-        DcaError::Rquest(e) if e.is_timeout() => ProviderOutcome::Timeout,
-        _ => ProviderOutcome::Error,
+        GetError::Request(e) if e.is_timeout() => {
+            PriceCallError::timeout("Yahoo request timed out")
+        }
+        GetError::RateLimited => PriceFailure::provider_error(error.to_string()).into(),
+        GetError::Request(e) => {
+            PriceFailure::provider_error(format!("Yahoo request failed: {e}")).into()
+        }
+    }
+}
+
+/// Extracts the most recent close from a Yahoo chart reply.
+///
+/// HTTP 404 and a `Not Found` chart error mean Yahoo lists no such symbol
+/// (unavailable). Any other non-success status, or a chart error reported with
+/// HTTP 200, is a provider error. An undecodable body or a reply without
+/// `chart.result` or `indicators.quote` is malformed. A reply whose closes are
+/// all null carries no price (unavailable).
+fn parse_chart_price(status: u16, body: &[u8]) -> std::result::Result<f64, PriceFailure> {
+    if status == 404 {
+        return Err(PriceFailure::unavailable("Yahoo does not list the symbol"));
+    }
+    if !(200..300).contains(&status) {
+        return Err(PriceFailure::provider_error(format!(
+            "Yahoo answered with HTTP status {status}"
+        )));
+    }
+
+    let response: chart::ChartResponse = serde_json::from_slice(body)
+        .map_err(|e| PriceFailure::malformed(format!("undecodable chart body: {e}")))?;
+
+    if let Some(error) = response.chart.error {
+        return Err(if error.code.eq_ignore_ascii_case("not found") {
+            PriceFailure::unavailable("Yahoo does not list the symbol")
+        } else {
+            PriceFailure::provider_error(format!(
+                "Yahoo chart error {}: {}",
+                error.code,
+                error.description.unwrap_or_default()
+            ))
+        });
+    }
+
+    let result = response
+        .chart
+        .result
+        .and_then(|results| results.into_iter().next())
+        .ok_or_else(|| PriceFailure::malformed("empty chart.result"))?;
+    let quote = result
+        .indicators
+        .quote
+        .into_iter()
+        .next()
+        .ok_or_else(|| PriceFailure::malformed("empty chart.result.indicators.quote"))?;
+
+    match quote {
+        chart::QuotesKind::Empty {} => Err(PriceFailure::unavailable("chart has no quotes")),
+        chart::QuotesKind::Quotes(q) => q
+            .close
+            .iter()
+            .rev()
+            .find_map(|p| *p)
+            .ok_or_else(|| PriceFailure::unavailable("chart has no closing price")),
     }
 }
 
@@ -375,18 +494,14 @@ fn outcome_of_lookup_error(error: &AssetProviderError) -> ProviderOutcome {
     }
 }
 
-/// Builds the chart URL for a symbol, percent-encoding it as a path segment.
-fn lookup_url(symbol: &str) -> std::result::Result<url::Url, AssetProviderError> {
-    let mut url = url::Url::parse(CHART_BASE_URL)
-        .map_err(|e| AssetProviderError::Malformed(e.to_string()))?;
-    url.path_segments_mut()
-        .map_err(|_| AssetProviderError::Malformed("chart URL cannot be a base".to_string()))?
-        .pop_if_empty()
-        .push(symbol);
-    url.query_pairs_mut()
-        .append_pair("range", "1d")
-        .append_pair("interval", "1d");
-    Ok(url)
+/// Builds the one-day chart URL used to resolve an asset, percent-encoding the symbol.
+fn lookup_url(
+    endpoints: &YahooEndpoints,
+    symbol: &str,
+) -> std::result::Result<url::Url, AssetProviderError> {
+    endpoints
+        .chart_url(symbol, &[("range", "1d"), ("interval", "1d")])
+        .map_err(AssetProviderError::Malformed)
 }
 
 /// Turns a Yahoo chart reply into the metadata of the requested asset.
@@ -531,15 +646,6 @@ mod lookup_tests {
         );
         assert_eq!(
             outcome_of_lookup_error(&AssetProviderError::Malformed("x".into())),
-            ProviderOutcome::Error
-        );
-    }
-
-    #[test]
-    fn non_timeout_price_errors_map_to_error() {
-        // GIVEN a generic price failure, WHEN it is classified, THEN it is an error.
-        assert_eq!(
-            outcome_of_error(&DcaError::Generic("boom".into())),
             ProviderOutcome::Error
         );
     }
@@ -691,7 +797,7 @@ mod lookup_tests {
     fn symbol_is_percent_encoded_in_the_url() {
         // GIVEN a symbol containing reserved URL characters,
         // WHEN the lookup URL is built, THEN the symbol stays one encoded path segment.
-        let url = lookup_url("A/B?C").unwrap();
+        let url = lookup_url(&YahooEndpoints::default(), "A/B?C").unwrap();
 
         assert_eq!(
             url.as_str(),
@@ -895,7 +1001,8 @@ mod chart {
     #[derive(Debug, Clone, Deserialize)]
     pub struct Error {
         pub code: String,
-        pub description: String,
+        #[serde(default)]
+        pub description: Option<String>,
     }
 
     #[derive(Debug, Clone, Deserialize)]
@@ -998,10 +1105,175 @@ mod fx_tests {
         let price = provider
             .fetch_market_price(&fx_market("eur", "usd"), jiff::Timestamp::now())
             .await
-            .unwrap()
             .expect("Yahoo should price EURUSD=X");
 
         println!("EURUSD=X -> {price}");
         assert!((0.5..2.0).contains(&price));
+    }
+}
+
+#[cfg(test)]
+mod price_tests {
+    use super::*;
+    use crate::{
+        app::domain::entity::{Asset, Fiat},
+        test_support::{FakeProvider, Reply},
+    };
+
+    fn eurusd() -> Market {
+        let fiat = |id: &str| Asset::Fiat(Fiat::new(id.into(), id.to_uppercase()));
+        Market::new("eurusd".into(), fiat("eur"), fiat("usd"), None)
+    }
+
+    fn provider_at(fake: &FakeProvider) -> YahooProvider {
+        YahooProvider::new(rquest::Client::new()).with_base_url(&fake.base_url())
+    }
+
+    fn chart(closes: &str) -> String {
+        format!(
+            r#"{{"chart":{{"result":[{{"indicators":{{"quote":[{{"close":{closes}}}]}}}}],"error":null}}}}"#
+        )
+    }
+
+    async fn price_of(fake: &FakeProvider) -> Result<f64, PriceFailure> {
+        provider_at(fake)
+            .fetch_market_price(&eurusd(), jiff::Timestamp::now())
+            .await
+    }
+
+    /// GIVEN Yahoo answers a 5-minute chart whose latest close follows a null candle,
+    /// WHEN the market price is fetched,
+    /// THEN the latest non-null close is the price, requested for the encoded FX ticker.
+    #[tokio::test]
+    async fn latest_close_is_the_price() {
+        let fake = FakeProvider::start(|_| Reply::ok(chart("[1.05,null,1.0725,null]"))).await;
+
+        assert_eq!(price_of(&fake).await, Ok(1.0725));
+
+        let requests = fake.requests();
+        assert_eq!(requests.len(), 1);
+        assert!(
+            requests[0].starts_with("/v8/finance/chart/EURUSD=X?"),
+            "{requests:?}"
+        );
+        assert!(requests[0].contains("interval=5m"));
+    }
+
+    /// GIVEN Yahoo has no 5-minute close but a daily one,
+    /// WHEN the market price is fetched,
+    /// THEN the daily candle is used, from the same provider.
+    #[tokio::test]
+    async fn daily_candles_back_up_a_missing_five_minute_close() {
+        let fake = FakeProvider::start(|target| {
+            if target.contains("interval=1d") {
+                Reply::ok(chart("[1.1]"))
+            } else {
+                Reply::ok(chart("[null]"))
+            }
+        })
+        .await;
+
+        assert_eq!(price_of(&fake).await, Ok(1.1));
+        assert_eq!(fake.requests().len(), 2);
+    }
+
+    /// GIVEN Yahoo answers HTTP 200 carrying a chart error other than "Not Found",
+    /// WHEN the market price is fetched,
+    /// THEN it is a provider error (not an unavailable price) and no daily fallback is tried.
+    #[tokio::test]
+    async fn chart_error_in_a_successful_reply_is_a_provider_error() {
+        let fake = FakeProvider::start(|_| {
+            Reply::ok(r#"{"chart":{"result":null,"error":{"code":"Too Many Requests","description":"slow down"}}}"#)
+        })
+        .await;
+
+        let failure = price_of(&fake).await.unwrap_err();
+
+        assert_eq!(failure.kind, FailureKind::ProviderError);
+        assert!(failure.message.contains("Too Many Requests"), "{failure}");
+        assert_eq!(fake.requests().len(), 1);
+    }
+
+    /// GIVEN Yahoo does not list the ticker (HTTP 404, or a "Not Found" chart error),
+    /// WHEN the market price is fetched,
+    /// THEN the price is unavailable.
+    #[tokio::test]
+    async fn unlisted_tickers_are_unavailable() {
+        let not_found =
+            r#"{"chart":{"result":null,"error":{"code":"Not Found","description":"No data"}}}"#;
+        for reply in [Reply::status(404, not_found), Reply::ok(not_found)] {
+            let fake = FakeProvider::start(move |_| reply.clone()).await;
+
+            assert_eq!(
+                price_of(&fake).await.unwrap_err().kind,
+                FailureKind::Unavailable
+            );
+        }
+    }
+
+    /// GIVEN Yahoo answers with server errors, HTML, or an empty chart,
+    /// WHEN the market price is fetched,
+    /// THEN server errors are provider errors and unreadable payloads are malformed.
+    #[tokio::test]
+    async fn failures_and_malformed_replies_are_told_apart() {
+        let cases = [
+            (Reply::status(503, "down"), FailureKind::ProviderError),
+            (Reply::status(429, ""), FailureKind::ProviderError),
+            (Reply::ok("<html>"), FailureKind::Malformed),
+            (
+                Reply::ok(r#"{"chart":{"result":[],"error":null}}"#),
+                FailureKind::Malformed,
+            ),
+            (
+                Reply::ok(r#"{"chart":{"result":[{"indicators":{"quote":[]}}],"error":null}}"#),
+                FailureKind::Malformed,
+            ),
+        ];
+        for (reply, kind) in cases {
+            let fake = FakeProvider::start({
+                let reply = reply.clone();
+                move |_| reply.clone()
+            })
+            .await;
+
+            assert_eq!(price_of(&fake).await.unwrap_err().kind, kind, "{reply:?}");
+        }
+    }
+
+    /// GIVEN a market Yahoo has no ticker for (a cross rate that is not stored),
+    /// WHEN the market price is fetched,
+    /// THEN it is unavailable without any request.
+    #[tokio::test]
+    async fn markets_without_a_ticker_never_reach_yahoo() {
+        let fake = FakeProvider::start(|_| Reply::ok(chart("[1.0]"))).await;
+        let fiat = |id: &str| Asset::Fiat(Fiat::new(id.into(), id.to_uppercase()));
+        let cross = Market::new("eurgbp".into(), fiat("eur"), fiat("gbp"), None);
+
+        let failure = provider_at(&fake)
+            .fetch_market_price(&cross, jiff::Timestamp::now())
+            .await
+            .unwrap_err();
+
+        assert_eq!(failure.kind, FailureKind::Unavailable);
+        assert!(fake.requests().is_empty());
+    }
+
+    /// GIVEN a search text and a chart symbol with reserved URL characters,
+    /// WHEN they are proxied,
+    /// THEN the text is a percent-encoded query value and the symbol one encoded path segment.
+    #[tokio::test]
+    async fn proxied_search_and_chart_requests_are_percent_encoded() {
+        let fake = FakeProvider::start(|_| Reply::ok("{}")).await;
+        let provider = provider_at(&fake);
+
+        provider.search("a b&c=d".to_string()).await;
+        provider.chart("A/B?C".to_string(), 1, 2).await;
+
+        let requests = fake.requests();
+        assert_eq!(requests[0], "/v1/finance/search?q=a+b%26c%3Dd");
+        assert!(
+            requests[1].starts_with("/v8/finance/chart/A%2FB%3FC?period1=1&period2=2"),
+            "{requests:?}"
+        );
     }
 }
