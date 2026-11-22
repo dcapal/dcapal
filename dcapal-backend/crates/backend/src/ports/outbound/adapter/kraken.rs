@@ -9,7 +9,7 @@ use failsafe::futures::CircuitBreaker;
 use itertools::Itertools;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use super::DefaultCircuitBreaker;
 use crate::{
@@ -239,7 +239,17 @@ impl KrakenProvider {
     ) -> (Vec<Market>, Vec<Asset>) {
         let pairs = get_new_markets(market_symbols, repo).await;
         let ccys = get_unique_ccys(&pairs);
+        info!(
+            markets = pairs.len(),
+            currencies = ccys.len(),
+            "Resolving assets of new Kraken markets"
+        );
         let (mut assets_map, unresolved) = self.fetch_assets_cmc(&ccys, repo).await;
+        info!(
+            resolved = assets_map.len(),
+            unresolved = unresolved.len(),
+            "Resolved assets of new Kraken markets"
+        );
 
         // Placeholder assets filled in after a CMC failure are neither stored nor
         // used by markets, so the next discovery run (which finds their markets
@@ -344,6 +354,10 @@ impl KrakenProvider {
         let mut skipped = 0usize;
         let mut requests = 0usize;
 
+        info!(
+            symbols = to_fetch.len(),
+            "Fetching asset metadata from CoinMarketCap"
+        );
         for chunk in to_fetch.chunks(CMC_CHUNK_SIZE) {
             if breaker_open {
                 skipped += chunk.len();
