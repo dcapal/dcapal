@@ -19,7 +19,6 @@ wasm-logger = { workspace = true }
 
 # Library dependencies
 getrandom = { workspace = true, features = ["wasm_js"] }
-lazy_static = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
 rust_decimal = { workspace = true }

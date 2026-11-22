@@ -1,12 +1,12 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
+    sync::LazyLock,
 };
 
 use failsafe::futures::CircuitBreaker;
 use futures::StreamExt;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
 use tracing::{debug, error, warn};
@@ -340,14 +340,14 @@ impl KrakenProvider {
     }
 
     async fn fetch_crypto_cmc(&self, ccys: &[&AssetId]) -> Result<Vec<Asset>> {
-        lazy_static! {
-            static ref CMC_ALIAS: HashMap<&'static str, &'static str> = HashMap::from([
+        static CMC_ALIAS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+            HashMap::from([
                 ("eth2.s", "eth"),
                 ("repv2", "rep"),
                 ("luna2", "luna"),
-                ("waxl", "axl")
-            ]);
-        }
+                ("waxl", "axl"),
+            ])
+        });
 
         // Skip currencies not known by CMC for now. Better to fallback than send
         // confusing asset names

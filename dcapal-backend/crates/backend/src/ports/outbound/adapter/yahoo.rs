@@ -1,4 +1,9 @@
-use std::{collections::HashMap, num::NonZeroU32, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    num::NonZeroU32,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use axum::{
@@ -852,11 +857,8 @@ pub trait AsYahooMarket {
 
 impl AsYahooMarket for Market {
     fn as_yahoo(&self) -> Option<String> {
-        lazy_static::lazy_static! {
-            static ref MAPPINGS: HashMap<&'static str, &'static str> = {
-                [("luna", ("luna1"))].into_iter().collect()
-            };
-        }
+        static MAPPINGS: LazyLock<HashMap<&'static str, &'static str>> =
+            LazyLock::new(|| [("luna", "luna1")].into_iter().collect());
 
         if self.is_fiat() {
             return yahoo_fx_ticker(&self.id).map(str::to_string);

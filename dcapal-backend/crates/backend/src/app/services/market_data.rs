@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -407,11 +407,8 @@ impl MarketDataService {
 }
 
 fn normalized_asset(id: &AssetId) -> AssetId {
-    lazy_static::lazy_static! {
-        static ref NORMALIZED: HashMap<&'static str, &'static str> = {
-            [("eth2", "eth"), ("eth2.s", "eth")].into_iter().collect()
-        };
-    }
+    static NORMALIZED: LazyLock<HashMap<&'static str, &'static str>> =
+        LazyLock::new(|| [("eth2", "eth"), ("eth2.s", "eth")].into_iter().collect());
 
     NORMALIZED
         .get(id.as_str())

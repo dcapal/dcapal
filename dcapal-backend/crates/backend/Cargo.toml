@@ -31,7 +31,6 @@ ip2location = { workspace = true }
 itertools = { workspace = true }
 jsonschema = { workspace = true }
 jsonwebtoken = { workspace = true }
-lazy_static = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
 moka = { workspace = true }
