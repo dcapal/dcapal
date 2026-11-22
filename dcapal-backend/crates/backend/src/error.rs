@@ -53,7 +53,7 @@ pub enum DcaError {
     JsonDeserializationFailure(String, String, #[source] serde_json::Error),
     #[error("Third-party API reqwest failed")]
     Reqwest(#[from] reqwest::Error),
-    #[error("IP2Location internal error: {0:?}")]
+    #[error("IP2Location internal error")]
     Ip2Location(#[source] ip2location::error::Error),
     #[error(transparent)]
     TypeHeaderError(#[from] axum_extra::typed_header::TypedHeaderRejection),
@@ -198,5 +198,18 @@ mod tests {
 
         assert!(format!("{error:?}").contains("-- Caused by:"));
         assert!(std::error::Error::source(&error).is_some());
+    }
+
+    /// GIVEN an IP2Location failure,
+    /// WHEN the error is rendered as a chain,
+    /// THEN the cause appears exactly once, as the source, not also in the message.
+    #[test]
+    fn ip2location_cause_is_rendered_once() {
+        let error = DcaError::Ip2Location(ip2location::error::Error::RecordNotFound);
+
+        let rendered = ErrorChain(&error).to_string();
+
+        assert_eq!(rendered.matches("RecordNotFound").count(), 1, "{rendered}");
+        assert!(rendered.starts_with("IP2Location internal error -- Caused by:"));
     }
 }
