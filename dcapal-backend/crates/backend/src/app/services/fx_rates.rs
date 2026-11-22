@@ -101,19 +101,22 @@ pub async fn seed_fx_catalog(
     service: &MarketDataService,
     crypto_provider: PriceProvider,
 ) -> Result<()> {
-    for (symbol, name) in FIAT_CATALOG {
-        let fiat = Asset::Fiat(Fiat::new(symbol.to_lowercase(), name.to_string()));
-        repo.store_asset(&fiat).await?;
-    }
+    let fiats = FIAT_CATALOG
+        .iter()
+        .map(|(symbol, name)| Asset::Fiat(Fiat::new(symbol.to_lowercase(), name.to_string())))
+        .collect::<Vec<_>>();
+    let markets = fx_markets();
+    let priced_by = markets
+        .iter()
+        .map(|market| (market, price_provider_for(market, crypto_provider)))
+        .collect::<Vec<_>>();
+
+    // Assets and markets land together, so a failure never leaves FX markets
+    // without their fiat assets.
+    let stored = repo.store_catalog(&fiats, &priced_by).await;
     service.invalidate_asset_cache();
-
-    for market in fx_markets() {
-        let provider = price_provider_for(&market, crypto_provider);
-        repo.store_market(&market, provider).await?;
-    }
     service.invalidate_market_cache();
-
-    Ok(())
+    stored
 }
 
 /// The seven FX markets (fiat against USD) without prices.

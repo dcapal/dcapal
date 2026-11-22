@@ -333,6 +333,164 @@ async fn reconciliation_deletes_only_crypto_markets_outside_the_snapshot(
     Ok(())
 }
 
+/// GIVEN a stored catalog, WHEN several assets are looked up at once with repeated,
+/// mixed-case and unknown ids, THEN the result is aligned with the input, and an empty
+/// input returns an empty result.
+#[sqlx::test(migrations = "../../migrations")]
+async fn find_assets_is_aligned_with_the_requested_ids(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool);
+    seed_catalog(&repo).await?;
+
+    let found = repo.find_assets(&["EUR", "nope", "btc", "eur"]).await?;
+
+    let ids = found
+        .iter()
+        .map(|a| a.as_ref().map(|a| a.id().clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        ids,
+        [
+            Some("eur".to_string()),
+            None,
+            Some("btc".to_string()),
+            Some("eur".to_string())
+        ]
+    );
+    assert!(repo.find_assets(&[] as &[&str]).await?.is_empty());
+    Ok(())
+}
+
+/// GIVEN a client-supplied crypto and fiat row, WHEN a batch of assets is stored together
+/// with a duplicate, THEN the fiat row takes the catalog name, the crypto row keeps its name
+/// and both become confirmed, new assets are inserted, and an empty batch is a no-op.
+#[sqlx::test(migrations = "../../migrations")]
+async fn store_assets_batches_inserts_and_confirmations(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool.clone());
+    insert_client_asset(&pool, 1, "DOGE", 1).await?;
+    insert_client_asset(&pool, 2, "EUR", 3).await?;
+
+    repo.store_assets(&[]).await?;
+    repo.store_assets(&[
+        crypto("doge"),
+        fiat("eur", "Euro"),
+        crypto("btc"),
+        crypto("btc"),
+    ])
+    .await?;
+
+    let rows: Vec<(String, String, i16)> =
+        sqlx::query_as("SELECT symbol, name, metadata_source FROM assets_data ORDER BY symbol")
+            .fetch_all(&pool)
+            .await?;
+    assert_eq!(
+        rows,
+        [
+            ("BTC".to_string(), "BTC".to_string(), 1),
+            ("DOGE".to_string(), "Client name".to_string(), 1),
+            ("EUR".to_string(), "Euro".to_string(), 1),
+        ]
+    );
+    Ok(())
+}
+
+/// GIVEN a catalog, WHEN several markets are stored in one call in any order, with a repeated
+/// market, THEN every market is inserted once, priced markets keep the last price, and an empty
+/// batch is a no-op.
+#[sqlx::test(migrations = "../../migrations")]
+async fn store_markets_inserts_a_batch_regardless_of_order(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool);
+    seed_catalog(&repo).await?;
+    let (btc, eth, eur) = (crypto("btc"), crypto("eth"), fiat("eur", "Euro"));
+    let btceur = Market::new(
+        "btceur".into(),
+        btc.clone(),
+        eur.clone(),
+        Some(price(1.0, 0)),
+    );
+    let btceur_newer = Market::new("btceur".into(), btc, eur.clone(), Some(price(3.0, 1)));
+    let etheur = Market::new("etheur".into(), eth, eur, None);
+
+    repo.store_markets(&[]).await?;
+    repo.store_markets(&[
+        (&etheur, PriceProvider::Kraken),
+        (&btceur, PriceProvider::Kraken),
+        (&btceur_newer, PriceProvider::Kraken),
+    ])
+    .await?;
+
+    assert_eq!(repo.load_markets().await?.len(), 2);
+    let stored = repo.find_market(&"btceur".to_string()).await?.unwrap();
+    assert_eq!(stored.price().unwrap().price, 3.0);
+    assert!(
+        repo.find_market(&"etheur".to_string())
+            .await?
+            .unwrap()
+            .price()
+            .is_none()
+    );
+    Ok(())
+}
+
+/// GIVEN a catalog missing one asset, WHEN a batch holding a valid market and a market of the
+/// missing asset is stored, THEN the call fails naming the market and nothing is written, not
+/// even the valid market.
+#[sqlx::test(migrations = "../../migrations")]
+async fn store_markets_rolls_back_the_whole_batch_on_a_missing_asset(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool);
+    seed_catalog(&repo).await?;
+    let (btc, eur) = (crypto("btc"), fiat("eur", "Euro"));
+    let valid = Market::new(
+        "btceur".into(),
+        btc.clone(),
+        eur.clone(),
+        Some(price(1.0, 0)),
+    );
+    let orphan = Market::new("doge".to_string() + "eur", crypto("doge"), eur, None);
+
+    let result = repo
+        .store_markets(&[
+            (&valid, PriceProvider::Kraken),
+            (&orphan, PriceProvider::Kraken),
+        ])
+        .await;
+
+    assert!(
+        matches!(result, Err(dcapal_backend::error::DcaError::RepositoryStoreFailure(id)) if id == "dogeeur")
+    );
+    assert!(repo.load_markets().await?.is_empty());
+    Ok(())
+}
+
+/// GIVEN a fresh database, WHEN the catalog is stored with assets and markets together and one
+/// market references an unknown asset, THEN neither the assets nor the markets are written.
+#[sqlx::test(migrations = "../../migrations")]
+async fn store_catalog_is_all_or_nothing(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool.clone());
+    let (usd, eur) = (fiat("usd", "US Dollar"), fiat("eur", "Euro"));
+    let eurusd = Market::new("eurusd".into(), eur.clone(), usd.clone(), None);
+    let broken = Market::new("eurchf".into(), eur.clone(), fiat("chf", "Franc"), None);
+
+    let failed = repo
+        .store_catalog(
+            &[usd.clone(), eur.clone()],
+            &[
+                (&eurusd, PriceProvider::Yahoo),
+                (&broken, PriceProvider::Yahoo),
+            ],
+        )
+        .await;
+    assert!(failed.is_err());
+    let assets: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assets_data")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(assets, 0);
+
+    repo.store_catalog(&[usd, eur], &[(&eurusd, PriceProvider::Yahoo)])
+        .await?;
+    assert_eq!(repo.load_markets().await?.len(), 1);
+    Ok(())
+}
+
 /// GIVEN a fresh database, WHEN runtime state is written, THEN markers, counters, visitors and
 /// imported portfolios behave as they did on Redis, including the expiry of transfers.
 #[sqlx::test(migrations = "../../migrations")]

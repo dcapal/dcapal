@@ -11,7 +11,7 @@
 //! Only provider-confirmed rows belong to the catalog: assets that clients
 //! supplied through synchronization never show up in it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use jiff_sqlx::ToSqlx;
@@ -21,22 +21,13 @@ use uuid::Uuid;
 
 use crate::{
     app::domain::{
-        asset::{AssetRef, ResolvedAsset},
         entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
         fiat::fiat_symbols,
-        portfolio::{AssetClass, Provider},
     },
     config::PriceProvider,
     error::{DcaError, Result},
-    ports::outbound::repository::{
-        asset::{AssetDirectory, AssetDirectoryError},
-        postgres::{
-            SqlxAssetDirectory,
-            types::{
-                AssetClass as DbAssetClass, MetadataSource as DbMetadataSource,
-                Provider as DbProvider,
-            },
-        },
+    ports::outbound::repository::postgres::types::{
+        AssetClass as DbAssetClass, MetadataSource as DbMetadataSource, Provider as DbProvider,
     },
 };
 
@@ -55,7 +46,6 @@ pub struct MarketPriceUpdate<'a> {
 #[derive(Clone)]
 pub struct MarketDataRepository {
     pool: PgPool,
-    assets: SqlxAssetDirectory,
 }
 
 /// A market's two catalog assets and, when present, its latest price.
@@ -117,30 +107,48 @@ const FIAT_PREDICATE: &str =
 impl MarketDataRepository {
     /// Creates a repository backed by the provided PostgreSQL pool.
     pub fn new(pool: PgPool) -> Self {
-        Self {
-            assets: SqlxAssetDirectory::new(pool.clone()),
-            pool,
-        }
+        Self { pool }
     }
 
     /// Finds a catalog asset by its lower-case id (the lower-cased symbol).
     pub async fn find_asset(&self, id: &AssetId) -> Result<Option<Asset>> {
-        let row = query_as::<_, AssetRow>(const_format::formatcp!(
-            "{SELECT_ASSETS} WHERE ad.symbol = UPPER($1) AND ad.metadata_source = $4 AND (
+        Ok(self
+            .find_assets(std::slice::from_ref(id))
+            .await?
+            .pop()
+            .flatten())
+    }
+
+    /// Finds several catalog assets with one query, matching ids case-insensitively.
+    ///
+    /// The result is aligned with `ids`: unknown assets are `None`.
+    pub async fn find_assets(&self, ids: &[impl AsRef<str>]) -> Result<Vec<Option<Asset>>> {
+        let wanted = ids
+            .iter()
+            .map(|id| id.as_ref().to_uppercase())
+            .collect::<Vec<_>>();
+        let rows = query_as::<_, AssetRow>(const_format::formatcp!(
+            "{SELECT_ASSETS} WHERE ad.symbol = ANY($1) AND ad.metadata_source = $5 AND (
                  (ad.provider = $2 AND ad.asset_class = $3)
-                 OR (ad.provider = $5 AND ad.asset_class = $6 AND ad.symbol = ANY($7)))"
+                 OR (ad.provider = $6 AND ad.asset_class = $7 AND ad.symbol = ANY($4)))"
         ))
-        .bind(id)
+        .bind(&wanted)
         .bind(DbProvider::Kraken)
         .bind(DbAssetClass::Crypto)
+        .bind(fiat_symbols())
         .bind(DbMetadataSource::ProviderConfirmed)
         .bind(DbProvider::YF)
         .bind(DbAssetClass::Cash)
-        .bind(fiat_symbols())
-        .fetch_optional(&self.pool)
+        .fetch_all(&self.pool)
         .await?;
 
-        row.map(Asset::try_from).transpose()
+        let found = rows
+            .into_iter()
+            .map(|row| Asset::try_from(row).map(|asset| (asset.id().to_uppercase(), asset)))
+            .collect::<Result<HashMap<_, _>>>()?;
+
+        // Ids may repeat (a conversion from an asset to itself), so clone instead of remove.
+        Ok(wanted.iter().map(|id| found.get(id).cloned()).collect())
     }
 
     /// Loads every catalog asset of a kind, in no particular order.
@@ -186,42 +194,37 @@ impl MarketDataRepository {
         .await?)
     }
 
-    /// Stores a catalog asset in `assets_data`.
+    /// Stores a catalog asset in `assets_data`; see [`Self::store_assets`].
+    pub async fn store_asset(&self, asset: &Asset) -> Result<()> {
+        self.store_assets(std::slice::from_ref(asset)).await
+    }
+
+    /// Stores catalog assets in `assets_data` with one statement, atomically.
     ///
     /// Missing assets are inserted as provider-confirmed. Provider-confirmed rows
     /// are never changed. A client-supplied fiat row is replaced by the catalog's
     /// English name and class; a client-supplied crypto row keeps the name the
     /// client chose (Kraken only knows the symbol) and is just marked confirmed.
-    pub async fn store_asset(&self, asset: &Asset) -> Result<()> {
-        let resolved = resolved_from_asset(asset);
-        let reference = AssetRef::from(&resolved);
+    /// When an asset appears several times the first occurrence wins.
+    pub async fn store_assets(&self, assets: &[Asset]) -> Result<()> {
+        upsert_assets(&self.pool, assets).await?;
+        debug!("Successfully stored {} market assets", assets.len());
+        Ok(())
+    }
 
-        match asset {
-            Asset::Fiat(_) => self
-                .assets
-                .upsert_resolved(&[resolved])
-                .await
-                .map_err(directory_error)?,
-            Asset::Crypto(_) => {
-                let known = self
-                    .assets
-                    .find_by_refs(std::slice::from_ref(&reference))
-                    .await
-                    .map_err(directory_error)?;
-                if known.is_empty() {
-                    self.assets
-                        .upsert_resolved(&[resolved])
-                        .await
-                        .map_err(directory_error)?;
-                }
-                self.assets
-                    .confirm(&[reference])
-                    .await
-                    .map_err(directory_error)?;
-            }
-        }
-
-        debug!("Successfully stored market asset '{}'", asset.id());
+    /// Stores catalog assets and then markets in one transaction.
+    ///
+    /// Either everything is stored or nothing is. See [`Self::store_assets`] and
+    /// [`Self::store_markets`] for the semantics of each part.
+    pub async fn store_catalog(
+        &self,
+        assets: &[Asset],
+        markets: &[(&Market, PriceProvider)],
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        upsert_assets(&mut *tx, assets).await?;
+        insert_markets(&mut tx, markets).await?;
+        tx.commit().await?;
         Ok(())
     }
 
@@ -259,63 +262,22 @@ impl MarketDataRepository {
         Ok(ids.iter().map(|id| found.remove(id.as_ref())).collect())
     }
 
-    /// Inserts a market if it does not exist yet, and stores its price when it has one.
-    ///
-    /// Both catalog assets must already be stored. `provider` is the provider that
-    /// prices the market; an existing market keeps its stored provider until a
-    /// price is stored.
+    /// Stores one market; see [`Self::store_markets`].
     pub async fn store_market(&self, market: &Market, provider: PriceProvider) -> Result<()> {
-        let stored_provider = stored_provider(provider)?;
-        let (base_provider, base_symbol) = catalog_key(&market.base);
-        let (quote_provider, quote_symbol) = catalog_key(&market.quote);
+        self.store_markets(&[(market, provider)]).await
+    }
+
+    /// Inserts the markets that do not exist yet and stores the prices they carry,
+    /// in one transaction and a constant number of statements.
+    ///
+    /// All catalog assets must already be stored; otherwise nothing is written and
+    /// the first market with a missing asset is reported. `provider` is the provider
+    /// that prices each market; an existing market keeps its stored provider until
+    /// a price is stored. When a market appears several times the last price wins.
+    pub async fn store_markets(&self, markets: &[(&Market, PriceProvider)]) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-
-        let ids = query_as::<_, (Uuid, Uuid)>(
-            "SELECT b.id, q.id
-             FROM assets_data AS b, assets_data AS q
-             WHERE b.provider = $1 AND b.symbol = $2
-               AND q.provider = $3 AND q.symbol = $4",
-        )
-        .bind(base_provider)
-        .bind(&base_symbol)
-        .bind(quote_provider)
-        .bind(&quote_symbol)
-        .fetch_optional(&mut *tx)
-        .await?;
-        let Some((base_id, quote_id)) = ids else {
-            warn!(mkt = market.id, "Failed to store market: asset not stored");
-            return Err(DcaError::RepositoryStoreFailure(market.id.clone()));
-        };
-
-        query(
-            "INSERT INTO market_price (base_asset_id, quote_asset_id, provider)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING",
-        )
-        .bind(base_id)
-        .bind(quote_id)
-        .bind(stored_provider)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| {
-            warn!(mkt = market.id, "Failed to store market: {e}");
-            DcaError::RepositoryStoreFailure(market.id.clone())
-        })?;
-
-        if let Some(price) = market.price() {
-            upsert_prices(
-                &mut tx,
-                &[MarketPriceUpdate {
-                    market_id: &market.id,
-                    price: *price,
-                    provider,
-                }],
-            )
-            .await?;
-        }
-
+        insert_markets(&mut tx, markets).await?;
         tx.commit().await?;
-        debug!("Successfully stored market '{}'", market.id);
         Ok(())
     }
 
@@ -339,7 +301,7 @@ impl MarketDataRepository {
             "DELETE FROM market_price AS p
              USING assets_data AS b, assets_data AS q
              WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
-               AND {id} <> ALL($1)
+               AND NOT EXISTS (SELECT 1 FROM UNNEST($1::text[]) AS k(id) WHERE k.id = {id})
                AND NOT (b.provider = $2 AND b.asset_class = $3 AND b.symbol = ANY($4)
                     AND q.provider = $2 AND q.asset_class = $3 AND q.symbol = ANY($4))
              RETURNING {id}",
@@ -470,32 +432,152 @@ fn catalog_key(asset: &Asset) -> (DbProvider, String) {
     (provider, asset.id().to_uppercase())
 }
 
-/// Builds the shared asset metadata a catalog asset is stored with.
+/// Upserts catalog assets with one set-based statement.
 ///
-/// The v1 `symbol` of a catalog asset (display name) is the stored name, and its
-/// currency is its own upper-case symbol.
-fn resolved_from_asset(asset: &Asset) -> ResolvedAsset {
-    let symbol = asset.id().to_uppercase();
-    let (provider, asset_class, name) = match asset {
-        Asset::Crypto(a) => (Provider::Kraken, AssetClass::Crypto, a.symbol.clone()),
-        Asset::Fiat(a) => (Provider::YF, AssetClass::Cash, a.symbol.clone()),
-    };
-
-    ResolvedAsset {
-        provider,
-        currency: symbol.clone(),
-        symbol,
-        name,
-        asset_class,
+/// Fiat rows (Yahoo cash) replace the metadata of a client-supplied row; crypto
+/// rows only mark it confirmed. Provider-confirmed rows are never changed.
+async fn upsert_assets<'e>(executor: impl sqlx::PgExecutor<'e>, assets: &[Asset]) -> Result<()> {
+    // A single statement cannot touch one row twice: keep the first of each key.
+    let assets = assets
+        .iter()
+        .unique_by(|asset| catalog_key(asset))
+        .collect::<Vec<_>>();
+    if assets.is_empty() {
+        return Ok(());
     }
+
+    let mut ids = Vec::with_capacity(assets.len());
+    let mut providers = Vec::with_capacity(assets.len());
+    let mut symbols = Vec::with_capacity(assets.len());
+    let mut names = Vec::with_capacity(assets.len());
+    let mut classes = Vec::with_capacity(assets.len());
+    for asset in &assets {
+        let (provider, symbol) = catalog_key(asset);
+        let (class, name) = match asset {
+            Asset::Crypto(a) => (DbAssetClass::Crypto, a.symbol.as_str()),
+            Asset::Fiat(a) => (DbAssetClass::Cash, a.symbol.as_str()),
+        };
+        ids.push(Uuid::now_v7());
+        providers.push(i16::from(provider));
+        symbols.push(symbol);
+        names.push(name);
+        classes.push(i16::from(class));
+    }
+
+    // The currency of a catalog asset is its own symbol.
+    query(
+        "INSERT INTO assets_data
+             (id, provider, symbol, name, currency, asset_class, metadata_source,
+              created_at, updated_at)
+         SELECT u.id, u.provider, u.symbol, u.name, u.symbol, u.asset_class, $6, NOW(), NOW()
+         FROM UNNEST($1::uuid[], $2::smallint[], $3::text[], $4::text[], $5::smallint[])
+              AS u(id, provider, symbol, name, asset_class)
+         ON CONFLICT (provider, symbol) DO UPDATE SET
+             name = CASE WHEN assets_data.provider = $7
+                         THEN EXCLUDED.name ELSE assets_data.name END,
+             currency = CASE WHEN assets_data.provider = $7
+                             THEN EXCLUDED.currency ELSE assets_data.currency END,
+             asset_class = CASE WHEN assets_data.provider = $7
+                                THEN EXCLUDED.asset_class ELSE assets_data.asset_class END,
+             metadata_source = EXCLUDED.metadata_source,
+             updated_at = EXCLUDED.updated_at
+         WHERE assets_data.metadata_source = $8",
+    )
+    .bind(&ids)
+    .bind(&providers)
+    .bind(&symbols)
+    .bind(&names)
+    .bind(&classes)
+    .bind(DbMetadataSource::ProviderConfirmed)
+    .bind(DbProvider::YF)
+    .bind(DbMetadataSource::ClientSupplied)
+    .execute(executor)
+    .await?;
+
+    Ok(())
 }
 
-/// Converts asset-directory failures into application errors.
-fn directory_error(error: AssetDirectoryError) -> DcaError {
-    match error {
-        AssetDirectoryError::Database(e) => DcaError::DatabaseError(e),
-        AssetDirectoryError::CorruptData(message) => DcaError::Generic(message),
+/// Inserts the markets that do not exist yet and stores their prices inside `tx`.
+///
+/// Fails, leaving `tx` to roll back, when a market's catalog asset is missing.
+async fn insert_markets(
+    tx: &mut Transaction<'_, Postgres>,
+    markets: &[(&Market, PriceProvider)],
+) -> Result<()> {
+    if markets.is_empty() {
+        return Ok(());
     }
+
+    let mut market_ids = Vec::with_capacity(markets.len());
+    let mut base_providers = Vec::with_capacity(markets.len());
+    let mut base_symbols = Vec::with_capacity(markets.len());
+    let mut quote_providers = Vec::with_capacity(markets.len());
+    let mut quote_symbols = Vec::with_capacity(markets.len());
+    let mut providers = Vec::with_capacity(markets.len());
+    for (market, provider) in markets {
+        let (base_provider, base_symbol) = catalog_key(&market.base);
+        let (quote_provider, quote_symbol) = catalog_key(&market.quote);
+        market_ids.push(market.id.as_str());
+        base_providers.push(i16::from(base_provider));
+        base_symbols.push(base_symbol);
+        quote_providers.push(i16::from(quote_provider));
+        quote_symbols.push(quote_symbol);
+        providers.push(i16::from(stored_provider(*provider)?));
+    }
+
+    // One statement resolves the assets, inserts the resolvable markets and reports
+    // the markets whose assets are missing.
+    let missing = query_scalar::<_, String>(
+        "WITH w AS (
+             SELECT * FROM UNNEST($1::text[], $2::smallint[], $3::text[], $4::smallint[],
+                                  $5::text[], $6::smallint[])
+                  AS w(market_id, base_provider, base_symbol, quote_provider, quote_symbol, provider)
+         ), resolved AS (
+             SELECT w.market_id, b.id AS base_id, q.id AS quote_id, w.provider
+             FROM w
+             LEFT JOIN assets_data AS b
+               ON b.provider = w.base_provider AND b.symbol = w.base_symbol
+             LEFT JOIN assets_data AS q
+               ON q.provider = w.quote_provider AND q.symbol = w.quote_symbol
+         ), inserted AS (
+             INSERT INTO market_price (base_asset_id, quote_asset_id, provider)
+             SELECT base_id, quote_id, provider FROM resolved
+             WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
+             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING
+         )
+         SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
+    )
+    .bind(&market_ids)
+    .bind(&base_providers)
+    .bind(&base_symbols)
+    .bind(&quote_providers)
+    .bind(&quote_symbols)
+    .bind(&providers)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|e| {
+        warn!("Failed to store {} markets: {e}", markets.len());
+        DcaError::RepositoryStoreFailure(market_ids[0].to_string())
+    })?;
+    if let Some(first) = missing.first() {
+        warn!(mkt = first, "Failed to store market: asset not stored");
+        return Err(DcaError::RepositoryStoreFailure(first.clone()));
+    }
+
+    let updates = markets
+        .iter()
+        .filter_map(|(market, provider)| {
+            (*market.price()).map(|price| MarketPriceUpdate {
+                market_id: &market.id,
+                price,
+                provider: *provider,
+            })
+        })
+        .collect::<Vec<_>>();
+    upsert_prices(tx, &updates).await?;
+
+    debug!("Successfully stored {} markets", markets.len());
+    Ok(())
 }
 
 impl TryFrom<AssetRow> for Asset {

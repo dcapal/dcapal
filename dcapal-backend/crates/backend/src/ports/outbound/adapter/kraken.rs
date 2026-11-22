@@ -5,7 +5,6 @@ use std::{
 };
 
 use failsafe::futures::CircuitBreaker;
-use futures::StreamExt;
 use itertools::Itertools;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
@@ -267,27 +266,27 @@ impl KrakenProvider {
     ) -> BTreeMap<String, Asset> {
         let mut assets = BTreeMap::new();
         let mut to_fetch = Vec::new();
-        for ccy in ccys {
-            match repo.find_asset(ccy).await {
-                Ok(asset) => {
-                    if let Some(a) = asset {
-                        assets.insert(a.id().clone(), a);
-                    } else if is_fiat(ccy) {
-                        assets.insert(
-                            ccy.clone(),
-                            Asset::Fiat(Fiat::new(
-                                ccy.clone(),
-                                fiat_name(ccy).unwrap_or(ccy).to_string(),
-                            )),
-                        );
-                    } else {
-                        to_fetch.push(ccy);
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to find asset '{ccy}': {e}");
-                    continue;
-                }
+        let ccys = ccys.iter().collect::<Vec<_>>();
+        let found = match repo.find_assets(&ccys).await {
+            Ok(found) => found,
+            Err(e) => {
+                error!("Failed to find {} assets: {e}", ccys.len());
+                return assets;
+            }
+        };
+        for (ccy, asset) in ccys.into_iter().zip(found) {
+            if let Some(a) = asset {
+                assets.insert(a.id().clone(), a);
+            } else if is_fiat(ccy) {
+                assets.insert(
+                    ccy.clone(),
+                    Asset::Fiat(Fiat::new(
+                        ccy.clone(),
+                        fiat_name(ccy).unwrap_or(ccy).to_string(),
+                    )),
+                );
+            } else {
+                to_fetch.push(ccy);
             }
         }
 
@@ -601,14 +600,31 @@ fn split_base_quote(market_symbols: &[String]) -> Vec<MarketPair> {
         .collect()
 }
 
+/// Returns the pairs that are not stored as markets yet, found with one lookup.
+///
+/// When the lookup fails every pair is considered new, so discovery stores them
+/// rather than skipping markets.
 async fn get_new_markets(
     market_symbols: &[String],
     repo: &MarketDataRepository,
 ) -> Vec<MarketPair> {
-    futures::stream::iter(split_base_quote(market_symbols))
-        .filter(|(base, quote)| is_new_market(format!("{base}{quote}"), repo))
-        .collect::<_>()
-        .await
+    let pairs = split_base_quote(market_symbols);
+    let ids = pairs
+        .iter()
+        .map(|(base, quote)| format!("{base}{quote}"))
+        .collect::<Vec<_>>();
+
+    match repo.find_markets(&ids).await {
+        Ok(found) => pairs
+            .into_iter()
+            .zip(found)
+            .filter_map(|(pair, market)| market.is_none().then_some(pair))
+            .collect(),
+        Err(e) => {
+            error!("Error occurred in searching {} markets: {e}", ids.len());
+            pairs
+        }
+    }
 }
 
 fn get_unique_ccys(market_pairs: &[MarketPair]) -> HashSet<AssetId> {
@@ -631,38 +647,30 @@ async fn fetch_assets(
     repo: &MarketDataRepository,
 ) -> BTreeMap<String, Asset> {
     let mut assets = BTreeMap::new();
-    for ccy in ccys {
-        match repo.find_asset(ccy).await {
-            Ok(asset) => {
-                if let Some(a) = asset {
-                    assets.insert(a.id().clone(), a);
-                } else {
-                    let a = match is_fiat(ccy) {
-                        true => Asset::Fiat(Fiat {
-                            id: ccy.to_string(),
-                            symbol: fiat_name(ccy).unwrap_or(ccy).to_string(),
-                        }),
-                        false => Asset::Crypto(Crypto::new_with_id(ccy.clone())),
-                    };
-                    assets.insert(ccy.clone(), a);
-                }
-            }
-            Err(e) => {
-                error!("Failed to find asset '{ccy}': {e}");
-                continue;
-            }
+    let ccys = ccys.iter().collect::<Vec<_>>();
+    let found = match repo.find_assets(&ccys).await {
+        Ok(found) => found,
+        Err(e) => {
+            error!("Failed to find {} assets: {e}", ccys.len());
+            return assets;
+        }
+    };
+
+    for (ccy, asset) in ccys.into_iter().zip(found) {
+        if let Some(a) = asset {
+            assets.insert(a.id().clone(), a);
+        } else {
+            let a = match is_fiat(ccy) {
+                true => Asset::Fiat(Fiat {
+                    id: ccy.to_string(),
+                    symbol: fiat_name(ccy).unwrap_or(ccy).to_string(),
+                }),
+                false => Asset::Crypto(Crypto::new_with_id(ccy.clone())),
+            };
+            assets.insert(ccy.clone(), a);
         }
     }
     assets
-}
-
-async fn is_new_market(id: MarketId, repo: &MarketDataRepository) -> bool {
-    let mkt = repo.find_market(&id).await.unwrap_or_else(|e| {
-        error!("Error occurred in searching market '{}': {}", id, e);
-        None
-    });
-
-    mkt.is_none()
 }
 
 fn get_kraken_api_periods(freq: OHLCFrequency) -> &'static str {
