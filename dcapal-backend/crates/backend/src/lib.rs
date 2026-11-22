@@ -56,8 +56,6 @@ use crate::{
 pub mod app;
 pub mod config;
 pub mod error;
-#[cfg(test)]
-mod market_v2_contract;
 pub mod ports;
 #[cfg(test)]
 mod test_support;
@@ -283,6 +281,14 @@ impl DcaServer {
             .await
             .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))?;
 
+        self.serve_on(listener).await
+    }
+
+    /// Serves the HTTP API on an already bound listener until the server fails.
+    ///
+    /// Unlike [`Self::start`] it neither requires FX rates nor starts the background
+    /// workers, so tests can serve a server built by [`Self::try_new`] on an ephemeral port.
+    pub async fn serve_on(&self, listener: TcpListener) -> Result<()> {
         axum::serve(listener, self.app.clone())
             .await
             .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))?;

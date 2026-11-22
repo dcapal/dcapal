@@ -8,14 +8,50 @@
 use std::net::SocketAddr;
 
 use serde_json::{Value, json};
-use sqlx::PgPool;
+use sqlx::{PgPool, postgres::PgConnectOptions};
+use tokio::net::TcpListener;
 
 use crate::{
+    DcaServer,
     app::domain::entity::{Asset, Crypto, Fiat, Market, Price},
-    config::PriceProvider,
+    config::{Config, PriceProvider},
     ports::outbound::repository::market_data::MarketDataRepository,
-    test_support::{ProviderUrls, serve},
 };
+
+/// Builds a server on the test database and serves it on an ephemeral loopback port.
+async fn serve(pool: &PgPool) -> SocketAddr {
+    let options: PgConnectOptions = (*pool.connect_options()).clone();
+    let config: Config = serde_json::from_value(json!({
+        "app": {
+            "log": {},
+            "providers": {"priceProvider": "kraken", "ipApiKey": ""},
+            "services": null,
+            "auth": {"jwtSecret": "secret"}
+        },
+        "server": {
+            "web": {"hostname": "127.0.0.1", "port": 0},
+            "metrics": {"hostname": "127.0.0.1", "port": 0},
+            "postgres": {
+                "hostname": options.get_host(),
+                "port": options.get_port(),
+                "user": options.get_username(),
+                "password": std::env::var("DATABASE_URL")
+                    .ok()
+                    .and_then(|u| url::Url::parse(&u).ok())
+                    .and_then(|u| u.password().map(str::to_string))
+                    .unwrap_or_default(),
+                "database": options.get_database().unwrap_or("postgres"),
+            }
+        }
+    }))
+    .unwrap();
+
+    let server = DcaServer::try_new(config).await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { server.serve_on(listener).await });
+    addr
+}
 
 async fn get(addr: SocketAddr, path: &str) -> (u16, Value) {
     let response = reqwest::get(format!("http://{addr}{path}")).await.unwrap();
@@ -76,7 +112,7 @@ async fn v1_market_data_responses_keep_their_shape(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    let addr = serve(&pool, ProviderUrls::default()).await;
+    let addr = serve(&pool).await;
 
     let (status, crypto) = get(addr, "/assets/crypto").await;
     assert_eq!(status, 200);

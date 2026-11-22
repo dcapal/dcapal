@@ -8,14 +8,16 @@ use jiff::Timestamp;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
-use crate::{
+mod common;
+
+use common::{FakeProvider, ProviderUrls, Reply, bearer_token, serve};
+use dcapal_backend::{
     app::domain::{
         entity::{Asset, Crypto, Fiat, Market, Price},
         market_quote::PriceFailure,
     },
     config::PriceProvider,
     ports::outbound::repository::market_data::{MarketDataRepository, MarketPriceFailure},
-    test_support::{FakeProvider, ProviderUrls, Reply, bearer_token, serve},
 };
 
 /// A response reduced to what the contract tests assert on.
@@ -86,7 +88,7 @@ async fn yahoo(
 }
 
 async fn serve_with_yahoo(pool: &PgPool, yahoo: &FakeProvider) -> SocketAddr {
-    crate::test_support::install_crypto_provider();
+    common::install_crypto_provider();
     serve(
         pool,
         ProviderUrls {
