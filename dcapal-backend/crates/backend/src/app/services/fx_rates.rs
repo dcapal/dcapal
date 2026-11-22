@@ -126,7 +126,9 @@ fn fx_markets() -> Vec<Market> {
     YAHOO_FX_TICKERS
         .iter()
         .map(|(market_id, _)| {
-            let (base_id, quote_id) = market_id.split_at(3);
+            let (base_id, quote_id) = market_id
+                .split_once('/')
+                .expect("FX market ids are `base/quote`");
             let fiat = |id: &str| {
                 Asset::Fiat(Fiat::new(
                     id.to_string(),
@@ -389,7 +391,7 @@ mod tests {
             panic!("expected a timeout");
         };
         assert_eq!(missing.len(), YAHOO_FX_TICKERS.len());
-        assert!(missing.contains(&"eurusd".to_string()));
+        assert!(missing.contains(&"eur/usd".to_string()));
         assert!(stored.lock().is_empty());
         assert_eq!(started.elapsed(), Duration::from_secs(120));
     }

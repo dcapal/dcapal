@@ -15,7 +15,7 @@ use super::{DefaultCircuitBreaker, PriceCallError};
 use crate::{
     DateTime,
     app::domain::{
-        entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+        entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency, market_id},
         fiat::{fiat_name, is_fiat},
         market_quote::{FailureKind, PriceFailure},
     },
@@ -208,7 +208,8 @@ impl KrakenProvider {
         let (r_lo, r_hi) = freq.ohlc_range(ts);
         let (after_ts, before_ts) = (r_lo.as_second(), r_hi.as_second());
         let url = self
-            .ohlc_url(id, after_ts, get_kraken_api_periods(freq))
+            // Kraken names pairs without a separator (`btceur`).
+            .ohlc_url(&id.replace('/', ""), after_ts, get_kraken_api_periods(freq))
             .map_err(PriceFailure::malformed)?;
 
         debug!(
@@ -262,17 +263,17 @@ impl KrakenProvider {
             .into_iter()
             .filter_map(|(base_id, quote_id)| {
                 let Some(base) = assets_map.get(&base_id) else {
-                    error!("Skipping market {base_id}{quote_id}: base asset data not found");
+                    error!("Skipping market {base_id}/{quote_id}: base asset data not found");
                     return None;
                 };
 
                 let Some(quote) = assets_map.get(&quote_id) else {
-                    error!("Skipping market {base_id}{quote_id}: quote asset data not found");
+                    error!("Skipping market {base_id}/{quote_id}: quote asset data not found");
                     return None;
                 };
 
                 Some(Market::new(
-                    format!("{base_id}{quote_id}"),
+                    market_id(&base_id, &quote_id),
                     base.clone(),
                     quote.clone(),
                     None,
@@ -663,17 +664,17 @@ async fn resolve_assets_data_kraken_only(
         .into_iter()
         .filter_map(|(base_id, quote_id)| {
             let Some(base) = assets_map.get(&base_id) else {
-                error!("Skipping market {base_id}{quote_id}: base asset data not found");
+                error!("Skipping market {base_id}/{quote_id}: base asset data not found");
                 return None;
             };
 
             let Some(quote) = assets_map.get(&quote_id) else {
-                error!("Skipping market {base_id}{quote_id}: quote asset data not found");
+                error!("Skipping market {base_id}/{quote_id}: quote asset data not found");
                 return None;
             };
 
             Some(Market::new(
-                format!("{base_id}{quote_id}"),
+                market_id(&base_id, &quote_id),
                 base.clone(),
                 quote.clone(),
                 None,
@@ -761,7 +762,7 @@ fn market_ids_from_symbols(market_symbols: &[String]) -> Result<HashSet<MarketId
                 warn!(symbol, "Ignoring malformed online Kraken market");
                 return None;
             };
-            Some(format!("{}{}", parsed.base, parsed.quote))
+            Some(market_id(parsed.base, parsed.quote))
         })
         .collect::<HashSet<_>>();
 
@@ -800,7 +801,7 @@ async fn get_new_markets(
     let pairs = split_base_quote(market_symbols);
     let ids = pairs
         .iter()
-        .map(|(base, quote)| format!("{base}{quote}"))
+        .map(|(base, quote)| market_id(base, quote))
         .collect::<Vec<_>>();
 
     match repo.find_markets(&ids).await {
@@ -1237,9 +1238,9 @@ mod tests {
         assert_eq!(
             ids,
             [
-                "btceur".to_string(),
-                "etheur".to_string(),
-                "adausd".to_string()
+                "btc/eur".to_string(),
+                "eth/eur".to_string(),
+                "ada/usd".to_string()
             ]
             .into_iter()
             .collect()
@@ -1386,7 +1387,7 @@ mod price_tests {
 
     fn btceur() -> Market {
         Market::new(
-            "btceur".into(),
+            "btc/eur".into(),
             Asset::Crypto(Crypto::new_with_id("btc".into())),
             Asset::Fiat(Fiat::new("eur".into(), "Euro".into())),
             None,

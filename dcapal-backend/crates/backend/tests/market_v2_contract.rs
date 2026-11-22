@@ -60,7 +60,7 @@ async fn store_priced(
         repo.store_asset(asset).await.unwrap();
     }
     let market = Market::new(
-        format!("{}{}", base.id(), quote.id()),
+        dcapal_backend::app::domain::entity::market_id(base.id(), quote.id()),
         base.clone(),
         quote.clone(),
         Some(Price::new(price, Timestamp::now())),
@@ -314,7 +314,7 @@ async fn last_known_price_is_flagged_after_a_failed_refresh(pool: PgPool) {
     assert_eq!(fresh.body["prices"][0]["source"], "provider");
     assert_eq!(fresh.body["prices"][0]["error"], Value::Null);
 
-    let id = "btcusd".to_string();
+    let id = "btc/usd".to_string();
     let failure = PriceFailure::provider_error("Kraken answered HTTP 503");
     repo.record_price_failures(&[MarketPriceFailure {
         market_id: &id,
@@ -436,7 +436,7 @@ async fn fx_rate_flags_a_failed_refresh(pool: PgPool) {
         PriceProvider::Yahoo,
     )
     .await;
-    let id = "eurusd".to_string();
+    let id = "eur/usd".to_string();
     let failure = PriceFailure::malformed("empty chart.result");
     repo.record_price_failures(&[MarketPriceFailure {
         market_id: &id,

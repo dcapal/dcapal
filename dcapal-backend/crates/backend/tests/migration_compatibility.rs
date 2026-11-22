@@ -636,13 +636,12 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
 }
 
 /// GIVEN a database migrated up to the discovery-marker rename, holding a legacy discovery
-/// marker, an ordinary BTC/EUR market and two different pairs whose concatenated ids
-/// collide ("ab"+"cd" and "a"+"bcd"),
+/// marker, a BTC/EUR market and the formerly colliding pairs AB/CD and A/BCD,
 /// WHEN the remaining migrations run,
-/// THEN every market gets its concatenated lower-case id, only the most recently priced of
-/// the colliding pairs remains, and the marker is renamed.
+/// THEN every market keeps its row and gets its lower-case `base/quote` id, and the marker
+/// is renamed.
 #[sqlx::test(migrations = false)]
-async fn market_id_migration_backfills_and_resolves_collisions(pool: PgPool) -> sqlx::Result<()> {
+async fn market_id_migration_backfills_slash_separated_ids(pool: PgPool) -> sqlx::Result<()> {
     MIGRATOR.run_to(20260914000000, &pool).await?;
     sqlx::query(
         "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class, metadata_source)
@@ -667,14 +666,7 @@ async fn market_id_migration_backfills_and_resolves_collisions(pool: PgPool) -> 
     let ids: Vec<String> = sqlx::query_scalar("SELECT market_id FROM market_price ORDER BY 1")
         .fetch_all(&pool)
         .await?;
-    assert_eq!(ids, ["abcd", "btceur"]);
-    let kept_base: String = sqlx::query_scalar(
-        "SELECT b.symbol FROM market_price p JOIN assets_data b ON b.id = p.base_asset_id
-         WHERE p.market_id = 'abcd'",
-    )
-    .fetch_one(&pool)
-    .await?;
-    assert_eq!(kept_base, "A");
+    assert_eq!(ids, ["a/bcd", "ab/cd", "btc/eur"]);
     let markers: Vec<String> = sqlx::query_scalar("SELECT name FROM worker_marker")
         .fetch_all(&pool)
         .await?;

@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn store_failure_keeps_its_database_cause() {
         let error =
-            DcaError::RepositoryStoreFailure("btceur".into(), Some(sqlx::Error::PoolClosed));
+            DcaError::RepositoryStoreFailure("btc/eur".into(), Some(sqlx::Error::PoolClosed));
 
         assert!(format!("{error:?}").contains("-- Caused by:"));
         assert!(std::error::Error::source(&error).is_some());

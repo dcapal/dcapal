@@ -64,7 +64,7 @@ async fn seed_market(
     quote: &Asset,
     price: Option<Price>,
 ) -> TestResult {
-    let id = format!("{}{}", base.id(), quote.id());
+    let id = dcapal_backend::app::domain::entity::market_id(base.id(), quote.id());
     repo.store_market(
         &Market::new(id, base.clone(), quote.clone(), price),
         PriceProvider::Kraken,
@@ -181,12 +181,12 @@ async fn markets_are_read_with_assets_and_optional_price(pool: PgPool) -> TestRe
     seed_market(&repo, &btc, &eur, Some(price(50_000.5, 1))).await?;
     seed_market(&repo, &eth, &eur, None).await?;
 
-    let btceur = repo.find_market(&"btceur".to_string()).await?.unwrap();
+    let btceur = repo.find_market(&"btc/eur".to_string()).await?.unwrap();
     assert_eq!(btceur.pair, "BTC/EUR");
     let stored = btceur.price().unwrap();
     assert_eq!((stored.price, stored.ts), (50_000.5, price(0.0, 1).ts));
     assert!(
-        repo.find_market(&"etheur".to_string())
+        repo.find_market(&"eth/eur".to_string())
             .await?
             .unwrap()
             .price()
@@ -195,9 +195,9 @@ async fn markets_are_read_with_assets_and_optional_price(pool: PgPool) -> TestRe
     assert!(repo.find_market(&"nope".to_string()).await?.is_none());
 
     let (a, b, c) = (
-        "etheur".to_string(),
+        "eth/eur".to_string(),
         "nope".to_string(),
-        "btceur".to_string(),
+        "btc/eur".to_string(),
     );
     let found = repo.find_markets(&[&a, &b, &c]).await?;
     assert_eq!(
@@ -219,8 +219,8 @@ async fn batch_upsert_replaces_prices_and_skips_unknown_markets(pool: PgPool) ->
     seed_market(&repo, &eth, &eur, None).await?;
 
     let (btceur, etheur, gone) = (
-        "btceur".to_string(),
-        "etheur".to_string(),
+        "btc/eur".to_string(),
+        "eth/eur".to_string(),
         "gone".to_string(),
     );
     let stored = repo
@@ -251,7 +251,7 @@ async fn prices_round_trip_exactly(pool: PgPool) -> TestResult {
     seed_catalog(&repo).await?;
     let (btc, eur) = (crypto("btc"), fiat("eur", "Euro"));
     seed_market(&repo, &btc, &eur, None).await?;
-    let id = "btceur".to_string();
+    let id = "btc/eur".to_string();
 
     for value in [
         1e-9,
@@ -274,7 +274,7 @@ async fn large_worker_batch_is_stored(pool: PgPool) -> TestResult {
     let repo = MarketDataRepository::new(pool);
     seed_catalog(&repo).await?;
     let eur = fiat("eur", "Euro");
-    let ids = (0..600).map(|i| format!("a{i}eur")).collect::<Vec<_>>();
+    let ids = (0..600).map(|i| format!("a{i}/eur")).collect::<Vec<_>>();
     for i in 0..600 {
         let base = crypto(&format!("a{i}"));
         repo.store_asset(&base).await?;
@@ -314,7 +314,7 @@ async fn reconciliation_deletes_only_crypto_markets_outside_the_snapshot(
     seed_market(&repo, &btc, &eur, Some(price(1.0, 0))).await?;
     seed_market(&repo, &eth, &eur, Some(price(2.0, 0))).await?;
     repo.store_market(
-        &Market::new("eurusd".into(), eur.clone(), usd, Some(price(1.1, 0))),
+        &Market::new("eur/usd".into(), eur.clone(), usd, Some(price(1.1, 0))),
         PriceProvider::Yahoo,
     )
     .await?;
@@ -322,14 +322,14 @@ async fn reconciliation_deletes_only_crypto_markets_outside_the_snapshot(
     assert!(repo.delete_markets_not_in(&HashSet::new()).await.is_err());
     assert_eq!(repo.load_markets().await?.len(), 3);
 
-    let keep = HashSet::from(["btceur".to_string()]);
-    assert_eq!(repo.delete_markets_not_in(&keep).await?, ["etheur"]);
+    let keep = HashSet::from(["btc/eur".to_string()]);
+    assert_eq!(repo.delete_markets_not_in(&keep).await?, ["eth/eur"]);
     assert_eq!(repo.load_markets().await?.len(), 2);
     let prices: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM market_price")
         .fetch_one(&pool)
         .await?;
     assert_eq!(prices, 2);
-    assert!(repo.find_market(&"eurusd".to_string()).await?.is_some());
+    assert!(repo.find_market(&"eur/usd".to_string()).await?.is_some());
     Ok(())
 }
 
@@ -402,13 +402,13 @@ async fn store_markets_inserts_a_batch_regardless_of_order(pool: PgPool) -> Test
     seed_catalog(&repo).await?;
     let (btc, eth, eur) = (crypto("btc"), crypto("eth"), fiat("eur", "Euro"));
     let btceur = Market::new(
-        "btceur".into(),
+        "btc/eur".into(),
         btc.clone(),
         eur.clone(),
         Some(price(1.0, 0)),
     );
-    let btceur_newer = Market::new("btceur".into(), btc, eur.clone(), Some(price(3.0, 1)));
-    let etheur = Market::new("etheur".into(), eth, eur, None);
+    let btceur_newer = Market::new("btc/eur".into(), btc, eur.clone(), Some(price(3.0, 1)));
+    let etheur = Market::new("eth/eur".into(), eth, eur, None);
 
     repo.store_markets(&[]).await?;
     repo.store_markets(&[
@@ -419,10 +419,10 @@ async fn store_markets_inserts_a_batch_regardless_of_order(pool: PgPool) -> Test
     .await?;
 
     assert_eq!(repo.load_markets().await?.len(), 2);
-    let stored = repo.find_market(&"btceur".to_string()).await?.unwrap();
+    let stored = repo.find_market(&"btc/eur".to_string()).await?.unwrap();
     assert_eq!(stored.price().unwrap().price, 3.0);
     assert!(
-        repo.find_market(&"etheur".to_string())
+        repo.find_market(&"eth/eur".to_string())
             .await?
             .unwrap()
             .price()
@@ -440,12 +440,12 @@ async fn store_markets_rolls_back_the_whole_batch_on_a_missing_asset(pool: PgPoo
     seed_catalog(&repo).await?;
     let (btc, eur) = (crypto("btc"), fiat("eur", "Euro"));
     let valid = Market::new(
-        "btceur".into(),
+        "btc/eur".into(),
         btc.clone(),
         eur.clone(),
         Some(price(1.0, 0)),
     );
-    let orphan = Market::new("doge".to_string() + "eur", crypto("doge"), eur, None);
+    let orphan = Market::new("doge/eur".to_string(), crypto("doge"), eur, None);
 
     let result = repo
         .store_markets(&[
@@ -455,7 +455,7 @@ async fn store_markets_rolls_back_the_whole_batch_on_a_missing_asset(pool: PgPoo
         .await;
 
     assert!(
-        matches!(result, Err(dcapal_backend::error::DcaError::RepositoryStoreFailure(id, _)) if id == "dogeeur")
+        matches!(result, Err(dcapal_backend::error::DcaError::RepositoryStoreFailure(id, _)) if id == "doge/eur")
     );
     assert!(repo.load_markets().await?.is_empty());
     Ok(())
@@ -467,7 +467,7 @@ async fn store_markets_rolls_back_the_whole_batch_on_a_missing_asset(pool: PgPoo
 async fn store_catalog_is_all_or_nothing(pool: PgPool) -> TestResult {
     let repo = MarketDataRepository::new(pool.clone());
     let (usd, eur) = (fiat("usd", "US Dollar"), fiat("eur", "Euro"));
-    let eurusd = Market::new("eurusd".into(), eur.clone(), usd.clone(), None);
+    let eurusd = Market::new("eur/usd".into(), eur.clone(), usd.clone(), None);
     let broken = Market::new("eurchf".into(), eur.clone(), fiat("chf", "Franc"), None);
 
     let failed = repo
@@ -554,7 +554,7 @@ async fn recorded_failure_keeps_the_last_known_price_until_a_new_price_clears_it
         Some(price(40_000.5, 1)),
     )
     .await?;
-    let market_id = "btceur".to_string();
+    let market_id = "btc/eur".to_string();
     let failure = PriceFailure::provider_error("Kraken answered HTTP 503");
 
     let recorded = repo
@@ -605,7 +605,7 @@ async fn non_positive_prices_are_never_stored(pool: PgPool) -> TestResult {
         Some(price(10.0, 1)),
     )
     .await?;
-    let id = "btceur".to_string();
+    let id = "btc/eur".to_string();
 
     for bad in [0.0, -3.0, f64::NAN, f64::INFINITY] {
         let stored = repo
@@ -688,9 +688,9 @@ async fn stored_non_positive_prices_read_as_unavailable(pool: PgPool) -> TestRes
         .execute(&pool)
         .await?;
 
-    let quotes = repo.find_market_quotes(&["btceur", "etheur"]).await?;
+    let quotes = repo.find_market_quotes(&["btc/eur", "eth/eur"]).await?;
 
-    for id in ["btceur", "etheur"] {
+    for id in ["btc/eur", "eth/eur"] {
         assert_eq!(quotes[id].price, None, "{id}");
         assert_eq!(
             quotes[id].failure.as_ref().unwrap().kind,
@@ -735,7 +735,7 @@ async fn markets_store_their_v1_id_and_foreign_keys_are_indexed(pool: PgPool) ->
     let ids: Vec<String> = sqlx::query_scalar("SELECT market_id FROM market_price")
         .fetch_all(&pool)
         .await?;
-    assert_eq!(ids, ["btceur"]);
+    assert_eq!(ids, ["btc/eur"]);
 
     let indexes: Vec<String> = sqlx::query_scalar(
         "SELECT indexname FROM pg_indexes
@@ -749,35 +749,50 @@ async fn markets_store_their_v1_id_and_foreign_keys_are_indexed(pool: PgPool) ->
     Ok(())
 }
 
-/// GIVEN a stored, priced market "abcd" (AB/CD),
-/// WHEN a different pair with the same concatenated id (A/BCD) is stored with another price,
-/// THEN the batch succeeds, the second pair is skipped and the first pair keeps its price.
+/// GIVEN two different pairs whose concatenated symbols are equal (AB/CD and A/BCD),
+/// WHEN both are stored with their own prices,
+/// THEN they coexist under distinct market ids and each keeps its price.
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_market_id_collision_never_overwrites_the_owning_pair(pool: PgPool) -> TestResult {
+async fn pairs_with_equal_concatenated_symbols_coexist(pool: PgPool) -> TestResult {
     let repo = MarketDataRepository::new(pool.clone());
     for id in ["ab", "cd", "a", "bcd"] {
         repo.store_asset(&crypto(id)).await?;
     }
-    let market = |base: &str, quote: &str, value: f64| {
-        Market::new(
-            "abcd".to_string(),
+    for (base, quote, value) in [("ab", "cd", 10.0), ("a", "bcd", 99.0)] {
+        let market = Market::new(
+            format!("{base}/{quote}"),
             crypto(base),
             crypto(quote),
             Some(price(value, 1)),
-        )
-    };
-    repo.store_market(&market("ab", "cd", 10.0), PriceProvider::Kraken)
-        .await?;
+        );
+        repo.store_market(&market, PriceProvider::Kraken).await?;
+    }
 
-    repo.store_market(&market("a", "bcd", 99.0), PriceProvider::Kraken)
-        .await?;
+    let rows: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT market_id, price::text FROM market_price ORDER BY market_id")
+            .fetch_all(&pool)
+            .await?;
 
-    let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
-        "SELECT b.symbol, q.symbol, p.price::text FROM market_price p
-         JOIN assets_data b ON b.id = p.base_asset_id JOIN assets_data q ON q.id = p.quote_asset_id",
-    )
-    .fetch_all(&pool)
-    .await?;
-    assert_eq!(rows, [("AB".into(), "CD".into(), Some("10".into()))]);
+    assert_eq!(
+        rows,
+        [
+            ("a/bcd".into(), Some("99".into())),
+            ("ab/cd".into(), Some("10".into()))
+        ]
+    );
+    Ok(())
+}
+
+/// GIVEN an asset whose symbol contains `/`,
+/// WHEN the catalog assets are stored,
+/// THEN that asset is skipped and the others are stored.
+#[sqlx::test(migrations = "../../migrations")]
+async fn assets_with_a_slash_in_their_symbol_are_skipped(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool);
+
+    repo.store_assets(&[crypto("a/b"), crypto("btc")]).await?;
+
+    assert!(repo.find_asset(&"btc".to_string()).await?.is_some());
+    assert!(repo.find_asset(&"a/b".to_string()).await?.is_none());
     Ok(())
 }

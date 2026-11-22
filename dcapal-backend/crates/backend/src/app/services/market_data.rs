@@ -16,7 +16,7 @@ use crate::{
     app::{
         domain::{
             asset::AssetRef,
-            entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
+            entity::{Asset, AssetId, AssetKind, Market, MarketId, Price, market_id},
             market_quote::{
                 FailureKind, FxRate, PriceFailure, PriceQuote, QuoteSource, QuoteStatus,
                 StoredQuote, derive_fx_rate, fx_candidate_markets,
@@ -482,12 +482,12 @@ impl MarketDataService {
 
         let (base, quote) = (normalized_asset(base), normalized_asset(quote));
         let candidates = [
-            format!("{base}{quote}"),
-            format!("{quote}{base}"),
-            format!("{base}{USD}"),
-            format!("{USD}{base}"),
-            format!("{USD}{quote}"),
-            format!("{quote}{USD}"),
+            market_id(base, quote),
+            market_id(quote, base),
+            market_id(base, USD),
+            market_id(USD, base),
+            market_id(USD, quote),
+            market_id(quote, USD),
         ];
         let markets = self.get_markets(&candidates).await?;
         let rate = select_conversion_rate(base, quote, &markets);
@@ -549,35 +549,35 @@ fn select_conversion_rate(
 ) -> Option<(Price, Vec<MarketId>)> {
     let priced = |id: String| markets.get(&id).and_then(|m| m.price().map(|px| (id, px)));
 
-    if let Some((id, px)) = priced(format!("{base}{quote}")) {
+    if let Some((id, px)) = priced(market_id(base, quote)) {
         return Some((px, vec![id]));
     }
-    if let Some((id, px)) = priced(format!("{quote}{base}")) {
+    if let Some((id, px)) = priced(market_id(quote, base)) {
         return Some((Price::new(1. / px.price, px.ts), vec![id]));
     }
 
-    let (base_usd_id, base_usd) = priced(format!("{base}{USD}")).or_else(|| {
-        priced(format!("{USD}{base}")).map(|(id, px)| (id, Price::new(1. / px.price, px.ts)))
+    let (base_usd_id, base_usd) = priced(market_id(base, USD)).or_else(|| {
+        priced(market_id(USD, base)).map(|(id, px)| (id, Price::new(1. / px.price, px.ts)))
     })?;
 
-    if let Some((id, px)) = priced(format!("{USD}{quote}")) {
+    if let Some((id, px)) = priced(market_id(USD, quote)) {
         let rate = Price::new(base_usd.price * px.price, base_usd.ts.min(px.ts));
         return Some((rate, vec![base_usd_id, id]));
     }
-    let (id, px) = priced(format!("{quote}{USD}"))?;
+    let (id, px) = priced(market_id(quote, USD))?;
     let rate = Price::new(base_usd.price / px.price, base_usd.ts.min(px.ts));
     Some((rate, vec![base_usd_id, id]))
 }
 
 /// Id of the stored market that prices a crypto asset in [`CRYPTO_QUOTE_CURRENCY`].
 fn crypto_market_id(asset: &AssetRef) -> MarketId {
-    format!("{}{CRYPTO_QUOTE_CURRENCY}", asset.symbol().to_lowercase())
+    market_id(&asset.symbol().to_lowercase(), CRYPTO_QUOTE_CURRENCY)
 }
 
 /// Builds the quote of a Kraken crypto asset from its stored market, if there is one.
 ///
 /// Only a market priced by Kraken counts: a same-named market of another provider (such
-/// as the fiat `eurusd`) never answers a `kraken:` reference.
+/// as the fiat `eur/usd`) never answers a `kraken:` reference.
 fn stored_crypto_quote(asset: &AssetRef, stored: &HashMap<MarketId, StoredQuote>) -> PriceQuote {
     match stored
         .get(&crypto_market_id(asset))
@@ -661,7 +661,7 @@ mod tests {
                 repo.find_asset(&quote.to_string()).await.unwrap().unwrap(),
             );
             let market = Market::new(
-                format!("{base}{quote}"),
+                market_id(base, quote),
                 b,
                 q,
                 Some(Price::new(1., Timestamp::now())),
@@ -699,18 +699,18 @@ mod tests {
             service.markets.run_pending_tasks();
         };
 
-        get("usdeur").await;
-        get("eurusd").await;
-        get("btceur").await;
-        get("etheur").await;
+        get("usd/eur").await;
+        get("eur/usd").await;
+        get("btc/eur").await;
+        get("eth/eur").await;
         // Reading btceur again makes etheur the least recently used entry.
-        get("btceur").await;
-        get("ltceur").await;
+        get("btc/eur").await;
+        get("ltc/eur").await;
         service.fx_markets.run_pending_tasks();
 
-        assert!(cached(&service, "usdeur") && cached(&service, "eurusd"));
-        assert!(cached(&service, "btceur") && cached(&service, "ltceur"));
-        assert!(!cached(&service, "etheur"));
+        assert!(cached(&service, "usd/eur") && cached(&service, "eur/usd"));
+        assert!(cached(&service, "btc/eur") && cached(&service, "ltc/eur"));
+        assert!(!cached(&service, "eth/eur"));
         assert_eq!(service.markets.entry_count(), 2);
     }
 
@@ -719,23 +719,23 @@ mod tests {
     #[sqlx::test(migrations = "../../migrations")]
     async fn set_price_replaces_the_cached_price_in_place(pool: PgPool) {
         let service = service_with(pool, 10, &[("usd", "eur"), ("btc", "eur")]).await;
-        for id in ["usdeur", "btceur"] {
+        for id in ["usd/eur", "btc/eur"] {
             service.get_market(&id.to_string()).await.unwrap();
         }
 
         let fresh = Price::new(42., Timestamp::now());
-        assert!(service.set_price(&"usdeur".to_string(), fresh));
-        assert!(service.set_price(&"btceur".to_string(), fresh));
+        assert!(service.set_price(&"usd/eur".to_string(), fresh));
+        assert!(service.set_price(&"btc/eur".to_string(), fresh));
         assert!(!service.set_price(&"unknown".to_string(), fresh));
 
         assert!(
-            service.fx_markets.contains_key("usdeur") && !service.markets.contains_key("usdeur")
+            service.fx_markets.contains_key("usd/eur") && !service.markets.contains_key("usd/eur")
         );
         assert!(
-            service.markets.contains_key("btceur") && !service.fx_markets.contains_key("btceur")
+            service.markets.contains_key("btc/eur") && !service.fx_markets.contains_key("btc/eur")
         );
         let market = service
-            .get_market(&"usdeur".to_string())
+            .get_market(&"usd/eur".to_string())
             .await
             .unwrap()
             .unwrap();
@@ -747,18 +747,18 @@ mod tests {
     #[sqlx::test(migrations = "../../migrations")]
     async fn invalidation_clears_both_caches(pool: PgPool) {
         let service = service_with(pool, 10, &[("usd", "eur"), ("btc", "eur")]).await;
-        for id in ["usdeur", "btceur"] {
+        for id in ["usd/eur", "btc/eur"] {
             service.get_market(&id.to_string()).await.unwrap();
         }
 
-        service.invalidate_markets(&["btceur".to_string()]);
-        assert!(cached(&service, "usdeur") && !cached(&service, "btceur"));
+        service.invalidate_markets(&["btc/eur".to_string()]);
+        assert!(cached(&service, "usd/eur") && !cached(&service, "btc/eur"));
 
         service.invalidate_market_cache();
-        assert!(!cached(&service, "usdeur"));
+        assert!(!cached(&service, "usd/eur"));
         assert!(
             service
-                .get_market(&"usdeur".to_string())
+                .get_market(&"usd/eur".to_string())
                 .await
                 .unwrap()
                 .is_some()
@@ -771,7 +771,7 @@ mod tests {
     #[sqlx::test(migrations = "../../migrations")]
     async fn invalidating_a_market_removes_it_and_dependent_conversion_rates(pool: PgPool) {
         let service = service_with(pool, 10, &[("uni", "eur")]).await;
-        let market_id = "unieur".to_string();
+        let market_id = "uni/eur".to_string();
         let dependency = ("uni".to_string(), "eur".to_string());
         service.get_market(&market_id).await.unwrap();
         service
@@ -785,12 +785,12 @@ mod tests {
 
         service.invalidate_markets(std::slice::from_ref(&market_id));
 
-        assert!(!cached(&service, "unieur"));
+        assert!(!cached(&service, "uni/eur"));
         assert!(!service.pricers.read().contains_key(&dependency));
         assert!(!service.price_deps.read().contains_key(&market_id));
     }
 
-    /// GIVEN EUR/GBP is converted by triangulating through `eurusd` and `gbpusd`
+    /// GIVEN EUR/GBP is converted by triangulating through `eur/usd` and `gbp/usd`
     /// (no direct, inverse or `usd{quote}` market exists),
     /// WHEN the price worker refreshes `gbpusd`,
     /// THEN the cached EUR/GBP rate that depended on it is dropped.
@@ -807,8 +807,8 @@ mod tests {
         assert!(service.get_conversion_rate(query).await.unwrap().is_some());
         assert!(service.pricers.read().contains_key(&pair));
 
-        service.get_market(&"gbpusd".to_string()).await.unwrap();
-        service.set_price(&"gbpusd".to_string(), Price::new(2., Timestamp::now()));
+        service.get_market(&"gbp/usd".to_string()).await.unwrap();
+        service.set_price(&"gbp/usd".to_string(), Price::new(2., Timestamp::now()));
 
         assert!(!service.pricers.read().contains_key(&pair));
     }
@@ -828,7 +828,7 @@ mod tests {
             async move { repo.find_asset(&id).await.unwrap().unwrap() }
         };
         let market = Market::new(
-            format!("{base}{quote}"),
+            market_id(base, quote),
             find(base).await,
             find(quote).await,
             Some(Price::new(
@@ -856,7 +856,7 @@ mod tests {
         let (service, _) = quote_service(pool.clone()).await;
         pool.close().await;
 
-        let result = service.get_market(&"btcusd".to_string()).await;
+        let result = service.get_market(&"btc/usd".to_string()).await;
 
         assert!(
             matches!(result, Err(DcaError::DatabaseError(_))),
@@ -888,7 +888,7 @@ mod tests {
         assert_eq!(fresh[1].status, QuoteStatus::Unavailable);
         assert_eq!(fresh[1].price, None);
 
-        let id = "btcusd".to_string();
+        let id = "btc/usd".to_string();
         let failure = PriceFailure::provider_error("Kraken answered HTTP 503");
         repo.record_price_failures(&[MarketPriceFailure {
             market_id: &id,
@@ -967,7 +967,7 @@ mod tests {
         assert_eq!(rate.provider, Some(Provider::YF));
         assert_eq!(rate.source, Some(QuoteSource::Provider));
 
-        let id = "gbpusd".to_string();
+        let id = "gbp/usd".to_string();
         let failure = PriceFailure::provider_error("HTTP 503");
         repo.record_price_failures(&[MarketPriceFailure {
             market_id: &id,
@@ -1018,7 +1018,7 @@ mod tests {
         assert_eq!(second[1].status, QuoteStatus::ProviderError);
     }
 
-    /// GIVEN a stored fiat market `eurusd` priced by Yahoo,
+    /// GIVEN a stored fiat market `eur/usd` priced by Yahoo,
     /// WHEN the price of `kraken:EUR` is requested,
     /// THEN it is unavailable: a Kraken reference never resolves to another provider's market.
     #[sqlx::test(migrations = "../../migrations")]
@@ -1074,7 +1074,7 @@ mod tests {
     #[sqlx::test(migrations = "../../migrations")]
     async fn quotes_read_before_an_invalidation_are_not_cached(pool: PgPool) {
         let (service, _) = quote_service(pool).await;
-        let id = "btcusd".to_string();
+        let id = "btc/usd".to_string();
         let stale = Some(StoredQuote {
             base: "btc".into(),
             quote: "usd".into(),

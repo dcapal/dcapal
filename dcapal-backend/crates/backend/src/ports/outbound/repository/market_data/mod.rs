@@ -5,8 +5,8 @@
 //! by Kraken (provider Kraken, class Crypto) and the fiat currencies of the fixed
 //! catalog (provider Yahoo, class Cash). A market is a row of `market_price`
 //! keyed by its base and quote `assets_data` ids. The v1 REST API still exposes
-//! the lower-case symbol as asset id and the concatenation of base and quote ids
-//! as market id, which is stored on each `market_price` row as `market_id`.
+//! the lower-case symbol as asset id; the market id is `{base}/{quote}` (`btc/eur`), stored
+//! on each `market_price` row as `market_id`.
 //!
 //! Only provider-confirmed rows belong to the catalog: assets that clients
 //! supplied through synchronization never show up in it.
@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 use crate::{
     app::domain::{
-        entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
+        entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price, market_id},
         fiat::fiat_symbols,
         market_quote::{PriceFailure, StoredQuote, validate_price},
         portfolio::Provider as AppProvider,
@@ -580,9 +580,20 @@ fn catalog_key(asset: &Asset) -> (DbProvider, String) {
 /// Fiat rows (Yahoo cash) replace the metadata of a client-supplied row; crypto
 /// rows only mark it confirmed. Provider-confirmed rows are never changed.
 async fn upsert_assets<'e>(executor: impl sqlx::PgExecutor<'e>, assets: &[Asset]) -> Result<()> {
-    // A single statement cannot touch one row twice: keep the first of each key.
+    // A single statement cannot touch one row twice: keep the first of each key. Assets
+    // whose id contains `/` are skipped: it separates the sides of a market id.
     let assets = assets
         .iter()
+        .filter(|asset| {
+            let valid = !asset.id().contains('/');
+            if !valid {
+                warn!(
+                    asset = asset.id(),
+                    "Skipping asset whose symbol contains '/'"
+                );
+            }
+            valid
+        })
         .unique_by(|asset| catalog_key(asset))
         .collect::<Vec<_>>();
     if assets.is_empty() {
@@ -669,9 +680,8 @@ async fn insert_markets(
     }
 
     // One statement resolves the assets, inserts the resolvable markets and reports
-    // the markets whose assets are missing and those whose id already belongs to a
-    // different pair (concatenated ids are not unique across pairs).
-    let reported = query_as::<_, (String, bool)>(
+    // the markets whose assets are missing.
+    let missing = query_scalar::<_, String>(
         "WITH w AS (
              SELECT * FROM UNNEST($1::text[], $2::smallint[], $3::text[], $4::smallint[],
                                   $5::text[], $6::smallint[])
@@ -683,26 +693,13 @@ async fn insert_markets(
                ON b.provider = w.base_provider AND b.symbol = w.base_symbol
              LEFT JOIN assets_data AS q
                ON q.provider = w.quote_provider AND q.symbol = w.quote_symbol
-         ), collisions AS (
-             SELECT r.market_id, r.base_id, r.quote_id
-             FROM resolved AS r
-             JOIN market_price AS p ON p.market_id = r.market_id
-             WHERE r.base_id IS NOT NULL AND r.quote_id IS NOT NULL
-               AND (p.base_asset_id <> r.base_id OR p.quote_asset_id <> r.quote_id)
          ), inserted AS (
              INSERT INTO market_price (market_id, base_asset_id, quote_asset_id, provider)
-             SELECT DISTINCT ON (r.market_id) r.market_id, r.base_id, r.quote_id, r.provider
-             FROM resolved AS r
-             WHERE r.base_id IS NOT NULL AND r.quote_id IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM collisions AS c
-                               WHERE c.market_id = r.market_id AND c.base_id = r.base_id
-                                 AND c.quote_id = r.quote_id)
-             ORDER BY r.market_id
-             ON CONFLICT DO NOTHING
+             SELECT market_id, base_id, quote_id, provider FROM resolved
+             WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
+             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING
          )
-         SELECT market_id, TRUE AS missing FROM resolved WHERE base_id IS NULL OR quote_id IS NULL
-         UNION ALL
-         SELECT market_id, FALSE AS missing FROM collisions",
+         SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
     )
     .bind(&market_ids)
     .bind(&base_providers)
@@ -716,28 +713,13 @@ async fn insert_markets(
         warn!("Failed to store {} markets: {}", markets.len(), ErrorChain(&e));
         DcaError::RepositoryStoreFailure(market_ids[0].to_string(), Some(e))
     })?;
-    let missing = reported.iter().find(|(_, missing)| *missing);
-    if let Some((first, _)) = missing {
+    if let Some(first) = missing.first() {
         warn!(mkt = first, "Failed to store market: asset not stored");
         return Err(DcaError::RepositoryStoreFailure(first.clone(), None));
     }
 
-    // A colliding market is skipped with its price, so it can never overwrite the
-    // price of the pair that owns the id.
-    let colliding = reported
-        .iter()
-        .map(|(id, _)| id.as_str())
-        .collect::<HashSet<_>>();
-    for id in &colliding {
-        warn!(
-            mkt = id,
-            "Skipping market whose id already belongs to a different asset pair"
-        );
-    }
-
     let updates = markets
         .iter()
-        .filter(|(market, _)| !colliding.contains(market.id.as_str()))
         .filter_map(|(market, provider)| {
             (*market.price()).map(|price| MarketPriceUpdate {
                 market_id: &market.id,
@@ -832,7 +814,7 @@ impl TryFrom<MarketRow> for Market {
             .zip(row.observed_at)
             .map(|(price, ts)| Price::new(price, ts.to_jiff()));
 
-        let id = format!("{}{}", base.id(), quote.id());
+        let id = market_id(base.id(), quote.id());
         Ok(Market::new(id, base, quote, price))
     }
 }

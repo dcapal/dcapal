@@ -1163,17 +1163,17 @@ fn get_api_interval(freq: OHLCFrequency) -> &'static str {
 /// Market id and Yahoo ticker of every fiat pair priced by Yahoo.
 ///
 /// Each ticker is `{CCY}USD=X` and quotes the USD value of one unit of the
-/// currency. Inverse and cross rates (`usdeur`, `eurgbp`) are not stored: the
+/// currency. Inverse and cross rates (`usd/eur`, `eur/gbp`) are not stored: the
 /// conversion service derives them from these markets. Yahoo expects the
 /// tickers in upper case.
 pub const YAHOO_FX_TICKERS: [(&str, &str); 7] = [
-    ("eurusd", "EURUSD=X"),
-    ("gbpusd", "GBPUSD=X"),
-    ("audusd", "AUDUSD=X"),
-    ("cadusd", "CADUSD=X"),
-    ("chfusd", "CHFUSD=X"),
-    ("jpyusd", "JPYUSD=X"),
-    ("aedusd", "AEDUSD=X"),
+    ("eur/usd", "EURUSD=X"),
+    ("gbp/usd", "GBPUSD=X"),
+    ("aud/usd", "AUDUSD=X"),
+    ("cad/usd", "CADUSD=X"),
+    ("chf/usd", "CHFUSD=X"),
+    ("jpy/usd", "JPYUSD=X"),
+    ("aed/usd", "AEDUSD=X"),
 ];
 
 /// Returns the Yahoo ticker of a fiat market id, if Yahoo prices that pair.
@@ -1261,13 +1261,13 @@ mod chart {
 mod fx_tests {
     use super::*;
     use crate::app::domain::{
-        entity::{Asset, Fiat},
+        entity::{Asset, Fiat, market_id},
         fiat::{FIAT_CATALOG, fiat_name},
     };
 
     fn fx_market(base: &str, quote: &str) -> Market {
         let fiat = |id: &str| Asset::Fiat(Fiat::new(id.into(), fiat_name(id).unwrap().into()));
-        Market::new(format!("{base}{quote}"), fiat(base), fiat(quote), None)
+        Market::new(market_id(base, quote), fiat(base), fiat(quote), None)
     }
 
     #[test]
@@ -1276,7 +1276,7 @@ mod fx_tests {
         // WHEN each non-USD currency is paired with USD,
         // THEN Yahoo prices the pair under an upper-case `{CCY}USD=X` ticker.
         for (symbol, _) in FIAT_CATALOG.iter().filter(|(symbol, _)| *symbol != "USD") {
-            let id = format!("{}usd", symbol.to_lowercase());
+            let id = market_id(&symbol.to_lowercase(), "usd");
             let ticker = yahoo_fx_ticker(&id).unwrap_or_else(|| panic!("no ticker for {id}"));
             assert_eq!(ticker, format!("{symbol}USD=X"));
             assert_eq!(
@@ -1305,7 +1305,7 @@ mod fx_tests {
             "btc".into(),
         ));
         let eur = Asset::Fiat(Fiat::new("eur".into(), "Euro".into()));
-        let market = Market::new("btceur".into(), btc, eur, None);
+        let market = Market::new("btc/eur".into(), btc, eur, None);
 
         assert_eq!(market.as_yahoo().as_deref(), Some("btc-eur"));
     }
@@ -1351,7 +1351,7 @@ mod price_tests {
 
     fn eurusd() -> Market {
         let fiat = |id: &str| Asset::Fiat(Fiat::new(id.into(), id.to_uppercase()));
-        Market::new("eurusd".into(), fiat("eur"), fiat("usd"), None)
+        Market::new("eur/usd".into(), fiat("eur"), fiat("usd"), None)
     }
 
     fn provider_at(fake: &FakeProvider) -> YahooProvider {
@@ -1476,7 +1476,7 @@ mod price_tests {
     async fn markets_without_a_ticker_never_reach_yahoo() {
         let fake = FakeProvider::start(|_| Reply::ok(chart("[1.0]"))).await;
         let fiat = |id: &str| Asset::Fiat(Fiat::new(id.into(), id.to_uppercase()));
-        let cross = Market::new("eurgbp".into(), fiat("eur"), fiat("gbp"), None);
+        let cross = Market::new("eur/gbp".into(), fiat("eur"), fiat("gbp"), None);
 
         let failure = provider_at(&fake)
             .fetch_market_price(&cross, jiff::Timestamp::now())

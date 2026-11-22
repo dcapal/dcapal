@@ -57,7 +57,7 @@ async fn v1_market_data_responses_keep_their_shape(pool: PgPool) {
         (&usd, &eur, 0.9),
     ] {
         let market = Market::new(
-            format!("{}{}", base.id(), quote.id()),
+            dcapal_backend::app::domain::entity::market_id(base.id(), quote.id()),
             base.clone(),
             quote.clone(),
             Some(Price::new(px, ts)),

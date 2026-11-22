@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     DateTime,
-    app::domain::{asset::AssetRef, portfolio::Provider},
+    app::domain::{asset::AssetRef, entity::market_id, portfolio::Provider},
 };
 
 /// Why a current price could not be produced.
@@ -295,12 +295,12 @@ const PIVOT: &str = "usd";
 pub fn fx_candidate_markets(base: &str, quote: &str) -> Vec<String> {
     let (base, quote) = (base.to_lowercase(), quote.to_lowercase());
     let mut ids = vec![
-        format!("{base}{quote}"),
-        format!("{quote}{base}"),
-        format!("{base}{PIVOT}"),
-        format!("{PIVOT}{base}"),
-        format!("{quote}{PIVOT}"),
-        format!("{PIVOT}{quote}"),
+        market_id(&base, &quote),
+        market_id(&quote, &base),
+        market_id(&base, PIVOT),
+        market_id(PIVOT, &base),
+        market_id(&quote, PIVOT),
+        market_id(PIVOT, &quote),
     ];
     ids.sort();
     ids.dedup();
@@ -340,17 +340,17 @@ pub fn derive_fx_rate(base: &str, quote: &str, stored: &HashMap<String, StoredQu
 
     // A priced stored market as (value of one base unit in its quote unit, market).
     let priced = |id: String| stored.get(&id).and_then(|m| m.price.map(|p| (p, m)));
-    let direct = priced(format!("{b}{q}")).map(|(p, m)| (p, Synthetic::None, vec![m]));
-    let inverse = || priced(format!("{q}{b}")).map(|(p, m)| (1.0 / p, Synthetic::Inverse, vec![m]));
+    let direct = priced(market_id(&b, &q)).map(|(p, m)| (p, Synthetic::None, vec![m]));
+    let inverse = || priced(market_id(&q, &b)).map(|(p, m)| (1.0 / p, Synthetic::Inverse, vec![m]));
     let triangulated = || {
         // The value of one unit of `currency` in USD, with the market it comes from.
         let in_pivot = |currency: &str| -> Option<(f64, Option<&StoredQuote>)> {
             if currency == PIVOT {
                 return Some((1.0, None));
             }
-            priced(format!("{currency}{PIVOT}"))
+            priced(market_id(currency, PIVOT))
                 .map(|(p, m)| (p, Some(m)))
-                .or_else(|| priced(format!("{PIVOT}{currency}")).map(|(p, m)| (1.0 / p, Some(m))))
+                .or_else(|| priced(market_id(PIVOT, currency)).map(|(p, m)| (1.0 / p, Some(m))))
         };
         let (base_usd, base_leg) = in_pivot(&b)?;
         let (quote_usd, quote_leg) = in_pivot(&q)?;
@@ -446,7 +446,7 @@ mod tests {
 
     fn stored(base: &str, quote: &str, price: Option<f64>) -> (String, StoredQuote) {
         (
-            format!("{base}{quote}"),
+            market_id(base, quote),
             StoredQuote {
                 base: base.into(),
                 quote: quote.into(),
