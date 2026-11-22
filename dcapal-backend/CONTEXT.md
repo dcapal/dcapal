@@ -18,7 +18,7 @@ _Avoid_: Application data store; application database
 ## Market data language
 
 **Market asset**:
-A crypto or fiat asset known to the market-data catalog and usable as the base or quote side of a market.
+A provider-confirmed `assets_data` row usable as the base or quote side of a market: Kraken crypto, or one of the eight catalog fiat currencies (Yahoo cash). It is the same shared asset metadata portfolios reference, not a separate catalog.
 _Avoid_: Asset, when the distinction from a portfolio asset matters; portfolio asset
 
 **Portfolio asset**:
@@ -38,7 +38,7 @@ An optional class stored on a Portfolio Asset relationship. Null means that the 
 _Avoid_: shared default Asset Class; provider asset type
 
 **Market**:
-A tradable pair of two market assets: a base asset and a quote asset. A market may have a current market price.
+A priced pair of two market assets: a base asset and a quote asset, stored as one latest-price row keyed by both. Kraken prices crypto markets; Yahoo prices fiat against fiat markets (FX). A market may have a current market price.
 _Avoid_: Portfolio asset; asset, when referring to the pair
 
 **Market price**:
@@ -46,7 +46,7 @@ A time-stamped observation of the value of one unit of a market's base asset exp
 _Avoid_: Conversion rate, when the price belongs to a specific market
 
 **Latest price**:
-The most recent market price stored for a market, one row per market, with its provider, observation time and storage time. It is replaced in place and is not part of the price series (see ADR 0007).
+The most recent market price stored for a market, one row per market, with the provider that supplied it, observation time and storage time. It is replaced in place and is not part of the price series (see ADR 0007).
 _Avoid_: Price series; historical price
 
 **Conversion rate**:

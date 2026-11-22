@@ -7,15 +7,18 @@ use tracing::{debug, error, info};
 use crate::{
     AppContext, DateTime,
     app::{
-        domain::entity::Asset,
-        domain::market_data_utils::fetch_market_price,
+        domain::{
+            entity::{Asset, Fiat, Market},
+            fiat::{FIAT_CATALOG, fiat_name},
+            market_data_utils::{fetch_market_price, price_provider_for},
+        },
         infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
     error::Result,
     ports::outbound::{
-        adapter::PriceProviders,
+        adapter::{PriceProviders, YAHOO_FX_TICKERS},
         repository::{MiscRepository, market_data::MarketDataRepository},
     },
 };
@@ -53,6 +56,11 @@ impl MarketDiscoveryWorker {
     }
 
     pub async fn run(&self, mut stop_token: StopToken) {
+        // FX never depends on Kraken: seed it before any Kraken call is made.
+        if let Err(e) = self.seed_fx_catalog().await {
+            error!("Failed to seed the fiat catalog and FX markets: {:?}", e);
+        }
+
         let mut reconciliation_stop_token = stop_token.clone();
         let reconciliation = self.run_market_reconciliation(&mut reconciliation_stop_token);
         let discovery = self.run_market_discovery(&mut stop_token);
@@ -158,7 +166,57 @@ impl MarketDiscoveryWorker {
         Ok(())
     }
 
+    /// Idempotently stores the fiat catalog and the Yahoo-priced FX markets, and
+    /// prices the FX markets that have no price yet.
+    ///
+    /// Fiat assets are written to `assets_data` as provider-confirmed Yahoo cash
+    /// with English names. This replaces the metadata of a client-supplied row
+    /// for the same symbol, which only v2 asset resolution did until now; the
+    /// catalog is the provider's answer for these symbols.
+    async fn seed_fx_catalog(&self) -> Result<()> {
+        for (symbol, name) in FIAT_CATALOG {
+            let fiat = Asset::Fiat(Fiat::new(symbol.to_lowercase(), name.to_string()));
+            self.market_data_repo.store_asset(&fiat).await?;
+        }
+        self.market_data_service.invalidate_asset_cache();
+
+        for (market_id, _) in YAHOO_FX_TICKERS {
+            let (base_id, quote_id) = market_id.split_at(3);
+            let fiat = |id: &str| {
+                Asset::Fiat(Fiat::new(
+                    id.to_string(),
+                    fiat_name(id).unwrap_or(id).to_string(),
+                ))
+            };
+            let mut market =
+                Market::new(market_id.to_string(), fiat(base_id), fiat(quote_id), None);
+            let provider = price_provider_for(&market, self.price_provider);
+            self.market_data_repo
+                .store_market(&market, provider)
+                .await?;
+
+            let unpriced = self
+                .market_data_repo
+                .find_market(&market.id)
+                .await?
+                .is_some_and(|stored| stored.price().is_none());
+            if unpriced
+                && let Some(price) = fetch_market_price(&market, &self.providers, provider).await
+            {
+                market.set_price(price);
+                self.market_data_repo
+                    .store_market(&market, provider)
+                    .await?;
+            }
+        }
+        self.market_data_service.invalidate_market_cache();
+
+        Ok(())
+    }
+
     async fn discover_new_markets(&self) -> Result<()> {
+        self.seed_fx_catalog().await?;
+
         // Collect assets and markets from Kraken
         let (assets, markets) = self
             .providers
@@ -177,19 +235,15 @@ impl MarketDiscoveryWorker {
         // Store markets in repository
         for mut m in markets {
             info!("Fetching price for market '{}'", m.id);
-            let Some(price) = fetch_market_price(&m, &self.providers, self.price_provider).await
-            else {
+            let provider = price_provider_for(&m, self.price_provider);
+            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
                 continue;
             };
 
             m.set_price(price);
 
             info!("Storing market '{}'", m.id);
-            if let Err(error) = self
-                .market_data_repo
-                .store_market(&m, self.price_provider)
-                .await
-            {
+            if let Err(error) = self.market_data_repo.store_market(&m, provider).await {
                 self.market_data_service.invalidate_market_cache();
                 return Err(error);
             }

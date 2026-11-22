@@ -8,7 +8,7 @@ use crate::{
     app::{
         domain::{
             entity::{MarketId, Price},
-            market_data_utils::fetch_market_price,
+            market_data_utils::{fetch_market_price, price_provider_for},
         },
         infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
@@ -76,16 +76,16 @@ impl PriceUpdaterWorker {
         // Get all known markets
         let markets = self.market_data_repo.load_markets().await?;
 
-        let mut batch: Vec<(MarketId, Price)> = Vec::with_capacity(FLUSH_BATCH_SIZE);
+        let mut batch: Vec<(MarketId, Price, PriceProvider)> = Vec::with_capacity(FLUSH_BATCH_SIZE);
         for m in markets {
-            let Some(price) = fetch_market_price(&m, &self.providers, self.price_provider).await
-            else {
+            let provider = price_provider_for(&m, self.price_provider);
+            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
                 warn!("Failed to fetch price update for market {}", m.id);
                 continue;
             };
 
             self.market_data_service.set_price(&m.id, price);
-            batch.push((m.id, price));
+            batch.push((m.id, price, provider));
 
             if batch.len() >= FLUSH_BATCH_SIZE {
                 self.flush(&mut batch).await;
@@ -101,24 +101,21 @@ impl PriceUpdaterWorker {
     }
 
     /// Stores and clears the pending prices, logging instead of failing the pass.
-    async fn flush(&self, batch: &mut Vec<(MarketId, Price)>) {
+    async fn flush(&self, batch: &mut Vec<(MarketId, Price, PriceProvider)>) {
         if batch.is_empty() {
             return;
         }
 
         let updates = batch
             .iter()
-            .map(|(market_id, price)| MarketPriceUpdate {
+            .map(|(market_id, price, provider)| MarketPriceUpdate {
                 market_id,
                 price: *price,
+                provider: *provider,
             })
             .collect::<Vec<_>>();
 
-        if let Err(e) = self
-            .market_data_repo
-            .upsert_prices(&updates, self.price_provider)
-            .await
-        {
+        if let Err(e) = self.market_data_repo.upsert_prices(&updates).await {
             error!(
                 "Failed to store {} market price updates: {e:?}",
                 batch.len()

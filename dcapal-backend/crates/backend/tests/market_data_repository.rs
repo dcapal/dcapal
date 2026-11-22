@@ -7,6 +7,7 @@ use dcapal_backend::{
     ports::outbound::repository::{
         ImportedRepository, MiscRepository, StatsRepository,
         market_data::{MarketDataRepository, MarketPriceUpdate},
+        postgres::types::Provider as DbProvider,
     },
 };
 use sqlx::PgPool;
@@ -41,6 +42,18 @@ async fn seed_catalog(repo: &MarketDataRepository) -> TestResult {
     Ok(())
 }
 
+fn update<'a>(
+    market_id: &'a String,
+    price: Price,
+    provider: PriceProvider,
+) -> MarketPriceUpdate<'a> {
+    MarketPriceUpdate {
+        market_id,
+        price,
+        provider,
+    }
+}
+
 async fn seed_market(
     repo: &MarketDataRepository,
     base: &Asset,
@@ -56,17 +69,37 @@ async fn seed_market(
     Ok(())
 }
 
+/// Inserts a client-supplied (unconfirmed) `assets_data` row, as v1 synchronization does.
+async fn insert_client_asset(
+    pool: &PgPool,
+    provider: i16,
+    symbol: &str,
+    class: i16,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class)
+         VALUES (uuidv7(), $1, $2, 'Client name', 'EUR', $3)",
+    )
+    .bind(provider)
+    .bind(symbol)
+    .bind(class)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// GIVEN an empty catalog, WHEN crypto and fiat assets are stored,
-/// THEN reads are per kind (in no guaranteed order), and a re-stored asset replaces the old one.
+/// THEN reads are per kind (in no guaranteed order), and provider-confirmed rows are
+/// never renamed by a later store.
 #[sqlx::test(migrations = "../../migrations")]
 async fn catalog_reads_are_per_kind(pool: PgPool) -> TestResult {
     let repo = MarketDataRepository::new(pool);
-    assert!(!repo.has_assets().await?);
+    assert!(!repo.has_crypto_assets().await?);
 
     seed_catalog(&repo).await?;
     repo.store_asset(&fiat("eur", "Euro (updated)")).await?;
 
-    assert!(repo.has_assets().await?);
+    assert!(repo.has_crypto_assets().await?);
     let cryptos = repo.load_assets_by_type(AssetKind::Crypto).await?;
     let mut ids = cryptos.iter().map(|a| a.id().as_str()).collect::<Vec<_>>();
     ids.sort_unstable();
@@ -77,12 +110,60 @@ async fn catalog_reads_are_per_kind(pool: PgPool) -> TestResult {
     assert_eq!(
         serde_json::to_value(&fiats)?,
         serde_json::json!([
-            {"type": "Fiat", "id": "eur", "symbol": "Euro (updated)"},
+            {"type": "Fiat", "id": "eur", "symbol": "Euro"},
             {"type": "Fiat", "id": "usd", "symbol": "US Dollar"},
         ])
     );
     assert!(repo.find_asset(&"btc".to_string()).await?.is_some());
     assert!(repo.find_asset(&"doge".to_string()).await?.is_none());
+    Ok(())
+}
+
+/// GIVEN client-supplied rows (Kraken crypto, Yahoo cash and a Yahoo currency ticker
+/// that Yahoo itself confirmed) next to the catalog,
+/// WHEN the catalog is read,
+/// THEN only catalog crypto and the fiat catalog symbols are listed or found, and a
+/// client-supplied crypto row is kept by name but marked confirmed when stored.
+#[sqlx::test(migrations = "../../migrations")]
+async fn only_confirmed_catalog_rows_are_visible(pool: PgPool) -> TestResult {
+    use dcapal_backend::ports::outbound::repository::postgres::types::{AssetClass, Provider};
+    let (kraken, yf) = (i16::from(Provider::Kraken), i16::from(Provider::YF));
+    let (crypto_class, cash) = (i16::from(AssetClass::Crypto), i16::from(AssetClass::Cash));
+    let repo = MarketDataRepository::new(pool.clone());
+    seed_catalog(&repo).await?;
+    insert_client_asset(&pool, kraken, "DOGE", crypto_class).await?;
+    insert_client_asset(&pool, yf, "CHF", cash).await?;
+    sqlx::query(
+        "INSERT INTO assets_data
+             (id, provider, symbol, name, currency, asset_class, metadata_source)
+         VALUES (uuidv7(), $1, 'EURUSD=X', 'EUR/USD', 'USD', $2, 1)",
+    )
+    .bind(yf)
+    .bind(cash)
+    .execute(&pool)
+    .await?;
+
+    assert!(repo.find_asset(&"doge".to_string()).await?.is_none());
+    assert!(repo.find_asset(&"chf".to_string()).await?.is_none());
+    assert!(repo.find_asset(&"eurusd=x".to_string()).await?.is_none());
+    let cryptos = repo.load_assets_by_type(AssetKind::Crypto).await?;
+    assert_eq!(cryptos.len(), 2);
+    let fiats = repo.load_assets_by_type(AssetKind::Fiat).await?;
+    assert_eq!(fiats.len(), 2);
+
+    repo.store_asset(&crypto("doge")).await?;
+    let (name, source): (String, i16) =
+        sqlx::query_as("SELECT name, metadata_source FROM assets_data WHERE symbol = 'DOGE'")
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!((name.as_str(), source), ("Client name", 1));
+    assert!(repo.find_asset(&"doge".to_string()).await?.is_some());
+
+    repo.store_asset(&fiat("chf", "Swiss franc")).await?;
+    let name: String = sqlx::query_scalar("SELECT name FROM assets_data WHERE symbol = 'CHF'")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(name, "Swiss franc");
     Ok(())
 }
 
@@ -139,38 +220,23 @@ async fn batch_upsert_replaces_prices_and_skips_unknown_markets(pool: PgPool) ->
         "gone".to_string(),
     );
     let stored = repo
-        .upsert_prices(
-            &[
-                MarketPriceUpdate {
-                    market_id: &btceur,
-                    price: price(2.0, 1),
-                },
-                MarketPriceUpdate {
-                    market_id: &btceur,
-                    price: price(3.0, 2),
-                },
-                MarketPriceUpdate {
-                    market_id: &etheur,
-                    price: price(f64::NAN, 2),
-                },
-                MarketPriceUpdate {
-                    market_id: &gone,
-                    price: price(9.0, 2),
-                },
-            ],
-            PriceProvider::Yahoo,
-        )
+        .upsert_prices(&[
+            update(&btceur, price(2.0, 1), PriceProvider::Kraken),
+            update(&btceur, price(3.0, 2), PriceProvider::Yahoo),
+            update(&etheur, price(f64::NAN, 2), PriceProvider::Kraken),
+            update(&gone, price(9.0, 2), PriceProvider::Kraken),
+        ])
         .await?;
 
     assert_eq!(stored, 1);
     let btceur_px = repo.find_market(&btceur).await?.unwrap();
     assert_eq!(btceur_px.price().unwrap().price, 3.0);
     assert!(repo.find_market(&etheur).await?.unwrap().price().is_none());
-    let (provider, error): (String, Option<String>) =
-        sqlx::query_as("SELECT provider, last_error FROM market_price WHERE market_id = 'btceur'")
+    let (provider, error): (i16, Option<String>) =
+        sqlx::query_as("SELECT provider, last_error FROM market_price WHERE price = 3")
             .fetch_one(&pool)
             .await?;
-    assert_eq!((provider.as_str(), error), ("Yahoo", None));
+    assert_eq!((provider, error), (i16::from(DbProvider::YF), None));
     Ok(())
 }
 
@@ -190,14 +256,8 @@ async fn prices_round_trip_exactly(pool: PgPool) -> TestResult {
         1.7e300,
         f64::MIN_POSITIVE,
     ] {
-        repo.upsert_prices(
-            &[MarketPriceUpdate {
-                market_id: &id,
-                price: price(value, 0),
-            }],
-            PriceProvider::Kraken,
-        )
-        .await?;
+        repo.upsert_prices(&[update(&id, price(value, 0), PriceProvider::Kraken)])
+            .await?;
         let read = repo.find_market(&id).await?.unwrap().price().unwrap().price;
         assert_eq!(read.to_bits(), value.to_bits(), "{value}");
     }
@@ -220,15 +280,9 @@ async fn large_worker_batch_is_stored(pool: PgPool) -> TestResult {
     let updates = ids
         .iter()
         .enumerate()
-        .map(|(i, id)| MarketPriceUpdate {
-            market_id: id,
-            price: price(i as f64 + 1.0, 0),
-        })
+        .map(|(i, id)| update(id, price(i as f64 + 1.0, 0), PriceProvider::Kraken))
         .collect::<Vec<_>>();
-    assert_eq!(
-        repo.upsert_prices(&updates, PriceProvider::Kraken).await?,
-        600
-    );
+    assert_eq!(repo.upsert_prices(&updates).await?, 600);
     assert!(
         repo.load_markets()
             .await?
@@ -238,26 +292,40 @@ async fn large_worker_batch_is_stored(pool: PgPool) -> TestResult {
     Ok(())
 }
 
-/// GIVEN stored markets, WHEN reconciling against a snapshot, THEN markets outside it are deleted
-/// with their prices, and an empty snapshot is rejected without deleting anything.
+/// GIVEN stored crypto markets and a Yahoo FX market, WHEN reconciling against a Kraken
+/// snapshot, THEN crypto markets outside it are deleted with their prices, the FX market is
+/// kept, and an empty snapshot is rejected without deleting anything.
 #[sqlx::test(migrations = "../../migrations")]
-async fn reconciliation_deletes_only_markets_outside_the_snapshot(pool: PgPool) -> TestResult {
+async fn reconciliation_deletes_only_crypto_markets_outside_the_snapshot(
+    pool: PgPool,
+) -> TestResult {
     let repo = MarketDataRepository::new(pool.clone());
     seed_catalog(&repo).await?;
-    let (btc, eth, eur) = (crypto("btc"), crypto("eth"), fiat("eur", "Euro"));
+    let (btc, eth, eur, usd) = (
+        crypto("btc"),
+        crypto("eth"),
+        fiat("eur", "Euro"),
+        fiat("usd", "US Dollar"),
+    );
     seed_market(&repo, &btc, &eur, Some(price(1.0, 0))).await?;
     seed_market(&repo, &eth, &eur, Some(price(2.0, 0))).await?;
+    repo.store_market(
+        &Market::new("eurusd".into(), eur.clone(), usd, Some(price(1.1, 0))),
+        PriceProvider::Yahoo,
+    )
+    .await?;
 
     assert!(repo.delete_markets_not_in(&HashSet::new()).await.is_err());
-    assert_eq!(repo.load_markets().await?.len(), 2);
+    assert_eq!(repo.load_markets().await?.len(), 3);
 
     let keep = HashSet::from(["btceur".to_string()]);
     assert_eq!(repo.delete_markets_not_in(&keep).await?, ["etheur"]);
-    assert_eq!(repo.load_markets().await?.len(), 1);
+    assert_eq!(repo.load_markets().await?.len(), 2);
     let prices: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM market_price")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(prices, 1);
+    assert_eq!(prices, 2);
+    assert!(repo.find_market(&"eurusd".to_string()).await?.is_some());
     Ok(())
 }
 

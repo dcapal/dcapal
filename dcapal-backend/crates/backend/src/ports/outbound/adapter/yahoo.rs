@@ -153,7 +153,10 @@ impl YahooProvider {
         freq: OHLCFrequency,
         ts: DateTime,
     ) -> Result<Option<f64>> {
-        let symbol = mkt.as_yahoo();
+        let Some(symbol) = mkt.as_yahoo() else {
+            warn!(mkt = mkt.id, "No Yahoo ticker for market");
+            return Ok(None);
+        };
         let interval = get_api_interval(freq);
         let (r_lo, r_hi) = freq.ohlc_range(ts);
         let (period_1, period_2) = (r_lo.timestamp(), r_hi.timestamp());
@@ -817,12 +820,38 @@ fn get_api_interval(freq: OHLCFrequency) -> &'static str {
     }
 }
 
+/// Market id and Yahoo ticker of every fiat pair priced by Yahoo.
+///
+/// Each ticker is `{CCY}USD=X` and quotes the USD value of one unit of the
+/// currency. Inverse and cross rates (`usdeur`, `eurgbp`) are not stored: the
+/// conversion service derives them from these markets. Yahoo expects the
+/// tickers in upper case.
+pub const YAHOO_FX_TICKERS: [(&str, &str); 7] = [
+    ("eurusd", "EURUSD=X"),
+    ("gbpusd", "GBPUSD=X"),
+    ("audusd", "AUDUSD=X"),
+    ("cadusd", "CADUSD=X"),
+    ("chfusd", "CHFUSD=X"),
+    ("jpyusd", "JPYUSD=X"),
+    ("aedusd", "AEDUSD=X"),
+];
+
+/// Returns the Yahoo ticker of a fiat market id, if Yahoo prices that pair.
+pub fn yahoo_fx_ticker(market_id: &str) -> Option<&'static str> {
+    YAHOO_FX_TICKERS
+        .iter()
+        .find(|(id, _)| *id == market_id)
+        .map(|(_, ticker)| *ticker)
+}
+
 pub trait AsYahooMarket {
-    fn as_yahoo(&self) -> String;
+    /// Returns the Yahoo ticker of the market, or `None` when Yahoo does not
+    /// price it (a fiat pair outside [`YAHOO_FX_TICKERS`]).
+    fn as_yahoo(&self) -> Option<String>;
 }
 
 impl AsYahooMarket for Market {
-    fn as_yahoo(&self) -> String {
+    fn as_yahoo(&self) -> Option<String> {
         lazy_static::lazy_static! {
             static ref MAPPINGS: HashMap<&'static str, &'static str> = {
                 [("luna", ("luna1"))].into_iter().collect()
@@ -830,11 +859,7 @@ impl AsYahooMarket for Market {
         }
 
         if self.is_fiat() {
-            if self.base.id() == "usd" {
-                return format!("{}=x", self.quote.id());
-            } else {
-                return format!("{}{}=x", self.base.id(), self.quote.id());
-            }
+            return yahoo_fx_ticker(&self.id).map(str::to_string);
         }
 
         let base = MAPPINGS
@@ -847,7 +872,7 @@ impl AsYahooMarket for Market {
             .map(|s| s.to_string())
             .unwrap_or_else(|| self.quote.id().clone());
 
-        format!("{base}-{quote}")
+        Some(format!("{base}-{quote}"))
     }
 }
 
@@ -891,5 +916,90 @@ mod chart {
     #[derive(Debug, Clone, Deserialize)]
     pub struct Quotes {
         pub close: Vec<Option<f64>>,
+    }
+}
+
+#[cfg(test)]
+mod fx_tests {
+    use super::*;
+    use crate::app::domain::{
+        entity::{Asset, Fiat},
+        fiat::{FIAT_CATALOG, fiat_name},
+    };
+
+    fn fx_market(base: &str, quote: &str) -> Market {
+        let fiat = |id: &str| Asset::Fiat(Fiat::new(id.into(), fiat_name(id).unwrap().into()));
+        Market::new(format!("{base}{quote}"), fiat(base), fiat(quote), None)
+    }
+
+    #[test]
+    fn every_catalog_fiat_except_usd_has_a_usd_ticker() {
+        // GIVEN the fiat catalog and the hardcoded Yahoo FX tickers,
+        // WHEN each non-USD currency is paired with USD,
+        // THEN Yahoo prices the pair under an upper-case `{CCY}USD=X` ticker.
+        for (symbol, _) in FIAT_CATALOG.iter().filter(|(symbol, _)| *symbol != "USD") {
+            let id = format!("{}usd", symbol.to_lowercase());
+            let ticker = yahoo_fx_ticker(&id).unwrap_or_else(|| panic!("no ticker for {id}"));
+            assert_eq!(ticker, format!("{symbol}USD=X"));
+            assert_eq!(
+                fx_market(&symbol.to_lowercase(), "usd")
+                    .as_yahoo()
+                    .as_deref(),
+                Some(ticker)
+            );
+        }
+        assert_eq!(YAHOO_FX_TICKERS.len(), FIAT_CATALOG.len() - 1);
+    }
+
+    #[test]
+    fn fiat_pairs_outside_the_table_have_no_ticker() {
+        // GIVEN fiat pairs that are not stored (inverse and cross rates),
+        // WHEN their Yahoo ticker is requested, THEN there is none.
+        assert_eq!(fx_market("usd", "eur").as_yahoo(), None);
+        assert_eq!(fx_market("eur", "gbp").as_yahoo(), None);
+    }
+
+    #[test]
+    fn crypto_markets_keep_their_dash_tickers() {
+        // GIVEN a crypto market, WHEN its Yahoo ticker is requested,
+        // THEN the base and quote ids are joined with a dash.
+        let btc = Asset::Crypto(crate::app::domain::entity::Crypto::new_with_id(
+            "btc".into(),
+        ));
+        let eur = Asset::Fiat(Fiat::new("eur".into(), "Euro".into()));
+        let market = Market::new("btceur".into(), btc, eur, None);
+
+        assert_eq!(market.as_yahoo().as_deref(), Some("btc-eur"));
+    }
+
+    /// Live check against Yahoo: run with `cargo test -- --ignored live_eurusd`.
+    #[tokio::test]
+    #[ignore = "needs network access to Yahoo"]
+    async fn live_eurusd_price_is_fetched_through_the_fx_ticker() {
+        // GIVEN the real Yahoo endpoint and the EURUSD market,
+        // WHEN its price is fetched,
+        // THEN a plausible USD per EUR rate is returned.
+        // Yahoo rejects clients without a browser-like user agent, as DcaServer configures.
+        let mut headers = rquest::header::HeaderMap::new();
+        headers.insert(
+            rquest::header::USER_AGENT,
+            rquest::header::HeaderValue::from_static(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            ),
+        );
+        let client = rquest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+        let provider = YahooProvider::new(client);
+
+        let price = provider
+            .fetch_market_price(&fx_market("eur", "usd"), chrono::Utc::now())
+            .await
+            .unwrap()
+            .expect("Yahoo should price EURUSD=X");
+
+        println!("EURUSD=X -> {price}");
+        assert!((0.5..2.0).contains(&price));
     }
 }

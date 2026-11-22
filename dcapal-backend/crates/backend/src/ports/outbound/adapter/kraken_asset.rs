@@ -12,13 +12,16 @@ use crate::{
     ports::outbound::repository::market_data::MarketDataRepository,
 };
 
-/// Resolves Kraken assets from the market-asset catalog kept by market discovery.
+/// Resolves Kraken assets from the crypto assets kept by market discovery.
 ///
-/// The catalog stores no display name for cryptocurrencies, so the symbol as
-/// submitted serves as name and as trading currency (a placeholder name). An
-/// empty catalog (cold start) is reported as a provider outage rather than as
-/// an unknown symbol; this path needs PostgreSQL and is covered by the repository integration tests. Fiat catalog entries carry
-/// their English name and resolve to cash in their own currency.
+/// The provider reads the provider-confirmed Kraken crypto rows of `assets_data`
+/// (client-supplied rows are ignored, so a client cannot vouch for itself).
+/// Kraken has no display name for cryptocurrencies, so the symbol as submitted
+/// serves as name and as trading currency (a placeholder name). Without any
+/// confirmed Kraken crypto row (cold start) an unknown symbol is reported as a
+/// provider outage rather than as unknown. Fiat currencies are not Kraken
+/// assets: they belong to Yahoo. This path needs PostgreSQL and is covered by
+/// the repository integration tests.
 pub struct KrakenAssetProvider {
     catalog: Arc<MarketDataRepository>,
 }
@@ -40,18 +43,27 @@ impl AssetProvider for KrakenAssetProvider {
             .await
             .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
 
-        if let Some(catalog_asset) = found {
+        if let Some(Asset::Crypto(_)) = found {
             // The catalog has no display name better than the symbol, so no
             // entry may rename an asset a client already named.
             return Ok(Some(ProviderAsset {
-                asset: resolved_from_catalog(asset, &catalog_asset),
+                asset: resolved_crypto(asset),
                 name_authoritative: false,
             }));
         }
+        if found.is_some() {
+            // A fiat currency is a Yahoo asset, not a Kraken one.
+            return Ok(None);
+        }
 
-        // A catalog that was never loaded (cold start) cannot tell an unknown
-        // symbol from a missing catalog, so it is reported as unavailable.
-        if self.catalog_is_empty().await? {
+        // Without confirmed Kraken crypto rows (cold start) an unknown symbol
+        // cannot be told from a catalog that was never loaded.
+        let has_catalog = self
+            .catalog
+            .has_crypto_assets()
+            .await
+            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
+        if !has_catalog {
             return Err(AssetProviderError::Unavailable(
                 "asset catalog is empty".into(),
             ));
@@ -60,67 +72,31 @@ impl AssetProvider for KrakenAssetProvider {
     }
 }
 
-impl KrakenAssetProvider {
-    /// Tells whether the catalog holds neither crypto nor fiat assets.
-    async fn catalog_is_empty(&self) -> Result<bool, AssetProviderError> {
-        let has_assets = self
-            .catalog
-            .has_assets()
-            .await
-            .map_err(|e| AssetProviderError::Unavailable(Box::new(e)))?;
-        Ok(!has_assets)
-    }
-}
-
-/// Builds the shared asset metadata for a catalog entry of the referenced symbol.
-fn resolved_from_catalog(reference: &AssetRef, catalog_asset: &Asset) -> ResolvedAsset {
-    let (name, asset_class) = match catalog_asset {
-        Asset::Crypto(_) => (reference.symbol().to_string(), AssetClass::Crypto),
-        // The catalog stores the fiat display name in the `symbol` field.
-        Asset::Fiat(fiat) => (fiat.symbol.clone(), AssetClass::Cash),
-    };
-
+/// Builds the shared asset metadata of a Kraken crypto asset: the symbol is both
+/// name and trading currency.
+fn resolved_crypto(reference: &AssetRef) -> ResolvedAsset {
     ResolvedAsset {
         provider: Provider::Kraken,
         symbol: reference.symbol().to_string(),
-        name,
+        name: reference.symbol().to_string(),
         currency: reference.symbol().to_string(),
-        asset_class,
+        asset_class: AssetClass::Crypto,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::domain::entity::{Crypto, Fiat};
 
     #[test]
     fn maps_crypto_catalog_entry() {
-        // GIVEN a crypto catalog entry, WHEN it is mapped for its reference,
+        // GIVEN a Kraken crypto reference, WHEN it is mapped to shared metadata,
         // THEN it resolves to a crypto asset named and quoted by its symbol.
         let reference = AssetRef::new(Provider::Kraken, "btc");
-        let asset = resolved_from_catalog(
-            &reference,
-            &Asset::Crypto(Crypto::new_with_id("btc".into())),
-        );
+        let asset = resolved_crypto(&reference);
 
         assert_eq!(asset.name, "BTC");
         assert_eq!(asset.currency, "BTC");
         assert_eq!(asset.asset_class, AssetClass::Crypto);
-    }
-
-    #[test]
-    fn maps_fiat_catalog_entry() {
-        // GIVEN a fiat catalog entry, WHEN it is mapped for its reference,
-        // THEN it resolves to cash carrying the fiat display name.
-        let reference = AssetRef::new(Provider::Kraken, "eur");
-        let asset = resolved_from_catalog(
-            &reference,
-            &Asset::Fiat(Fiat::new("eur".into(), "Euro".into())),
-        );
-
-        assert_eq!(asset.name, "Euro");
-        assert_eq!(asset.currency, "EUR");
-        assert_eq!(asset.asset_class, AssetClass::Cash);
     }
 }

@@ -14,7 +14,10 @@ use tracing::{debug, error, warn};
 use super::DefaultCircuitBreaker;
 use crate::{
     DateTime,
-    app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+    app::domain::{
+        entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+        fiat::{fiat_name, is_fiat},
+    },
     app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
     config,
     error::{DcaError, Result},
@@ -265,10 +268,13 @@ impl KrakenProvider {
                 Ok(asset) => {
                     if let Some(a) = asset {
                         assets.insert(a.id().clone(), a);
-                    } else if fiat::is_fiat(ccy) {
+                    } else if is_fiat(ccy) {
                         assets.insert(
                             ccy.clone(),
-                            Asset::Fiat(Fiat::new(ccy.clone(), fiat::get_name(ccy).to_string())),
+                            Asset::Fiat(Fiat::new(
+                                ccy.clone(),
+                                fiat_name(ccy).unwrap_or(ccy).to_string(),
+                            )),
                         );
                     } else {
                         to_fetch.push(ccy);
@@ -538,6 +544,10 @@ fn parse_online_market_symbols(response: &AssetPairsResponse) -> Result<Vec<Stri
                 warn!(symbol, "Ignoring malformed online Kraken market");
                 return None;
             };
+            // Fiat against fiat pairs are priced by Yahoo, not discovered from Kraken.
+            if is_fiat(parsed.base) && is_fiat(parsed.quote) {
+                return None;
+            }
             Some(format!("{}/{}", parsed.base, parsed.quote))
         })
         .collect::<Vec<_>>();
@@ -615,10 +625,10 @@ async fn fetch_assets(
                 if let Some(a) = asset {
                     assets.insert(a.id().clone(), a);
                 } else {
-                    let a = match fiat::is_fiat(ccy) {
+                    let a = match is_fiat(ccy) {
                         true => Asset::Fiat(Fiat {
                             id: ccy.to_string(),
-                            symbol: fiat::get_name(ccy).to_string(),
+                            symbol: fiat_name(ccy).unwrap_or(ccy).to_string(),
                         }),
                         false => Asset::Crypto(Crypto::new_with_id(ccy.clone())),
                     };
@@ -632,33 +642,6 @@ async fn fetch_assets(
         }
     }
     assets
-}
-
-mod fiat {
-    use std::collections::HashMap;
-
-    use lazy_static::lazy_static;
-
-    lazy_static! {
-        static ref FIAT_IDS: HashMap<&'static str, &'static str> = HashMap::from([
-            ("aed", "United Arab Emirates Dirham"),
-            ("aud", "Australian Dollar"),
-            ("cad", "Canadian Dollar"),
-            ("chf", "Swiss franc"),
-            ("eur", "Euro"),
-            ("gbp", "British Pound"),
-            ("jpy", "Japanese Yen"),
-            ("usd", "United States Dollar")
-        ]);
-    }
-
-    pub fn is_fiat(id: &str) -> bool {
-        FIAT_IDS.contains_key(id)
-    }
-
-    pub fn get_name(id: &str) -> &'static str {
-        FIAT_IDS.get(id).unwrap()
-    }
 }
 
 async fn is_new_market(id: MarketId, repo: &MarketDataRepository) -> bool {
@@ -861,6 +844,29 @@ mod tests {
             .into_iter()
             .collect()
         );
+    }
+
+    #[test]
+    fn fiat_against_fiat_pairs_are_not_discovered_from_kraken() {
+        // GIVEN Kraken lists a crypto pair and fiat against fiat pairs,
+        // WHEN the online pairs are parsed,
+        // THEN only the crypto pair is kept, because Yahoo prices FX.
+        let pair = |wsname: &str| Pair {
+            wsname: wsname.to_string(),
+            status: "online".to_string(),
+        };
+        let response = AssetPairsResponse {
+            error: vec![],
+            result: HashMap::from([
+                ("a".to_string(), pair("EUR/USD")),
+                ("b".to_string(), pair("USD/JPY")),
+                ("c".to_string(), pair("BTC/EUR")),
+            ]),
+        };
+
+        let symbols = parse_online_market_symbols(&response).unwrap();
+
+        assert_eq!(symbols, ["btc/eur"]);
     }
 
     #[test]

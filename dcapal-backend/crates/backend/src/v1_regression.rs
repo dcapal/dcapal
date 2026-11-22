@@ -70,7 +70,8 @@ fn sorted_by_id(value: Value) -> Value {
 /// GIVEN a catalog and markets stored in PostgreSQL,
 /// WHEN the v1 asset and price endpoints are called,
 /// THEN they answer with the same JSON shapes as when Redis held the data (asset lists are
-/// compared regardless of order, which the v1 clients do not rely on).
+/// compared regardless of order, which the v1 clients do not rely on), and rows of the shared
+/// asset table that are not catalog assets are not listed.
 #[sqlx::test(migrations = "../../migrations")]
 async fn v1_market_data_responses_keep_their_shape(pool: PgPool) {
     let repo = MarketDataRepository::new(pool.clone());
@@ -101,6 +102,17 @@ async fn v1_market_data_responses_keep_their_shape(pool: PgPool) {
             .await
             .unwrap();
     }
+    // Shared asset rows that are not part of the catalog (client-supplied crypto, and a
+    // currency ticker confirmed by Yahoo) must never show up in the v1 lists.
+    sqlx::query(
+        "INSERT INTO assets_data
+             (id, provider, symbol, name, currency, asset_class, metadata_source)
+         VALUES (uuidv7(), 1, 'DOGE', 'Dogecoin', 'DOGE', 4, 0),
+                (uuidv7(), 2, 'EURUSD=X', 'EUR/USD', 'USD', 3, 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     let addr = serve(&pool).await;
 
     let (status, crypto) = get(addr, "/assets/crypto").await;

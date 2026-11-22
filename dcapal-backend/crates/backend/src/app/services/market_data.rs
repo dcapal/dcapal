@@ -339,7 +339,7 @@ impl MarketDataService {
                 "Computed conversion rate for market {} triangulating between markets",
                 base_quote_id
             );
-            return Ok(Some((rate, vec![base_quote_id, usd_quote_id])));
+            return Ok(Some((rate, vec![base_usd_id, quote_usd_id])));
         }
 
         warn!(
@@ -461,7 +461,7 @@ mod tests {
         let repo = Arc::new(MarketDataRepository::new(pool));
         for (base, quote) in markets {
             for asset in [base, quote] {
-                let asset = if *asset == "eur" || *asset == "usd" {
+                let asset = if ["eur", "usd", "gbp"].contains(asset) {
                     fiat(asset)
                 } else {
                     crypto(asset)
@@ -600,5 +600,28 @@ mod tests {
         assert!(!cached(&service, "unieur"));
         assert!(!service.pricers.read().contains_key(&dependency));
         assert!(!service.price_deps.read().contains_key(&market_id));
+    }
+
+    /// GIVEN EUR/GBP is converted by triangulating through `eurusd` and `gbpusd`
+    /// (no direct, inverse or `usd{quote}` market exists),
+    /// WHEN the price worker refreshes `gbpusd`,
+    /// THEN the cached EUR/GBP rate that depended on it is dropped.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn triangulated_rate_through_the_quote_usd_market_depends_on_both_usd_markets(
+        pool: PgPool,
+    ) {
+        let service = service_with(pool, 10, &[("eur", "usd"), ("gbp", "usd")]).await;
+        let query = ConversionRateQuery {
+            base: fiat("eur"),
+            quote: fiat("gbp"),
+        };
+        let pair = ("eur".to_string(), "gbp".to_string());
+        assert!(service.get_conversion_rate(query).await.unwrap().is_some());
+        assert!(service.pricers.read().contains_key(&pair));
+
+        service.get_market(&"gbpusd".to_string()).await.unwrap();
+        service.set_price(&"gbpusd".to_string(), Price::new(2., Utc::now()));
+
+        assert!(!service.pricers.read().contains_key(&pair));
     }
 }
