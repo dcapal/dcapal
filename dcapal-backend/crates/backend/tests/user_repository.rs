@@ -1,15 +1,15 @@
-use chrono::Utc;
 use dcapal_backend::{
     app::infra::claim::{Claims, UserMetadataClaim},
     ports::outbound::repository::{postgres::SqlxUserRepository, user::UserRepository},
 };
+use jiff::Timestamp;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 fn claims(user_id: Uuid, email: &str, full_name: Option<&str>) -> Claims {
     Claims {
-        iat: Utc::now().timestamp(),
-        exp: (Utc::now().timestamp() + 3600) as usize,
+        iat: Timestamp::now().as_second(),
+        exp: (Timestamp::now().as_second() + 3600) as usize,
         sub: user_id,
         user_metadata: UserMetadataClaim {
             email: email.to_string(),
@@ -69,11 +69,12 @@ async fn inserts_a_missing_user(pool: PgPool) -> dcapal_backend::error::Result<(
 #[sqlx::test(migrations = "../../migrations", fixtures("users"))]
 async fn leaves_an_unchanged_user_untouched(pool: PgPool) -> dcapal_backend::error::Result<()> {
     let repository = SqlxUserRepository::new(pool.clone());
-    let before: chrono::DateTime<Utc> =
+    let before: jiff_sqlx::Timestamp =
         sqlx::query_scalar("SELECT updated_at FROM users WHERE id = $1")
             .bind(Uuid::from_u128(1))
             .fetch_one(&pool)
             .await?;
+    let before = before.to_jiff();
 
     let user = repository
         .save_user_if_not_present(&claims(
@@ -84,11 +85,12 @@ async fn leaves_an_unchanged_user_untouched(pool: PgPool) -> dcapal_backend::err
         .await?;
 
     assert_eq!(user.updated_at, before);
-    let after: chrono::DateTime<Utc> =
+    let after: jiff_sqlx::Timestamp =
         sqlx::query_scalar("SELECT updated_at FROM users WHERE id = $1")
             .bind(Uuid::from_u128(1))
             .fetch_one(&pool)
             .await?;
+    let after = after.to_jiff();
     assert_eq!(after, before);
 
     Ok(())

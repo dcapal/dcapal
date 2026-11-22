@@ -10,9 +10,9 @@ use std::{
 use axum::{
     Router, extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get,
 };
-use chrono::prelude::*;
 use futures::future::BoxFuture;
 use hyper::header;
+use jiff::Timestamp;
 use metrics::{Unit, counter, describe_counter, describe_histogram};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -57,7 +57,7 @@ pub mod ports;
 mod v1_regression;
 
 /// The timestamp type shared by API and persistence models.
-pub type DateTime = chrono::DateTime<Utc>;
+pub type DateTime = Timestamp;
 
 #[allow(dead_code)]
 /// Shared application state made available to HTTP handlers and workers.

@@ -14,12 +14,12 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
+use jiff_sqlx::ToSqlx;
 use sqlx::{PgPool, Postgres, Transaction, query, query_as, query_scalar};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
-    DateTime,
     app::domain::{
         asset::{AssetRef, ResolvedAsset},
         entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
@@ -70,7 +70,7 @@ struct MarketRow {
     quote_symbol: String,
     quote_name: String,
     price: Option<f64>,
-    observed_at: Option<DateTime>,
+    observed_at: Option<jiff_sqlx::Timestamp>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -412,7 +412,10 @@ async fn upsert_prices(
             .iter()
             .map(|u| u.price.price.to_string())
             .collect::<Vec<_>>();
-        let observed = chunk.iter().map(|u| u.price.ts).collect::<Vec<_>>();
+        let observed = chunk
+            .iter()
+            .map(|u| u.price.ts.to_sqlx())
+            .collect::<Vec<_>>();
         let providers = chunk
             .iter()
             .map(|u| stored_provider(u.provider))
@@ -543,7 +546,7 @@ impl TryFrom<MarketRow> for Market {
         let price = row
             .price
             .zip(row.observed_at)
-            .map(|(price, ts)| Price::new(price, ts));
+            .map(|(price, ts)| Price::new(price, ts.to_jiff()));
 
         let id = format!("{}{}", base.id(), quote.id());
         Ok(Market::new(id, base, quote, price))

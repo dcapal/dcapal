@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use tracing::{error, warn};
 
 use super::entity::{Market, Price};
@@ -22,7 +22,7 @@ pub async fn fetch_market_price(
     providers: &PriceProviders,
     provider: PriceProvider,
 ) -> Option<Price> {
-    let now = Utc::now();
+    let now = Timestamp::now();
     let price = match provider {
         PriceProvider::CryptoWatch => providers.cw.fetch_market_price(market, now).await,
         PriceProvider::Kraken => providers.kraken.fetch_market_price(market, now).await,

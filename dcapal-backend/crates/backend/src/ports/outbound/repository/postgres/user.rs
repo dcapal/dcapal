@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use chrono::Utc;
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use sqlx::{PgPool, query_as};
 
 use crate::{
@@ -33,7 +34,7 @@ impl UserRepository for SqlxUserRepository {
         .fetch_optional(&self.pool)
         .await?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         // Every authenticated request lands here, so an unchanged profile must
         // not cost a write (and its dead tuple and WAL record).
@@ -56,7 +57,7 @@ impl UserRepository for SqlxUserRepository {
             .bind(claims.user_metadata.full_name.clone())
             .bind(&claims.user_metadata.email)
             .bind(&claims.role)
-            .bind(now)
+            .bind(now.to_sqlx())
             .fetch_one(&self.pool)
             .await?)
         } else {
@@ -69,7 +70,7 @@ impl UserRepository for SqlxUserRepository {
             .bind(claims.user_metadata.full_name.clone())
             .bind(&claims.user_metadata.email)
             .bind(&claims.role)
-            .bind(now)
+            .bind(now.to_sqlx())
             .fetch_one(&self.pool)
             .await?)
         }

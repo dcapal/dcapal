@@ -92,8 +92,9 @@ pub trait Expiring {
     fn is_outdated(&self) -> bool;
     fn time_to_live(&self) -> Duration;
 
-    fn time_to_live_chrono(&self) -> chrono::Duration {
-        chrono::Duration::from_std(self.time_to_live()).unwrap()
+    /// Returns the remaining lifetime as a Jiff span.
+    fn time_to_live_span(&self) -> jiff::Span {
+        jiff::Span::try_from(self.time_to_live()).unwrap()
     }
 }
 

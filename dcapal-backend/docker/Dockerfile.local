@@ -2,7 +2,7 @@
 
 # Local images favour a quick, debuggable build. Production keeps using the
 # release Dockerfile and its release-with-debug profile.
-FROM rust:1.97.1-bookworm AS chef
+FROM rust:1.100.0-bookworm AS chef
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     cargo install cargo-chef

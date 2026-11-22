@@ -123,7 +123,7 @@ impl CryptoWatchProvider {
     ) -> Result<Option<f64>> {
         let periods = get_cw_api_periods(freq);
         let (r_lo, r_hi) = freq.ohlc_range(ts);
-        let (after_ts, before_ts) = (r_lo.timestamp(), r_hi.timestamp());
+        let (after_ts, before_ts) = (r_lo.as_second(), r_hi.as_second());
         let url = format!(
             "https://api.cryptowat.ch/markets/kraken/{id}/ohlc?after={after_ts}&before={before_ts}&periods={periods}"
         );

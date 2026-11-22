@@ -3,7 +3,8 @@
 
 use std::collections::HashMap;
 
-use chrono::{Duration, Utc};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use sqlx::{PgPool, query, query_as, query_scalar};
 use uuid::Uuid;
 
@@ -31,12 +32,12 @@ impl MiscRepository {
 
     /// Returns when market discovery last completed, if it ever did.
     pub async fn get_cw_last_fetched(&self) -> Result<Option<DateTime>> {
-        Ok(
+        let completed_at: Option<jiff_sqlx::Timestamp> =
             query_scalar("SELECT completed_at FROM worker_marker WHERE name = $1")
                 .bind(Self::CW_LAST_FETCHED)
                 .fetch_optional(&self.pool)
-                .await?,
-        )
+                .await?;
+        Ok(completed_at.map(jiff_sqlx::Timestamp::to_jiff))
     }
 
     /// Records when market discovery last completed.
@@ -46,7 +47,7 @@ impl MiscRepository {
              ON CONFLICT (name) DO UPDATE SET completed_at = EXCLUDED.completed_at",
         )
         .bind(Self::CW_LAST_FETCHED)
-        .bind(ts)
+        .bind(ts.to_sqlx())
         .execute(&self.pool)
         .await?;
 
@@ -126,7 +127,7 @@ pub struct ImportedPortfolio {
 
 impl ImportedRepository {
     /// How long an imported portfolio can be fetched.
-    const TTL: Duration = Duration::seconds(60);
+    const TTL: std::time::Duration = std::time::Duration::from_secs(60);
 
     /// Creates a repository backed by the provided PostgreSQL pool.
     pub fn new(pool: PgPool) -> Self {
@@ -136,8 +137,8 @@ impl ImportedRepository {
     /// Stores a portfolio for [`Self::TTL`] and purges the transfers that already expired.
     pub async fn store_portfolio(&self, pfolio: &serde_json::Value) -> Result<ImportedPortfolio> {
         // Whole seconds, like the expiry the clients were given before.
-        let expires_at = DateTime::from_timestamp((Utc::now() + Self::TTL).timestamp(), 0)
-            .unwrap_or_else(Utc::now);
+        let expires_at = Timestamp::from_second((Timestamp::now() + Self::TTL).as_second())
+            .unwrap_or_else(|_| Timestamp::now());
         let id = Uuid::new_v4();
 
         let mut tx = self.pool.begin().await?;
@@ -147,7 +148,7 @@ impl ImportedRepository {
         query("INSERT INTO imported_portfolio (id, payload, expires_at) VALUES ($1, $2, $3)")
             .bind(id)
             .bind(pfolio)
-            .bind(expires_at)
+            .bind(expires_at.to_sqlx())
             .execute(&mut *tx)
             .await?;
         tx.commit().await?;

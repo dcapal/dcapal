@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use chrono::{TimeZone, Utc};
 use dcapal_backend::{
     app::domain::entity::{Asset, AssetKind, Crypto, Fiat, Market, Price},
     config::PriceProvider,
@@ -10,6 +9,7 @@ use dcapal_backend::{
         postgres::types::Provider as DbProvider,
     },
 };
+use jiff::{civil::date, tz::TimeZone};
 use sqlx::PgPool;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -22,10 +22,14 @@ fn fiat(id: &str, name: &str) -> Asset {
     Asset::Fiat(Fiat::new(id.to_string(), name.to_string()))
 }
 
-fn price(value: f64, minute: u32) -> Price {
+fn price(value: f64, minute: i8) -> Price {
     Price::new(
         value,
-        Utc.with_ymd_and_hms(2026, 11, 15, 10, minute, 0).unwrap(),
+        date(2026, 11, 15)
+            .at(10, minute, 0, 0)
+            .to_zoned(TimeZone::UTC)
+            .unwrap()
+            .timestamp(),
     )
 }
 
@@ -335,7 +339,11 @@ async fn reconciliation_deletes_only_crypto_markets_outside_the_snapshot(
 async fn runtime_state_is_persisted(pool: PgPool) -> TestResult {
     let misc = MiscRepository::new(pool.clone());
     assert!(misc.get_cw_last_fetched().await?.is_none());
-    let ts = Utc.with_ymd_and_hms(2026, 11, 15, 1, 2, 3).unwrap();
+    let ts = date(2026, 11, 15)
+        .at(1, 2, 3, 0)
+        .to_zoned(TimeZone::UTC)
+        .unwrap()
+        .timestamp();
     misc.set_cw_last_fetched(ts).await?;
     assert_eq!(misc.get_cw_last_fetched().await?, Some(ts));
 

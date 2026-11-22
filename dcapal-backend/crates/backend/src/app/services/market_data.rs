@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use chrono::Utc;
+use jiff::Timestamp;
 use moka::{policy::EvictionPolicy, sync::Cache};
 use parking_lot::RwLock;
 use tracing::{error, info, warn};
@@ -277,7 +277,7 @@ impl MarketDataService {
     ) -> Result<Option<(Price, Vec<MarketId>)>> {
         // Base/base => 1.
         if base == quote {
-            return Ok(Some((Price::new(1., Utc::now()), vec![])));
+            return Ok(Some((Price::new(1., Timestamp::now()), vec![])));
         }
 
         let base = normalized_asset(base);
@@ -476,7 +476,7 @@ mod tests {
                 format!("{base}{quote}"),
                 b,
                 q,
-                Some(Price::new(1., Utc::now())),
+                Some(Price::new(1., Timestamp::now())),
             );
             repo.store_market(&market, PriceProvider::Kraken)
                 .await
@@ -535,7 +535,7 @@ mod tests {
             service.get_market(&id.to_string()).await.unwrap();
         }
 
-        let fresh = Price::new(42., Utc::now());
+        let fresh = Price::new(42., Timestamp::now());
         assert!(service.set_price(&"usdeur".to_string(), fresh));
         assert!(service.set_price(&"btceur".to_string(), fresh));
         assert!(!service.set_price(&"unknown".to_string(), fresh));
@@ -589,7 +589,7 @@ mod tests {
         service
             .pricers
             .write()
-            .insert(dependency.clone(), Some(Price::new(1., Utc::now())));
+            .insert(dependency.clone(), Some(Price::new(1., Timestamp::now())));
         service
             .price_deps
             .write()
@@ -620,7 +620,7 @@ mod tests {
         assert!(service.pricers.read().contains_key(&pair));
 
         service.get_market(&"gbpusd".to_string()).await.unwrap();
-        service.set_price(&"gbpusd".to_string(), Price::new(2., Utc::now()));
+        service.set_price(&"gbpusd".to_string(), Price::new(2., Timestamp::now()));
 
         assert!(!service.pricers.read().contains_key(&pair));
     }

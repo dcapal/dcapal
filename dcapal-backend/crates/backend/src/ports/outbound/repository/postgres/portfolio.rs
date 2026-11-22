@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use rust_decimal::Decimal;
 use sqlx::{Postgres, Transaction, query, query_as};
 use uuid::Uuid;
@@ -72,8 +73,10 @@ struct AssetData {
     asset_class: DbAssetClass,
     currency: String,
     provider: DbProvider,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    created_at: Timestamp,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    updated_at: Timestamp,
 }
 struct PortfolioAssetInput {
     asset_data: AssetData,
@@ -98,7 +101,7 @@ impl AssetData {
         currency: String,
         provider: DbProvider,
     ) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Uuid::now_v7(),
             symbol: symbol.to_uppercase(),
@@ -118,7 +121,7 @@ async fn upsert_allocation(
     portfolio_id: Uuid,
     relationship_id: Uuid,
     weight: Decimal,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 ) -> Result<()> {
     query(
         "INSERT INTO portfolio_asset_allocation
@@ -130,7 +133,7 @@ async fn upsert_allocation(
     .bind(portfolio_id)
     .bind(relationship_id)
     .bind(weight)
-    .bind(updated_at)
+    .bind(updated_at.to_sqlx())
     .execute(&mut **tx)
     .await?;
     Ok(())
@@ -160,8 +163,8 @@ impl SqlxPortfolioRepository {
         .bind(&asset_data.name)
         .bind(&asset_data.currency)
         .bind(asset_data.asset_class)
-        .bind(asset_data.created_at)
-        .bind(asset_data.updated_at)
+        .bind(asset_data.created_at.to_sqlx())
+        .bind(asset_data.updated_at.to_sqlx())
         .fetch_one(&mut **tx)
         .await?)
     }
@@ -196,7 +199,7 @@ impl SqlxPortfolioRepository {
                 .get(&shared_asset.id)
                 .copied()
                 .unwrap_or_else(Uuid::now_v7);
-            let now = Utc::now();
+            let now = Timestamp::now();
             query(
                 "INSERT INTO portfolio_asset
                      (id, portfolio_id, assets_data_id, asset_class_override,
@@ -227,7 +230,7 @@ impl SqlxPortfolioRepository {
             .bind(fee_fields.fee_rate)
             .bind(fee_fields.min_fee)
             .bind(fee_fields.max_fee)
-            .bind(now)
+            .bind(now.to_sqlx())
             .execute(&mut **tx)
             .await?;
             upsert_allocation(tx, portfolio_id, relationship_id, asset.target_weight, now).await?;
@@ -299,7 +302,7 @@ impl SqlxPortfolioRepository {
             .bind(portfolio.id)
             .bind(&portfolio.name)
             .bind(&portfolio.quote_ccy)
-            .bind(portfolio.last_updated_at)
+            .bind(portfolio.last_updated_at.to_sqlx())
             .bind(DbAllocationMode::from(
                 LEGACY_WRITE_ALLOCATION.allocation_mode,
             ))
@@ -327,7 +330,7 @@ impl SqlxPortfolioRepository {
             .bind(user_id)
             .bind(&portfolio.name)
             .bind(&portfolio.quote_ccy)
-            .bind(portfolio.last_updated_at)
+            .bind(portfolio.last_updated_at.to_sqlx())
             .bind(DbAllocationMode::from(
                 LEGACY_WRITE_ALLOCATION.allocation_mode,
             ))

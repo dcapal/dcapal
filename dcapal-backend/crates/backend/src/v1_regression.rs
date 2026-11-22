@@ -86,7 +86,7 @@ async fn v1_market_data_responses_keep_their_shape(pool: PgPool) {
     for asset in [&eth, &btc, &usd, &eur] {
         repo.store_asset(asset).await.unwrap();
     }
-    let ts = chrono::DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+    let ts = jiff::Timestamp::from_second(1_700_000_000).unwrap();
     for (base, quote, px) in [
         (&btc, &eur, 40_000.5),
         (&btc, &usd, 44_000.25),

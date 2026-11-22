@@ -44,6 +44,7 @@ pub struct PortfolioV2Request {
     pub fees: Option<TransactionFeesV2Request>,
     pub assets: Vec<PortfolioAssetV2Request>,
     pub strategic_allocation: Option<StrategicAllocationV2Request>,
+    #[schema(value_type = String, format = DateTime)]
     pub last_updated_at: crate::DateTime,
 }
 
@@ -168,6 +169,7 @@ pub struct PortfolioV2Response {
     pub fees: Option<TransactionFeesV2Response>,
     pub assets: Vec<PortfolioAssetV2Response>,
     pub strategic_allocation: Option<StrategicAllocationV2Response>,
+    #[schema(value_type = String, format = DateTime)]
     pub last_updated_at: crate::DateTime,
 }
 

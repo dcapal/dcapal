@@ -157,7 +157,7 @@ impl KrakenProvider {
         ts: DateTime,
     ) -> Result<Option<f64>> {
         let (r_lo, r_hi) = freq.ohlc_range(ts);
-        let (after_ts, before_ts) = (r_lo.timestamp(), r_hi.timestamp());
+        let (after_ts, before_ts) = (r_lo.as_second(), r_hi.as_second());
         let periods = get_kraken_api_periods(freq);
         let url = format!(
             "https://api.kraken.com/0/public/OHLC?pair={id}&since={after_ts}&interval={periods}"

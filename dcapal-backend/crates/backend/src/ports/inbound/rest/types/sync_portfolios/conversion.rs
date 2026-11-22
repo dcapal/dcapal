@@ -120,7 +120,7 @@ impl TryFrom<(PortfolioRow, Vec<PortfolioAssetRow>)> for PortfolioResponse {
 #[cfg(test)]
 mod test {
 
-    use chrono::Utc;
+    use jiff::Timestamp;
     use rust_decimal::dec;
     use uuid::Uuid;
 
@@ -139,7 +139,7 @@ mod test {
             name: String::from("my_pf"),
             currency: String::from("EUR"),
             deleted: false,
-            last_updated_at: Utc::now(),
+            last_updated_at: Timestamp::now(),
             fees: FeeFields {
                 max_fee_impact: None,
                 fee_type: Some(DbFeeType::Fixed),
@@ -148,8 +148,8 @@ mod test {
                 min_fee: None,
                 max_fee: None,
             },
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         };
 
         let asset_model = PortfolioAssetRow {
@@ -176,8 +176,8 @@ mod test {
                 max_fee: None,
             },
             average_buy_price: Some(dec!(90.0)),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         };
         let assets_model = vec![asset_model.clone()];
 
@@ -257,7 +257,7 @@ mod test {
         // aggregate is projected through v1, THEN zero represents the same
         // no-minimum policy required by the legacy shape.
         let portfolio_id = Uuid::new_v4();
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut portfolio = PortfolioRow {
             id: portfolio_id,
             user_id: Uuid::new_v4(),
@@ -353,7 +353,7 @@ mod test {
         // GIVEN canonical Portfolio Asset rows for every supported class, WHEN they are projected,
         // THEN v1 emits uppercase class names and the legacy provider aliases.
         let portfolio_id = Uuid::new_v4();
-        let now = Utc::now();
+        let now = Timestamp::now();
         let portfolio = PortfolioRow {
             id: portfolio_id,
             user_id: Uuid::new_v4(),

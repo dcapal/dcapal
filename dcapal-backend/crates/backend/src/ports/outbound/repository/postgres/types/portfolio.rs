@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
 
@@ -28,12 +28,15 @@ pub struct PortfolioRow {
     /// Whether the portfolio has been soft-deleted.
     pub deleted: bool,
     /// The timestamp supplied by the client for synchronization.
-    pub last_updated_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub last_updated_at: Timestamp,
     /// The stored fee policy columns.
     #[sqlx(flatten)]
     pub fees: FeeFields,
     /// When the database row was created.
-    pub created_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub created_at: Timestamp,
     /// When the database row was last changed.
-    pub updated_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub updated_at: Timestamp,
 }

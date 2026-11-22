@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use itertools::Itertools;
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use sqlx::{PgPool, QueryBuilder, query_as};
 use uuid::Uuid;
 
@@ -39,7 +41,7 @@ struct AssetRow {
     currency: String,
     asset_class: DbAssetClass,
     metadata_source: DbMetadataSource,
-    last_confirm_attempt: Option<DateTime>,
+    last_confirm_attempt: Option<jiff_sqlx::Timestamp>,
 }
 
 #[async_trait]
@@ -84,7 +86,7 @@ impl AssetDirectory for SqlxAssetDirectory {
                  (id, provider, symbol, name, currency, asset_class, metadata_source,
                   created_at, updated_at) ",
         );
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         builder.push_values(assets, |mut row, asset| {
             row.push_bind(Uuid::now_v7())
                 .push_bind(DbProvider::from(asset.provider))
@@ -93,8 +95,8 @@ impl AssetDirectory for SqlxAssetDirectory {
                 .push_bind(&asset.currency)
                 .push_bind(DbAssetClass::from(asset.asset_class))
                 .push_bind(DbMetadataSource::ProviderConfirmed)
-                .push_bind(now)
-                .push_bind(now);
+                .push_bind(now.to_sqlx())
+                .push_bind(now.to_sqlx());
         });
         builder.push(
             " ON CONFLICT (provider, symbol) DO UPDATE SET
@@ -156,7 +158,7 @@ impl AssetDirectory for SqlxAssetDirectory {
         )
         .bind(providers)
         .bind(symbols)
-        .bind(at)
+        .bind(at.to_sqlx())
         .bind(DbMetadataSource::ClientSupplied)
         .execute(&self.pool)
         .await?;
@@ -176,7 +178,7 @@ impl From<AssetRow> for StoredAsset {
                 asset_class: row.asset_class.into(),
             },
             source: row.metadata_source.into(),
-            last_confirm_attempt: row.last_confirm_attempt,
+            last_confirm_attempt: row.last_confirm_attempt.map(jiff_sqlx::Timestamp::to_jiff),
         }
     }
 }

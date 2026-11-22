@@ -297,7 +297,7 @@ mod tests {
     };
 
     use async_trait::async_trait;
-    use chrono::Utc;
+    use jiff::Timestamp;
     use rust_decimal::Decimal;
 
     use super::*;
@@ -701,14 +701,14 @@ mod tests {
         v2_command(
             repository,
             assets,
-            vec![v2_portfolio(Uuid::new_v4(), Utc::now())],
+            vec![v2_portfolio(Uuid::new_v4(), Timestamp::now())],
             Vec::new(),
         )
         .await
     }
 
     /// A Simple v2 aggregate holding VWCE, last updated at `updated_at`.
-    fn v2_portfolio(id: Uuid, updated_at: chrono::DateTime<Utc>) -> PortfolioV2 {
+    fn v2_portfolio(id: Uuid, updated_at: Timestamp) -> PortfolioV2 {
         PortfolioV2 {
             id,
             name: "Portfolio".to_string(),
@@ -751,7 +751,7 @@ mod tests {
     }
 
     /// The stored form of a live Portfolio with no assets.
-    fn stored_portfolio(id: Uuid, updated_at: chrono::DateTime<Utc>) -> StoredPortfolio {
+    fn stored_portfolio(id: Uuid, updated_at: Timestamp) -> StoredPortfolio {
         StoredPortfolio {
             id,
             version: PortfolioVersion {
@@ -777,8 +777,8 @@ mod tests {
             id,
             version: PortfolioVersion {
                 deleted: true,
-                last_updated_at: Utc::now(),
-                updated_at: Utc::now(),
+                last_updated_at: Timestamp::now(),
+                updated_at: Timestamp::now(),
             },
             content: None,
         }
@@ -815,7 +815,7 @@ mod tests {
         let command = v2_command(
             &command_repository(),
             &assets,
-            vec![v2_portfolio(id, Utc::now())],
+            vec![v2_portfolio(id, Timestamp::now())],
             Vec::new(),
         )
         .await;
@@ -887,7 +887,7 @@ mod tests {
         let command = v2_command(
             &command_repository(),
             &assets,
-            vec![v2_portfolio(id, Utc::now())],
+            vec![v2_portfolio(id, Timestamp::now())],
             Vec::new(),
         )
         .await;
@@ -940,7 +940,7 @@ mod tests {
         let command = v2_command(
             &command_repository(),
             &assets,
-            vec![v2_portfolio(id, Utc::now())],
+            vec![v2_portfolio(id, Timestamp::now())],
             Vec::new(),
         )
         .await;
@@ -1018,7 +1018,7 @@ mod tests {
         let command = v2_command(
             &command_repository(),
             &assets,
-            vec![v2_portfolio(Uuid::new_v4(), Utc::now())],
+            vec![v2_portfolio(Uuid::new_v4(), Timestamp::now())],
             Vec::new(),
         )
         .await;
@@ -1046,7 +1046,7 @@ mod tests {
         let newer = Uuid::from_u128(1);
         let doomed = Uuid::from_u128(2);
         let unknown = Uuid::from_u128(3);
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut repository = MockPortfolioRepository::new();
         repository
             .expect_load_sync_snapshot()
@@ -1054,7 +1054,7 @@ mod tests {
             .returning(move |_| {
                 let snapshot = SyncSnapshot {
                     portfolios: vec![
-                        stored_portfolio(newer, now + chrono::Duration::days(1)),
+                        stored_portfolio(newer, now + jiff::Span::new().hours(24)),
                         stored_portfolio(doomed, now),
                     ],
                 };
@@ -1201,7 +1201,7 @@ mod tests {
                 )));
             }
 
-            let now = Utc::now();
+            let now = Timestamp::now();
             Ok((
                 PortfolioRow {
                     id: portfolio.id,
@@ -1274,7 +1274,7 @@ mod tests {
                     average_buy_price: Decimal::ONE,
                     fees: None,
                 }],
-                last_updated_at: Utc::now(),
+                last_updated_at: Timestamp::now(),
             }],
             deleted_portfolios: Vec::new(),
         }
