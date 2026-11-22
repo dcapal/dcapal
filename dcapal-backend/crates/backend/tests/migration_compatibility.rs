@@ -561,7 +561,7 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
     let gbp_yf = insert_shared_asset(&pool, YF, "GBP", OTHER).await?;
     let jpy = insert_shared_asset(&pool, KRAKEN, "JPY", CASH).await?;
     let jpy_yf = insert_shared_asset(&pool, YF, "JPY", CASH).await?;
-    let chf = insert_shared_asset(&pool, KRAKEN, "CHF", CASH).await?;
+    let _chf = insert_shared_asset(&pool, KRAKEN, "CHF", CASH).await?;
     let _chf_yf = insert_shared_asset(&pool, YF, "CHF", CASH).await?;
     let usdt = insert_shared_asset(&pool, KRAKEN, "USDT", CASH).await?;
     let _dai = insert_shared_asset(&pool, KRAKEN, "DAI", CASH).await?;

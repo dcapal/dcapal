@@ -62,3 +62,4 @@ rquest = { workspace = true }
 [dev-dependencies]
 migration = { path = "../migration" }
 mockall = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }

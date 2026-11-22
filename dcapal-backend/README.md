@@ -24,6 +24,17 @@ run:
 make backend-migrate
 ```
 
+## Startup and Yahoo reachability
+
+Before the backend binds its HTTP port it seeds the eight fiat assets and the
+seven FX markets (idempotent) and makes sure every FX market has a stored price.
+When all seven already have a price, even a stale one, it starts immediately
+without contacting any provider. Otherwise it fetches the missing prices from
+Yahoo, retrying each ticker with exponential backoff (1 s up to 30 s) for at
+most two minutes, and then exits with a non-zero status so the orchestrator
+restarts it. Yahoo must therefore be reachable on the first boot against an
+empty database only; later boots do not depend on it. See ADR 0007.
+
 ## Local development modes
 
 The root Makefile owns the complete local setup. It bootstraps the pinned

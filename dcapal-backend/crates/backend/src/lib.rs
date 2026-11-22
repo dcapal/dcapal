@@ -24,7 +24,10 @@ use crate::{
     app::{
         infra,
         services::{
-            asset::AssetService, market_data::MarketDataService, portfolio::PortfolioService,
+            asset::AssetService,
+            fx_rates::{FxStartupPolicy, YahooFxFetcher, ensure_fx_rates},
+            market_data::MarketDataService,
+            portfolio::PortfolioService,
         },
         workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
@@ -229,6 +232,17 @@ impl DcaServer {
     pub async fn start(&mut self, _signal_handler: BoxFuture<'_, ()>) -> Result<()> {
         info!("Initializing metrics");
         self.init_metrics().await;
+
+        // Conversions depend on the FX rates, so the server does not go online without them.
+        info!("Ensuring FX rates are available");
+        ensure_fx_rates(
+            &self.ctx.repos.mkt_data,
+            &self.ctx.services.mkt_data,
+            &YahooFxFetcher::new(self.ctx.providers.clone()),
+            self.ctx.config.app.providers.price_provider,
+            FxStartupPolicy::default(),
+        )
+        .await?;
 
         info!("Starting MarketDiscovery worker");
         {

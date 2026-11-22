@@ -8,17 +8,16 @@ use crate::{
     AppContext, DateTime,
     app::{
         domain::{
-            entity::{Asset, Fiat, Market},
-            fiat::{FIAT_CATALOG, fiat_name},
+            entity::Asset,
             market_data_utils::{fetch_market_price, price_provider_for},
         },
         infra::utils::{StopToken, should_stop},
-        services::market_data::MarketDataService,
+        services::{fx_rates::seed_fx_catalog, market_data::MarketDataService},
     },
     config::PriceProvider,
     error::Result,
     ports::outbound::{
-        adapter::{PriceProviders, YAHOO_FX_TICKERS},
+        adapter::PriceProviders,
         repository::{MiscRepository, market_data::MarketDataRepository},
     },
 };
@@ -56,7 +55,9 @@ impl MarketDiscoveryWorker {
     }
 
     pub async fn run(&self, mut stop_token: StopToken) {
-        // FX never depends on Kraken: seed it before any Kraken call is made.
+        // FX never depends on Kraken: seed it before any Kraken call is made. The
+        // startup gate has normally priced the FX markets already and the price
+        // updater keeps them fresh, so seeding is idempotent and stores no prices.
         if let Err(e) = self.seed_fx_catalog().await {
             error!("Failed to seed the fiat catalog and FX markets: {:?}", e);
         }
@@ -166,52 +167,15 @@ impl MarketDiscoveryWorker {
         Ok(())
     }
 
-    /// Idempotently stores the fiat catalog and the Yahoo-priced FX markets, and
-    /// prices the FX markets that have no price yet.
-    ///
-    /// Fiat assets are written to `assets_data` as provider-confirmed Yahoo cash
-    /// with English names. This replaces the metadata of a client-supplied row
-    /// for the same symbol, which only v2 asset resolution did until now; the
-    /// catalog is the provider's answer for these symbols.
+    /// Idempotently stores the fiat catalog and the FX markets (see
+    /// [`seed_fx_catalog`]); prices are the startup gate's and the price updater's job.
     async fn seed_fx_catalog(&self) -> Result<()> {
-        for (symbol, name) in FIAT_CATALOG {
-            let fiat = Asset::Fiat(Fiat::new(symbol.to_lowercase(), name.to_string()));
-            self.market_data_repo.store_asset(&fiat).await?;
-        }
-        self.market_data_service.invalidate_asset_cache();
-
-        for (market_id, _) in YAHOO_FX_TICKERS {
-            let (base_id, quote_id) = market_id.split_at(3);
-            let fiat = |id: &str| {
-                Asset::Fiat(Fiat::new(
-                    id.to_string(),
-                    fiat_name(id).unwrap_or(id).to_string(),
-                ))
-            };
-            let mut market =
-                Market::new(market_id.to_string(), fiat(base_id), fiat(quote_id), None);
-            let provider = price_provider_for(&market, self.price_provider);
-            self.market_data_repo
-                .store_market(&market, provider)
-                .await?;
-
-            let unpriced = self
-                .market_data_repo
-                .find_market(&market.id)
-                .await?
-                .is_some_and(|stored| stored.price().is_none());
-            if unpriced
-                && let Some(price) = fetch_market_price(&market, &self.providers, provider).await
-            {
-                market.set_price(price);
-                self.market_data_repo
-                    .store_market(&market, provider)
-                    .await?;
-            }
-        }
-        self.market_data_service.invalidate_market_cache();
-
-        Ok(())
+        seed_fx_catalog(
+            &self.market_data_repo,
+            &self.market_data_service,
+            self.price_provider,
+        )
+        .await
     }
 
     async fn discover_new_markets(&self) -> Result<()> {

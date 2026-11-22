@@ -49,9 +49,23 @@ the last value) that Redis cannot give.
   provider per market (fiat/fiat: Yahoo, otherwise the configured crypto
   provider) and stores the provider actually used. CryptoWatch has no provider
   code, so its prices cannot be stored.
-- The discovery worker seeds the fiat assets and the FX markets at start and
-  before every discovery, so FX never depends on Kraken. Hourly reconciliation
+- The discovery worker also seeds the fiat assets and the FX markets at start
+  and before every discovery, so FX never depends on Kraken. Hourly reconciliation
   deletes only markets outside the Kraken snapshot that are not fiat/fiat.
+- **FX startup gate.** The server does not go online without FX rates:
+  `DcaServer::start` runs `ensure_fx_rates` before it binds the listener (not in
+  `try_new`, so tests can build the server without it). The step idempotently
+  upserts the eight fiat assets and the seven FX markets (the seeding is shared
+  with the discovery worker, which keeps calling it), returns immediately when
+  all seven FX markets already have a price, even a stale one, and otherwise
+  fetches the missing prices from Yahoo with the hardcoded tickers. Each ticker
+  is retried with exponential backoff (1 s doubling up to 30 s) inside a total
+  budget of two minutes; when the budget is spent startup fails with
+  `DcaError::StartupFailure`, the process exits non-zero and the orchestrator
+  restarts it. Yahoo reachability is thus required on the first boot against
+  an empty database only. The price fetcher is injected (`FxPriceFetcher`) so
+  the gate is tested with a fake provider and a paused clock. The price worker
+  keeps refreshing FX prices every five minutes.
 - The migration moves only the eight catalog fiat symbols (AED, AUD, CAD, CHF,
   EUR, GBP, JPY, USD) of existing Kraken cash rows of `assets_data` to Yahoo:
   renamed in place when no Yahoo row of the symbol exists; otherwise the
