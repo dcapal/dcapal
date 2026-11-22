@@ -151,6 +151,9 @@ mod tests {
             "/v1/sync/portfolios",
             "/v2/sync/portfolios",
             "/markets/v2/assets/lookup",
+            "/markets/v2/assets/{provider}/search",
+            "/markets/v2/prices",
+            "/markets/v2/fx",
         ] {
             assert!(paths.contains_key(expected), "missing path {expected}");
         }
@@ -371,6 +374,78 @@ mod tests {
         assert_enum_contains(
             &openapi["components"]["schemas"]["AssetRefV2"]["properties"]["provider"],
             &["yf", "kraken"],
+        );
+    }
+
+    /// GIVEN the generated OpenAPI document,
+    /// WHEN the v2 search, prices and FX operations are inspected,
+    /// THEN their parameters, structured error responses, provenance fields and
+    /// camel-case enums (outcome, status, source, synthetic) are documented, and prices
+    /// and rates are strings.
+    #[test]
+    fn v2_market_data_documents_provenance_and_failures() {
+        let (_, openapi) = super::super::build_openapi_router();
+        let openapi = openapi_value(&openapi).expect("serialize openapi");
+        let schemas = &openapi["components"]["schemas"];
+
+        let search = &openapi["paths"]["/markets/v2/assets/{provider}/search"]["get"];
+        let names = search["parameters"]
+            .as_array()
+            .expect("search parameters")
+            .iter()
+            .map(|p| p["name"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"provider") && names.contains(&"query"));
+        for status in ["200", "400", "429", "500"] {
+            assert!(search["responses"].get(status).is_some(), "search {status}");
+        }
+        assert_enum_contains(
+            &schemas["SearchOutcomeV2"],
+            &["usable", "empty", "providerError", "malformed"],
+        );
+        assert_enum_contains(
+            &schemas["PriceAvailabilityV2"],
+            &["available", "unavailable", "unknown"],
+        );
+
+        let prices = &openapi["paths"]["/markets/v2/prices"]["get"];
+        assert!(prices["responses"].get("400").is_some());
+        assert_enum_contains(
+            &schemas["QuoteStatusV2"],
+            &[
+                "usable",
+                "unavailable",
+                "providerError",
+                "malformed",
+                "pending",
+            ],
+        );
+        assert_enum_contains(&schemas["QuoteSourceV2"], &["provider", "lastKnown"]);
+        let price = &schemas["PriceV2"]["properties"];
+        for field in [
+            "provider",
+            "currency",
+            "price",
+            "observedAt",
+            "fetchedAt",
+            "source",
+            "status",
+            "error",
+        ] {
+            assert!(price.get(field).is_some(), "PriceV2.{field}");
+        }
+        assert_eq!(price["observedAt"]["format"], "date-time");
+
+        let fx = &openapi["paths"]["/markets/v2/fx"]["get"];
+        assert!(fx["responses"].get("400").is_some());
+        assert_enum_contains(
+            &schemas["SyntheticV2"],
+            &["none", "inverse", "triangulated"],
+        );
+        assert!(
+            schemas["FxRateV2Response"]["properties"]
+                .get("legs")
+                .is_some()
         );
     }
 
