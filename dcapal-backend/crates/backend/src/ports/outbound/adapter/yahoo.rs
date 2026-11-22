@@ -51,6 +51,9 @@ enum Admission {
     Wait,
     /// Fail immediately instead of holding the caller (public proxy endpoints).
     Reject,
+    /// Wait for capacity at most this long, then fail (on-demand live quotes, whose
+    /// requests fan out beyond the limiter's burst).
+    WaitUpTo(Duration),
 }
 
 /// Failure of a rate-limited Yahoo request.
@@ -177,6 +180,17 @@ impl YahooProvider {
                     record_yahoo_limiter_rejection();
                     return Err(GetError::RateLimited);
                 }
+            }
+            Admission::WaitUpTo(max_wait) => {
+                let start = std::time::Instant::now();
+                if tokio::time::timeout(max_wait, self.limiter.until_ready())
+                    .await
+                    .is_err()
+                {
+                    record_yahoo_limiter_rejection();
+                    return Err(GetError::RateLimited);
+                }
+                record_yahoo_limiter_wait(start.elapsed());
             }
         }
         let response = self.http.get(url).timeout(timeout).send().await?;
@@ -631,6 +645,12 @@ mod search {
 /// Upper bound on one live quote, rate-limiter wait included.
 const LIVE_QUOTE_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Longest a live quote waits for the shared limiter before failing as rate limited.
+///
+/// Long enough to drain a 20-symbol request past the limiter's burst, short enough to
+/// keep the HTTP request from being held open.
+const LIVE_QUOTE_MAX_WAIT: Duration = Duration::from_secs(2);
+
 #[async_trait]
 impl LivePriceProvider for YahooProvider {
     /// Reads the regular-market price from the `meta` block of a one-day chart.
@@ -649,9 +669,10 @@ impl LivePriceProvider for YahooProvider {
 }
 
 impl YahooProvider {
-    /// Fetches a live quote without queueing for the shared limiter, so on-demand price
-    /// requests never starve the price worker or lookups: a saturated limiter fails the
-    /// quote immediately as a rate-limited provider error.
+    /// Fetches a live quote, waiting at most [`LIVE_QUOTE_MAX_WAIT`] for the shared limiter,
+    /// so a request that fans out past the burst is spread over the next moments while
+    /// on-demand price requests still never starve the price worker or lookups: a
+    /// limiter that stays saturated fails the quote as a rate-limited provider error.
     async fn current_price_inner(
         &self,
         symbol: &str,
@@ -662,7 +683,11 @@ impl YahooProvider {
             .map_err(PriceFailure::malformed)?;
         let (status, body) = tokio::time::timeout(LIVE_QUOTE_TIMEOUT, async {
             let response = self
-                .get(url.as_str(), LIVE_QUOTE_TIMEOUT, Admission::Reject)
+                .get(
+                    url.as_str(),
+                    LIVE_QUOTE_TIMEOUT,
+                    Admission::WaitUpTo(LIVE_QUOTE_MAX_WAIT),
+                )
                 .await
                 .map_err(|e| call_error_of(&e))?;
             let status = response.status().as_u16();
@@ -1649,10 +1674,11 @@ mod price_tests {
 
     /// GIVEN a Yahoo limiter whose only slot is spent,
     /// WHEN a live quote is requested,
-    /// THEN it fails at once as a provider error without contacting Yahoo, and the call is
-    /// recorded as rate limited rather than as a provider timeout or error.
+    /// THEN it waits no longer than [`LIVE_QUOTE_MAX_WAIT`], then fails as a provider error
+    /// without contacting Yahoo, and the call is recorded as rate limited rather than as a
+    /// provider timeout or error.
     #[tokio::test]
-    async fn live_quotes_do_not_queue_for_the_limiter() {
+    async fn live_quotes_wait_a_bounded_time_for_the_limiter() {
         let fake = FakeProvider::start(|_| Reply::ok("{}")).await;
         let quota = Quota::per_hour(NonZeroU32::new(1).unwrap());
         let provider =
@@ -1663,7 +1689,7 @@ mod price_tests {
         let failure = provider.current_price("VWCE.DE").await.unwrap_err();
         let call = provider.current_price_inner("VWCE.DE").await;
 
-        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(started.elapsed() < 2 * LIVE_QUOTE_MAX_WAIT + Duration::from_secs(1));
         assert_eq!(failure.kind, FailureKind::ProviderError);
         assert!(fake.requests().is_empty());
         let call = call.unwrap_err();
