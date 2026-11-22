@@ -47,10 +47,13 @@ pub struct PriceFailure {
 
 impl PriceFailure {
     /// Creates a failure of the given kind.
+    ///
+    /// URLs in the message are replaced by `<url>`: HTTP client errors name the
+    /// requested URL, which may expose an internal proxy host.
     pub fn new(kind: FailureKind, message: impl Into<String>) -> Self {
         Self {
             kind,
-            message: message.into(),
+            message: redact_urls(message.into()),
         }
     }
 
@@ -86,6 +89,35 @@ impl PriceFailure {
             })
             .unwrap_or_else(|| Self::provider_error(text))
     }
+}
+
+/// Replaces every `scheme://...` URL in `text` with `<url>`, up to the next whitespace,
+/// closing bracket or quote.
+fn redact_urls(text: String) -> String {
+    if !text.contains("://") {
+        return text;
+    }
+
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text.as_str();
+    while let Some(sep) = rest.find("://") {
+        // The scheme is the run of ASCII letters right before `://`.
+        let scheme_start = rest[..sep]
+            .char_indices()
+            .rev()
+            .find(|(_, c)| !c.is_ascii_alphabetic())
+            .map_or(0, |(i, c)| i + c.len_utf8());
+        out.push_str(&rest[..scheme_start]);
+        out.push_str("<url>");
+
+        let after = &rest[sep + 3..];
+        let end = after
+            .find(|c: char| c.is_whitespace() || matches!(c, ')' | '"' | '\'' | ',' | '>'))
+            .unwrap_or(after.len());
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Checks that a provider price is a finite, strictly positive number.
@@ -414,6 +446,25 @@ pub fn derive_fx_rate(base: &str, quote: &str, stored: &HashMap<String, StoredQu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// GIVEN failure messages that name request URLs, one of them inside brackets,
+    /// WHEN failures are built from them,
+    /// THEN every URL is replaced by `<url>` and the rest of the text is kept.
+    #[test]
+    fn failure_messages_do_not_expose_urls() {
+        let failure = PriceFailure::provider_error(
+            "Kraken request failed: error sending request for url (http://internal-proxy.corp:8080/0/public/OHLC?pair=btceur): connect refused, see https://example.org/x",
+        );
+
+        assert_eq!(
+            failure.message,
+            "Kraken request failed: error sending request for url (<url>): connect refused, see <url>"
+        );
+        assert_eq!(
+            PriceFailure::unavailable("Yahoo does not list the symbol").message,
+            "Yahoo does not list the symbol"
+        );
+    }
 
     /// GIVEN failures of every kind,
     /// WHEN they are encoded for storage and decoded again,

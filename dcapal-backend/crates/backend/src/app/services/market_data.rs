@@ -56,7 +56,7 @@ pub struct MarketDataService {
     price_deps: RwLock<HashMap<MarketId, Vec<(AssetId, AssetId)>>>,
     assets_cache: RwLock<AssetsCache>,
     live_prices: Option<Arc<dyn LivePriceProvider>>,
-    live_cache: Cache<String, LivePrice>,
+    live_cache: Cache<String, (LivePrice, Timestamp)>,
     live_unavailable: Cache<String, PriceFailure>,
     quote_cache: Cache<MarketId, Option<StoredQuote>>,
     // Bumped by every quote invalidation; a read that started before a bump must not cache.
@@ -176,25 +176,26 @@ impl MarketDataService {
         if let Some(failure) = self.live_unavailable.get(asset.symbol()) {
             return PriceQuote::failed(asset.clone(), failure);
         }
-        let cached = self.live_cache.get(asset.symbol());
-        let fetched_now = cached.is_none();
-        let answer = match cached {
-            Some(quote) => Ok(quote),
-            None => live.current_price(asset.symbol()).await,
+        // A cached quote keeps the time it was fetched at, so `fetchedAt` never claims
+        // more freshness than the value has.
+        let answer = match self.live_cache.get(asset.symbol()) {
+            Some(cached) => Ok(cached),
+            None => live.current_price(asset.symbol()).await.map(|quote| {
+                let fetched = (quote, Timestamp::now());
+                self.live_cache
+                    .insert(asset.symbol().to_string(), fetched.clone());
+                fetched
+            }),
         };
-        if let (true, Ok(quote)) = (fetched_now, &answer) {
-            self.live_cache
-                .insert(asset.symbol().to_string(), quote.clone());
-        }
 
         match answer {
-            Ok(quote) => PriceQuote {
+            Ok((quote, fetched_at)) => PriceQuote {
                 asset: asset.clone(),
                 provider: Provider::YF,
                 currency: Some(quote.currency),
                 price: Some(quote.price),
                 observed_at: quote.observed_at,
-                fetched_at: Some(Timestamp::now()),
+                fetched_at: Some(fetched_at),
                 source: Some(QuoteSource::Provider),
                 status: QuoteStatus::Usable,
                 failure: None,
