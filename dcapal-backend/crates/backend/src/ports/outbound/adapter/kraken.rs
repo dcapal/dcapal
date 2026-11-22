@@ -256,6 +256,10 @@ impl KrakenProvider {
         (markets, assets)
     }
 
+    /// Resolves currencies with their catalog or CoinMarketCap metadata.
+    ///
+    /// Classified like [`fetch_assets`]: catalog fiat is fiat, everything else
+    /// (including non-fiat quotes of cross-crypto pairs) is Kraken crypto.
     async fn fetch_assets_cmc(
         &self,
         ccys: &HashSet<AssetId>,
@@ -614,6 +618,14 @@ fn get_unique_ccys(market_pairs: &[MarketPair]) -> HashSet<AssetId> {
         .collect::<_>()
 }
 
+/// Resolves the currencies of discovered Kraken pairs into assets.
+///
+/// Only the eight catalog fiat currencies are classified as fiat; every other
+/// currency is a Kraken crypto asset. This includes the non-fiat quotes of
+/// Kraken pairs (`btc` in `ethbtc`, stablecoins such as `usdt`, and currencies
+/// such as `zar`, `mxn` or `try`), so those pairs are crypto against crypto
+/// markets: both assets are stored as Kraken/Crypto and the market is priced by
+/// Kraken, never by Yahoo, which only prices fiat against fiat.
 async fn fetch_assets(
     ccys: &HashSet<AssetId>,
     repo: &MarketDataRepository,
@@ -733,7 +745,11 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use crate::{
-        app::domain::entity::{Asset, Fiat, Market},
+        app::domain::{
+            entity::{Asset, Fiat, Market},
+            market_data_utils::price_provider_for,
+        },
+        config::PriceProvider,
         ports::outbound::repository::market_data::MarketDataRepository,
     };
 
@@ -741,6 +757,32 @@ mod tests {
         AssetPairsResponse, MarketSymbol, Pair, fetch_assets, get_new_markets,
         market_ids_from_symbols, parse_market_symbol, parse_online_market_symbols,
     };
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn cross_crypto_pairs_are_crypto_markets_priced_by_kraken(pool: sqlx::PgPool) {
+        // GIVEN Kraken lists the cross-crypto pair ETH/BTC, whose quote is not fiat,
+        let repo = MarketDataRepository::new(pool);
+
+        // WHEN its currencies are classified and the market is built,
+        let pairs = get_new_markets(&["eth/btc".to_string()], &repo).await;
+        let assets = fetch_assets(&super::get_unique_ccys(&pairs), &repo).await;
+        let market = Market::new(
+            "ethbtc".to_string(),
+            assets["eth"].clone(),
+            assets["btc"].clone(),
+            None,
+        );
+
+        // THEN both assets are crypto, the market is not an FX market, and Kraken
+        // (the configured crypto provider) prices it rather than Yahoo.
+        assert!(matches!(assets["eth"], Asset::Crypto(_)));
+        assert!(matches!(assets["btc"], Asset::Crypto(_)));
+        assert!(!market.is_fiat());
+        assert!(matches!(
+            price_provider_for(&market, PriceProvider::Kraken),
+            PriceProvider::Kraken
+        ));
+    }
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn discovery_selects_a_market_whose_base_asset_is_missing(pool: sqlx::PgPool) {
