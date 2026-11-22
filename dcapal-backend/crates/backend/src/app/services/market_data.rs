@@ -59,6 +59,8 @@ pub struct MarketDataService {
     live_cache: Cache<String, LivePrice>,
     live_unavailable: Cache<String, PriceFailure>,
     quote_cache: Cache<MarketId, Option<StoredQuote>>,
+    // Bumped by every quote invalidation; a read that started before a bump must not cache.
+    quote_epoch: AtomicU64,
 }
 
 /// How long a Yahoo "no price for this symbol" answer is reused.
@@ -120,6 +122,7 @@ impl MarketDataService {
                 .max_capacity(QUOTE_CACHE_CAPACITY)
                 .time_to_live(QUOTE_CACHE_TTL)
                 .build(),
+            quote_epoch: AtomicU64::new(0),
         }
     }
 
@@ -240,10 +243,12 @@ impl MarketDataService {
             return Ok(quotes);
         }
 
+        // A writer may invalidate while the rows are in flight; such rows can be stale.
+        let epoch = self.quote_epoch.load(Ordering::Acquire);
         let mut loaded = self.repo.find_market_quotes(&missing).await?;
         for id in missing {
             let quote = loaded.remove(&id);
-            self.quote_cache.insert(id.clone(), quote.clone());
+            self.cache_loaded_quote(epoch, &id, &quote);
             if let Some(quote) = quote {
                 quotes.insert(id, quote);
             }
@@ -251,8 +256,16 @@ impl MarketDataService {
         Ok(quotes)
     }
 
+    /// Caches a quote read at `epoch`, unless a quote invalidation happened since then.
+    fn cache_loaded_quote(&self, epoch: u64, id: &MarketId, quote: &Option<StoredQuote>) {
+        if self.quote_epoch.load(Ordering::Acquire) == epoch {
+            self.quote_cache.insert(id.clone(), quote.clone());
+        }
+    }
+
     /// Forgets cached stored quotes of the given markets after their price or failure changed.
     pub fn invalidate_quotes(&self, ids: &[MarketId]) {
+        self.quote_epoch.fetch_add(1, Ordering::AcqRel);
         for id in ids {
             self.quote_cache.invalidate(id);
         }
@@ -310,6 +323,7 @@ impl MarketDataService {
         self.market_cache_generation.fetch_add(1, Ordering::AcqRel);
         self.fx_markets.invalidate_all();
         self.markets.invalidate_all();
+        self.quote_epoch.fetch_add(1, Ordering::AcqRel);
         self.quote_cache.invalidate_all();
         self.pricers.write().clear();
         self.price_deps.write().clear();
@@ -1051,5 +1065,40 @@ mod tests {
 
         assert!(first.is_err() && second.is_err());
         assert!(service.assets_cache.read().crypto.is_none());
+    }
+
+    /// GIVEN a quote row read from storage before a writer invalidated its market,
+    /// WHEN the (now stale) row is about to be cached,
+    /// THEN it is not cached, whether the invalidation was of that market or of every market;
+    /// a row read after the invalidation is cached.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn quotes_read_before_an_invalidation_are_not_cached(pool: PgPool) {
+        let (service, _) = quote_service(pool).await;
+        let id = "btcusd".to_string();
+        let stale = Some(StoredQuote {
+            base: "btc".into(),
+            quote: "usd".into(),
+            provider: Provider::Kraken,
+            price: Some(1.0),
+            observed_at: None,
+            fetched_at: None,
+            failure: None,
+            failed_at: None,
+        });
+
+        for invalidate in [
+            (|s: &MarketDataService, id: &MarketId| s.invalidate_quotes(std::slice::from_ref(id)))
+                as fn(&MarketDataService, &MarketId),
+            |s, _| s.invalidate_market_cache(),
+        ] {
+            let epoch = service.quote_epoch.load(Ordering::Acquire);
+            invalidate(&service, &id);
+            service.cache_loaded_quote(epoch, &id, &stale);
+            assert!(service.quote_cache.get(&id).is_none());
+        }
+
+        let fresh_epoch = service.quote_epoch.load(Ordering::Acquire);
+        service.cache_loaded_quote(fresh_epoch, &id, &stale);
+        assert!(service.quote_cache.get(&id).is_some());
     }
 }
