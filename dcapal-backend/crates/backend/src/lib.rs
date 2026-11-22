@@ -22,7 +22,7 @@ use tracing::{error, info};
 
 use crate::{
     app::{
-        infra,
+        infra::{self, utils::spawn_supervised},
         services::{
             asset::AssetService,
             fx_rates::{FxStartupPolicy, YahooFxFetcher, ensure_fx_rates},
@@ -248,7 +248,7 @@ impl DcaServer {
         {
             let ctx = self.ctx.clone();
             let stop_rx = self.stop_tx.subscribe();
-            let handle = tokio::spawn(async move {
+            let handle = spawn_supervised("MarketDiscovery", async move {
                 let worker = MarketDiscoveryWorker::new(&ctx);
                 worker.run(stop_rx).await;
             });
@@ -259,7 +259,7 @@ impl DcaServer {
         {
             let ctx = self.ctx.clone();
             let stop_rx = self.stop_tx.subscribe();
-            let handle = tokio::spawn(async move {
+            let handle = spawn_supervised("PriceUpdater", async move {
                 let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 60));
                 worker.run(stop_rx).await;
             });

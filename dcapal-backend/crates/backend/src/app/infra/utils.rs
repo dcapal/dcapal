@@ -4,7 +4,11 @@ use std::{
 };
 
 use futures::Future;
-use tokio::sync::{OnceCell, RwLock, watch};
+use tokio::{
+    sync::{OnceCell, RwLock, watch},
+    task::{JoinError, JoinHandle},
+};
+use tracing::{error, info};
 
 pub struct ExpiringOnceCellValue<T> {
     pub value: T,
@@ -136,5 +140,75 @@ pub async fn should_stop(stop_rx: &mut StopToken) {
         if *stop_rx.borrow_and_update() {
             return;
         }
+    }
+}
+
+/// Spawns a long-running background task and reports how it ended.
+///
+/// The task runs on its own Tokio task, and a thin supervisor awaits it. A panic
+/// or cancellation is logged at ERROR with the task `name` and the panic message,
+/// so a worker that dies is never silent; a normal return is logged at INFO. The
+/// returned handle completes once the task has ended and has been reported, and
+/// never propagates the panic.
+pub fn spawn_supervised<F>(name: &'static str, task: F) -> JoinHandle<()>
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    let inner = tokio::spawn(task);
+    tokio::spawn(async move {
+        match inner.await {
+            Ok(()) => info!(task = name, "Background task finished"),
+            Err(e) => {
+                let panicked = e.is_panic();
+                error!(
+                    task = name,
+                    panicked,
+                    "Background task died: {}",
+                    describe_join_error(e)
+                );
+            }
+        }
+    })
+}
+
+/// Describes why a task ended abnormally, including the panic message if any.
+fn describe_join_error(error: JoinError) -> String {
+    if !error.is_panic() {
+        return error.to_string();
+    }
+
+    let payload = error.into_panic();
+    payload
+        .downcast_ref::<&str>()
+        .map(|s| s.to_string())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "panic with a non-string payload".to_string())
+}
+
+#[cfg(test)]
+mod supervised_tests {
+    use super::spawn_supervised;
+
+    #[tokio::test]
+    async fn supervisor_survives_a_panicking_task() {
+        // GIVEN a background task that panics,
+        // WHEN it is spawned under the supervisor,
+        let handle = spawn_supervised("panicking-test-task", async {
+            panic!("boom");
+        });
+
+        // THEN the supervisor reports it and finishes normally instead of
+        // propagating the panic to whoever awaits the handle.
+        assert!(handle.await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn supervisor_finishes_after_a_normal_return() {
+        // GIVEN a background task that returns normally,
+        // WHEN it is spawned under the supervisor,
+        let handle = spawn_supervised("returning-test-task", async {});
+
+        // THEN the supervisor finishes normally too.
+        assert!(handle.await.is_ok());
     }
 }
