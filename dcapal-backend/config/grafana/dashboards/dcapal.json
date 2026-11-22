@@ -335,7 +335,7 @@
                       "spec": {
                         "editorMode": "code",
                         "exemplar": false,
-                        "expr": "((sum(rate(dcapal_yahoo_limiter_rejections_total{job=\"$envs\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_yahoo_upstream_rate_limits_total{job=\"$envs\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_provider_requests_total{job=\"$envs\",provider=\"kraken\",outcome=\"rate_limited\"}[$__rate_interval])) or vector(0))) and on() (count(up{job=\"$envs\"} == 1) > 0)",
+                        "expr": "((sum(rate(dcapal_yahoo_limiter_rejections_total{job=\"$envs\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_yahoo_upstream_rate_limits_total{job=\"$envs\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_provider_requests_total{job=\"$envs\",provider=\"kraken\",outcome=\"rate_limited\"}[$__rate_interval])) or vector(0)) + (sum(rate(dcapal_provider_requests_total{job=\"$envs\",provider=\"coin_market_cap\",outcome=\"rate_limited\"}[$__rate_interval])) or vector(0))) and on() (count(up{job=\"$envs\"} == 1) > 0)",
                         "instant": true,
                         "interval": "",
                         "legendFormat": "Others",
@@ -390,7 +390,7 @@
               }
             }
           },
-          "description": "Rate of local Yahoo rejections and upstream HTTP 429 responses, plus Kraken HTTP 429s. Shows 0 only while a selected backend scrape is up; No data means Grafana has no live target/sample."
+          "description": "Rate of local Yahoo rejections and upstream HTTP 429 responses, plus provider HTTP 429s from Kraken and CoinMarketCap (both mapped to the rate_limited outcome). Shows 0 only while a selected backend scrape is up; No data means Grafana has no live target/sample."
         }
       },
       "panel-5": {
@@ -510,7 +510,7 @@
         "kind": "Panel",
         "spec": {
           "id": 6,
-          "title": "API latency p50 / p95",
+          "title": "API latency p50",
           "description": "Endpoint latency summary is exported in microseconds. Quantiles are per instance; do not aggregate quantiles across instances.",
           "links": [],
           "data": {
@@ -530,10 +530,10 @@
                       "spec": {
                         "editorMode": "code",
                         "exemplar": false,
-                        "expr": "dcapal_latency_summary{job=\"$envs\",quantile=~\"0.5|0.95\"} / 1000000",
+                        "expr": "dcapal_latency_summary{job=\"$envs\",quantile=\"0.5\"} / 1000000",
                         "instant": false,
                         "interval": "",
-                        "legendFormat": "{{path}} p{{quantile}}",
+                        "legendFormat": "{{path}}",
                         "range": true
                       }
                     },
@@ -898,7 +898,7 @@
         "kind": "Panel",
         "spec": {
           "id": 10,
-          "title": "Provider call duration p50 / p95",
+          "title": "Provider call duration p50",
           "description": "Duration includes limiter wait. Summary quantiles remain per instance and must not be averaged across instances.",
           "links": [],
           "data": {
@@ -918,10 +918,10 @@
                       "spec": {
                         "editorMode": "code",
                         "exemplar": false,
-                        "expr": "dcapal_provider_request_seconds{job=\"$envs\",quantile=~\"0.5|0.95\"}",
+                        "expr": "dcapal_provider_request_seconds{job=\"$envs\",quantile=\"0.5\"}",
                         "instant": false,
                         "interval": "",
-                        "legendFormat": "{{provider}} · {{op}} · p{{quantile}} · {{instance}}",
+                        "legendFormat": "{{provider}} · {{op}} · · {{instance}}",
                         "range": true
                       }
                     },
@@ -1237,7 +1237,7 @@
         "kind": "Panel",
         "spec": {
           "id": 13,
-          "title": "Portfolio sync stage duration p50 / p95",
+          "title": "Portfolio sync stage duration p50",
           "description": "Per-stage latency summary. Quantiles are per instance; inspect the individual instance series.",
           "links": [],
           "data": {
@@ -1257,10 +1257,10 @@
                       "spec": {
                         "editorMode": "code",
                         "exemplar": false,
-                        "expr": "dcapal_sync_stage_seconds{job=\"$envs\",quantile=~\"0.5|0.95\"}",
+                        "expr": "dcapal_sync_stage_seconds{job=\"$envs\",quantile=\"0.5\"}",
                         "instant": false,
                         "interval": "",
-                        "legendFormat": "{{stage}} p{{quantile}} · {{instance}}",
+                        "legendFormat": "{{stage}} · {{instance}}",
                         "range": true
                       }
                     },
@@ -1750,6 +1750,458 @@
             }
           }
         }
+      },
+      "panel-19": {
+        "kind": "Panel",
+        "spec": {
+          "id": 19,
+          "title": "API latency p95",
+          "description": "Endpoint latency summary is exported in microseconds. Quantiles are per instance; do not aggregate quantiles across instances.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "dcapal_latency_summary{job=\"$envs\",quantile=\"0.95\"} / 1000000",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{path}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-20": {
+        "kind": "Panel",
+        "spec": {
+          "id": 20,
+          "title": "Provider call duration p95",
+          "description": "Duration includes limiter wait. Summary quantiles remain per instance and must not be averaged across instances.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "dcapal_provider_request_seconds{job=\"$envs\",quantile=\"0.95\"}",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{provider}} · {{op}} · · {{instance}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-21": {
+        "kind": "Panel",
+        "spec": {
+          "id": 21,
+          "title": "Portfolio sync stage duration p95",
+          "description": "Per-stage latency summary. Quantiles are per instance; inspect the individual instance series.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "dcapal_sync_stage_seconds{job=\"$envs\",quantile=\"0.95\"}",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{stage}} · {{instance}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Seconds",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 12,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-18": {
+        "kind": "Panel",
+        "spec": {
+          "id": 18,
+          "title": "Provider requests · count",
+          "description": "Provider calls in each interval by provider, operation and outcome, stacked so bar height is the total call volume. Use it to spot bursts that the per-second rate smooths out.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "grafanacloud-prom"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "sum by (provider,op,outcome) (increase(dcapal_provider_requests_total{job=\"$envs\"}[$__rate_interval]))",
+                        "instant": false,
+                        "interval": "",
+                        "legendFormat": "{{provider}} · {{op}} · {{outcome}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "12.0.0-85820.patch2-86140",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": -1E+308,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Requests",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "bars",
+                    "fillOpacity": 80,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "pointSize": 2,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "never",
+                    "spanNulls": false,
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -1814,7 +2266,7 @@
               "x": 0,
               "y": 3,
               "width": 12,
-              "height": 7,
+              "height": 14,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-5"
@@ -1864,7 +2316,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 10,
+              "y": 17,
               "width": 8,
               "height": 7,
               "element": {
@@ -1877,7 +2329,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 10,
+              "y": 17,
               "width": 8,
               "height": 7,
               "element": {
@@ -1890,7 +2342,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 17,
+              "y": 31,
               "width": 12,
               "height": 5,
               "element": {
@@ -1903,7 +2355,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 12,
-              "y": 17,
+              "y": 31,
               "width": 12,
               "height": 5,
               "element": {
@@ -1916,7 +2368,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 22,
+              "y": 36,
               "width": 8,
               "height": 7,
               "element": {
@@ -1929,9 +2381,9 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 22,
+              "y": 36,
               "width": 8,
-              "height": 7,
+              "height": 14,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-14"
@@ -1942,7 +2394,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 29,
+              "y": 50,
               "width": 24,
               "height": 9,
               "element": {
@@ -1955,9 +2407,9 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 16,
-              "y": 10,
+              "y": 17,
               "width": 8,
-              "height": 7,
+              "height": 14,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-17"
@@ -1968,12 +2420,64 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 16,
-              "y": 22,
+              "y": 36,
+              "width": 8,
+              "height": 14,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-16"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 10,
+              "width": 12,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-19"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 24,
               "width": 8,
               "height": 7,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-16"
+                "name": "panel-18"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 8,
+              "y": 24,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-20"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 43,
+              "width": 8,
+              "height": 7,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-21"
               }
             }
           }

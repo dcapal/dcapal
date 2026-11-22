@@ -52,6 +52,7 @@ pub const SYNC_EVENTS_TOTAL: &str = concatcp!(BASE, '_', "sync_events_total");
 pub enum MetricProvider {
     Yahoo,
     Kraken,
+    CoinMarketCap,
 }
 
 /// Kind of outbound provider call (`op` label).
@@ -76,6 +77,8 @@ pub enum ProviderOutcome {
     /// Our limiter rejected the call, or the provider answered HTTP 429.
     RateLimited,
     Timeout,
+    /// The circuit breaker rejected the call; no upstream request was made.
+    CircuitOpen,
     Error,
 }
 
@@ -576,7 +579,12 @@ mod tests {
         // values match the documented label vocabulary.
         assert_eq!(<&str>::from(ProviderOutcome::NotFound), "not_found");
         assert_eq!(<&str>::from(ProviderOutcome::RateLimited), "rate_limited");
+        assert_eq!(<&str>::from(ProviderOutcome::CircuitOpen), "circuit_open");
         assert_eq!(<&str>::from(MetricProvider::Kraken), "kraken");
+        assert_eq!(
+            <&str>::from(MetricProvider::CoinMarketCap),
+            "coin_market_cap"
+        );
         assert_eq!(<&str>::from(ProviderOp::Proxy), "proxy");
         assert_eq!(
             <&str>::from(SyncEvent::NewAssetsResolved),
