@@ -100,6 +100,9 @@ impl IntoResponse for DcaError {
             DcaError::BadRequest(_) | DcaError::ValidationFailure { .. } => {
                 (StatusCode::BAD_REQUEST, format!("{self}")).into_response()
             }
+            DcaError::TypeHeaderError(_) | DcaError::JwtError(_) => {
+                (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+            }
             DcaError::PriceNotAvailable(_, _) => {
                 (StatusCode::NOT_FOUND, format!("{self}")).into_response()
             }

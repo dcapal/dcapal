@@ -23,7 +23,7 @@ use crate::{
     app::domain::{
         entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
         fiat::fiat_symbols,
-        market_quote::{PriceFailure, StoredQuote},
+        market_quote::{PriceFailure, StoredQuote, validate_price},
         portfolio::Provider as AppProvider,
     },
     config::PriceProvider,
@@ -742,6 +742,17 @@ async fn insert_markets(
 impl From<QuoteRow> for StoredQuote {
     /// Builds the stored quote of a market from its `market_price` row.
     fn from(row: QuoteRow) -> Self {
+        let mut failure = row.last_error.as_deref().map(PriceFailure::from_stored);
+        let mut failed_at = row.last_error_at.map(|t| t.to_jiff());
+        // A stored zero, negative or non-finite price (legacy rows) is no price.
+        let price = row.price.and_then(|p| match validate_price(p) {
+            Ok(p) => Some(p),
+            Err(invalid) => {
+                failure.get_or_insert(invalid);
+                failed_at = failed_at.or_else(|| row.fetched_at.map(|t| t.to_jiff()));
+                None
+            }
+        });
         Self {
             base: row.base_symbol.to_lowercase(),
             quote: row.quote_symbol.to_lowercase(),
@@ -749,11 +760,11 @@ impl From<QuoteRow> for StoredQuote {
                 DbProvider::YF => AppProvider::YF,
                 DbProvider::Kraken => AppProvider::Kraken,
             },
-            price: row.price,
+            price,
             observed_at: row.observed_at.map(|t| t.to_jiff()),
             fetched_at: row.fetched_at.map(|t| t.to_jiff()),
-            failure: row.last_error.as_deref().map(PriceFailure::from_stored),
-            failed_at: row.last_error_at.map(|t| t.to_jiff()),
+            failure,
+            failed_at,
         }
     }
 }

@@ -26,7 +26,10 @@ use crate::{
         services::command::ConversionRateQuery,
     },
     error::Result,
-    ports::outbound::{adapter::LivePriceProvider, repository::market_data::MarketDataRepository},
+    ports::outbound::{
+        adapter::{LivePrice, LivePriceProvider},
+        repository::market_data::MarketDataRepository,
+    },
 };
 
 const MAX_MARKET_LOAD_ATTEMPTS: usize = 3;
@@ -53,7 +56,14 @@ pub struct MarketDataService {
     price_deps: RwLock<HashMap<MarketId, Vec<(AssetId, AssetId)>>>,
     assets_cache: RwLock<AssetsCache>,
     live_prices: Option<Arc<dyn LivePriceProvider>>,
+    live_cache: Cache<String, LivePrice>,
 }
+
+/// How long a live Yahoo quote is reused, so repeated requests do not spend the shared limiter.
+const LIVE_QUOTE_TTL: std::time::Duration = std::time::Duration::from_secs(45);
+
+/// Number of live quotes kept in memory.
+const LIVE_QUOTE_CAPACITY: u64 = 1_000;
 
 /// Quote currency of the prices reported for Kraken crypto assets.
 const CRYPTO_QUOTE_CURRENCY: &str = "usd";
@@ -83,6 +93,10 @@ impl MarketDataService {
             price_deps: RwLock::new(HashMap::new()),
             assets_cache: RwLock::new(AssetsCache::new()),
             live_prices: None,
+            live_cache: Cache::builder()
+                .max_capacity(LIVE_QUOTE_CAPACITY)
+                .time_to_live(LIVE_QUOTE_TTL)
+                .build(),
         }
     }
 
@@ -133,7 +147,18 @@ impl MarketDataService {
             );
         };
 
-        match live.current_price(asset.symbol()).await {
+        let cached = self.live_cache.get(asset.symbol());
+        let fetched_now = cached.is_none();
+        let answer = match cached {
+            Some(quote) => Ok(quote),
+            None => live.current_price(asset.symbol()).await,
+        };
+        if let (true, Ok(quote)) = (fetched_now, &answer) {
+            self.live_cache
+                .insert(asset.symbol().to_string(), quote.clone());
+        }
+
+        match answer {
             Ok(quote) => PriceQuote {
                 asset: asset.clone(),
                 provider: Provider::YF,
@@ -496,8 +521,14 @@ fn crypto_market_id(asset: &AssetRef) -> MarketId {
 }
 
 /// Builds the quote of a Kraken crypto asset from its stored market, if there is one.
+///
+/// Only a market priced by Kraken counts: a same-named market of another provider (such
+/// as the fiat `eurusd`) never answers a `kraken:` reference.
 fn stored_crypto_quote(asset: &AssetRef, stored: &HashMap<MarketId, StoredQuote>) -> PriceQuote {
-    match stored.get(&crypto_market_id(asset)) {
+    match stored
+        .get(&crypto_market_id(asset))
+        .filter(|market| market.provider == Provider::Kraken)
+    {
         Some(market) => {
             PriceQuote::from_stored(asset.clone(), &CRYPTO_QUOTE_CURRENCY.to_uppercase(), market)
         }
@@ -546,8 +577,7 @@ mod tests {
         config::PriceProvider,
         error::DcaError,
         ports::outbound::{
-            adapter::{LivePrice, MockLivePriceProvider},
-            repository::market_data::MarketPriceFailure,
+            adapter::MockLivePriceProvider, repository::market_data::MarketPriceFailure,
         },
     };
 
@@ -895,5 +925,55 @@ mod tests {
         assert_eq!(stale.rate, rate.rate);
         assert_eq!(stale.source, Some(QuoteSource::LastKnown));
         assert_eq!(stale.failure, Some(failure));
+    }
+
+    /// GIVEN a Yahoo symbol quoted once, and a symbol whose quote failed,
+    /// WHEN each is requested twice in a row,
+    /// THEN the successful quote is served from the short-lived cache (one provider call)
+    /// while the failure is not cached (two provider calls).
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn live_quotes_are_cached_briefly_but_failures_are_not(pool: PgPool) {
+        let (service, _) = quote_service(pool).await;
+        let mut live = MockLivePriceProvider::new();
+        live.expect_current_price()
+            .withf(|symbol| symbol == "OK")
+            .times(1)
+            .returning(|_| {
+                Ok(LivePrice {
+                    price: 2.0,
+                    currency: "USD".into(),
+                    observed_at: None,
+                })
+            });
+        live.expect_current_price()
+            .withf(|symbol| symbol == "BAD")
+            .times(2)
+            .returning(|_| Err(PriceFailure::provider_error("down")));
+        let service = service.with_live_prices(Arc::new(live));
+        let refs = [
+            AssetRef::new(Provider::YF, "ok"),
+            AssetRef::new(Provider::YF, "bad"),
+        ];
+
+        let first = service.current_prices(&refs).await.unwrap();
+        let second = service.current_prices(&refs).await.unwrap();
+
+        assert_eq!(first[0].price, Some(2.0));
+        assert_eq!(second[0].price, Some(2.0));
+        assert_eq!(second[1].status, QuoteStatus::ProviderError);
+    }
+
+    /// GIVEN a stored fiat market `eurusd` priced by Yahoo,
+    /// WHEN the price of `kraken:EUR` is requested,
+    /// THEN it is unavailable: a Kraken reference never resolves to another provider's market.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn kraken_references_never_resolve_to_fiat_markets(pool: PgPool) {
+        let (service, repo) = quote_service(pool).await;
+        store_priced(&repo, "eur", "usd", 1.25).await;
+
+        let quotes = service.current_prices(&[kraken("eur")]).await.unwrap();
+
+        assert_eq!(quotes[0].status, QuoteStatus::Unavailable);
+        assert_eq!(quotes[0].price, None);
     }
 }

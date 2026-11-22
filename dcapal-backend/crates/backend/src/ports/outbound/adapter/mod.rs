@@ -35,6 +35,8 @@ use crate::app::domain::market_quote::{FailureKind, PriceFailure};
 pub(crate) struct PriceCallError {
     pub failure: PriceFailure,
     pub timed_out: bool,
+    /// Whether the local rate limiter refused the call before it reached the provider.
+    pub rate_limited: bool,
 }
 
 impl From<PriceFailure> for PriceCallError {
@@ -42,6 +44,7 @@ impl From<PriceFailure> for PriceCallError {
         Self {
             failure,
             timed_out: false,
+            rate_limited: false,
         }
     }
 }
@@ -52,6 +55,17 @@ impl PriceCallError {
         Self {
             failure: PriceFailure::provider_error(message),
             timed_out: true,
+            rate_limited: false,
+        }
+    }
+
+    /// A provider error because the local rate limiter had no capacity: the provider
+    /// was never asked, so it is not a provider failure for the metrics.
+    pub(crate) fn rate_limited(message: impl Into<String>) -> Self {
+        Self {
+            failure: PriceFailure::provider_error(message),
+            timed_out: false,
+            rate_limited: true,
         }
     }
 
@@ -62,6 +76,7 @@ impl PriceCallError {
         use crate::app::infra::stats::ProviderOutcome;
         match result {
             Ok(_) => ProviderOutcome::Ok,
+            Err(e) if e.rate_limited => ProviderOutcome::RateLimited,
             Err(e) if e.timed_out => ProviderOutcome::Timeout,
             Err(e) if e.failure.kind == FailureKind::Unavailable => ProviderOutcome::NotFound,
             Err(_) => ProviderOutcome::Error,

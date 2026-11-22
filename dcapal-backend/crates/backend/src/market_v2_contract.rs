@@ -289,7 +289,7 @@ async fn prices_report_each_asset_with_its_own_provenance(pool: PgPool) {
 /// GIVEN a stored BTC/USD price and a recorded refresh failure,
 /// WHEN the price is requested,
 /// THEN the last known price is still returned, flagged `lastKnown` with the failure and its
-/// time; a fresh answer for fresh data is publicly cacheable for at most five minutes.
+/// time; a fresh answer for fresh data is privately cacheable for at most five minutes.
 #[sqlx::test(migrations = "../../migrations")]
 async fn last_known_price_is_flagged_after_a_failed_refresh(pool: PgPool) {
     let repo = MarketDataRepository::new(pool.clone());
@@ -306,7 +306,7 @@ async fn last_known_price_is_flagged_after_a_failed_refresh(pool: PgPool) {
     let fresh = get(addr, "/markets/v2/prices?asset=kraken:btc").await;
     let cache = fresh.cache_control.unwrap();
     assert!(
-        cache.contains("public") && cache.contains("max-age="),
+        cache.contains("private") && cache.contains("max-age="),
         "{cache}"
     );
     assert_eq!(fresh.body["prices"][0]["source"], "provider");
@@ -447,4 +447,56 @@ async fn fx_rate_flags_a_failed_refresh(pool: PgPool) {
     assert_eq!(answer.body["rate"], "1.25");
     assert_eq!(answer.body["source"], "lastKnown");
     assert_eq!(answer.body["error"]["kind"], "malformed");
+}
+
+/// GIVEN a Yahoo-priced EUR/USD market,
+/// WHEN the price of `kraken:EUR` is requested,
+/// THEN it is `unavailable` and never the fiat market's price.
+#[sqlx::test(migrations = "../../migrations")]
+async fn kraken_references_do_not_resolve_to_fiat_markets(pool: PgPool) {
+    let repo = MarketDataRepository::new(pool.clone());
+    store_priced(
+        &repo,
+        &fiat("eur"),
+        &fiat("usd"),
+        1.25,
+        PriceProvider::Yahoo,
+    )
+    .await;
+    let addr = serve(&pool, ProviderUrls::default()).await;
+
+    let answer = get(addr, "/markets/v2/prices?asset=kraken:EUR").await;
+
+    assert_eq!(answer.body["prices"][0]["status"], "unavailable");
+    assert_eq!(answer.body["prices"][0]["price"], Value::Null);
+}
+
+/// GIVEN a request without a bearer token and one with a bad token,
+/// WHEN each of the three v2 market-data routes is called,
+/// THEN every call is answered 401.
+#[sqlx::test(migrations = "../../migrations")]
+async fn market_routes_require_authentication(pool: PgPool) {
+    let addr = serve(&pool, ProviderUrls::default()).await;
+    let client = reqwest::Client::new();
+
+    for path in [
+        "/markets/v2/assets/yf/search?query=x",
+        "/markets/v2/prices?asset=yf:AAPL",
+        "/markets/v2/fx?base=EUR&quote=USD",
+    ] {
+        let anonymous = client
+            .get(format!("http://{addr}{path}"))
+            .send()
+            .await
+            .unwrap();
+        let forged = client
+            .get(format!("http://{addr}{path}"))
+            .bearer_auth("not-a-jwt")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(anonymous.status().as_u16(), 401, "{path}");
+        assert_eq!(forged.status().as_u16(), 401, "{path}");
+    }
 }

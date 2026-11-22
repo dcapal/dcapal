@@ -661,3 +661,41 @@ async fn crypto_catalog_search_matches_literally_and_reports_price_availability(
     assert_eq!((eth[0].symbol.as_str(), eth[0].priced), ("ETH", false));
     Ok(())
 }
+
+/// GIVEN legacy rows holding a zero price and a negative price,
+/// WHEN their quotes are read,
+/// THEN neither is a price: both are unavailable failures, so no rate can divide by them.
+#[sqlx::test(migrations = "../../migrations")]
+async fn stored_non_positive_prices_read_as_unavailable(pool: PgPool) -> TestResult {
+    use dcapal_backend::app::domain::market_quote::FailureKind;
+    let repo = MarketDataRepository::new(pool.clone());
+    seed_catalog(&repo).await?;
+    seed_market(
+        &repo,
+        &crypto("btc"),
+        &fiat("eur", "Euro"),
+        Some(price(1.0, 1)),
+    )
+    .await?;
+    seed_market(
+        &repo,
+        &crypto("eth"),
+        &fiat("eur", "Euro"),
+        Some(price(1.0, 1)),
+    )
+    .await?;
+    sqlx::query("UPDATE market_price SET price = CASE WHEN base_asset_id = (SELECT id FROM assets_data WHERE symbol = 'BTC') THEN 0 ELSE -2 END")
+        .execute(&pool)
+        .await?;
+
+    let quotes = repo.find_market_quotes(&["btceur", "etheur"]).await?;
+
+    for id in ["btceur", "etheur"] {
+        assert_eq!(quotes[id].price, None, "{id}");
+        assert_eq!(
+            quotes[id].failure.as_ref().unwrap().kind,
+            FailureKind::Unavailable
+        );
+    }
+    Ok(())
+}

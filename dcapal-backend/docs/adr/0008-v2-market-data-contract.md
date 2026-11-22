@@ -54,11 +54,11 @@ stay visible. ADR 0007 reserved `market_price.last_error` for this work.
   config) so tests run against local HTTP fakes.
 - Yahoo equities and funds are not stored in `market_price` (it holds only
   catalog markets); their prices are fetched on request, capped at 20 per call,
-  with a ten second timeout, waiting for the shared Yahoo limiter.
+  with a ten second timeout. They never queue for the shared Yahoo limiter: a saturated limiter fails that entry at once as a rate-limited `providerError` (recorded as `rate_limited`, not a provider timeout), and successful quotes are cached for 45 seconds per symbol. A `kraken:` reference only resolves to a market priced by Kraken. Stored zero or negative prices read as `unavailable`. Missing or invalid bearer tokens are answered 401.
 - `MarketDataService::get_market` reports storage failures as errors instead of
   "market not found". Consequently v1 `/price` answers 500 rather than 404 when the
   database fails.
-- `Cache-Control` of `/prices` and `/fx` is public with a max-age up to the end of the
+- `Cache-Control` of `/prices` and `/fx` is private (the endpoints are authenticated) with a max-age up to the end of the
   five-minute validity window of the stalest value, and `no-cache` when any value is
   missing.
 

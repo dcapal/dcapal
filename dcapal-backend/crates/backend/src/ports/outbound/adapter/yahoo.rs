@@ -415,7 +415,9 @@ fn call_error_of(error: &GetError) -> PriceCallError {
         GetError::Request(e) if e.is_timeout() => {
             PriceCallError::timeout("Yahoo request timed out")
         }
-        GetError::RateLimited => PriceFailure::provider_error(error.to_string()).into(),
+        GetError::RateLimited => {
+            PriceCallError::rate_limited("Yahoo rate limit reached; retry later")
+        }
         GetError::Request(e) => {
             PriceFailure::provider_error(format!("Yahoo request failed: {e}")).into()
         }
@@ -647,6 +649,9 @@ impl LivePriceProvider for YahooProvider {
 }
 
 impl YahooProvider {
+    /// Fetches a live quote without queueing for the shared limiter, so on-demand price
+    /// requests never starve the price worker or lookups: a saturated limiter fails the
+    /// quote immediately as a rate-limited provider error.
     async fn current_price_inner(
         &self,
         symbol: &str,
@@ -655,10 +660,18 @@ impl YahooProvider {
             .endpoints
             .chart_url(symbol, &[("range", "1d"), ("interval", "1d")])
             .map_err(PriceFailure::malformed)?;
-        let (status, body) = tokio::time::timeout(
-            LIVE_QUOTE_TIMEOUT,
-            self.read_body(url.as_str(), LIVE_QUOTE_TIMEOUT),
-        )
+        let (status, body) = tokio::time::timeout(LIVE_QUOTE_TIMEOUT, async {
+            let response = self
+                .get(url.as_str(), LIVE_QUOTE_TIMEOUT, Admission::Reject)
+                .await
+                .map_err(|e| call_error_of(&e))?;
+            let status = response.status().as_u16();
+            let body = response
+                .bytes()
+                .await
+                .map_err(|e| call_error_of(&GetError::Request(e)))?;
+            Ok::<_, PriceCallError>((status, body.to_vec()))
+        })
         .await
         .map_err(|_| PriceCallError::timeout("Yahoo quote timed out"))??;
 
@@ -1632,5 +1645,32 @@ mod price_tests {
 
         assert_eq!(result.unwrap_err(), AssetSearchError::RateLimited);
         assert!(fake.requests().is_empty());
+    }
+
+    /// GIVEN a Yahoo limiter whose only slot is spent,
+    /// WHEN a live quote is requested,
+    /// THEN it fails at once as a provider error without contacting Yahoo, and the call is
+    /// recorded as rate limited rather than as a provider timeout or error.
+    #[tokio::test]
+    async fn live_quotes_do_not_queue_for_the_limiter() {
+        let fake = FakeProvider::start(|_| Reply::ok("{}")).await;
+        let quota = Quota::per_hour(NonZeroU32::new(1).unwrap());
+        let provider =
+            YahooProvider::with_quota(rquest::Client::new(), quota).with_base_url(&fake.base_url());
+        provider.limiter.check().unwrap();
+
+        let started = std::time::Instant::now();
+        let failure = provider.current_price("VWCE.DE").await.unwrap_err();
+        let call = provider.current_price_inner("VWCE.DE").await;
+
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(failure.kind, FailureKind::ProviderError);
+        assert!(fake.requests().is_empty());
+        let call = call.unwrap_err();
+        assert!(call.rate_limited && !call.timed_out);
+        assert_eq!(
+            PriceCallError::outcome::<()>(&Err(call)),
+            ProviderOutcome::RateLimited
+        );
     }
 }
