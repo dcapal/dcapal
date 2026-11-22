@@ -18,8 +18,8 @@ use crate::{
             asset::AssetRef,
             entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
             market_quote::{
-                FxRate, PriceFailure, PriceQuote, QuoteSource, QuoteStatus, StoredQuote,
-                derive_fx_rate, fx_candidate_markets,
+                FailureKind, FxRate, PriceFailure, PriceQuote, QuoteSource, QuoteStatus,
+                StoredQuote, derive_fx_rate, fx_candidate_markets,
             },
             portfolio::Provider,
         },
@@ -57,7 +57,19 @@ pub struct MarketDataService {
     assets_cache: RwLock<AssetsCache>,
     live_prices: Option<Arc<dyn LivePriceProvider>>,
     live_cache: Cache<String, LivePrice>,
+    live_unavailable: Cache<String, PriceFailure>,
+    quote_cache: Cache<MarketId, Option<StoredQuote>>,
 }
+
+/// How long a Yahoo "no price for this symbol" answer is reused.
+const LIVE_UNAVAILABLE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// How long stored quotes read for `/prices` and `/fx` are reused. Writers invalidate
+/// them sooner, so this only bounds staleness when an invalidation is missed.
+const QUOTE_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Number of stored quotes (and known-missing markets) kept in memory.
+const QUOTE_CACHE_CAPACITY: u64 = 5_000;
 
 /// How long a live Yahoo quote is reused, so repeated requests do not spend the shared limiter.
 const LIVE_QUOTE_TTL: std::time::Duration = std::time::Duration::from_secs(45);
@@ -67,6 +79,9 @@ const LIVE_QUOTE_CAPACITY: u64 = 1_000;
 
 /// Quote currency of the prices reported for Kraken crypto assets.
 const CRYPTO_QUOTE_CURRENCY: &str = "usd";
+
+/// Upper-case form of [`CRYPTO_QUOTE_CURRENCY`] as shown in quotes.
+const CRYPTO_QUOTE_LABEL: &str = "USD";
 
 impl MarketDataService {
     /// Creates a service that keeps up to [`DEFAULT_LAST_PRICE_CAPACITY`] non-FX markets in memory.
@@ -97,6 +112,14 @@ impl MarketDataService {
                 .max_capacity(LIVE_QUOTE_CAPACITY)
                 .time_to_live(LIVE_QUOTE_TTL)
                 .build(),
+            live_unavailable: Cache::builder()
+                .max_capacity(LIVE_QUOTE_CAPACITY)
+                .time_to_live(LIVE_UNAVAILABLE_TTL)
+                .build(),
+            quote_cache: Cache::builder()
+                .max_capacity(QUOTE_CACHE_CAPACITY)
+                .time_to_live(QUOTE_CACHE_TTL)
+                .build(),
         }
     }
 
@@ -125,7 +148,7 @@ impl MarketDataService {
         let stored = if kraken_markets.is_empty() {
             HashMap::new()
         } else {
-            self.repo.find_market_quotes(&kraken_markets).await?
+            self.stored_quotes(&kraken_markets).await?
         };
 
         // Live quotes of every Yahoo symbol run concurrently; the shared limiter paces them.
@@ -147,6 +170,9 @@ impl MarketDataService {
             );
         };
 
+        if let Some(failure) = self.live_unavailable.get(asset.symbol()) {
+            return PriceQuote::failed(asset.clone(), failure);
+        }
         let cached = self.live_cache.get(asset.symbol());
         let fetched_now = cached.is_none();
         let answer = match cached {
@@ -171,7 +197,15 @@ impl MarketDataService {
                 failure: None,
                 failed_at: None,
             },
-            Err(failure) => PriceQuote::failed(asset.clone(), failure),
+            Err(failure) => {
+                // A symbol Yahoo does not price stays that way for a while; other
+                // failures are retried at the next request.
+                if failure.kind == FailureKind::Unavailable {
+                    self.live_unavailable
+                        .insert(asset.symbol().to_string(), failure.clone());
+                }
+                PriceQuote::failed(asset.clone(), failure)
+            }
         }
     }
 
@@ -181,24 +215,64 @@ impl MarketDataService {
     /// derived from; an `Err` means the storage failed.
     pub async fn fx_rate(&self, base: &str, quote: &str) -> Result<FxRate> {
         let stored = self
-            .repo
-            .find_market_quotes(&fx_candidate_markets(base, quote))
+            .stored_quotes(&fx_candidate_markets(base, quote))
             .await?;
         Ok(derive_fx_rate(base, quote, &stored))
     }
 
-    pub async fn get_assets_by_type(&self, kind: AssetKind) -> Arc<Vec<Asset>> {
+    /// Reads stored quotes through a short-lived cache that also remembers unknown markets.
+    ///
+    /// Misses are fetched with one query. Writers call [`Self::invalidate_quotes`], so a
+    /// refreshed or failed price shows up at the next read.
+    async fn stored_quotes(&self, ids: &[MarketId]) -> Result<HashMap<MarketId, StoredQuote>> {
+        let mut quotes = HashMap::with_capacity(ids.len());
+        let mut missing = Vec::new();
+        for id in ids {
+            match self.quote_cache.get(id) {
+                Some(Some(quote)) => {
+                    quotes.insert(id.clone(), quote);
+                }
+                Some(None) => {}
+                None => missing.push(id.clone()),
+            }
+        }
+        if missing.is_empty() {
+            return Ok(quotes);
+        }
+
+        let mut loaded = self.repo.find_market_quotes(&missing).await?;
+        for id in missing {
+            let quote = loaded.remove(&id);
+            self.quote_cache.insert(id.clone(), quote.clone());
+            if let Some(quote) = quote {
+                quotes.insert(id, quote);
+            }
+        }
+        Ok(quotes)
+    }
+
+    /// Forgets cached stored quotes of the given markets after their price or failure changed.
+    pub fn invalidate_quotes(&self, ids: &[MarketId]) {
+        for id in ids {
+            self.quote_cache.invalidate(id);
+        }
+    }
+
+    /// Returns the catalog assets of a kind, cached until the catalog changes.
+    ///
+    /// A storage failure is an error and is never cached as an empty catalog.
+    pub async fn get_assets_by_type(&self, kind: AssetKind) -> Result<Arc<Vec<Asset>>> {
         {
             let cache = self.assets_cache.read();
             match kind {
                 AssetKind::Crypto => {
                     if let Some(assets) = &cache.crypto {
-                        return assets.clone();
+                        return Ok(assets.clone());
                     }
                 }
                 AssetKind::Fiat => {
                     if let Some(assets) = &cache.fiats {
-                        return assets.clone();
+                        return Ok(assets.clone());
                     }
                 }
             }
@@ -208,21 +282,18 @@ impl MarketDataService {
             .repo
             .load_assets_by_type(kind)
             .await
-            .unwrap_or_else(|e| {
-                error!("Failed to load assets: {}", ErrorChain(&e));
-                vec![]
-            });
+            .inspect_err(|e| error!("Failed to load assets: {}", ErrorChain(e)))?;
 
         let mut cache = self.assets_cache.write();
 
         match kind {
             AssetKind::Crypto => {
                 cache.crypto = Some(Arc::new(assets));
-                cache.crypto.as_ref().unwrap().clone()
+                Ok(cache.crypto.as_ref().unwrap().clone())
             }
             AssetKind::Fiat => {
                 cache.fiats = Some(Arc::new(assets));
-                cache.fiats.as_ref().unwrap().clone()
+                Ok(cache.fiats.as_ref().unwrap().clone())
             }
         }
     }
@@ -239,6 +310,7 @@ impl MarketDataService {
         self.market_cache_generation.fetch_add(1, Ordering::AcqRel);
         self.fx_markets.invalidate_all();
         self.markets.invalidate_all();
+        self.quote_cache.invalidate_all();
         self.pricers.write().clear();
         self.price_deps.write().clear();
     }
@@ -251,6 +323,7 @@ impl MarketDataService {
             self.fx_markets.invalidate(id);
             self.markets.invalidate(id);
         }
+        self.invalidate_quotes(ids);
 
         let mut pricers = self.pricers.write();
         let mut price_deps = self.price_deps.write();
@@ -379,6 +452,10 @@ impl MarketDataService {
         }
     }
 
+    /// Derives the rate of `base` in `quote`, with the markets it depends on.
+    ///
+    /// Every market the derivation can use is loaded with one lookup, then the
+    /// precedence (direct, inverse, triangulation through USD) is applied in memory.
     async fn compute_conversion_rate(
         &self,
         base: &AssetId,
@@ -389,130 +466,93 @@ impl MarketDataService {
             return Ok(Some((Price::new(1., Timestamp::now()), vec![])));
         }
 
-        let base = normalized_asset(base);
-        let quote = normalized_asset(quote);
-
-        // Find base/quote market
-        let id = format!("{base}{quote}");
-        let mkt = self.get_market(&id).await?;
-        if let Some(m) = mkt
-            && let Some(px) = m.price()
-        {
-            info!("Computed conversion rate for market {}", m.id);
-            return Ok(Some((*px, vec![id])));
-        }
-
-        // Find quote/base market
-        let id = format!("{quote}{base}");
-        let mkt = self.get_market(&id).await?;
-        if let Some(m) = mkt
-            && let Some(px) = m.price()
-        {
-            let rate = Price::new(1. / px.price, px.ts);
-            info!("Computed conversion rate for market {}", m.id);
-            return Ok(Some((rate, vec![id])));
-        }
-
-        // Find alternative markets
-        let Some((base_usd_id, base_usd_px)) = self.get_base_usd_price(&base, &quote).await? else {
-            return Ok(None);
-        };
-
-        let usd_ccy = "usd";
-        let base_quote_id = format!("{base}{quote}");
-        let usd_quote_id = format!("{usd_ccy}{quote}");
-        let quote_usd_id = format!("{quote}{usd_ccy}");
-
-        let usd_quote = self.get_market(&usd_quote_id).await?;
-        if let Some(usd_quote) = usd_quote
-            && let Some(usd_quote_px) = usd_quote.price()
-        {
-            let price = base_usd_px.price * usd_quote_px.price;
-            let ts = std::cmp::min(base_usd_px.ts, usd_quote_px.ts);
-            let rate = Price::new(price, ts);
-            info!(
-                "Computed conversion rate for market {} triangulating between markets",
-                base_quote_id
+        let (base, quote) = (normalized_asset(base), normalized_asset(quote));
+        let candidates = [
+            format!("{base}{quote}"),
+            format!("{quote}{base}"),
+            format!("{base}{USD}"),
+            format!("{USD}{base}"),
+            format!("{USD}{quote}"),
+            format!("{quote}{USD}"),
+        ];
+        let markets = self.get_markets(&candidates).await?;
+        let rate = select_conversion_rate(base, quote, &markets);
+        if rate.is_none() {
+            warn!(
+                base = base,
+                quote = quote,
+                "Price not available for the pair"
             );
-            return Ok(Some((rate, vec![base_usd_id, usd_quote_id])));
         }
-
-        let quote_usd = self.get_market(&quote_usd_id).await?;
-        if let Some(quote_usd) = quote_usd
-            && let Some(quote_usd_px) = quote_usd.price()
-        {
-            let price = base_usd_px.price / quote_usd_px.price;
-            let ts = std::cmp::min(base_usd_px.ts, quote_usd_px.ts);
-            let rate = Price::new(price, ts);
-            info!(
-                "Computed conversion rate for market {} triangulating between markets",
-                base_quote_id
-            );
-            return Ok(Some((rate, vec![base_usd_id, quote_usd_id])));
-        }
-
-        warn!(
-            base = base,
-            quote = quote,
-            "Price not available for markets '{}' and '{}'",
-            usd_quote_id,
-            quote_usd_id
-        );
-
-        Ok(None)
+        Ok(rate)
     }
 
-    async fn get_base_usd_price(
-        &self,
-        base: &AssetId,
-        quote: &AssetId,
-    ) -> Result<Option<(MarketId, Price)>> {
-        let base_usd_id = format!("{}{}", base, "usd");
-        let usd_base_id = format!("{}{}", "usd", base);
-
-        let base_usd = self.get_market(&base_usd_id).await?;
-        if let Some(ref m) = base_usd
-            && let Some(px) = m.price()
-        {
-            return Ok(Some((base_usd_id, *px)));
-        }
-
-        let usd_base = self.get_market(&usd_base_id).await?;
-        if let Some(ref m) = usd_base
-            && let Some(px) = m.price()
-        {
-            return Ok(Some((
-                usd_base_id,
-                Price {
-                    price: 1. / px.price,
-                    ts: px.ts,
-                },
-            )));
-        }
-
-        match (base_usd, usd_base) {
-            (None, None) => {
-                warn!(
-                    base = base,
-                    quote = quote,
-                    "Cannot find any of markets: '{}', '{}'",
-                    base_usd_id,
-                    usd_base_id
-                );
-                Ok(None)
-            }
-            (_, _) => {
-                warn!(
-                    base = base,
-                    quote = quote,
-                    "Price not available for any of markets: '{}', '{}'",
-                    base_usd_id,
-                    usd_base_id
-                );
-                Ok(None)
+    /// Loads several markets, serving cached ones and fetching the others with one query.
+    ///
+    /// Unknown markets are absent from the result. Loaded markets are cached unless the
+    /// market cache was invalidated meanwhile.
+    async fn get_markets(&self, ids: &[MarketId]) -> Result<HashMap<MarketId, Arc<Market>>> {
+        let generation = self.market_cache_generation.load(Ordering::Acquire);
+        let mut found = HashMap::with_capacity(ids.len());
+        let mut missing = Vec::new();
+        for id in ids {
+            match self.cached_market(id) {
+                Some(market) => {
+                    found.insert(id.clone(), market);
+                }
+                None => missing.push(id),
             }
         }
+        if missing.is_empty() {
+            return Ok(found);
+        }
+
+        let loaded = self.repo.find_markets(&missing).await?;
+        let _guard = self.invalidation_lock.read();
+        let cacheable = self.market_cache_generation.load(Ordering::Acquire) == generation;
+        for market in loaded.into_iter().flatten() {
+            let market = Arc::new(market);
+            if cacheable {
+                self.cache_for(&market)
+                    .insert(market.id.clone(), market.clone());
+            }
+            found.insert(market.id.clone(), market);
+        }
+        Ok(found)
     }
+}
+
+/// Identifier of the pivot currency of triangulated rates.
+const USD: &str = "usd";
+
+/// Applies the conversion precedence to already loaded markets: the direct market, then
+/// its inverse, then a triangulation through USD (base to USD, then USD to quote or the
+/// inverse of quote to USD). Returns the rate with the ids of the markets it uses.
+fn select_conversion_rate(
+    base: &str,
+    quote: &str,
+    markets: &HashMap<MarketId, Arc<Market>>,
+) -> Option<(Price, Vec<MarketId>)> {
+    let priced = |id: String| markets.get(&id).and_then(|m| m.price().map(|px| (id, px)));
+
+    if let Some((id, px)) = priced(format!("{base}{quote}")) {
+        return Some((px, vec![id]));
+    }
+    if let Some((id, px)) = priced(format!("{quote}{base}")) {
+        return Some((Price::new(1. / px.price, px.ts), vec![id]));
+    }
+
+    let (base_usd_id, base_usd) = priced(format!("{base}{USD}")).or_else(|| {
+        priced(format!("{USD}{base}")).map(|(id, px)| (id, Price::new(1. / px.price, px.ts)))
+    })?;
+
+    if let Some((id, px)) = priced(format!("{USD}{quote}")) {
+        let rate = Price::new(base_usd.price * px.price, base_usd.ts.min(px.ts));
+        return Some((rate, vec![base_usd_id, id]));
+    }
+    let (id, px) = priced(format!("{quote}{USD}"))?;
+    let rate = Price::new(base_usd.price / px.price, base_usd.ts.min(px.ts));
+    Some((rate, vec![base_usd_id, id]))
 }
 
 /// Id of the stored market that prices a crypto asset in [`CRYPTO_QUOTE_CURRENCY`].
@@ -529,28 +569,24 @@ fn stored_crypto_quote(asset: &AssetRef, stored: &HashMap<MarketId, StoredQuote>
         .get(&crypto_market_id(asset))
         .filter(|market| market.provider == Provider::Kraken)
     {
-        Some(market) => {
-            PriceQuote::from_stored(asset.clone(), &CRYPTO_QUOTE_CURRENCY.to_uppercase(), market)
-        }
+        Some(market) => PriceQuote::from_stored(asset.clone(), CRYPTO_QUOTE_LABEL, market),
         None => PriceQuote::failed(
             asset.clone(),
             PriceFailure::unavailable(format!(
                 "Kraken lists no {}/{} market",
                 asset.symbol(),
-                CRYPTO_QUOTE_CURRENCY.to_uppercase()
+                CRYPTO_QUOTE_LABEL
             )),
         ),
     }
 }
 
-fn normalized_asset(id: &AssetId) -> AssetId {
+/// Maps an asset id to the id its markets are listed under (staked variants trade as the base asset).
+fn normalized_asset(id: &str) -> &str {
     static NORMALIZED: LazyLock<HashMap<&'static str, &'static str>> =
         LazyLock::new(|| [("eth2", "eth"), ("eth2.s", "eth")].into_iter().collect());
 
-    NORMALIZED
-        .get(id.as_str())
-        .unwrap_or(&id.as_str())
-        .to_string()
+    NORMALIZED.get(id).copied().unwrap_or(id)
 }
 
 struct AssetsCache {
@@ -846,6 +882,10 @@ mod tests {
         }])
         .await
         .unwrap();
+        // The cached fresh quote is served until the writer invalidates it, as the price worker does.
+        let cached = service.current_prices(&refs[..1]).await.unwrap();
+        assert_eq!(cached[0].source, Some(QuoteSource::Provider));
+        service.invalidate_quotes(std::slice::from_ref(&id));
 
         let stale = service.current_prices(&refs[..1]).await.unwrap();
         assert_eq!(stale[0].price, Some(44_000.25));
@@ -921,6 +961,7 @@ mod tests {
         }])
         .await
         .unwrap();
+        service.invalidate_quotes(std::slice::from_ref(&id));
         let stale = service.fx_rate("EUR", "GBP").await.unwrap();
         assert_eq!(stale.rate, rate.rate);
         assert_eq!(stale.source, Some(QuoteSource::LastKnown));
@@ -975,5 +1016,40 @@ mod tests {
 
         assert_eq!(quotes[0].status, QuoteStatus::Unavailable);
         assert_eq!(quotes[0].price, None);
+    }
+
+    /// GIVEN a Yahoo symbol the provider does not price,
+    /// WHEN it is requested twice,
+    /// THEN the provider is asked once and the second answer is the remembered "unavailable".
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn unavailable_live_quotes_are_remembered_briefly(pool: PgPool) {
+        let (service, _) = quote_service(pool).await;
+        let mut live = MockLivePriceProvider::new();
+        live.expect_current_price()
+            .times(1)
+            .returning(|_| Err(PriceFailure::unavailable("no such symbol")));
+        let service = service.with_live_prices(Arc::new(live));
+        let refs = [AssetRef::new(Provider::YF, "nope")];
+
+        let first = service.current_prices(&refs).await.unwrap();
+        let second = service.current_prices(&refs).await.unwrap();
+
+        assert_eq!(first[0].status, QuoteStatus::Unavailable);
+        assert_eq!(second[0].status, QuoteStatus::Unavailable);
+    }
+
+    /// GIVEN a catalog that cannot be read,
+    /// WHEN the asset list is requested,
+    /// THEN the failure is returned and nothing is cached, so the next call can succeed.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn catalog_read_failures_are_errors_and_never_cached(pool: PgPool) {
+        let (service, _) = quote_service(pool.clone()).await;
+        pool.close().await;
+
+        let first = service.get_assets_by_type(AssetKind::Crypto).await;
+        let second = service.get_assets_by_type(AssetKind::Crypto).await;
+
+        assert!(first.is_err() && second.is_err());
+        assert!(service.assets_cache.read().crypto.is_none());
     }
 }

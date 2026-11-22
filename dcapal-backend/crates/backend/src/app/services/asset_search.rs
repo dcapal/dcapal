@@ -1,6 +1,8 @@
 //! Asset search across the providers the v2 market-data contract supports.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+
+use moka::sync::Cache;
 
 use crate::{
     app::{
@@ -12,7 +14,7 @@ use crate::{
     },
     error::DcaError,
     ports::outbound::{
-        adapter::{AssetSearchError, AssetSearchProvider},
+        adapter::{AssetSearchError, AssetSearchProvider, ListedAsset},
         repository::market_data::MarketDataRepository,
     },
 };
@@ -98,12 +100,26 @@ pub enum AssetSearchServiceError {
 pub struct AssetSearchService {
     repo: Arc<MarketDataRepository>,
     listings: Arc<dyn AssetSearchProvider>,
+    listed_cache: Cache<String, Vec<ListedAsset>>,
 }
+
+/// How long the answer to a Yahoo search is reused.
+const LISTED_SEARCH_TTL: Duration = Duration::from_secs(300);
+
+/// Number of distinct Yahoo searches kept in memory.
+const LISTED_SEARCH_CAPACITY: u64 = 1_000;
 
 impl AssetSearchService {
     /// Creates a service that searches Yahoo through `listings` and Kraken in `repo`.
     pub fn new(repo: Arc<MarketDataRepository>, listings: Arc<dyn AssetSearchProvider>) -> Self {
-        Self { repo, listings }
+        Self {
+            repo,
+            listings,
+            listed_cache: Cache::builder()
+                .max_capacity(LISTED_SEARCH_CAPACITY)
+                .time_to_live(LISTED_SEARCH_TTL)
+                .build(),
+        }
     }
 
     /// Searches the command's provider only; results are never merged across providers.
@@ -149,10 +165,18 @@ impl AssetSearchService {
 
     /// Searches Yahoo; prices of its results are not known until asked for.
     async fn search_yahoo(&self, query: &str) -> Result<Vec<AssetSearchHit>, AssetSearchError> {
-        Ok(self
-            .listings
-            .search_assets(query)
-            .await?
+        // Answers are reused for the same text, ignoring case and surrounding blanks;
+        // failures and rate-limit rejections are never remembered.
+        let key = query.trim().to_lowercase();
+        let listed = match self.listed_cache.get(&key) {
+            Some(listed) => listed,
+            None => {
+                let listed = self.listings.search_assets(query).await?;
+                self.listed_cache.insert(key, listed.clone());
+                listed
+            }
+        };
+        Ok(listed
             .into_iter()
             .map(|asset| AssetSearchHit {
                 provider: Provider::YF,
@@ -258,12 +282,14 @@ mod tests {
             SearchOutcome::ProviderError,
             SearchOutcome::Malformed,
         ];
-        for expected in outcomes {
-            let search = service.search(command(Provider::YF, "x")).await.unwrap();
+        for (i, expected) in outcomes.into_iter().enumerate() {
+            // Distinct texts, because a successful answer is cached per text.
+            let text = format!("x{i}");
+            let search = service.search(command(Provider::YF, &text)).await.unwrap();
             assert_eq!(search.outcome, expected);
             assert_eq!(search.failure.is_some(), expected != SearchOutcome::Empty);
         }
-        let limited = service.search(command(Provider::YF, "x")).await;
+        let limited = service.search(command(Provider::YF, "limited")).await;
         assert!(matches!(limited, Err(AssetSearchServiceError::RateLimited)));
     }
 
@@ -299,5 +325,38 @@ mod tests {
         assert_eq!(hit.asset_class, AssetClass::Crypto);
         assert_eq!(hit.price_availability, PriceAvailability::Unavailable);
         assert_eq!(empty.outcome, SearchOutcome::Empty);
+    }
+
+    /// GIVEN a Yahoo search that succeeded and one that failed,
+    /// WHEN each text is searched twice (the first with different case and blanks),
+    /// THEN the successful answer is reused (one provider call) and the failure is retried.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn successful_yahoo_searches_are_cached_and_failures_are_not(pool: PgPool) {
+        let mut listings = MockAssetSearchProvider::new();
+        listings
+            .expect_search_assets()
+            .withf(|q| q.trim().eq_ignore_ascii_case("vwce"))
+            .times(1)
+            .returning(|_| Ok(vec![]));
+        listings
+            .expect_search_assets()
+            .withf(|q| q == "bad")
+            .times(2)
+            .returning(|_| {
+                Err(AssetSearchError::Failed(PriceFailure::provider_error(
+                    "503",
+                )))
+            });
+        let service = service(pool, listings);
+
+        service.search(command(Provider::YF, "vwce")).await.unwrap();
+        service
+            .search(command(Provider::YF, " VWCE "))
+            .await
+            .unwrap();
+        service.search(command(Provider::YF, "bad")).await.unwrap();
+        let retried = service.search(command(Provider::YF, "bad")).await.unwrap();
+
+        assert_eq!(retried.outcome, SearchOutcome::ProviderError);
     }
 }

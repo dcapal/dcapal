@@ -320,6 +320,8 @@ async fn last_known_price_is_flagged_after_a_failed_refresh(pool: PgPool) {
     }])
     .await
     .unwrap();
+    // A new server has an empty quote cache, as after the price worker invalidated it.
+    let addr = serve(&pool, ProviderUrls::default()).await;
     let stale = get(addr, "/markets/v2/prices?asset=kraken:btc").await;
 
     let price = &stale.body["prices"][0];
