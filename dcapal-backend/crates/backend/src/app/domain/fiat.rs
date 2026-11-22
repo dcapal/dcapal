@@ -16,9 +16,21 @@ pub const FIAT_CATALOG: [(&str, &str); 8] = [
     ("USD", "United States Dollar"),
 ];
 
+/// Upper-case symbols of the catalog fiat currencies, derived from
+/// [`FIAT_CATALOG`] at compile time so reading them never allocates.
+const FIAT_SYMBOLS: [&str; FIAT_CATALOG.len()] = {
+    let mut symbols = [""; FIAT_CATALOG.len()];
+    let mut i = 0;
+    while i < FIAT_CATALOG.len() {
+        symbols[i] = FIAT_CATALOG[i].0;
+        i += 1;
+    }
+    symbols
+};
+
 /// Returns the upper-case symbols of the catalog fiat currencies.
-pub fn fiat_symbols() -> Vec<&'static str> {
-    FIAT_CATALOG.iter().map(|(symbol, _)| *symbol).collect()
+pub fn fiat_symbols() -> &'static [&'static str] {
+    &FIAT_SYMBOLS
 }
 
 /// Returns the English name of a catalog fiat currency, matching the symbol
