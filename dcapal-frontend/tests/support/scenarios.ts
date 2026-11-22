@@ -2,6 +2,7 @@
 export const scenarios = Object.freeze({
   default: "default",
   importSuccess: "import-success",
+  importYfFiatCash: "import-yf-fiat-cash",
   importUnresolvedPrice: "import-unresolved-price",
   searchDefault: "search-default",
   searchLoading: "search-loading",

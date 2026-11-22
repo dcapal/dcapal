@@ -148,6 +148,26 @@ const getChart = (scenario: string, symbol: string): FixtureRecord => {
 };
 
 const getImportedPortfolio = (scenario: string): FixtureRecord => {
+  if (scenario === "import-yf-fiat-cash") {
+    // Fiat cash as the backend now returns it: provider YF, bare currency symbol.
+    return {
+      ...importPortfolio,
+      assets: [
+        {
+          symbol: "EUR",
+          name: "Euro",
+          aclass: "CURRENCY",
+          baseCcy: "eur",
+          provider: "YF",
+          price: "1",
+          averageBuyPrice: "1",
+          qty: "100",
+          targetWeight: "100",
+        },
+      ],
+    };
+  }
+
   if (scenario !== "import-unresolved-price") return importPortfolio;
 
   return {
@@ -214,6 +234,14 @@ export const handlers = [
 
   http.get("/api/assets/chart/:symbol", async ({ params, request }) => {
     await delay(40);
+    // Yahoo has no chart for a bare currency symbol: fiat cash must be priced
+    // through /price instead.
+    if (
+      getScenario(request) === "import-yf-fiat-cash" &&
+      String(params.symbol || "").toLowerCase() === "eur"
+    ) {
+      return errorResponse("No chart for a bare currency symbol", 404);
+    }
     return HttpResponse.json(
       getChart(getScenario(request), String(params.symbol || ""))
     );

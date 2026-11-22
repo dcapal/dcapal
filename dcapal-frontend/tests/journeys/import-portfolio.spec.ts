@@ -81,3 +81,35 @@ test.describe("unresolved import prices", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("imported fiat cash stored as a YF asset", () => {
+  test.use({ scenario: scenarios.importYfFiatCash });
+
+  test("prices YF fiat cash through the DCA-Pal price API", async ({
+    page,
+  }) => {
+    /*
+     * GIVEN a shared portfolio holding fiat cash with provider YF, for which
+     *   Yahoo has no chart
+     * WHEN the portfolio is imported
+     * THEN the cash is priced through the price API and shown in the editor
+     */
+    const importResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .endsWith("/api/import/portfolio/fixture-import-portfolio") &&
+        response.ok()
+    );
+    await page.goto("/import?p=fixture-import-portfolio");
+    await importResponse;
+
+    await expect(page.getByTestId("portfolio-editor")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(
+      page.locator('[data-testid="asset-card"][data-symbol="EUR"]')
+    ).toBeVisible();
+    await expect(page.getByTestId("import-error")).toHaveCount(0);
+  });
+});

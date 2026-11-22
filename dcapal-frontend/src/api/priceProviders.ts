@@ -159,7 +159,13 @@ export const getYahooPrice = (
     staleTime: PRICE_STALE_TIME,
   });
 
-/** Resolves a provider price and turns unusable provider data into `null`. */
+/**
+ * Resolves a provider price and turns unusable provider data into `null`.
+ *
+ * Fiat cash assets are priced by the DCA-Pal price API whether they are stored
+ * as `DCAPal` (older client copies) or `YF` (current backend), because Yahoo
+ * has no chart for a bare currency symbol.
+ */
 export const getPriceForProvider = async (
   provider: Provider,
   validCcys: string[],
@@ -167,7 +173,13 @@ export const getPriceForProvider = async (
   quote: string
 ): Promise<number | null> => {
   try {
-    if (provider === Provider.DCA_PAL) {
+    const isSupportedFiat = validCcys.some(
+      (ccy) => ccy.toLowerCase() === symbol.toLowerCase()
+    );
+    if (
+      provider === Provider.DCA_PAL ||
+      (provider === Provider.YF && isSupportedFiat)
+    ) {
       return await getDcaPalPrice(symbol, quote);
     }
 
