@@ -53,6 +53,24 @@ pub struct MarketPriceFailure<'a> {
     pub failure: &'a PriceFailure,
 }
 
+/// A Kraken catalog crypto asset found by a catalog search.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct CatalogSearchHit {
+    /// Upper-case Kraken symbol.
+    pub symbol: String,
+    /// Display name.
+    pub name: String,
+    /// Whether a USD market of the asset has a stored price.
+    pub priced: bool,
+}
+
+/// Escapes the `LIKE` wildcards of user text, with `\` as the escape character.
+fn escape_like(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 /// Reads and writes the market-asset catalog, markets and latest prices.
 #[derive(Clone)]
 pub struct MarketDataRepository {
@@ -203,6 +221,44 @@ impl MarketDataRepository {
         };
 
         rows.into_iter().map(Asset::try_from).collect()
+    }
+
+    /// Searches the provider-confirmed Kraken crypto catalog by symbol or name.
+    ///
+    /// The match is a case-insensitive substring of either column with `%` and `_`
+    /// taken literally. An exact symbol match comes first, then symbol order; at most
+    /// `limit` assets are returned. `priced` tells whether the asset has a USD market
+    /// with a stored price.
+    pub async fn search_crypto_catalog(
+        &self,
+        text: &str,
+        limit: i64,
+    ) -> Result<Vec<CatalogSearchHit>> {
+        let hits = query_as::<_, CatalogSearchHit>(const_format::formatcp!(
+            "SELECT ad.symbol, ad.name,
+                    EXISTS (SELECT 1 FROM market_price AS p
+                            JOIN assets_data AS q ON q.id = p.quote_asset_id
+                            WHERE p.base_asset_id = ad.id AND p.price IS NOT NULL
+                              AND q.provider = $4 AND q.asset_class = $5 AND q.symbol = $6
+                           ) AS priced
+             FROM assets_data AS ad
+             WHERE {CRYPTO_PREDICATE}
+               AND (ad.symbol ILIKE $7 ESCAPE '\\' OR ad.name ILIKE $7 ESCAPE '\\')
+             ORDER BY (UPPER(ad.symbol) = UPPER($8)) DESC, ad.symbol
+             LIMIT $9"
+        ))
+        .bind(DbProvider::Kraken)
+        .bind(DbAssetClass::Crypto)
+        .bind(DbMetadataSource::ProviderConfirmed)
+        .bind(DbProvider::YF)
+        .bind(DbAssetClass::Cash)
+        .bind("USD")
+        .bind(format!("%{}%", escape_like(text)))
+        .bind(text)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(hits)
     }
 
     /// Tells whether at least one provider-confirmed Kraken crypto asset is known.

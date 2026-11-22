@@ -6,6 +6,7 @@ pub mod assets;
 mod cache;
 pub mod import;
 pub mod lookup_assets_v2;
+pub mod markets_v2;
 pub mod price;
 pub mod root;
 pub mod sync_portfolios;

@@ -1,6 +1,7 @@
 //! The [`adapter`](self) module contains adapters to third-party services
 
 mod asset_provider;
+mod asset_search;
 mod cw;
 mod fiat_asset;
 mod ipapi;
@@ -12,6 +13,7 @@ mod yahoo;
 use std::sync::Arc;
 
 pub use asset_provider::*;
+pub use asset_search::*;
 pub use cw::*;
 use failsafe::{
     StateMachine,

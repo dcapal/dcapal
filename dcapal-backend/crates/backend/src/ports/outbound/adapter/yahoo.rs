@@ -14,7 +14,8 @@ use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use tracing::{debug, error, warn};
 
 use super::{
-    LivePrice, LivePriceProvider, PriceCallError,
+    AssetSearchError, AssetSearchProvider, ListedAsset, LivePrice, LivePriceProvider,
+    PriceCallError,
     asset_provider::{AssetProvider, AssetProviderError, ProviderAsset},
 };
 use crate::{
@@ -502,6 +503,127 @@ fn lookup_url(
     endpoints
         .chart_url(symbol, &[("range", "1d"), ("interval", "1d")])
         .map_err(AssetProviderError::Malformed)
+}
+
+/// Maximum number of assets one Yahoo search returns.
+const SEARCH_RESULT_LIMIT: u32 = 20;
+
+#[async_trait]
+impl AssetSearchProvider for YahooProvider {
+    /// Searches Yahoo's listings without waiting for the rate limiter: a saturated
+    /// limiter is reported as [`AssetSearchError::RateLimited`].
+    ///
+    /// Recorded as one `lookup` provider call.
+    async fn search_assets(&self, query: &str) -> Result<Vec<ListedAsset>, AssetSearchError> {
+        observe_provider(
+            MetricProvider::Yahoo,
+            ProviderOp::Lookup,
+            self.search_assets_inner(query),
+            |result| match result {
+                Ok(_) => ProviderOutcome::Ok,
+                Err(SearchCallError::RateLimited) => ProviderOutcome::RateLimited,
+                Err(SearchCallError::Call(e)) => PriceCallError::outcome::<()>(&Err(e.clone())),
+            },
+        )
+        .await
+        .map_err(|e| match e {
+            SearchCallError::RateLimited => AssetSearchError::RateLimited,
+            SearchCallError::Call(e) => AssetSearchError::Failed(e.failure),
+        })
+    }
+}
+
+/// Failure of one Yahoo search request.
+enum SearchCallError {
+    RateLimited,
+    Call(PriceCallError),
+}
+
+impl YahooProvider {
+    async fn search_assets_inner(&self, query: &str) -> Result<Vec<ListedAsset>, SearchCallError> {
+        let mut url = self
+            .endpoints
+            .search_url(query)
+            .map_err(|e| SearchCallError::Call(PriceFailure::malformed(e).into()))?;
+        url.query_pairs_mut()
+            .append_pair("quotesCount", &SEARCH_RESULT_LIMIT.to_string())
+            .append_pair("newsCount", "0");
+
+        let (status, body) = tokio::time::timeout(LIVE_QUOTE_TIMEOUT, async {
+            let response = self
+                .get(url.as_str(), LIVE_QUOTE_TIMEOUT, Admission::Reject)
+                .await
+                .map_err(|e| match e {
+                    GetError::RateLimited => SearchCallError::RateLimited,
+                    other => SearchCallError::Call(call_error_of(&other)),
+                })?;
+            let status = response.status().as_u16();
+            let body = response
+                .bytes()
+                .await
+                .map_err(|e| SearchCallError::Call(call_error_of(&GetError::Request(e))))?;
+            Ok::<_, SearchCallError>((status, body))
+        })
+        .await
+        .map_err(|_| SearchCallError::Call(PriceCallError::timeout("Yahoo search timed out")))??;
+
+        parse_search_response(status, &body).map_err(|f| SearchCallError::Call(f.into()))
+    }
+}
+
+/// Turns a Yahoo search reply into listed assets.
+///
+/// A non-success status is a provider error; an undecodable body or one without a
+/// `quotes` list is malformed. Entries without a symbol are skipped. The asset class
+/// comes from `quoteType` with the same conservative mapping as asset lookups.
+fn parse_search_response(
+    status: u16,
+    body: &[u8],
+) -> std::result::Result<Vec<ListedAsset>, PriceFailure> {
+    if !(200..300).contains(&status) {
+        return Err(PriceFailure::provider_error(format!(
+            "Yahoo answered with HTTP status {status}"
+        )));
+    }
+
+    let response: search::Response = serde_json::from_slice(body)
+        .map_err(|e| PriceFailure::malformed(format!("undecodable search body: {e}")))?;
+    let quotes = response
+        .quotes
+        .ok_or_else(|| PriceFailure::malformed("missing quotes list"))?;
+
+    Ok(quotes
+        .into_iter()
+        .filter_map(|quote| {
+            let symbol = non_blank(quote.symbol)?;
+            Some(ListedAsset {
+                symbol,
+                name: non_blank(quote.longname).or_else(|| non_blank(quote.shortname)),
+                venue: non_blank(quote.exch_disp).or_else(|| non_blank(quote.exchange)),
+                asset_class: asset_class_of(quote.quote_type.as_deref()),
+            })
+        })
+        .collect())
+}
+
+mod search {
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    pub struct Response {
+        pub quotes: Option<Vec<Quote>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Quote {
+        pub symbol: Option<String>,
+        pub longname: Option<String>,
+        pub shortname: Option<String>,
+        pub exch_disp: Option<String>,
+        pub exchange: Option<String>,
+        pub quote_type: Option<String>,
+    }
 }
 
 /// Upper bound on one live quote, rate-limiter wait included.
@@ -1415,5 +1537,100 @@ mod price_tests {
             FailureKind::Unavailable
         );
         assert!(fake.requests()[0].ends_with("/VOD.L?range=1d&interval=1d"));
+    }
+
+    fn search_body(quotes: &str) -> String {
+        format!(r#"{{"quotes":{quotes}}}"#)
+    }
+
+    /// GIVEN Yahoo answers a search with an ETF, an unnamed entry, and an entry
+    /// without symbol,
+    /// WHEN the assets are searched,
+    /// THEN the listed assets carry symbol, name, venue and class, and the symbol-less
+    /// entry is skipped; the query travels percent-encoded.
+    #[tokio::test]
+    async fn search_lists_typed_assets() {
+        let fake = FakeProvider::start(|_| {
+            Reply::ok(search_body(
+                r#"[{"symbol":"VWCE.DE","longname":"Vanguard FTSE All-World","shortname":"VANGUARD","exchDisp":"XETRA","exchange":"GER","quoteType":"ETF"},
+                    {"symbol":"BTC-USD","exchange":"CCC","quoteType":"CRYPTOCURRENCY"},
+                    {"longname":"No symbol"}]"#,
+            ))
+        })
+        .await;
+
+        let found = provider_at(&fake).search_assets("vwce & co").await.unwrap();
+
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].symbol, "VWCE.DE");
+        assert_eq!(found[0].name.as_deref(), Some("Vanguard FTSE All-World"));
+        assert_eq!(found[0].venue.as_deref(), Some("XETRA"));
+        assert_eq!(found[0].asset_class, AssetClass::Equity);
+        assert_eq!(
+            (found[1].name.clone(), found[1].venue.as_deref()),
+            (None, Some("CCC"))
+        );
+        assert_eq!(found[1].asset_class, AssetClass::Crypto);
+        assert!(fake.requests()[0].starts_with("/v1/finance/search?q=vwce+%26+co&"));
+    }
+
+    /// GIVEN Yahoo answers with an empty list, a server error, and unreadable bodies,
+    /// WHEN assets are searched,
+    /// THEN an empty list is an answer, a server error is a provider failure, and
+    /// bodies without a quotes list are malformed.
+    #[tokio::test]
+    async fn search_failures_are_told_apart() {
+        let cases = [
+            (Reply::ok(search_body("[]")), None),
+            (Reply::status(503, "down"), Some(FailureKind::ProviderError)),
+            (Reply::ok("<html>"), Some(FailureKind::Malformed)),
+            (Reply::ok("{}"), Some(FailureKind::Malformed)),
+        ];
+        for (reply, expected) in cases {
+            let fake = FakeProvider::start({
+                let reply = reply.clone();
+                move |_| reply.clone()
+            })
+            .await;
+
+            let result = provider_at(&fake).search_assets("x").await;
+
+            match expected {
+                None => assert!(result.unwrap().is_empty()),
+                Some(kind) => assert_eq!(
+                    result.unwrap_err(),
+                    AssetSearchError::Failed(PriceFailure::new(kind, result_message(&reply))),
+                ),
+            }
+        }
+    }
+
+    /// The message the adapter is expected to give for a canned reply.
+    fn result_message(reply: &Reply) -> String {
+        match reply.status {
+            200 if reply.body == "{}" => "missing quotes list".to_string(),
+            200 => format!(
+                "undecodable search body: {}",
+                serde_json::from_str::<search::Response>(&reply.body).unwrap_err()
+            ),
+            status => format!("Yahoo answered with HTTP status {status}"),
+        }
+    }
+
+    /// GIVEN a Yahoo limiter whose only slot is spent,
+    /// WHEN assets are searched,
+    /// THEN the search is rejected as rate limited without contacting Yahoo.
+    #[tokio::test]
+    async fn search_is_rejected_when_the_limiter_is_saturated() {
+        let fake = FakeProvider::start(|_| Reply::ok(search_body("[]"))).await;
+        let quota = Quota::per_hour(NonZeroU32::new(1).unwrap());
+        let provider =
+            YahooProvider::with_quota(rquest::Client::new(), quota).with_base_url(&fake.base_url());
+        provider.limiter.check().unwrap();
+
+        let result = provider.search_assets("x").await;
+
+        assert_eq!(result.unwrap_err(), AssetSearchError::RateLimited);
+        assert!(fake.requests().is_empty());
     }
 }

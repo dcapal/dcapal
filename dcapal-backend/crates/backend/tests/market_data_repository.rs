@@ -617,3 +617,47 @@ async fn non_positive_prices_are_never_stored(pool: PgPool) -> TestResult {
     assert_eq!(price_and_error(&pool).await?.0.as_deref(), Some("10"));
     Ok(())
 }
+
+/// GIVEN a Kraken catalog with BTC (priced in USD), WBTC and ETH, plus a client-supplied
+/// DOGE row,
+/// WHEN the catalog is searched by symbol text, by a wildcard character, and with a limit,
+/// THEN matches are case-insensitive substrings with the exact symbol first, wildcards are
+/// literal, unconfirmed rows never match, and the USD price availability is reported.
+#[sqlx::test(migrations = "../../migrations")]
+async fn crypto_catalog_search_matches_literally_and_reports_price_availability(
+    pool: PgPool,
+) -> TestResult {
+    let repo = MarketDataRepository::new(pool.clone());
+    for asset in [
+        crypto("btc"),
+        crypto("wbtc"),
+        crypto("eth"),
+        fiat("usd", "US Dollar"),
+    ] {
+        repo.store_asset(&asset).await?;
+    }
+    seed_market(
+        &repo,
+        &crypto("btc"),
+        &fiat("usd", "US Dollar"),
+        Some(price(40_000.0, 1)),
+    )
+    .await?;
+    seed_market(&repo, &crypto("eth"), &fiat("usd", "US Dollar"), None).await?;
+    insert_client_asset(&pool, 1, "DOGE", 4).await?;
+
+    let hits = repo.search_crypto_catalog("bTc", 10).await?;
+    let found = hits
+        .iter()
+        .map(|h| (h.symbol.as_str(), h.priced))
+        .collect::<Vec<_>>();
+    assert_eq!(found, [("BTC", true), ("WBTC", false)]);
+
+    assert_eq!(repo.search_crypto_catalog("b", 1).await?.len(), 1);
+    assert!(repo.search_crypto_catalog("%", 10).await?.is_empty());
+    assert!(repo.search_crypto_catalog("_", 10).await?.is_empty());
+    assert!(repo.search_crypto_catalog("doge", 10).await?.is_empty());
+    let eth = repo.search_crypto_catalog("eth", 10).await?;
+    assert_eq!((eth[0].symbol.as_str(), eth[0].priced), ("ETH", false));
+    Ok(())
+}

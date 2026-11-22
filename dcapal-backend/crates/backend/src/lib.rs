@@ -25,6 +25,7 @@ use crate::{
         infra,
         services::{
             asset::AssetService,
+            asset_search::AssetSearchService,
             fx_rates::{FxStartupPolicy, YahooFxFetcher, ensure_fx_rates},
             market_data::MarketDataService,
             portfolio::PortfolioService,
@@ -84,6 +85,7 @@ struct Services {
     mkt_data: Arc<MarketDataService>,
     portfolio: Arc<PortfolioService>,
     asset: Arc<AssetService>,
+    asset_search: Arc<AssetSearchService>,
 }
 
 #[derive(Clone)]
@@ -182,6 +184,10 @@ impl DcaServer {
                 asset_service.clone(),
             )),
             asset: asset_service,
+            asset_search: Arc::new(AssetSearchService::new(
+                repos.mkt_data.clone(),
+                providers.yahoo.clone(),
+            )),
         };
 
         let (api_routes, openapi) = rest::build_openapi_router();
