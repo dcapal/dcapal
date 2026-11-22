@@ -119,8 +119,8 @@ impl Price {
 
 impl Expiring for Price {
     fn is_outdated(&self) -> bool {
-        let now = Timestamp::now().to_zoned(TimeZone::UTC);
-        let ts = self.ts.to_zoned(TimeZone::UTC);
+        let now = Timestamp::now().to_zoned_datetime(TimeZone::UTC);
+        let ts = self.ts.to_zoned_datetime(TimeZone::UTC);
         if now.date() > ts.date() || now.hour() > ts.hour() {
             return true;
         }
@@ -192,7 +192,7 @@ impl OHLCFrequency {
         static MINS_5: i8 = 5;
         static N_PERIODS: i64 = 12;
 
-        let zoned = ts.to_zoned(TimeZone::UTC);
+        let zoned = ts.to_zoned_datetime(TimeZone::UTC);
         let ts_mins = zoned.minute();
         let range_upper_mins = (ts_mins / MINS_5) * MINS_5;
         let range_upper = zoned
@@ -213,7 +213,7 @@ impl OHLCFrequency {
         static N_DAYS: i64 = 1;
 
         let ts_start_day = ts
-            .to_zoned(TimeZone::UTC)
+            .to_zoned_datetime(TimeZone::UTC)
             .with()
             .hour(0)
             .minute(0)

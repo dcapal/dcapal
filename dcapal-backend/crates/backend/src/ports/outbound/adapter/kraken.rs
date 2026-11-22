@@ -9,7 +9,7 @@ use failsafe::futures::CircuitBreaker;
 use itertools::Itertools;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use super::{DefaultCircuitBreaker, PriceCallError};
 use crate::{
@@ -235,7 +235,17 @@ impl KrakenProvider {
     ) -> (Vec<Market>, Vec<Asset>) {
         let pairs = get_new_markets(market_symbols, repo).await;
         let ccys = get_unique_ccys(&pairs);
+        info!(
+            markets = pairs.len(),
+            currencies = ccys.len(),
+            "Resolving assets of new Kraken markets"
+        );
         let (mut assets_map, unresolved) = self.fetch_assets_cmc(&ccys, repo).await;
+        info!(
+            resolved = assets_map.len(),
+            unresolved = unresolved.len(),
+            "Resolved assets of new Kraken markets"
+        );
 
         // Placeholder assets filled in after a CMC failure are neither stored nor
         // used by markets, so the next discovery run (which finds their markets
@@ -340,6 +350,10 @@ impl KrakenProvider {
         let mut skipped = 0usize;
         let mut requests = 0usize;
 
+        info!(
+            symbols = to_fetch.len(),
+            "Fetching asset metadata from CoinMarketCap"
+        );
         for chunk in to_fetch.chunks(CMC_CHUNK_SIZE) {
             if breaker_open {
                 skipped += chunk.len();
@@ -415,8 +429,11 @@ impl KrakenProvider {
             .filter_map(|c| (!CMC_ALIAS.contains_key(c.as_str())).then_some(c.as_str()))
             .join(",");
 
+        // `skip_invalid=true` makes CoinMarketCap drop symbols it does not know
+        // instead of rejecting the whole request with HTTP 400. Those symbols are
+        // then filled with defaults by the caller.
         let url = format!(
-            "{}/v2/cryptocurrency/info?symbol={symbols}",
+            "{}/v2/cryptocurrency/info?skip_invalid=true&symbol={symbols}",
             self.cmc_base_url
         );
 
