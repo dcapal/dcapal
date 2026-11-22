@@ -253,13 +253,13 @@ fn next_recovery_backoff(previous: Duration) -> Duration {
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
     let last_fetched = misc.get_cw_last_fetched().await?;
-    let today = Timestamp::now().to_zoned(TimeZone::UTC).date();
+    let today = Timestamp::now().to_zoned_datetime(TimeZone::UTC).date();
     Ok((is_outdated_at(last_fetched, today), last_fetched))
 }
 
 fn is_outdated_at(last_fetched: Option<DateTime>, today: Date) -> bool {
     last_fetched
-        .map(|ts| ts.to_zoned(TimeZone::UTC).date() < today)
+        .map(|ts| ts.to_zoned_datetime(TimeZone::UTC).date() < today)
         .unwrap_or(true)
 }
 
@@ -286,7 +286,7 @@ mod tests {
         // GIVEN daily discovery completed earlier on the current UTC date
         let last_fetched = date(2026, 9, 2)
             .at(1, 2, 3, 0)
-            .to_zoned(TimeZone::UTC)
+            .to_zoned_datetime(TimeZone::UTC)
             .unwrap()
             .timestamp();
 
@@ -302,7 +302,7 @@ mod tests {
         // GIVEN daily discovery completed on the previous UTC date
         let last_fetched = date(2026, 9, 1)
             .at(23, 59, 59, 0)
-            .to_zoned(TimeZone::UTC)
+            .to_zoned_datetime(TimeZone::UTC)
             .unwrap()
             .timestamp();
 

@@ -553,7 +553,7 @@ mod tests {
     fn at(day: u32) -> DateTime {
         date(2026, 1, day as i8)
             .at(0, 0, 0, 0)
-            .to_zoned(jiff::tz::TimeZone::UTC)
+            .to_zoned_datetime(jiff::tz::TimeZone::UTC)
             .unwrap()
             .timestamp()
     }
