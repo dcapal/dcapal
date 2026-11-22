@@ -27,7 +27,7 @@ fn price(value: f64, minute: i8) -> Price {
         value,
         date(2026, 11, 15)
             .at(10, minute, 0, 0)
-            .to_zoned(TimeZone::UTC)
+            .to_zoned_datetime(TimeZone::UTC)
             .unwrap()
             .timestamp(),
     )
@@ -499,7 +499,7 @@ async fn runtime_state_is_persisted(pool: PgPool) -> TestResult {
     assert!(misc.get_cw_last_fetched().await?.is_none());
     let ts = date(2026, 11, 15)
         .at(1, 2, 3, 0)
-        .to_zoned(TimeZone::UTC)
+        .to_zoned_datetime(TimeZone::UTC)
         .unwrap()
         .timestamp();
     misc.set_cw_last_fetched(ts).await?;

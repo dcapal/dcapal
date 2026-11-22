@@ -33,8 +33,8 @@ axum-extra = { version = "0.12.6", features = ["typed-header"] }
 config = "0.15.27"
 console_error_panic_hook = { version = "0.1.7" }
 const_format = "0.2.37"
-jiff = { version = "0.2.0", features = ["serde"] }
-jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
+jiff = { version = "1.0.2", features = ["serde"] }
+jiff-sqlx = { version = "1.0.0", features = ["postgres"] }
 derive_more = { version = "2.1.1", features = ["display"] }
 env_logger = "0.11.12"
 failsafe = "1.3.0"
@@ -93,7 +93,7 @@ tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
-utoipa = { version = "6.0.0", features = ["jiff_0_2", "decimal", "uuid", "axum_extras"] }
+utoipa = { version = "6.0.0", features = ["decimal", "uuid", "axum_extras"] }
 utoipa-axum = "0.3.0"
 uuid = { version = "1.29.3", features = ["v4", "v7", "serde"] }
 wasm-bindgen = { version = "0.2.130", features = ["serde-serialize"] }
