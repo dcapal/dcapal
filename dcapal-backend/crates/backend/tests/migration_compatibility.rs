@@ -524,8 +524,8 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
 ) -> sqlx::Result<()> {
     // GIVEN a database at the previous migration holding Kraken cash assets: one without a
     // Yahoo twin, one with a twin of the same class, one whose twin has another class, one
-    // whose twin is held by the same Portfolio, one nobody holds, and one outside the fiat
-    // catalog; plus a Kraken crypto asset,
+    // whose twin is held by the same Portfolio, one nobody holds, and two outside the fiat
+    // catalog (USDT held as cash, DAI held by nobody); plus a Kraken crypto asset,
     const KRAKEN: i16 = 1;
     const YF: i16 = 2;
     const OTHER: i16 = 0;
@@ -564,6 +564,7 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
     let chf = insert_shared_asset(&pool, KRAKEN, "CHF", CASH).await?;
     let _chf_yf = insert_shared_asset(&pool, YF, "CHF", CASH).await?;
     let usdt = insert_shared_asset(&pool, KRAKEN, "USDT", CASH).await?;
+    let _dai = insert_shared_asset(&pool, KRAKEN, "DAI", CASH).await?;
     let btc = insert_shared_asset(&pool, KRAKEN, "BTC", CRYPTO).await?;
 
     let eur_rel = hold(&pool, first, eur, None).await?;
@@ -573,7 +574,6 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
     let btc_rel = hold(&pool, first, btc, None).await?;
     let jpy_rel = hold(&pool, second, jpy, None).await?;
     let jpy_yf_rel = hold(&pool, second, jpy_yf, None).await?;
-    let _ = chf;
 
     // WHEN the market-data migration runs,
     MIGRATOR.run(&pool).await?;
@@ -594,8 +594,13 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
         .fetch_one(&pool)
         .await?;
     assert_eq!(renamed, YF);
-    // a non-catalog Kraken cash row is moved like the others,
+    // a Kraken cash row outside the fiat catalog is not touched,
     assert_eq!(target(&pool, usdt_rel).await?, (usdt, None));
+    let usdt_provider: i16 = sqlx::query_scalar("SELECT provider FROM assets_data WHERE id = $1")
+        .bind(usdt)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(usdt_provider, KRAKEN);
     // relationships are repointed to the existing Yahoo twin,
     assert_eq!(target(&pool, usd_rel).await?, (usd_yf, None));
     // keeping the effective class as an override when the twin's default differs,
@@ -606,7 +611,8 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
     // other providers' assets are untouched,
     assert_eq!(target(&pool, btc_rel).await?, (btc, None));
 
-    // and only unreferenced Kraken cash rows are deleted.
+    // and only unreferenced Kraken fiat cash rows are deleted: the unreferenced non-fiat
+    // cash row (DAI) is kept.
     let remaining: Vec<(i16, String)> = sqlx::query_as(
         "SELECT provider, symbol FROM assets_data
          WHERE provider = $1 AND asset_class IN ($2, $3)
@@ -619,7 +625,12 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
     .await?;
     assert_eq!(
         remaining,
-        vec![(KRAKEN, "BTC".to_string()), (KRAKEN, "JPY".to_string()),]
+        vec![
+            (KRAKEN, "BTC".to_string()),
+            (KRAKEN, "DAI".to_string()),
+            (KRAKEN, "JPY".to_string()),
+            (KRAKEN, "USDT".to_string()),
+        ]
     );
     Ok(())
 }

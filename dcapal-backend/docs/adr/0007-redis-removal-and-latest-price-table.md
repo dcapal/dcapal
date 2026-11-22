@@ -52,14 +52,19 @@ the last value) that Redis cannot give.
 - The discovery worker seeds the fiat assets and the FX markets at start and
   before every discovery, so FX never depends on Kraken. Hourly reconciliation
   deletes only markets outside the Kraken snapshot that are not fiat/fiat.
-- The migration moves existing Kraken cash rows of `assets_data` to Yahoo:
+- The migration moves only the eight catalog fiat symbols (AED, AUD, CAD, CHF,
+  EUR, GBP, JPY, USD) of existing Kraken cash rows of `assets_data` to Yahoo:
   renamed in place when no Yahoo row of the symbol exists; otherwise the
   Portfolio relationships are repointed to the Yahoo row (keeping the effective
   Asset Class as an override), except for Portfolios that already hold both
-  rows, which stay on the Kraken row. Only unreferenced Kraken cash rows are
-  deleted and holdings are never merged. The migration reports counts with
-  `RAISE NOTICE`, including Kraken cash rows outside the fiat catalog. The v1
-  synchronization maps incoming Kraken cash fiat symbols to Yahoo.
+  rows, which stay on the Kraken row. Only unreferenced Kraken fiat cash rows
+  are deleted and holdings are never merged. Kraken cash rows of any other
+  symbol (for example a stablecoin a user holds as cash) are left untouched;
+  the migration reports their count with `RAISE NOTICE`, along with the other
+  counts, for the production dry run. The v1 synchronization maps incoming
+  Kraken (or legacy `DCAPal`) cash rows of catalog fiat symbols to Yahoo and
+  returns them to clients with provider `YF`; non-fiat Kraken cash keeps
+  provider `DCAPal`.
 - The 5-minute price worker flushes prices in batches of 50 markets, one
   `UPDATE ... FROM UNNEST` per batch. Prices of markets deleted by reconciliation
   in the meantime are skipped.

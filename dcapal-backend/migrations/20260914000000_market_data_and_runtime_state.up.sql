@@ -33,10 +33,12 @@ CREATE TABLE market_price (
     PRIMARY KEY (base_asset_id, quote_asset_id)
 ) WITH (fillfactor = 80);
 
--- Fiat currencies are provider-neutral cash priced by Yahoo, so the fiat assets
--- that older versions stored under Kraken (provider 1, class Cash 3) move to
--- Yahoo (provider 2). The statements below never merge holding or allocation
--- values: a Portfolio keeps one relationship per asset.
+-- Fiat currencies are provider-neutral cash priced by Yahoo, so the catalog fiat
+-- assets that older versions stored under Kraken (provider 1, class Cash 3) move
+-- to Yahoo (provider 2). Only the eight catalog fiat symbols move: other Kraken
+-- cash rows, such as a stablecoin a user holds as cash, stay on Kraken. The
+-- statements below never merge holding or allocation values: a Portfolio keeps
+-- one relationship per asset.
 DO $$
 DECLARE
     kraken_provider CONSTANT SMALLINT := 1;
@@ -50,8 +52,8 @@ DECLARE
     deleted_count BIGINT;
     outside_catalog_count BIGINT;
 BEGIN
-    -- Kraken cash rows whose symbol is not a catalog fiat currency are moved
-    -- like the others; report them so a production dry run can review them.
+    -- Kraken cash rows whose symbol is not a catalog fiat currency are left
+    -- untouched; report them so a production dry run can review them.
     SELECT COUNT(*)
     INTO outside_catalog_count
     FROM assets_data
@@ -66,6 +68,7 @@ BEGIN
             updated_at = NOW()
         WHERE kraken.provider = kraken_provider
           AND kraken.asset_class = cash_class
+          AND kraken.symbol = ANY (fiat_symbols)
           AND NOT EXISTS (
               SELECT 1
               FROM assets_data AS yf
@@ -90,6 +93,7 @@ BEGIN
           ON yf.provider = yf_provider AND yf.symbol = kraken.symbol
         WHERE kraken.provider = kraken_provider
           AND kraken.asset_class = cash_class
+          AND kraken.symbol = ANY (fiat_symbols)
     ),
     repointed AS (
         UPDATE portfolio_asset AS relationship
@@ -119,13 +123,15 @@ BEGIN
     FROM portfolio_asset AS relationship
     JOIN assets_data AS kraken ON kraken.id = relationship.assets_data_id
     WHERE kraken.provider = kraken_provider
-      AND kraken.asset_class = cash_class;
+      AND kraken.asset_class = cash_class
+      AND kraken.symbol = ANY (fiat_symbols);
 
-    -- Only Kraken cash rows left without any relationship are removed.
+    -- Only Kraken fiat cash rows left without any relationship are removed.
     WITH deleted AS (
         DELETE FROM assets_data AS kraken
         WHERE kraken.provider = kraken_provider
           AND kraken.asset_class = cash_class
+          AND kraken.symbol = ANY (fiat_symbols)
           AND NOT EXISTS (
               SELECT 1
               FROM portfolio_asset AS relationship
@@ -141,7 +147,7 @@ BEGIN
     RAISE NOTICE 'portfolio relationships left on a Kraken cash asset (Portfolio already holds the Yahoo asset): %',
         conflict_count;
     RAISE NOTICE 'unreferenced Kraken cash assets deleted: %', deleted_count;
-    RAISE NOTICE 'Kraken cash assets outside the fiat catalog moved to Yahoo: %',
+    RAISE NOTICE 'Kraken cash assets outside the fiat catalog left on Kraken: %',
         outside_catalog_count;
 END
 $$;
