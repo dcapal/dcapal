@@ -17,7 +17,7 @@ use crate::{
     config::PriceProvider,
     error::{ErrorChain, Result},
     ports::outbound::{
-        adapter::PriceProviders,
+        adapter::{AsYahooMarket, PriceProviders},
         repository::market_data::{MarketDataRepository, MarketPriceFailure, MarketPriceUpdate},
     },
 };
@@ -79,10 +79,12 @@ impl PriceUpdaterWorker {
     /// Prices are flushed every [`FLUSH_BATCH_SIZE`] markets instead of one write per
     /// market, so a pass costs a handful of statements rather than hundreds.
     ///
-    /// Every market, priced or failed, is followed by a pause of [`MARKET_PACING`], so a
-    /// pass lasts at least `markets * MARKET_PACING` (about twenty minutes for 2,400
-    /// markets). That can exceed the five-minute period: the worker waits one period
-    /// after a pass ends, so passes never overlap and prices are refreshed once per pass.
+    /// Every market whose provider was asked, priced or failed, is followed by a pause of
+    /// [`MARKET_PACING`], so a pass lasts at least `markets * MARKET_PACING` (about twenty
+    /// minutes for 2,400 markets). Markets that fail without any request, such as fiat
+    /// pairs Yahoo has no ticker for, are not paced. A pass can exceed the five-minute
+    /// period: the worker waits one period after a pass ends, so passes never overlap and
+    /// prices are refreshed once per pass.
     async fn update_prices(&self) -> Result<()> {
         // Get all known markets
         let markets = self.market_data_repo.load_markets().await?;
@@ -91,6 +93,9 @@ impl PriceUpdaterWorker {
         let mut failures: Vec<(MarketId, PriceFailure)> = Vec::new();
         for m in markets {
             let provider = price_provider_for(&m, self.price_provider);
+            // Yahoo is never asked about a market it has no ticker for.
+            let reaches_provider =
+                !matches!(provider, PriceProvider::Yahoo) || m.as_yahoo().is_some();
             let price = match fetch_market_price(&m, &self.providers, provider).await {
                 Ok(price) => price,
                 Err(failure) => {
@@ -99,9 +104,11 @@ impl PriceUpdaterWorker {
                     if failures.len() >= FLUSH_BATCH_SIZE {
                         self.flush_failures(&mut failures).await;
                     }
-                    // Failed markets are paced like priced ones, so a provider outage
-                    // cannot turn the pass into a request burst.
-                    tokio::time::sleep(MARKET_PACING).await;
+                    // A failed attempt that reached the provider is paced like a priced
+                    // one, so an outage cannot turn the pass into a request burst.
+                    if reaches_provider {
+                        tokio::time::sleep(MARKET_PACING).await;
+                    }
                     continue;
                 }
             };

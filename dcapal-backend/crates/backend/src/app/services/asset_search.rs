@@ -166,13 +166,16 @@ impl AssetSearchService {
     /// Searches Yahoo; prices of its results are not known until asked for.
     async fn search_yahoo(&self, query: &str) -> Result<Vec<AssetSearchHit>, AssetSearchError> {
         // Answers are reused for the same text, ignoring case and surrounding blanks;
-        // failures and rate-limit rejections are never remembered.
+        // failures, rate-limit rejections and empty answers (which Yahoo also gives on
+        // transient hiccups) are never remembered.
         let key = query.trim().to_lowercase();
         let listed = match self.listed_cache.get(&key) {
             Some(listed) => listed,
             None => {
                 let listed = self.listings.search_assets(query).await?;
-                self.listed_cache.insert(key, listed.clone());
+                if !listed.is_empty() {
+                    self.listed_cache.insert(key, listed.clone());
+                }
                 listed
             }
         };
@@ -327,9 +330,10 @@ mod tests {
         assert_eq!(empty.outcome, SearchOutcome::Empty);
     }
 
-    /// GIVEN a Yahoo search that succeeded and one that failed,
+    /// GIVEN a Yahoo search that found assets, one that found nothing and one that failed,
     /// WHEN each text is searched twice (the first with different case and blanks),
-    /// THEN the successful answer is reused (one provider call) and the failure is retried.
+    /// THEN the answer with assets is reused (one provider call), while the empty answer and
+    /// the failure are asked of Yahoo again.
     #[sqlx::test(migrations = "../../migrations")]
     async fn successful_yahoo_searches_are_cached_and_failures_are_not(pool: PgPool) {
         let mut listings = MockAssetSearchProvider::new();
@@ -337,6 +341,18 @@ mod tests {
             .expect_search_assets()
             .withf(|q| q.trim().eq_ignore_ascii_case("vwce"))
             .times(1)
+            .returning(|_| {
+                Ok(vec![ListedAsset {
+                    symbol: "VWCE.DE".into(),
+                    name: None,
+                    venue: None,
+                    asset_class: AssetClass::Equity,
+                }])
+            });
+        listings
+            .expect_search_assets()
+            .withf(|q| q == "nothing")
+            .times(2)
             .returning(|_| Ok(vec![]));
         listings
             .expect_search_assets()
@@ -352,6 +368,14 @@ mod tests {
         service.search(command(Provider::YF, "vwce")).await.unwrap();
         service
             .search(command(Provider::YF, " VWCE "))
+            .await
+            .unwrap();
+        service
+            .search(command(Provider::YF, "nothing"))
+            .await
+            .unwrap();
+        service
+            .search(command(Provider::YF, "nothing"))
             .await
             .unwrap();
         service.search(command(Provider::YF, "bad")).await.unwrap();
