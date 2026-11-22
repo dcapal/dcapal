@@ -54,7 +54,7 @@ impl PriceUpdaterWorker {
         }
     }
 
-    pub async fn run(&self, mut stop_token: StopToken) {
+    pub async fn run(&self, mut stop_token: StopToken) -> Result<()> {
         let mut sleep = tokio::time::sleep(Duration::from_millis(50));
         loop {
             tokio::select! {
@@ -70,6 +70,8 @@ impl PriceUpdaterWorker {
             let next = Timestamp::now() + jiff::Span::try_from(self.period).unwrap();
             info!("Next PriceUpdaterWorker execution: {next}");
         }
+
+        Ok(())
     }
 
     /// Fetches the price of every known market and stores the results in batches.

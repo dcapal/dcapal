@@ -56,7 +56,7 @@ impl MarketDiscoveryWorker {
         }
     }
 
-    pub async fn run(&self, mut stop_token: StopToken) {
+    pub async fn run(&self, mut stop_token: StopToken) -> Result<()> {
         // FX never depends on Kraken: seed it before any Kraken call is made. The
         // startup gate has normally priced the FX markets already and the price
         // updater keeps them fresh, so seeding is idempotent and stores no prices.
@@ -69,6 +69,8 @@ impl MarketDiscoveryWorker {
         let discovery = self.run_market_discovery(&mut stop_token);
 
         tokio::join!(reconciliation, discovery);
+
+        Ok(())
     }
 
     async fn run_market_reconciliation(&self, stop_token: &mut StopToken) {
