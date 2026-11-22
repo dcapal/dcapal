@@ -540,7 +540,7 @@ async fn upsert_prices(
         let providers = chunk
             .iter()
             .map(|u| stored_provider(u.provider))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
         let result = query(const_format::formatcp!(
             "UPDATE market_price AS p
@@ -569,16 +569,11 @@ async fn upsert_prices(
     Ok(stored)
 }
 
-/// Converts the configured price provider into the provider code stored with a price.
-///
-/// CryptoWatch has no code in `assets_data.provider`, so its prices cannot be stored.
-fn stored_provider(provider: PriceProvider) -> Result<DbProvider> {
+/// Converts the price provider into the provider code stored with a price.
+fn stored_provider(provider: PriceProvider) -> DbProvider {
     match provider {
-        PriceProvider::Kraken => Ok(DbProvider::Kraken),
-        PriceProvider::Yahoo => Ok(DbProvider::YF),
-        PriceProvider::CryptoWatch => Err(DcaError::Generic(
-            "CryptoWatch prices cannot be stored: it has no provider code".to_string(),
-        )),
+        PriceProvider::Kraken => DbProvider::Kraken,
+        PriceProvider::Yahoo => DbProvider::YF,
     }
 }
 
@@ -681,7 +676,7 @@ async fn insert_markets(
         base_symbols.push(base_symbol);
         quote_providers.push(i16::from(quote_provider));
         quote_symbols.push(quote_symbol);
-        providers.push(i16::from(stored_provider(*provider)?));
+        providers.push(i16::from(stored_provider(*provider)));
     }
 
     // One statement resolves the assets, inserts the resolvable markets and reports

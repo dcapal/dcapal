@@ -133,7 +133,11 @@ impl MarketDiscoveryWorker {
                     recovery_backoff = next_recovery_backoff(recovery_backoff);
                     next_recovery_attempt = Instant::now() + recovery_backoff;
                 }
-                Ok(()) => match self.misc_repo.set_cw_last_fetched(Timestamp::now()).await {
+                Ok(()) => match self
+                    .misc_repo
+                    .set_discovery_completed(Timestamp::now())
+                    .await
+                {
                     Ok(()) => {
                         recovery_pending = false;
                         recovery_backoff = Duration::ZERO;
@@ -252,7 +256,7 @@ fn next_recovery_backoff(previous: Duration) -> Duration {
 }
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
-    let last_fetched = misc.get_cw_last_fetched().await?;
+    let last_fetched = misc.get_discovery_completed().await?;
     let today = Timestamp::now().to_zoned(TimeZone::UTC).date();
     Ok((is_outdated_at(last_fetched, today), last_fetched))
 }

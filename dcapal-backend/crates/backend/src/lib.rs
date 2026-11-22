@@ -38,8 +38,8 @@ use crate::{
         inbound::rest,
         outbound::{
             adapter::{
-                CatalogFiatAssetProvider, CryptoWatchProvider, IpApi, KrakenAssetProvider,
-                KrakenProvider, PriceProviders, ProviderRoutedAssetProvider, YahooProvider,
+                CatalogFiatAssetProvider, IpApi, KrakenAssetProvider, KrakenProvider,
+                PriceProviders, ProviderRoutedAssetProvider, YahooProvider,
             },
             repository::{
                 ImportedRepository, MiscRepository, StatsRepository,
@@ -157,10 +157,6 @@ impl DcaServer {
         });
 
         let providers = Arc::new(PriceProviders {
-            cw: Arc::new(CryptoWatchProvider::new(
-                http.clone(),
-                &config.app.providers,
-            )),
             kraken: Arc::new(KrakenProvider::new(http.clone(), &config.app.providers)),
             yahoo: Arc::new(match &config.app.providers.yahoo_base_url {
                 Some(base) => YahooProvider::new(rquest.clone()).with_base_url(base),

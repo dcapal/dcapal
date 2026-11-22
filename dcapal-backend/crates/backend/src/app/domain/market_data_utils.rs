@@ -5,9 +5,7 @@ use super::{
     entity::{Market, Price},
     market_quote::{FailureKind, PriceFailure, validate_price},
 };
-use crate::{
-    config::PriceProvider, error::Result as AppResult, ports::outbound::adapter::PriceProviders,
-};
+use crate::{config::PriceProvider, ports::outbound::adapter::PriceProviders};
 
 /// Chooses the provider that prices a market.
 ///
@@ -33,9 +31,6 @@ pub async fn fetch_market_price(
     let now = Timestamp::now();
     // The provider is chosen explicitly: a failure is reported, never retried elsewhere.
     let fetched = match provider {
-        PriceProvider::CryptoWatch => {
-            classify_price(providers.cw.fetch_market_price(market, now).await)
-        }
         PriceProvider::Kraken => providers.kraken.fetch_market_price(market, now).await,
         PriceProvider::Yahoo => providers.yahoo.fetch_market_price(market, now).await,
     };
@@ -55,46 +50,10 @@ pub async fn fetch_market_price(
     outcome
 }
 
-/// Turns the raw answer of a price adapter into a validated price or a visible failure.
-fn classify_price(fetched: AppResult<Option<f64>>) -> Result<f64, PriceFailure> {
-    match fetched {
-        Ok(Some(px)) => validate_price(px),
-        Ok(None) => Err(PriceFailure::unavailable(
-            "provider has no price for the market",
-        )),
-        Err(e) => Err(PriceFailure::provider_error(format!("{e:?}"))),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        app::domain::entity::{Asset, Crypto, Fiat},
-        error::DcaError,
-    };
-
-    /// GIVEN adapter answers that are a price, no price, an error and a zero price,
-    /// WHEN they are classified,
-    /// THEN only the positive price is a value; the rest are failures of distinct kinds.
-    #[test]
-    fn adapter_answers_are_classified_into_prices_and_failures() {
-        assert_eq!(classify_price(Ok(Some(2.5))).unwrap(), 2.5);
-        assert_eq!(
-            classify_price(Ok(None)).unwrap_err().kind,
-            FailureKind::Unavailable
-        );
-        assert_eq!(
-            classify_price(Ok(Some(0.0))).unwrap_err().kind,
-            FailureKind::Unavailable
-        );
-        assert_eq!(
-            classify_price(Err(DcaError::Generic("boom".into())))
-                .unwrap_err()
-                .kind,
-            FailureKind::ProviderError
-        );
-    }
+    use crate::app::domain::entity::{Asset, Crypto, Fiat};
 
     fn market(base: Asset, quote: Asset) -> Market {
         Market::new("m".to_string(), base, quote, None)
@@ -127,9 +86,7 @@ mod tests {
         use std::sync::Arc;
 
         use crate::{
-            ports::outbound::adapter::{
-                CryptoWatchProvider, IpApi, KrakenProvider, PriceProviders, YahooProvider,
-            },
+            ports::outbound::adapter::{IpApi, KrakenProvider, PriceProviders, YahooProvider},
             test_support::{FakeProvider, Reply, install_crypto_provider},
         };
 
@@ -143,14 +100,12 @@ mod tests {
         .await;
         let config: crate::config::Providers = serde_json::from_value(serde_json::json!({
             "priceProvider": "kraken",
-            "cwApiKey": "",
             "ipApiKey": "",
             "krakenBaseUrl": kraken.base_url(),
         }))
         .unwrap();
         let http = reqwest::Client::new();
         let providers = PriceProviders {
-            cw: Arc::new(CryptoWatchProvider::new(http.clone(), &config)),
             kraken: Arc::new(KrakenProvider::new(http.clone(), &config)),
             yahoo: Arc::new(
                 YahooProvider::new(rquest::Client::new()).with_base_url(&yahoo.base_url()),

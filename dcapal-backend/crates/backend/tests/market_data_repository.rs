@@ -496,14 +496,14 @@ async fn store_catalog_is_all_or_nothing(pool: PgPool) -> TestResult {
 #[sqlx::test(migrations = "../../migrations")]
 async fn runtime_state_is_persisted(pool: PgPool) -> TestResult {
     let misc = MiscRepository::new(pool.clone());
-    assert!(misc.get_cw_last_fetched().await?.is_none());
+    assert!(misc.get_discovery_completed().await?.is_none());
     let ts = date(2026, 11, 15)
         .at(1, 2, 3, 0)
         .to_zoned(TimeZone::UTC)
         .unwrap()
         .timestamp();
-    misc.set_cw_last_fetched(ts).await?;
-    assert_eq!(misc.get_cw_last_fetched().await?, Some(ts));
+    misc.set_discovery_completed(ts).await?;
+    assert_eq!(misc.get_discovery_completed().await?, Some(ts));
 
     let stats = StatsRepository::new(pool.clone());
     assert_eq!(stats.bump_visit("1.2.3.4").await?, 1);
@@ -697,5 +697,27 @@ async fn stored_non_positive_prices_read_as_unavailable(pool: PgPool) -> TestRes
             FailureKind::Unavailable
         );
     }
+    Ok(())
+}
+
+/// GIVEN a database that still holds the discovery marker under its legacy CryptoWatch name,
+/// WHEN the rename migration runs,
+/// THEN discovery reads the same completion time under the new name.
+#[sqlx::test(migrations = "../../migrations")]
+async fn legacy_discovery_marker_is_renamed_by_the_migration(pool: PgPool) -> TestResult {
+    let ts = price(1.0, 7).ts;
+    sqlx::query("INSERT INTO worker_marker (name, completed_at) VALUES ('cw-last-fetched', $1)")
+        .bind(jiff_sqlx::ToSqlx::to_sqlx(ts))
+        .execute(&pool)
+        .await?;
+
+    sqlx::raw_sql(include_str!(
+        "../../../migrations/20260922000000_rename_discovery_marker.up.sql"
+    ))
+    .execute(&pool)
+    .await?;
+
+    let misc = MiscRepository::new(pool);
+    assert_eq!(misc.get_discovery_completed().await?, Some(ts));
     Ok(())
 }

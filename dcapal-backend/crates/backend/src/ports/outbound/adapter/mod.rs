@@ -2,7 +2,6 @@
 
 mod asset_provider;
 mod asset_search;
-mod cw;
 mod fiat_asset;
 mod ipapi;
 mod kraken;
@@ -14,7 +13,6 @@ use std::sync::Arc;
 
 pub use asset_provider::*;
 pub use asset_search::*;
-pub use cw::*;
 use failsafe::{
     StateMachine,
     backoff::EqualJittered,
@@ -91,7 +89,6 @@ type DefaultCircuitBreaker = StateMachine<
 
 #[derive(Clone)]
 pub struct PriceProviders {
-    pub cw: Arc<CryptoWatchProvider>,
     pub kraken: Arc<KrakenProvider>,
     pub yahoo: Arc<YahooProvider>,
     pub ipapi: Arc<IpApi>,

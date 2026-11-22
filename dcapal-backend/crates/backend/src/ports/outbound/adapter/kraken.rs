@@ -1351,7 +1351,6 @@ mod price_tests {
     fn providers_config(base: &str) -> config::Providers {
         serde_json::from_value(serde_json::json!({
             "priceProvider": "kraken",
-            "cwApiKey": "",
             "ipApiKey": "",
             "krakenBaseUrl": base,
         }))

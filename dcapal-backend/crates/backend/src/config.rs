@@ -6,7 +6,6 @@ use crate::error::Result;
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, strum_macros::Display)]
 #[serde(rename_all = "lowercase")]
 pub enum PriceProvider {
-    CryptoWatch,
     Kraken,
     Yahoo,
 }
@@ -33,7 +32,6 @@ fn default_enable_stdout() -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct Providers {
     pub price_provider: PriceProvider,
-    pub cw_api_key: String,
     pub ip_api_key: String,
     pub cmc_api_key: Option<String>,
     /// Root URL that replaces `https://query1.finance.yahoo.com` and

@@ -103,3 +103,11 @@ the last value) that Redis cannot give.
 - Every non-loopback request now performs one PostgreSQL upsert for the visitor
   counter, where it performed one Redis `HINCRBY`.
 - Deployment secrets `REDIS_*` and the `config/redis` files are no longer used.
+
+## Update (2026-11-22)
+
+CryptoWatch has been removed entirely (adapter, `PriceProvider::CryptoWatch`, the
+`cwApiKey` setting and the `DCAPAL_CW_API_KEY` deployment secret); Kraken is the only
+crypto price provider. A configuration with `priceProvider: cryptowatch` now fails at
+startup. The discovery freshness marker `cw-last-fetched` was renamed to
+`kraken-discovery-completed` by a forward migration.

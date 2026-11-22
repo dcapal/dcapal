@@ -113,7 +113,7 @@ pub async fn serve(pool: &PgPool, urls: ProviderUrls) -> SocketAddr {
         "app": {
             "log": {},
             "providers": {
-                "priceProvider": "kraken", "cwApiKey": "", "ipApiKey": "",
+                "priceProvider": "kraken", "ipApiKey": "",
                 "yahooBaseUrl": urls.yahoo, "krakenBaseUrl": urls.kraken
             },
             "services": null,

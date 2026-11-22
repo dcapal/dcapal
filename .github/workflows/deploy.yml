@@ -256,7 +256,6 @@ jobs:
 
       - name: Configure dcapal.yml
         env:
-          DCAPAL_CW_API_KEY: ${{ secrets.DCAPAL_CW_API_KEY }}
           DCAPAL_IP_API_KEY: ${{ secrets.DCAPAL_IP_API_KEY }}
           DCAPAL_CMC_API_KEY: ${{ secrets.DCAPAL_CMC_API_KEY }}
           JWT_SECRET: ${{ inputs.deploy_environment == 'production' && secrets.JWT_SECRET || secrets.JWT_SECRET_DEV }}
@@ -265,7 +264,6 @@ jobs:
           POSTGRES_DATABASE: ${{ inputs.deploy_environment == 'production' && secrets.POSTGRES_DATABASE || secrets.POSTGRES_DATABASE_DEV }}
         run: |
           export DCAPAL_JWT_SECRET="${JWT_SECRET}"
-          export DCAPAL_CW_API_KEY="${DCAPAL_CW_API_KEY}"
           export DCAPAL_IP_API_KEY="${DCAPAL_IP_API_KEY}"
           export DCAPAL_CMC_API_KEY="${DCAPAL_CMC_API_KEY}"
           export DCAPAL_IP2LOCATION_PATH="data/${IP2LOCATION_FILENAME}"
