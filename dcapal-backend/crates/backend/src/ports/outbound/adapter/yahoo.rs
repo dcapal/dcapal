@@ -30,7 +30,7 @@ use crate::{
         MetricProvider, ProviderOp, ProviderOutcome, observe_provider,
         record_yahoo_limiter_rejection, record_yahoo_limiter_wait, record_yahoo_upstream_response,
     },
-    error::DcaError,
+    error::{DcaError, ErrorChain},
 };
 
 /// Sustained and burst budget of requests per second shared by every Yahoo call.
@@ -337,7 +337,7 @@ impl YahooProvider {
                 StatusCode::TOO_MANY_REQUESTS.into_response()
             }
             Err(e) => {
-                error!("Proxy error: {e:?}");
+                error!("Proxy error: {}", ErrorChain(&e));
                 StatusCode::BAD_GATEWAY.into_response()
             }
         }
@@ -419,7 +419,7 @@ fn call_error_of(error: &GetError) -> PriceCallError {
             PriceCallError::rate_limited("Yahoo rate limit reached; retry later")
         }
         GetError::Request(e) => {
-            PriceFailure::provider_error(format!("Yahoo request failed: {e}")).into()
+            PriceFailure::provider_error(format!("Yahoo request failed: {}", ErrorChain(e))).into()
         }
     }
 }

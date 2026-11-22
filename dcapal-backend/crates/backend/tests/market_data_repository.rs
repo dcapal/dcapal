@@ -455,7 +455,7 @@ async fn store_markets_rolls_back_the_whole_batch_on_a_missing_asset(pool: PgPoo
         .await;
 
     assert!(
-        matches!(result, Err(dcapal_backend::error::DcaError::RepositoryStoreFailure(id)) if id == "dogeeur")
+        matches!(result, Err(dcapal_backend::error::DcaError::RepositoryStoreFailure(id, _)) if id == "dogeeur")
     );
     assert!(repo.load_markets().await?.is_empty());
     Ok(())

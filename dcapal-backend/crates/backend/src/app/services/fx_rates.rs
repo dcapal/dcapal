@@ -405,10 +405,10 @@ mod tests {
             fx_markets(),
             &fetcher,
             FxStartupPolicy::default(),
-            |market: Market| async move { Err(DcaError::RepositoryStoreFailure(market.id)) },
+            |market: Market| async move { Err(DcaError::RepositoryStoreFailure(market.id, None)) },
         )
         .await;
 
-        assert!(matches!(result, Err(DcaError::RepositoryStoreFailure(_))));
+        assert!(matches!(result, Err(DcaError::RepositoryStoreFailure(..))));
     }
 }

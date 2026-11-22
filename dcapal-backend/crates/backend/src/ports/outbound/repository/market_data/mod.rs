@@ -27,7 +27,7 @@ use crate::{
         portfolio::Provider as AppProvider,
     },
     config::PriceProvider,
-    error::{DcaError, Result},
+    error::{DcaError, ErrorChain, Result},
     ports::outbound::repository::postgres::types::{
         AssetClass as DbAssetClass, MetadataSource as DbMetadataSource, Provider as DbProvider,
     },
@@ -710,12 +710,12 @@ async fn insert_markets(
     .fetch_all(&mut **tx)
     .await
     .map_err(|e| {
-        warn!("Failed to store {} markets: {e}", markets.len());
-        DcaError::RepositoryStoreFailure(market_ids[0].to_string())
+        warn!("Failed to store {} markets: {}", markets.len(), ErrorChain(&e));
+        DcaError::RepositoryStoreFailure(market_ids[0].to_string(), Some(e))
     })?;
     if let Some(first) = missing.first() {
         warn!(mkt = first, "Failed to store market: asset not stored");
-        return Err(DcaError::RepositoryStoreFailure(first.clone()));
+        return Err(DcaError::RepositoryStoreFailure(first.clone(), None));
     }
 
     let updates = markets

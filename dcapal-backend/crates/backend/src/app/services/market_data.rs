@@ -25,7 +25,7 @@ use crate::{
         },
         services::command::ConversionRateQuery,
     },
-    error::Result,
+    error::{ErrorChain, Result},
     ports::outbound::{
         adapter::{LivePrice, LivePriceProvider},
         repository::market_data::MarketDataRepository,
@@ -209,7 +209,7 @@ impl MarketDataService {
             .load_assets_by_type(kind)
             .await
             .unwrap_or_else(|e| {
-                error!("{:?}", e);
+                error!("Failed to load assets: {}", ErrorChain(&e));
                 vec![]
             });
 

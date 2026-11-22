@@ -12,7 +12,7 @@ use crate::{
         },
         services::{asset_search::AssetSearchServiceError, portfolio::PortfolioServiceError},
     },
-    error::DcaError,
+    error::{DcaError, ErrorChain},
     ports::{
         inbound::rest::types::v2_common::{
             V2ErrorResponse, V2FieldError, V2ValidationError, VALIDATION_CODE,
@@ -120,6 +120,8 @@ fn ownership(field: String) -> (StatusCode, V2ErrorResponse) {
 
 impl IntoResponse for V2HttpError {
     fn into_response(self) -> Response {
+        // Rendered up front because matching consumes the error; only server errors log it.
+        let chain = ErrorChain(&self).to_string();
         let (status, body) = match self {
             Self::Validation(error) => (StatusCode::BAD_REQUEST, error.response()),
             Self::Command(SyncPortfoliosV2CommandError::Validation(error)) => (
@@ -184,6 +186,9 @@ impl IntoResponse for V2HttpError {
             }
         };
 
+        if status.is_server_error() {
+            tracing::error!(%status, error = %chain, "v2 request failed");
+        }
         (status, Json(body)).into_response()
     }
 }

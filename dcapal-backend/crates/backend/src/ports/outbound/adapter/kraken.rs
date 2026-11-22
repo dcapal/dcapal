@@ -21,7 +21,7 @@ use crate::{
     },
     app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
     config,
-    error::{DcaError, Result},
+    error::{DcaError, ErrorChain, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
 };
 
@@ -294,7 +294,7 @@ impl KrakenProvider {
         let found = match repo.find_assets(&ccys).await {
             Ok(found) => found,
             Err(e) => {
-                error!("Failed to find {} assets: {e}", ccys.len());
+                error!("Failed to find {} assets: {}", ccys.len(), ErrorChain(&e));
                 return (assets, HashSet::new());
             }
         };
@@ -543,7 +543,7 @@ fn call_error_of(error: &DcaError) -> PriceCallError {
             PriceCallError::timeout("Kraken request timed out")
         }
         DcaError::Reqwest(e) if e.is_decode() => {
-            PriceFailure::malformed(format!("undecodable Kraken reply: {e}")).into()
+            PriceFailure::malformed(format!("undecodable Kraken reply: {}", ErrorChain(e))).into()
         }
         other => PriceFailure::provider_error(format!("Kraken request failed: {other:?}")).into(),
     }
@@ -793,7 +793,11 @@ async fn get_new_markets(
             .filter_map(|(pair, market)| market.is_none().then_some(pair))
             .collect(),
         Err(e) => {
-            error!("Error occurred in searching {} markets: {e}", ids.len());
+            error!(
+                "Error occurred in searching {} markets: {}",
+                ids.len(),
+                ErrorChain(&e)
+            );
             pairs
         }
     }
@@ -823,7 +827,7 @@ async fn fetch_assets(
     let found = match repo.find_assets(&ccys).await {
         Ok(found) => found,
         Err(e) => {
-            error!("Failed to find {} assets: {e}", ccys.len());
+            error!("Failed to find {} assets: {}", ccys.len(), ErrorChain(&e));
             return assets;
         }
     };

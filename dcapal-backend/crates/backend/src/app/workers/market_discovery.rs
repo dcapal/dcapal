@@ -15,7 +15,7 @@ use crate::{
         services::{fx_rates::seed_fx_catalog, market_data::MarketDataService},
     },
     config::PriceProvider,
-    error::Result,
+    error::{ErrorChain, Result},
     ports::outbound::{
         adapter::PriceProviders,
         repository::{MiscRepository, market_data::MarketDataRepository},
@@ -199,7 +199,7 @@ impl MarketDiscoveryWorker {
         let asset_result = self.market_data_repo.store_assets(&assets).await;
         self.market_data_service.invalidate_asset_cache();
         if let Err(error) = &asset_result {
-            error!(error = %error, count = assets.len(), "Failed to store discovered assets");
+            error!(error = %ErrorChain(error), count = assets.len(), "Failed to store discovered assets");
         }
         asset_result?;
 
