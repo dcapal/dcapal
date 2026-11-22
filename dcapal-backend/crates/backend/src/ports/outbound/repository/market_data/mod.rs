@@ -241,8 +241,8 @@ impl MarketDataRepository {
     /// Finds several markets at once.
     ///
     /// The result is aligned with `ids`: unknown markets are `None`.
-    pub async fn find_markets(&self, ids: &[&MarketId]) -> Result<Vec<Option<Market>>> {
-        let wanted = ids.iter().map(|id| id.as_str()).collect::<Vec<_>>();
+    pub async fn find_markets(&self, ids: &[impl AsRef<str>]) -> Result<Vec<Option<Market>>> {
+        let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let rows = query_as::<_, MarketRow>(const_format::formatcp!(
             "{SELECT_MARKETS} WHERE {} = ANY($1)",
             market_id_sql!()
@@ -256,7 +256,7 @@ impl MarketDataRepository {
             .map(|row| Market::try_from(row).map(|m| (m.id.clone(), m)))
             .collect::<Result<std::collections::HashMap<_, _>>>()?;
 
-        Ok(ids.iter().map(|id| found.remove(*id)).collect())
+        Ok(ids.iter().map(|id| found.remove(id.as_ref())).collect())
     }
 
     /// Inserts a market if it does not exist yet, and stores its price when it has one.

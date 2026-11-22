@@ -188,8 +188,7 @@ async fn unpriced_fx_markets(repo: &MarketDataRepository) -> Result<Vec<Market>>
         .iter()
         .map(|(market_id, _)| market_id.to_string())
         .collect::<Vec<_>>();
-    let wanted = ids.iter().collect::<Vec<_>>();
-    let stored = repo.find_markets(&wanted).await?;
+    let stored = repo.find_markets(&ids).await?;
 
     Ok(fx_markets()
         .into_iter()
