@@ -721,3 +721,30 @@ async fn legacy_discovery_marker_is_renamed_by_the_migration(pool: PgPool) -> Te
     assert_eq!(misc.get_discovery_completed().await?, Some(ts));
     Ok(())
 }
+
+/// GIVEN stored markets,
+/// WHEN their rows and the schema are inspected,
+/// THEN each row carries the v1 market id (base symbol followed by quote symbol, lower-case)
+/// and the foreign keys that lead no index have one.
+#[sqlx::test(migrations = "../../migrations")]
+async fn markets_store_their_v1_id_and_foreign_keys_are_indexed(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool.clone());
+    seed_catalog(&repo).await?;
+    seed_market(&repo, &crypto("btc"), &fiat("eur", "Euro"), None).await?;
+
+    let ids: Vec<String> = sqlx::query_scalar("SELECT market_id FROM market_price")
+        .fetch_all(&pool)
+        .await?;
+    assert_eq!(ids, ["btceur"]);
+
+    let indexes: Vec<String> = sqlx::query_scalar(
+        "SELECT indexname FROM pg_indexes
+         WHERE indexname IN ('market_price_quote_asset_id_idx', 'portfolio_asset_assets_data_id_idx',
+                             'market_price_market_id_key')
+         ORDER BY indexname",
+    )
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(indexes.len(), 3);
+    Ok(())
+}

@@ -6,7 +6,7 @@
 //! catalog (provider Yahoo, class Cash). A market is a row of `market_price`
 //! keyed by its base and quote `assets_data` ids. The v1 REST API still exposes
 //! the lower-case symbol as asset id and the concatenation of base and quote ids
-//! as market id, so lookups by those ids compare against `LOWER(symbol)`.
+//! as market id, which is stored on each `market_price` row as `market_id`.
 //!
 //! Only provider-confirmed rows belong to the catalog: assets that clients
 //! supplied through synchronization never show up in it.
@@ -112,13 +112,6 @@ struct AssetRow {
     asset_class: DbAssetClass,
     symbol: String,
     name: String,
-}
-
-/// SQL expression of the v1 market id of a joined `market_price` row.
-macro_rules! market_id_sql {
-    () => {
-        "LOWER(b.symbol) || LOWER(q.symbol)"
-    };
 }
 
 /// Markets joined with their two assets and prices; callers append a `WHERE`.
@@ -227,7 +220,8 @@ impl MarketDataRepository {
     ///
     /// The match is a case-insensitive substring of either column with `%` and `_`
     /// taken literally. An exact symbol match comes first, then symbol order; at most
-    /// `limit` assets are returned. `priced` tells whether the asset has a USD market
+    /// `limit` assets are returned, and price availability is computed only for those.
+    /// `priced` tells whether the asset has a USD market
     /// with a stored price.
     pub async fn search_crypto_catalog(
         &self,
@@ -235,17 +229,22 @@ impl MarketDataRepository {
         limit: i64,
     ) -> Result<Vec<CatalogSearchHit>> {
         let hits = query_as::<_, CatalogSearchHit>(const_format::formatcp!(
-            "SELECT ad.symbol, ad.name,
+            "WITH hits AS (
+                 SELECT ad.id, ad.symbol, ad.name
+                 FROM assets_data AS ad
+                 WHERE {CRYPTO_PREDICATE}
+                   AND (ad.symbol ILIKE $7 ESCAPE '\\' OR ad.name ILIKE $7 ESCAPE '\\')
+                 ORDER BY (ad.symbol = $8) DESC, ad.symbol
+                 LIMIT $9
+             )
+             SELECT h.symbol, h.name,
                     EXISTS (SELECT 1 FROM market_price AS p
                             JOIN assets_data AS q ON q.id = p.quote_asset_id
-                            WHERE p.base_asset_id = ad.id AND p.price IS NOT NULL
+                            WHERE p.base_asset_id = h.id AND p.price IS NOT NULL
                               AND q.provider = $4 AND q.asset_class = $5 AND q.symbol = $6
                            ) AS priced
-             FROM assets_data AS ad
-             WHERE {CRYPTO_PREDICATE}
-               AND (ad.symbol ILIKE $7 ESCAPE '\\' OR ad.name ILIKE $7 ESCAPE '\\')
-             ORDER BY (UPPER(ad.symbol) = UPPER($8)) DESC, ad.symbol
-             LIMIT $9"
+             FROM hits AS h
+             ORDER BY (h.symbol = $8) DESC, h.symbol"
         ))
         .bind(DbProvider::Kraken)
         .bind(DbAssetClass::Crypto)
@@ -254,7 +253,7 @@ impl MarketDataRepository {
         .bind(DbAssetClass::Cash)
         .bind("USD")
         .bind(format!("%{}%", escape_like(text)))
-        .bind(text)
+        .bind(text.to_ascii_uppercase())
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
@@ -312,8 +311,7 @@ impl MarketDataRepository {
     /// Finds a market, with its latest price when one has been stored.
     pub async fn find_market(&self, id: &MarketId) -> Result<Option<Market>> {
         let row = query_as::<_, MarketRow>(const_format::formatcp!(
-            "{SELECT_MARKETS} WHERE {} = $1",
-            market_id_sql!()
+            "{SELECT_MARKETS} WHERE p.market_id = $1"
         ))
         .bind(id)
         .fetch_optional(&self.pool)
@@ -328,8 +326,7 @@ impl MarketDataRepository {
     pub async fn find_markets(&self, ids: &[impl AsRef<str>]) -> Result<Vec<Option<Market>>> {
         let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let rows = query_as::<_, MarketRow>(const_format::formatcp!(
-            "{SELECT_MARKETS} WHERE {} = ANY($1)",
-            market_id_sql!()
+            "{SELECT_MARKETS} WHERE p.market_id = ANY($1)"
         ))
         .bind(&wanted)
         .fetch_all(&self.pool)
@@ -354,14 +351,13 @@ impl MarketDataRepository {
     ) -> Result<HashMap<MarketId, StoredQuote>> {
         let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let rows = query_as::<_, QuoteRow>(const_format::formatcp!(
-            "SELECT {id} AS market_id, b.symbol AS base_symbol, q.symbol AS quote_symbol,
+            "SELECT p.market_id, b.symbol AS base_symbol, q.symbol AS quote_symbol,
                     p.provider, p.price::float8 AS price, p.observed_at, p.fetched_at,
                     p.last_error, p.last_error_at
              FROM market_price AS p
              JOIN assets_data AS b ON b.id = p.base_asset_id
              JOIN assets_data AS q ON q.id = p.quote_asset_id
-             WHERE {id} = ANY($1)",
-            id = market_id_sql!()
+             WHERE p.market_id = ANY($1)"
         ))
         .bind(&wanted)
         .fetch_all(&self.pool)
@@ -412,11 +408,10 @@ impl MarketDataRepository {
             "DELETE FROM market_price AS p
              USING assets_data AS b, assets_data AS q
              WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
-               AND NOT EXISTS (SELECT 1 FROM UNNEST($1::text[]) AS k(id) WHERE k.id = {id})
+               AND NOT EXISTS (SELECT 1 FROM UNNEST($1::text[]) AS k(id) WHERE k.id = p.market_id)
                AND NOT (b.provider = $2 AND b.asset_class = $3 AND b.symbol = ANY($4)
                     AND q.provider = $2 AND q.asset_class = $3 AND q.symbol = ANY($4))
-             RETURNING {id}",
-            id = market_id_sql!()
+             RETURNING p.market_id"
         ))
         .bind(&keep)
         .bind(DbProvider::YF)
@@ -471,11 +466,8 @@ impl MarketDataRepository {
             let result = query(const_format::formatcp!(
                 "UPDATE market_price AS p
                  SET last_error = u.error, last_error_at = NOW()
-                 FROM UNNEST($1::text[], $2::text[]) AS u(market_id, error),
-                      assets_data AS b, assets_data AS q
-                 WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
-                   AND {} = u.market_id",
-                market_id_sql!()
+                 FROM UNNEST($1::text[], $2::text[]) AS u(market_id, error)
+                 WHERE p.market_id = u.market_id"
             ))
             .bind(&ids)
             .bind(&errors)
@@ -551,11 +543,8 @@ async fn upsert_prices(
                  last_error = NULL,
                  last_error_at = NULL
              FROM UNNEST($1::text[], $2::text[], $3::timestamptz[], $4::smallint[])
-                  AS u(market_id, price, observed_at, provider),
-                  assets_data AS b, assets_data AS q
-             WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
-               AND {} = u.market_id",
-            market_id_sql!()
+                  AS u(market_id, price, observed_at, provider)
+             WHERE p.market_id = u.market_id"
         ))
         .bind(&ids)
         .bind(&prices)
@@ -694,10 +683,10 @@ async fn insert_markets(
              LEFT JOIN assets_data AS q
                ON q.provider = w.quote_provider AND q.symbol = w.quote_symbol
          ), inserted AS (
-             INSERT INTO market_price (base_asset_id, quote_asset_id, provider)
-             SELECT base_id, quote_id, provider FROM resolved
+             INSERT INTO market_price (market_id, base_asset_id, quote_asset_id, provider)
+             SELECT market_id, base_id, quote_id, provider FROM resolved
              WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
-             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING
+             ON CONFLICT DO NOTHING
          )
          SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
     )
