@@ -6,7 +6,11 @@ use std::{
 };
 
 use axum::{Router, http::Uri};
+use serde_json::json;
+use sqlx::{PgPool, postgres::PgConnectOptions};
 use tokio::net::TcpListener;
+
+use crate::{DcaServer, config::Config};
 
 /// One canned answer of a [`FakeProvider`].
 #[derive(Debug, Clone)]
@@ -88,4 +92,82 @@ pub fn install_crypto_provider() {
         // A concurrent test may have installed it first; either outcome is fine.
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
+}
+
+/// Base URLs that replace the real provider hosts of a test server.
+#[derive(Debug, Default, Clone)]
+pub struct ProviderUrls {
+    /// Replaces the Yahoo hosts.
+    pub yahoo: Option<String>,
+    /// Replaces the Kraken host.
+    pub kraken: Option<String>,
+}
+
+/// The shared JWT secret of test servers.
+const JWT_SECRET: &str = "secret";
+
+/// Builds a server on the test database and serves it on an ephemeral loopback port.
+pub async fn serve(pool: &PgPool, urls: ProviderUrls) -> SocketAddr {
+    let options: PgConnectOptions = (*pool.connect_options()).clone();
+    let config: Config = serde_json::from_value(json!({
+        "app": {
+            "log": {},
+            "providers": {
+                "priceProvider": "kraken", "cwApiKey": "", "ipApiKey": "",
+                "yahooBaseUrl": urls.yahoo, "krakenBaseUrl": urls.kraken
+            },
+            "services": null,
+            "auth": {"jwtSecret": JWT_SECRET}
+        },
+        "server": {
+            "web": {"hostname": "127.0.0.1", "port": 0},
+            "metrics": {"hostname": "127.0.0.1", "port": 0},
+            "postgres": {
+                "hostname": options.get_host(),
+                "port": options.get_port(),
+                "user": options.get_username(),
+                "password": std::env::var("DATABASE_URL")
+                    .ok()
+                    .and_then(|u| url::Url::parse(&u).ok())
+                    .and_then(|u| u.password().map(str::to_string))
+                    .unwrap_or_default(),
+                "database": options.get_database().unwrap_or("postgres"),
+            }
+        }
+    }))
+    .unwrap();
+
+    let server = DcaServer::try_new(config).await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let app = server.app.clone();
+    tokio::spawn(async move { axum::serve(listener, app).await });
+    addr
+}
+
+/// Mints a valid bearer token for a test user.
+pub fn bearer_token() -> String {
+    use jsonwebtoken::{EncodingKey, Header, encode};
+    use uuid::Uuid;
+
+    use crate::app::infra::claim::{Claims, UserMetadataClaim};
+
+    let claims = Claims {
+        iat: 1_700_000_000,
+        exp: 4_000_000_000,
+        sub: Uuid::from_u128(7),
+        session_id: Uuid::from_u128(8),
+        role: "authenticated".to_string(),
+        aud: "authenticated".to_string(),
+        user_metadata: UserMetadataClaim {
+            email: "market-v2@example.com".to_string(),
+            full_name: None,
+        },
+    };
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(JWT_SECRET.as_bytes()).unwrap(),
+    )
+    .unwrap()
 }

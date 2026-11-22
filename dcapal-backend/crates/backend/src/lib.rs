@@ -56,6 +56,8 @@ use crate::{
 pub mod app;
 pub mod config;
 pub mod error;
+#[cfg(test)]
+mod market_v2_contract;
 pub mod ports;
 #[cfg(test)]
 mod test_support;
