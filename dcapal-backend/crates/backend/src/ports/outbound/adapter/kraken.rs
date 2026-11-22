@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     sync::LazyLock,
+    time::Duration,
 };
 
 use failsafe::futures::CircuitBreaker;
@@ -27,12 +28,23 @@ use crate::{
 /// Root URL of the public Kraken API.
 const DEFAULT_BASE_URL: &str = "https://api.kraken.com";
 
+/// Number of symbols requested from CoinMarketCap in one call.
+const CMC_CHUNK_SIZE: usize = 100;
+
+/// Pause between consecutive CoinMarketCap chunk requests, so a full discovery
+/// sweep does not burst through the provider's rate limit.
+const CMC_CHUNK_PACING: Duration = Duration::from_millis(2500);
+
+/// Production CoinMarketCap API root.
+const CMC_BASE_URL: &str = "https://pro-api.coinmarketcap.com";
+
 #[derive(Clone)]
 pub struct KrakenProvider {
     http: reqwest::Client,
     /// Root URL of the Kraken public API, without a trailing slash.
     base_url: String,
     cmc_api_key: Option<String>,
+    cmc_base_url: String,
     kraken_circuit_breaker: DefaultCircuitBreaker,
     cmc_circuit_breaker: DefaultCircuitBreaker,
 }
@@ -53,6 +65,7 @@ impl KrakenProvider {
             http,
             base_url,
             cmc_api_key: config.cmc_api_key.clone(),
+            cmc_base_url: CMC_BASE_URL.to_string(),
             kraken_circuit_breaker,
             cmc_circuit_breaker,
         }
@@ -222,7 +235,18 @@ impl KrakenProvider {
     ) -> (Vec<Market>, Vec<Asset>) {
         let pairs = get_new_markets(market_symbols, repo).await;
         let ccys = get_unique_ccys(&pairs);
-        let assets_map = self.fetch_assets_cmc(&ccys, repo).await;
+        let (mut assets_map, unresolved) = self.fetch_assets_cmc(&ccys, repo).await;
+
+        // Placeholder assets filled in after a CMC failure are neither stored nor
+        // used by markets, so the next discovery run (which finds their markets
+        // still missing) retries them instead of freezing placeholder names.
+        if !unresolved.is_empty() {
+            warn!(
+                count = unresolved.len(),
+                "Not storing assets whose CMC metadata could not be fetched; they are retried on the next discovery run"
+            );
+            assets_map.retain(|id, _| !unresolved.contains(id));
+        }
 
         let markets = pairs
             .into_iter()
@@ -255,11 +279,15 @@ impl KrakenProvider {
     ///
     /// Classified like [`fetch_assets`]: catalog fiat is fiat, everything else
     /// (including non-fiat quotes of cross-crypto pairs) is Kraken crypto.
+    ///
+    /// Returns the resolved assets and the ids that only hold a placeholder
+    /// because their CoinMarketCap request failed (as opposed to CoinMarketCap
+    /// not knowing them); callers must not persist those as provider-confirmed.
     async fn fetch_assets_cmc(
         &self,
         ccys: &HashSet<AssetId>,
         repo: &MarketDataRepository,
-    ) -> BTreeMap<String, Asset> {
+    ) -> (BTreeMap<String, Asset>, HashSet<AssetId>) {
         let mut assets = BTreeMap::new();
         let mut to_fetch = Vec::new();
         let ccys = ccys.iter().collect::<Vec<_>>();
@@ -267,7 +295,7 @@ impl KrakenProvider {
             Ok(found) => found,
             Err(e) => {
                 error!("Failed to find {} assets: {e}", ccys.len());
-                return assets;
+                return (assets, HashSet::new());
             }
         };
         for (ccy, asset) in ccys.into_iter().zip(found) {
@@ -286,52 +314,88 @@ impl KrakenProvider {
             }
         }
 
-        static CHUNK_SIZE: usize = 100;
-        let mut start = 0;
-        let mut end = CHUNK_SIZE.min(to_fetch.len());
+        let unresolved = self
+            .resolve_cmc_chunks(&to_fetch, &mut assets, CMC_CHUNK_PACING)
+            .await;
 
-        let next_chunk = |start: &mut usize, end: &mut usize| {
-            *start += CHUNK_SIZE;
-            *end = (*end + CHUNK_SIZE).min(to_fetch.len());
-        };
+        (assets, unresolved)
+    }
 
-        while start < end {
-            let chunk = &to_fetch[start..end];
-            let fetched = self.fetch_crypto_cmc(chunk).await;
+    /// Fetches CoinMarketCap metadata for `to_fetch` in paced chunks and inserts
+    /// the results into `assets`.
+    ///
+    /// Symbols CoinMarketCap does not know get a default asset. Symbols whose
+    /// request failed also get a default asset and are returned, so the caller
+    /// can avoid persisting them. Once the CoinMarketCap circuit breaker opens,
+    /// no further requests are made and the remaining symbols are reported with
+    /// a single summary warning.
+    async fn resolve_cmc_chunks(
+        &self,
+        to_fetch: &[&AssetId],
+        assets: &mut BTreeMap<String, Asset>,
+        pacing: Duration,
+    ) -> HashSet<AssetId> {
+        let mut unresolved = HashSet::new();
+        let mut breaker_open = false;
+        let mut skipped = 0usize;
+        let mut requests = 0usize;
 
-            if let Err(e) = fetched {
-                warn!("Failed to fetch CMC assets. Filling with default ({chunk:?}): {e:?}");
-
-                for id in chunk {
-                    assets.insert(
-                        id.to_string(),
-                        Asset::Crypto(Crypto::new_with_id(id.to_string())),
-                    );
-                }
-
-                next_chunk(&mut start, &mut end);
+        for chunk in to_fetch.chunks(CMC_CHUNK_SIZE) {
+            if breaker_open {
+                skipped += chunk.len();
+                fill_default_assets(chunk, assets, &mut unresolved);
                 continue;
             }
 
-            fetched.unwrap().into_iter().for_each(|a| {
-                assets.insert(a.id().clone(), a);
-            });
+            if requests > 0 {
+                tokio::time::sleep(pacing).await;
+            }
+            requests += 1;
 
-            for id in chunk {
-                if !assets.contains_key(*id) {
-                    warn!("Cannot find CMC asset '{id}' in `assets` map. Filling with default");
+            match self.fetch_crypto_cmc(chunk).await {
+                Ok(fetched) => {
+                    fetched.into_iter().for_each(|a| {
+                        assets.insert(a.id().clone(), a);
+                    });
 
-                    assets.insert(
-                        id.to_string(),
-                        Asset::Crypto(Crypto::new_with_id(id.to_string())),
-                    );
+                    for id in chunk {
+                        if !assets.contains_key(*id) {
+                            warn!(
+                                "Cannot find CMC asset '{id}' in `assets` map. Filling with default"
+                            );
+
+                            assets.insert(
+                                id.to_string(),
+                                Asset::Crypto(Crypto::new_with_id(id.to_string())),
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    // The underlying error was already logged with its cause chain
+                    // by `fetch_cmc_api`.
+                    if matches!(e, DcaError::ExternalServiceDied(_)) {
+                        breaker_open = true;
+                        skipped += chunk.len();
+                    } else {
+                        warn!(
+                            symbols = chunk.len(),
+                            "Failed to fetch CMC assets chunk. Filling with default"
+                        );
+                    }
+                    fill_default_assets(chunk, assets, &mut unresolved);
                 }
             }
-
-            next_chunk(&mut start, &mut end);
         }
 
-        assets
+        if skipped > 0 {
+            warn!(
+                symbols = skipped,
+                "CMC circuit breaker is open: skipped remaining CMC requests and filled {skipped} symbols with defaults"
+            );
+        }
+
+        unresolved
     }
 
     async fn fetch_crypto_cmc(&self, ccys: &[&AssetId]) -> Result<Vec<Asset>> {
@@ -351,8 +415,10 @@ impl KrakenProvider {
             .filter_map(|c| (!CMC_ALIAS.contains_key(c.as_str())).then_some(c.as_str()))
             .join(",");
 
-        let url =
-            format!("https://pro-api.coinmarketcap.com/v2/cryptocurrency/info?symbol={symbols}");
+        let url = format!(
+            "{}/v2/cryptocurrency/info?symbol={symbols}",
+            self.cmc_base_url
+        );
 
         debug!(url = url, "Fetching assets data from CMC");
 
@@ -398,15 +464,39 @@ impl KrakenProvider {
         } else if let StatusCode::NOT_FOUND = res.status() {
             Ok(None)
         } else {
-            Err(res.error_for_status().unwrap_err().into())
+            Err(DcaError::UpstreamStatus {
+                service: "Kraken",
+                status: res.status(),
+            })
         }
     }
 
+    /// Calls CoinMarketCap through its circuit breaker. Recorded as one `lookup`
+    /// provider call, including calls rejected by the open breaker.
     async fn fetch_cmc_api<T: DeserializeOwned + Debug>(&self, url: &str) -> Result<Option<T>> {
-        self.cmc_circuit_breaker
-            .call(self.fetch_cmc_api_inner::<T>(url))
-            .await
-            .map_err(|e| DcaError::from_failsafe(e, "CoinMarketCapProvider"))
+        observe_provider(
+            MetricProvider::CoinMarketCap,
+            ProviderOp::Lookup,
+            async {
+                self.cmc_circuit_breaker
+                    .call(self.fetch_cmc_api_inner::<T>(url))
+                    .await
+                    .map_err(|e| {
+                        // Breaker rejections are summarized by the caller; real
+                        // failures are logged here with their cause chain.
+                        if let failsafe::Error::Inner(inner) = &e {
+                            warn!("CoinMarketCap request failed: {inner:?}");
+                        }
+                        DcaError::from_failsafe(e, "CoinMarketCapProvider")
+                    })
+            },
+            |result| match result {
+                Ok(Some(_)) => ProviderOutcome::Ok,
+                Ok(None) => ProviderOutcome::NotFound,
+                Err(e) => outcome_of_error(e),
+            },
+        )
+        .await
     }
 
     async fn fetch_cmc_api_inner<T: DeserializeOwned + Debug>(
@@ -425,7 +515,10 @@ impl KrakenProvider {
         } else if let StatusCode::NOT_FOUND = res.status() {
             Ok(None)
         } else {
-            Err(res.error_for_status().unwrap_err().into())
+            Err(DcaError::UpstreamStatus {
+                service: "CoinMarketCap",
+                status: res.status(),
+            })
         }
     }
 }
@@ -500,11 +593,36 @@ fn parse_ohlc_price(mut res: OHLCResult, before_ts: i64) -> std::result::Result<
         .ok_or_else(|| PriceFailure::malformed(format!("cannot parse close '{:?}'", cstick[4])))
 }
 
-/// Classifies a failed Kraken call for the provider metrics.
+/// Classifies a failed Kraken or CoinMarketCap call for the provider metrics:
+/// an open circuit breaker is `circuit_open`, HTTP 429 is `rate_limited` and
+/// timeouts are `timeout`.
 fn outcome_of_error(error: &DcaError) -> ProviderOutcome {
     match error {
+        DcaError::ExternalServiceDied(_) => ProviderOutcome::CircuitOpen,
+        DcaError::UpstreamStatus { status, .. } if *status == StatusCode::TOO_MANY_REQUESTS => {
+            ProviderOutcome::RateLimited
+        }
         DcaError::Reqwest(e) if e.is_timeout() => ProviderOutcome::Timeout,
+        DcaError::Reqwest(e) if e.status() == Some(StatusCode::TOO_MANY_REQUESTS) => {
+            ProviderOutcome::RateLimited
+        }
         _ => ProviderOutcome::Error,
+    }
+}
+
+/// Inserts a default (placeholder) crypto asset for each id and records it as
+/// unresolved.
+fn fill_default_assets(
+    ids: &[&AssetId],
+    assets: &mut BTreeMap<String, Asset>,
+    unresolved: &mut HashSet<AssetId>,
+) {
+    for id in ids {
+        assets.insert(
+            id.to_string(),
+            Asset::Crypto(Crypto::new_with_id(id.to_string())),
+        );
+        unresolved.insert(id.to_string());
     }
 }
 
@@ -816,9 +934,166 @@ mod tests {
     };
 
     use super::{
-        AssetPairsResponse, MarketSymbol, Pair, fetch_assets, get_new_markets,
-        market_ids_from_symbols, parse_market_symbol, parse_online_market_symbols,
+        AssetPairsResponse, KrakenProvider, MarketSymbol, Pair, fetch_assets, get_new_markets,
+        market_ids_from_symbols, outcome_of_error, parse_market_symbol,
+        parse_online_market_symbols,
     };
+    use crate::{app::infra::stats::ProviderOutcome, error::DcaError};
+    use reqwest::StatusCode;
+    use std::{
+        collections::BTreeMap,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+
+    /// Starts a local CoinMarketCap stub that answers every request with `status`
+    /// and, for 200, a body naming each requested symbol `Name<SYMBOL>`.
+    /// Returns its base URL and a counter of the requests it received.
+    async fn cmc_stub(status: u16) -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let hits = Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let counter = counter.clone();
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 16 * 1024];
+                    let n = socket.read(&mut buf).await.unwrap_or(0);
+                    let request = String::from_utf8_lossy(&buf[..n]).to_string();
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    let body = if status == 200 {
+                        let symbols = request
+                            .split("symbol=")
+                            .nth(1)
+                            .and_then(|r| r.split(' ').next())
+                            .unwrap_or("");
+                        let data = symbols
+                            .split(',')
+                            .map(|sym| {
+                                format!(
+                                    r#""{u}":[{{"id":1,"symbol":"{u}","name":"Name{u}"}}]"#,
+                                    u = sym.to_uppercase()
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join(",");
+                        format!(
+                            r#"{{"status":{{"error_code":0,"error_message":null}},"data":{{{data}}}}}"#
+                        )
+                    } else {
+                        "{}".to_string()
+                    };
+                    let response = format!(
+                        "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = socket.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+        (base, hits)
+    }
+
+    fn provider(base_url: String) -> KrakenProvider {
+        if rustls::crypto::CryptoProvider::get_default().is_none() {
+            let _ = rustls::crypto::ring::default_provider().install_default();
+        }
+        KrakenProvider {
+            http: reqwest::Client::new(),
+            base_url: super::DEFAULT_BASE_URL.to_string(),
+            cmc_api_key: Some("test-key".to_string()),
+            cmc_base_url: base_url,
+            kraken_circuit_breaker: failsafe::Config::new().build(),
+            cmc_circuit_breaker: failsafe::Config::new().build(),
+        }
+    }
+
+    fn name_of(asset: &Asset) -> &str {
+        match asset {
+            Asset::Crypto(c) => &c.symbol,
+            Asset::Fiat(f) => &f.symbol,
+        }
+    }
+
+    fn ids(n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("c{i:04}")).collect()
+    }
+
+    #[tokio::test]
+    async fn rate_limited_cmc_stops_after_breaker_opens_and_leaves_assets_unresolved() {
+        // GIVEN CoinMarketCap answers HTTP 429 to every request and 800 symbols
+        // (8 chunks) need metadata,
+        let (base, hits) = cmc_stub(429).await;
+        let provider = provider(base);
+        let symbols = ids(800);
+        let to_fetch = symbols.iter().collect::<Vec<_>>();
+        let mut assets = BTreeMap::new();
+
+        // WHEN the chunks are resolved,
+        let unresolved = provider
+            .resolve_cmc_chunks(&to_fetch, &mut assets, Duration::ZERO)
+            .await;
+
+        // THEN requests stop once the breaker opens (5 failures, no 6th request),
+        // every symbol gets a placeholder and every symbol is reported unresolved.
+        assert_eq!(hits.load(Ordering::SeqCst), 5);
+        assert_eq!(assets.len(), 800);
+        assert_eq!(unresolved.len(), 800);
+        assert_eq!(name_of(&assets["c0000"]), "C0000");
+    }
+
+    #[tokio::test]
+    async fn successful_cmc_applies_names_and_leaves_nothing_unresolved() {
+        // GIVEN CoinMarketCap answers every request successfully,
+        let (base, hits) = cmc_stub(200).await;
+        let provider = provider(base);
+        let symbols = ids(150);
+        let to_fetch = symbols.iter().collect::<Vec<_>>();
+        let mut assets = BTreeMap::new();
+
+        // WHEN the symbols are resolved (two chunks),
+        let unresolved = provider
+            .resolve_cmc_chunks(&to_fetch, &mut assets, Duration::ZERO)
+            .await;
+
+        // THEN provider names are applied and nothing is flagged unresolved.
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+        assert!(unresolved.is_empty());
+        assert_eq!(assets.len(), 150);
+        assert_eq!(name_of(&assets["c0000"]), "NameC0000");
+    }
+
+    #[test]
+    fn provider_failures_are_classified_for_metrics() {
+        // GIVEN the errors a Kraken or CoinMarketCap call can fail with,
+        let rate_limited = DcaError::UpstreamStatus {
+            service: "CoinMarketCap",
+            status: StatusCode::TOO_MANY_REQUESTS,
+        };
+        let server_error = DcaError::UpstreamStatus {
+            service: "Kraken",
+            status: StatusCode::BAD_GATEWAY,
+        };
+        let breaker = DcaError::ExternalServiceDied("CoinMarketCapProvider".to_string());
+
+        // WHEN they are classified,
+        // THEN 429 is rate limited, an open breaker is circuit open, others are errors.
+        assert_eq!(
+            outcome_of_error(&rate_limited),
+            ProviderOutcome::RateLimited
+        );
+        assert_eq!(outcome_of_error(&breaker), ProviderOutcome::CircuitOpen);
+        assert_eq!(outcome_of_error(&server_error), ProviderOutcome::Error);
+    }
 
     #[sqlx::test(migrations = "../../migrations")]
     async fn cross_crypto_pairs_are_crypto_markets_priced_by_kraken(pool: sqlx::PgPool) {
