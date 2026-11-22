@@ -69,7 +69,7 @@ family in `init_metrics()` (`src/lib.rs`).
 | Family | Labels and values |
 | --- | --- |
 | `dcapal_requests_total` | `path` (route template), `status` (`2xx`, `4xx`, `5xx`, `other`) |
-| `dcapal_provider_requests_total` | `provider` (`yahoo`, `kraken`), `op` (`lookup`, `price`, `proxy`), `outcome` (`ok`, `not_found`, `rate_limited`, `timeout`, `error`) |
+| `dcapal_provider_requests_total` | `provider` (`yahoo`, `kraken`, `coin_market_cap`), `op` (`lookup`, `price`, `proxy`), `outcome` (`ok`, `not_found`, `rate_limited`, `timeout`, `circuit_open`, `error`) |
 | `dcapal_provider_request_seconds` | `provider`, `op` (no `outcome`); seconds, includes limiter wait |
 | `dcapal_yahoo_limiter_wait_seconds` | no labels; seconds spent waiting for a local Yahoo request slot |
 | `dcapal_yahoo_limiter_rejections_total` | no labels; Yahoo calls rejected before reaching the provider |

@@ -35,6 +35,12 @@ pub enum DcaError {
     RepositoryStoreFailure(String),
     #[error("External service died: {0}")]
     ExternalServiceDied(String),
+    /// A provider answered with a non-success HTTP status.
+    #[error("{service} responded with HTTP {status}")]
+    UpstreamStatus {
+        service: &'static str,
+        status: StatusCode,
+    },
     #[error("{0}")]
     StartupFailure(String, #[source] anyhow::Error),
     #[error("Failed to parse config")]
