@@ -1,4 +1,8 @@
-//! Helpers shared by the backend's in-crate tests.
+//! Helpers of the in-crate unit tests: a local fake provider and the TLS provider setup.
+//!
+//! `tests/common/mod.rs` has its own copy of [`FakeProvider`]: a `#[cfg(test)]` module of
+//! the library is not visible to integration tests (they link the library built without
+//! `cfg(test)`), and exposing it would put test code in the public API.
 
 use std::{
     net::SocketAddr,

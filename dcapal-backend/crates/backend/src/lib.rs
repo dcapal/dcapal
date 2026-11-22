@@ -59,8 +59,6 @@ pub mod error;
 pub mod ports;
 #[cfg(test)]
 mod test_support;
-#[cfg(test)]
-mod v1_regression;
 
 /// The timestamp type shared by API and persistence models.
 pub type DateTime = Timestamp;

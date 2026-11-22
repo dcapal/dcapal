@@ -1,5 +1,8 @@
 //! Helpers shared by the integration tests: provider fakes and a served backend.
 
+// Each integration-test binary uses a different subset of these helpers.
+#![allow(dead_code)]
+
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
