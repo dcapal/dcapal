@@ -141,17 +141,16 @@ impl ImportedRepository {
             .unwrap_or_else(|_| Timestamp::now());
         let id = Uuid::new_v4();
 
-        let mut tx = self.pool.begin().await?;
-        query("DELETE FROM imported_portfolio WHERE expires_at <= NOW()")
-            .execute(&mut *tx)
-            .await?;
-        query("INSERT INTO imported_portfolio (id, payload, expires_at) VALUES ($1, $2, $3)")
-            .bind(id)
-            .bind(pfolio)
-            .bind(expires_at.to_sqlx())
-            .execute(&mut *tx)
-            .await?;
-        tx.commit().await?;
+        // One statement purges and inserts atomically, saving the transaction round-trips.
+        query(
+            "WITH purged AS (DELETE FROM imported_portfolio WHERE expires_at <= NOW())
+             INSERT INTO imported_portfolio (id, payload, expires_at) VALUES ($1, $2, $3)",
+        )
+        .bind(id)
+        .bind(pfolio)
+        .bind(expires_at.to_sqlx())
+        .execute(&self.pool)
+        .await?;
 
         Ok(ImportedPortfolio { id, expires_at })
     }
