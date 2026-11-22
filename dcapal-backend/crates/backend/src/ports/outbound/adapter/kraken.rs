@@ -419,8 +419,11 @@ impl KrakenProvider {
             .filter_map(|c| (!CMC_ALIAS.contains_key(c.as_str())).then_some(c.as_str()))
             .join(",");
 
+        // `skip_invalid=true` makes CoinMarketCap drop symbols it does not know
+        // instead of rejecting the whole request with HTTP 400. Those symbols are
+        // then filled with defaults by the caller.
         let url = format!(
-            "{}/v2/cryptocurrency/info?symbol={symbols}",
+            "{}/v2/cryptocurrency/info?skip_invalid=true&symbol={symbols}",
             self.cmc_base_url
         );
 
