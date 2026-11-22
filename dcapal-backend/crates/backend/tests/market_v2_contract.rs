@@ -333,7 +333,11 @@ async fn last_known_price_is_flagged_after_a_failed_refresh(pool: PgPool) {
     );
     assert_eq!(price["source"], "lastKnown");
     assert_eq!(price["error"]["kind"], "providerError");
-    assert_eq!(price["error"]["message"], "Kraken answered HTTP 503");
+    // The recorded reason ("Kraken answered HTTP 503") never reaches the client.
+    assert_eq!(
+        price["error"]["message"],
+        "The provider could not be reached or answered with an error."
+    );
     assert!(price["error"]["occurredAt"].as_str().is_some());
 }
 

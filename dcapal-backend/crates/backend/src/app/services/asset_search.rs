@@ -148,18 +148,22 @@ impl AssetSearchService {
             Err(AssetSearchError::RateLimited) => {
                 return Err(AssetSearchServiceError::RateLimited);
             }
-            Err(AssetSearchError::Failed(failure)) => AssetSearch {
-                provider,
-                query,
-                outcome: match failure.kind {
-                    FailureKind::Malformed => SearchOutcome::Malformed,
-                    FailureKind::Unavailable | FailureKind::ProviderError => {
-                        SearchOutcome::ProviderError
-                    }
-                },
-                results: Vec::new(),
-                failure: Some(failure),
-            },
+            Err(AssetSearchError::Failed(failure)) => {
+                // The reason stays in the logs; clients only see the failure kind.
+                tracing::warn!(%provider, %failure, "Asset search failed");
+                AssetSearch {
+                    provider,
+                    query,
+                    outcome: match failure.kind {
+                        FailureKind::Malformed => SearchOutcome::Malformed,
+                        FailureKind::Unavailable | FailureKind::ProviderError => {
+                            SearchOutcome::ProviderError
+                        }
+                    },
+                    results: Vec::new(),
+                    failure: Some(failure),
+                }
+            }
         })
     }
 

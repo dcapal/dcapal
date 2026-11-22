@@ -46,6 +46,9 @@ stay visible. ADR 0007 reserved `market_price.last_error` for this work.
   with source `lastKnown` and the failure, so stale data is visible rather than
   silent; a fresh price has source `provider`. A manual price is Portfolio data
   (ADR 0003) and is not a market-data source.
+- Failures on the wire carry only their kind and a generic message of that kind.
+  What the provider or the HTTP client reported is kept in `last_error` and the logs
+  and never reaches a client.
 - Adapters report typed failures (unavailable, provider error, malformed) and
   never answer with another provider. A Yahoo 200 reply carrying a chart error is a
   provider error, so an error on the 5-minute request no longer falls back to daily

@@ -91,10 +91,20 @@ impl From<QuoteSource> for QuoteSourceV2 {
 
 impl FailureV2 {
     /// Describes a failure that happened at `at`, when that is known.
+    ///
+    /// The message is a generic text of the failure kind: what the provider or the HTTP
+    /// client reported is for logs only and never reaches a client.
     pub fn new(failure: PriceFailure, at: Option<Timestamp>) -> Self {
+        let message = match failure.kind {
+            FailureKind::Unavailable => "The provider has no usable price.",
+            FailureKind::ProviderError => {
+                "The provider could not be reached or answered with an error."
+            }
+            FailureKind::Malformed => "The provider answered with an unreadable payload.",
+        };
         Self {
             kind: failure.kind.into(),
-            message: failure.message,
+            message: message.to_string(),
             occurred_at: at.map(format_time),
         }
     }

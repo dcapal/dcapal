@@ -207,6 +207,9 @@ impl MarketDataService {
                 if failure.kind == FailureKind::Unavailable {
                     self.live_unavailable
                         .insert(asset.symbol().to_string(), failure.clone());
+                } else {
+                    // The reason stays in the logs; clients only see the failure kind.
+                    warn!(symbol = asset.symbol(), %failure, "Live quote failed");
                 }
                 PriceQuote::failed(asset.clone(), failure)
             }
