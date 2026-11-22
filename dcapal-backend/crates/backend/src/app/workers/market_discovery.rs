@@ -126,7 +126,18 @@ impl MarketDiscoveryWorker {
                 continue;
             }
 
-            match self.discover_new_markets().await {
+            info!(
+                last_completed = last_fetched_ts.map(|t| t.to_string()).unwrap_or_default(),
+                recovery_pending, "Starting market discovery"
+            );
+            let started = Instant::now();
+            let outcome = self.discover_new_markets().await;
+            info!(
+                elapsed_secs = started.elapsed().as_secs(),
+                ok = outcome.is_ok(),
+                "Market discovery finished"
+            );
+            match outcome {
                 Err(e) => {
                     error!("Failed to update Kraken Assets and Markets data: {:?}", e);
                     recovery_pending = true;
