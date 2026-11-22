@@ -697,7 +697,7 @@ async fn insert_markets(
              INSERT INTO market_price (market_id, base_asset_id, quote_asset_id, provider)
              SELECT market_id, base_id, quote_id, provider FROM resolved
              WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
-             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING
+             ON CONFLICT DO NOTHING
          )
          SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
     )
