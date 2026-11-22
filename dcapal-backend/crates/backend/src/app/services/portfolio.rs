@@ -269,7 +269,7 @@ fn normalize_sync_request(mut req: SyncPortfoliosRequest) -> SyncPortfoliosReque
             // as Kraken cash are mapped to Yahoo so no new Kraken cash rows appear.
             let provider = if provider == Provider::Kraken
                 && asset_class == AssetClass::Cash
-                && is_fiat(&asset.symbol.trim().to_ascii_lowercase())
+                && is_fiat(asset.symbol.trim())
             {
                 Provider::YF
             } else {
@@ -377,6 +377,27 @@ mod tests {
         let normalized = normalize_sync_request(request);
 
         assert_eq!(normalized.portfolios[0].assets[0].provider, "YF");
+    }
+
+    #[test]
+    fn sync_normalization_maps_mixed_case_padded_kraken_fiat_cash_to_yahoo() {
+        // GIVEN a v1 sync request holding " eUr " (mixed case, padded) as Kraken cash,
+        // WHEN the request is normalized,
+        // THEN the case-insensitive fiat check still maps it to Yahoo, while a
+        // non-fiat cash symbol stays on Kraken.
+        let mut request = valid_request();
+        request.portfolios[0].assets[0].symbol = " eUr ".to_string();
+        request.portfolios[0].assets[0].aclass = "CURRENCY".to_string();
+        request.portfolios[0].assets[0].provider = "DCAPal".to_string();
+        let mut other = request.portfolios[0].assets[0].clone();
+        other.symbol = "DoGe".to_string();
+        request.portfolios[0].assets.push(other);
+
+        let normalized = normalize_sync_request(request);
+        let assets = &normalized.portfolios[0].assets;
+
+        assert_eq!(assets[0].provider, "YF");
+        assert_eq!(assets[1].provider, "DCAPal");
     }
 
     #[test]
