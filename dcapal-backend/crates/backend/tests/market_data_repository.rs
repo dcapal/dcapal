@@ -748,3 +748,36 @@ async fn markets_store_their_v1_id_and_foreign_keys_are_indexed(pool: PgPool) ->
     assert_eq!(indexes.len(), 3);
     Ok(())
 }
+
+/// GIVEN a stored, priced market "abcd" (AB/CD),
+/// WHEN a different pair with the same concatenated id (A/BCD) is stored with another price,
+/// THEN the batch succeeds, the second pair is skipped and the first pair keeps its price.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_market_id_collision_never_overwrites_the_owning_pair(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool.clone());
+    for id in ["ab", "cd", "a", "bcd"] {
+        repo.store_asset(&crypto(id)).await?;
+    }
+    let market = |base: &str, quote: &str, value: f64| {
+        Market::new(
+            "abcd".to_string(),
+            crypto(base),
+            crypto(quote),
+            Some(price(value, 1)),
+        )
+    };
+    repo.store_market(&market("ab", "cd", 10.0), PriceProvider::Kraken)
+        .await?;
+
+    repo.store_market(&market("a", "bcd", 99.0), PriceProvider::Kraken)
+        .await?;
+
+    let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT b.symbol, q.symbol, p.price::text FROM market_price p
+         JOIN assets_data b ON b.id = p.base_asset_id JOIN assets_data q ON q.id = p.quote_asset_id",
+    )
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(rows, [("AB".into(), "CD".into(), Some("10".into()))]);
+    Ok(())
+}

@@ -669,8 +669,9 @@ async fn insert_markets(
     }
 
     // One statement resolves the assets, inserts the resolvable markets and reports
-    // the markets whose assets are missing.
-    let missing = query_scalar::<_, String>(
+    // the markets whose assets are missing and those whose id already belongs to a
+    // different pair (concatenated ids are not unique across pairs).
+    let reported = query_as::<_, (String, bool)>(
         "WITH w AS (
              SELECT * FROM UNNEST($1::text[], $2::smallint[], $3::text[], $4::smallint[],
                                   $5::text[], $6::smallint[])
@@ -682,13 +683,26 @@ async fn insert_markets(
                ON b.provider = w.base_provider AND b.symbol = w.base_symbol
              LEFT JOIN assets_data AS q
                ON q.provider = w.quote_provider AND q.symbol = w.quote_symbol
+         ), collisions AS (
+             SELECT r.market_id, r.base_id, r.quote_id
+             FROM resolved AS r
+             JOIN market_price AS p ON p.market_id = r.market_id
+             WHERE r.base_id IS NOT NULL AND r.quote_id IS NOT NULL
+               AND (p.base_asset_id <> r.base_id OR p.quote_asset_id <> r.quote_id)
          ), inserted AS (
              INSERT INTO market_price (market_id, base_asset_id, quote_asset_id, provider)
-             SELECT market_id, base_id, quote_id, provider FROM resolved
-             WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
+             SELECT DISTINCT ON (r.market_id) r.market_id, r.base_id, r.quote_id, r.provider
+             FROM resolved AS r
+             WHERE r.base_id IS NOT NULL AND r.quote_id IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM collisions AS c
+                               WHERE c.market_id = r.market_id AND c.base_id = r.base_id
+                                 AND c.quote_id = r.quote_id)
+             ORDER BY r.market_id
              ON CONFLICT DO NOTHING
          )
-         SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
+         SELECT market_id, TRUE AS missing FROM resolved WHERE base_id IS NULL OR quote_id IS NULL
+         UNION ALL
+         SELECT market_id, FALSE AS missing FROM collisions",
     )
     .bind(&market_ids)
     .bind(&base_providers)
@@ -702,13 +716,28 @@ async fn insert_markets(
         warn!("Failed to store {} markets: {}", markets.len(), ErrorChain(&e));
         DcaError::RepositoryStoreFailure(market_ids[0].to_string(), Some(e))
     })?;
-    if let Some(first) = missing.first() {
+    let missing = reported.iter().find(|(_, missing)| *missing);
+    if let Some((first, _)) = missing {
         warn!(mkt = first, "Failed to store market: asset not stored");
         return Err(DcaError::RepositoryStoreFailure(first.clone(), None));
     }
 
+    // A colliding market is skipped with its price, so it can never overwrite the
+    // price of the pair that owns the id.
+    let colliding = reported
+        .iter()
+        .map(|(id, _)| id.as_str())
+        .collect::<HashSet<_>>();
+    for id in &colliding {
+        warn!(
+            mkt = id,
+            "Skipping market whose id already belongs to a different asset pair"
+        );
+    }
+
     let updates = markets
         .iter()
+        .filter(|(market, _)| !colliding.contains(market.id.as_str()))
         .filter_map(|(market, provider)| {
             (*market.price()).map(|price| MarketPriceUpdate {
                 market_id: &market.id,

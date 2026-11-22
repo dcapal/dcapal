@@ -10,7 +10,8 @@ FROM assets_data AS b, assets_data AS q
 WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id;
 
 -- Concatenated ids are not guaranteed unique across different pairs. Keep the most
--- recently priced market of any collision; the discovery worker restores the others.
+-- recently priced market of any collision. The others are deleted for good: the
+-- application refuses to store a market whose id belongs to a different pair.
 DELETE FROM market_price AS p
 USING (
     SELECT base_asset_id, quote_asset_id,

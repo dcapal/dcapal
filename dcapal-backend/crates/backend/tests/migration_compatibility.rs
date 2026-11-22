@@ -636,8 +636,8 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
 }
 
 /// GIVEN a database migrated up to the discovery-marker rename, holding a legacy discovery
-/// marker, two ordinary markets and two different pairs whose concatenated ids collide
-/// ("ab"+"cd" and "a"+"bcd"),
+/// marker, an ordinary BTC/EUR market and two different pairs whose concatenated ids
+/// collide ("ab"+"cd" and "a"+"bcd"),
 /// WHEN the remaining migrations run,
 /// THEN every market gets its concatenated lower-case id, only the most recently priced of
 /// the colliding pairs remains, and the marker is renamed.
