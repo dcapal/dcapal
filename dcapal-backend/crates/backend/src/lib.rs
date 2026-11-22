@@ -250,7 +250,7 @@ impl DcaServer {
             let stop_rx = self.stop_tx.subscribe();
             let handle = spawn_supervised("MarketDiscovery", async move {
                 let worker = MarketDiscoveryWorker::new(&ctx);
-                worker.run(stop_rx).await;
+                worker.run(stop_rx).await
             });
             self.worker_handlers.push(handle);
         }
@@ -261,7 +261,7 @@ impl DcaServer {
             let stop_rx = self.stop_tx.subscribe();
             let handle = spawn_supervised("PriceUpdater", async move {
                 let worker = PriceUpdaterWorker::new(&ctx, Duration::from_secs(5 * 60));
-                worker.run(stop_rx).await;
+                worker.run(stop_rx).await
             });
             self.worker_handlers.push(handle);
         }
