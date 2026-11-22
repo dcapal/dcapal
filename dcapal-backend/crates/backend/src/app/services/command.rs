@@ -14,24 +14,27 @@ pub struct ConversionRateQuery {
 }
 
 impl ConversionRateQuery {
+    /// Resolves both assets of a conversion with a single catalog lookup.
     pub async fn try_new(base: &str, quote: &str, repo: &MarketDataRepository) -> Result<Self> {
         let base = normalize_asset_id(base);
-        let base_asset = repo.find_asset(&base).await?;
-        if base_asset.is_none() {
-            return Err(DcaError::BadRequest(format!("Unknown base asset: {base}")));
-        }
-
         let quote = normalize_asset_id(quote);
-        let quote_asset = repo.find_asset(&quote).await?;
-        if quote_asset.is_none() {
+        let mut found = repo
+            .find_assets(&[base.as_str(), quote.as_str()])
+            .await?
+            .into_iter();
+
+        let Some(Some(base_asset)) = found.next() else {
+            return Err(DcaError::BadRequest(format!("Unknown base asset: {base}")));
+        };
+        let Some(Some(quote_asset)) = found.next() else {
             return Err(DcaError::BadRequest(format!(
                 "Unknown quote asset: {quote}"
             )));
-        }
+        };
 
         Ok(ConversionRateQuery {
-            base: base_asset.unwrap(),
-            quote: quote_asset.unwrap(),
+            base: base_asset,
+            quote: quote_asset,
         })
     }
 }

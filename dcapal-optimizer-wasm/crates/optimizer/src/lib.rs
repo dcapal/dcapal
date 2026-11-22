@@ -1,7 +1,7 @@
-#[macro_use]
-extern crate lazy_static;
-
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, Mutex},
+};
 
 use optimize::{
     FeeStructure, FeeStructureFixed, FeeStructureVariable, TransactionFees,
@@ -25,13 +25,12 @@ const AMOUNT_DECIMALS: u32 = 4;
 const PERCENTAGE_DECIMALS: u32 = 6;
 const SHARES_DECIMALS: u32 = 8;
 
-lazy_static! {
-    static ref ADVANCED_PROBLEMS: Mutex<HashMap<String, optimize::advanced::Problem>> =
-        Mutex::new(HashMap::new());
-    static ref SUGGESTION_PROBLEMS: Mutex<HashMap<String, optimize::suggestions::Problem>> =
-        Mutex::new(HashMap::new());
-    static ref NUMERIC_DIST: distr::Uniform<u8> = distr::Uniform::new_inclusive(0, 9).unwrap();
-}
+static ADVANCED_PROBLEMS: LazyLock<Mutex<HashMap<String, optimize::advanced::Problem>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static SUGGESTION_PROBLEMS: LazyLock<Mutex<HashMap<String, optimize::suggestions::Problem>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static NUMERIC_DIST: LazyLock<distr::Uniform<u8>> =
+    LazyLock::new(|| distr::Uniform::new_inclusive(0, 9).unwrap());
 
 #[wasm_bindgen]
 pub struct Solver {}

@@ -1,4 +1,4 @@
-//! Redis-backed regression coverage for conversion asset lookup.
+//! PostgreSQL-backed regression coverage for conversion asset lookup.
 
 use dcapal_backend::{
     app::{
@@ -9,18 +9,10 @@ use dcapal_backend::{
 };
 
 /// Verifies that public mixed-case currency identifiers resolve against the
-/// lower-case ids stored in the Redis market-data catalog.
-#[tokio::test]
-#[ignore = "requires a disposable Redis instance; set DCAPAL_TEST_REDIS_URL"]
-async fn conversion_query_resolves_uppercase_symbols_from_redis() {
-    // GIVEN a Redis catalog containing Kraken-style lower-case asset ids
-    let url = std::env::var("DCAPAL_TEST_REDIS_URL")
-        .expect("DCAPAL_TEST_REDIS_URL must point to a disposable Redis instance");
-    let pool = deadpool_redis::Config::from_url(url)
-        .builder()
-        .expect("Redis pool config should be valid")
-        .build()
-        .expect("Redis pool should be constructible");
+/// lower-case ids stored in the market-data catalog.
+#[sqlx::test(migrations = "../../migrations")]
+async fn conversion_query_resolves_uppercase_symbols_from_the_catalog(pool: sqlx::PgPool) {
+    // GIVEN a catalog containing Kraken-style lower-case asset ids
     let repo = MarketDataRepository::new(pool);
     repo.store_asset(&Asset::Crypto(Crypto::new_with_id("btc".to_string())))
         .await

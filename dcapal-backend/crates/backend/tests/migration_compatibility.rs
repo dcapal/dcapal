@@ -15,7 +15,7 @@ async fn sqlx_migrations_normalize_a_pre_shared_schema(pool: PgPool) -> sqlx::Re
     let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(migration_count, 10);
+    assert_eq!(migration_count, 11);
 
     let average_buy_price: Option<String> = sqlx::query_scalar(
         "SELECT data_type
@@ -477,5 +477,160 @@ async fn portfolios_are_indexed_by_owner_after_migrating(pool: PgPool) -> sqlx::
     .await?;
     assert_eq!(index.as_deref(), Some("idx_portfolios_user_id"));
 
+    Ok(())
+}
+
+/// Inserts a shared asset with a fresh UUIDv7 and returns its id.
+async fn insert_shared_asset(
+    pool: &PgPool,
+    provider: i16,
+    symbol: &str,
+    asset_class: i16,
+) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class)
+         VALUES (uuidv7(), $1, $2, $2, $2, $3)
+         RETURNING id",
+    )
+    .bind(provider)
+    .bind(symbol)
+    .bind(asset_class)
+    .fetch_one(pool)
+    .await
+}
+
+/// Links a Portfolio to a shared asset and returns the relationship id.
+async fn hold(
+    pool: &PgPool,
+    portfolio_id: Uuid,
+    assets_data_id: Uuid,
+    class_override: Option<i16>,
+) -> sqlx::Result<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO portfolio_asset (id, portfolio_id, assets_data_id, quantity, asset_class_override)
+         VALUES (uuidv7(), $1, $2, 1, $3)
+         RETURNING id",
+    )
+    .bind(portfolio_id)
+    .bind(assets_data_id)
+    .bind(class_override)
+    .fetch_one(pool)
+    .await
+}
+
+#[sqlx::test(migrations = false, fixtures("pre_shared_schema"))]
+async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
+    pool: PgPool,
+) -> sqlx::Result<()> {
+    // GIVEN a database at the previous migration holding Kraken cash assets: one without a
+    // Yahoo twin, one with a twin of the same class, one whose twin has another class, one
+    // whose twin is held by the same Portfolio, one nobody holds, and two outside the fiat
+    // catalog (USDT held as cash, DAI held by nobody); plus a Kraken crypto asset,
+    const KRAKEN: i16 = 1;
+    const YF: i16 = 2;
+    const OTHER: i16 = 0;
+    const CASH: i16 = 3;
+    const CRYPTO: i16 = 4;
+    MIGRATOR.run(&pool).await?;
+    MIGRATOR.undo(&pool, 20260913000000).await?;
+
+    let user_id = Uuid::parse_str("00000000-0000-0000-0000-000000000003").unwrap();
+    let first = Uuid::parse_str("10000000-0000-0000-0000-000000000003").unwrap();
+    let second = Uuid::parse_str("10000000-0000-0000-0000-000000000004").unwrap();
+    sqlx::query(
+        "INSERT INTO users (id, username, email, role)
+         VALUES ($1, 'cash-user', 'cash-user@example.com', 'User')",
+    )
+    .bind(user_id)
+    .execute(&pool)
+    .await?;
+    for portfolio_id in [first, second] {
+        sqlx::query(
+            "INSERT INTO portfolios (id, user_id, name, currency) VALUES ($1, $2, 'P', 'EUR')",
+        )
+        .bind(portfolio_id)
+        .bind(user_id)
+        .execute(&pool)
+        .await?;
+    }
+
+    let eur = insert_shared_asset(&pool, KRAKEN, "EUR", CASH).await?;
+    let usd = insert_shared_asset(&pool, KRAKEN, "USD", CASH).await?;
+    let usd_yf = insert_shared_asset(&pool, YF, "USD", CASH).await?;
+    let gbp = insert_shared_asset(&pool, KRAKEN, "GBP", CASH).await?;
+    let gbp_yf = insert_shared_asset(&pool, YF, "GBP", OTHER).await?;
+    let jpy = insert_shared_asset(&pool, KRAKEN, "JPY", CASH).await?;
+    let jpy_yf = insert_shared_asset(&pool, YF, "JPY", CASH).await?;
+    let _chf = insert_shared_asset(&pool, KRAKEN, "CHF", CASH).await?;
+    let _chf_yf = insert_shared_asset(&pool, YF, "CHF", CASH).await?;
+    let usdt = insert_shared_asset(&pool, KRAKEN, "USDT", CASH).await?;
+    let _dai = insert_shared_asset(&pool, KRAKEN, "DAI", CASH).await?;
+    let btc = insert_shared_asset(&pool, KRAKEN, "BTC", CRYPTO).await?;
+
+    let eur_rel = hold(&pool, first, eur, None).await?;
+    let usd_rel = hold(&pool, first, usd, None).await?;
+    let gbp_rel = hold(&pool, first, gbp, None).await?;
+    let usdt_rel = hold(&pool, first, usdt, None).await?;
+    let btc_rel = hold(&pool, first, btc, None).await?;
+    let jpy_rel = hold(&pool, second, jpy, None).await?;
+    let jpy_yf_rel = hold(&pool, second, jpy_yf, None).await?;
+
+    // WHEN the market-data migration runs,
+    MIGRATOR.run(&pool).await?;
+
+    // THEN the relationship of every Portfolio ends up on the expected asset,
+    async fn target(pool: &PgPool, relationship: Uuid) -> sqlx::Result<(Uuid, Option<i16>)> {
+        sqlx::query_as(
+            "SELECT assets_data_id, asset_class_override FROM portfolio_asset WHERE id = $1",
+        )
+        .bind(relationship)
+        .fetch_one(pool)
+        .await
+    }
+    // a row without a Yahoo twin is renamed in place, keeping its identity,
+    assert_eq!(target(&pool, eur_rel).await?, (eur, None));
+    let renamed: i16 = sqlx::query_scalar("SELECT provider FROM assets_data WHERE id = $1")
+        .bind(eur)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(renamed, YF);
+    // a Kraken cash row outside the fiat catalog is not touched,
+    assert_eq!(target(&pool, usdt_rel).await?, (usdt, None));
+    let usdt_provider: i16 = sqlx::query_scalar("SELECT provider FROM assets_data WHERE id = $1")
+        .bind(usdt)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(usdt_provider, KRAKEN);
+    // relationships are repointed to the existing Yahoo twin,
+    assert_eq!(target(&pool, usd_rel).await?, (usd_yf, None));
+    // keeping the effective class as an override when the twin's default differs,
+    assert_eq!(target(&pool, gbp_rel).await?, (gbp_yf, Some(CASH)));
+    // a Portfolio that already holds the twin keeps its relationship on the Kraken row,
+    assert_eq!(target(&pool, jpy_rel).await?, (jpy, None));
+    assert_eq!(target(&pool, jpy_yf_rel).await?, (jpy_yf, None));
+    // other providers' assets are untouched,
+    assert_eq!(target(&pool, btc_rel).await?, (btc, None));
+
+    // and only unreferenced Kraken fiat cash rows are deleted: the unreferenced non-fiat
+    // cash row (DAI) is kept.
+    let remaining: Vec<(i16, String)> = sqlx::query_as(
+        "SELECT provider, symbol FROM assets_data
+         WHERE provider = $1 AND asset_class IN ($2, $3)
+         ORDER BY symbol",
+    )
+    .bind(KRAKEN)
+    .bind(CASH)
+    .bind(CRYPTO)
+    .fetch_all(&pool)
+    .await?;
+    assert_eq!(
+        remaining,
+        vec![
+            (KRAKEN, "BTC".to_string()),
+            (KRAKEN, "DAI".to_string()),
+            (KRAKEN, "JPY".to_string()),
+            (KRAKEN, "USDT".to_string()),
+        ]
+    );
     Ok(())
 }

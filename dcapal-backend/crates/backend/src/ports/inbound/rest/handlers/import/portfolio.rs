@@ -1,12 +1,13 @@
 //! `POST /import/portfolio`: validates and stores a shared portfolio payload.
 
+use std::sync::LazyLock;
+
 use axum::{
     Json,
     extract::State,
     response::{IntoResponse, Response},
 };
 use hyper::StatusCode;
-use lazy_static::lazy_static;
 use metrics::counter;
 
 use crate::{
@@ -17,13 +18,12 @@ use crate::{
 static PORTFOLIO_SCHEMA_STR: &str =
     include_str!("../../../../../../../../docs/schema/portfolio/v1/schema.json");
 
-lazy_static! {
-    /// The v1 portfolio import JSON schema as a document.
-    pub(crate) static ref PORTFOLIO_JSON_SCHEMA: serde_json::Value =
-        serde_json::from_str(PORTFOLIO_SCHEMA_STR).unwrap();
-    static ref PORTFOLIO_SCHEMA_VALIDATOR: jsonschema::Validator =
-        jsonschema::draft7::new(&PORTFOLIO_JSON_SCHEMA).unwrap();
-}
+/// The v1 portfolio import JSON schema as a document.
+pub(crate) static PORTFOLIO_JSON_SCHEMA: LazyLock<serde_json::Value> =
+    LazyLock::new(|| serde_json::from_str(PORTFOLIO_SCHEMA_STR).unwrap());
+
+static PORTFOLIO_SCHEMA_VALIDATOR: LazyLock<jsonschema::Validator> =
+    LazyLock::new(|| jsonschema::draft7::new(&PORTFOLIO_JSON_SCHEMA).unwrap());
 
 #[utoipa::path(
     post,

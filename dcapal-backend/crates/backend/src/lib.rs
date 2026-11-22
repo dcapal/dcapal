@@ -1,9 +1,6 @@
 #[macro_use]
 extern crate const_format;
 
-// Keep derive_more available for the backend's standard trait-derivation conventions.
-use derive_more as _;
-
 use std::{
     net::{AddrParseError, SocketAddr},
     sync::Arc,
@@ -13,7 +10,6 @@ use std::{
 use axum::{
     Router, extract::connect_info::IntoMakeServiceWithConnectInfo, middleware, routing::get,
 };
-use deadpool_redis::{Pool, Runtime};
 use futures::future::BoxFuture;
 use hyper::header;
 use jiff::Timestamp;
@@ -28,7 +24,10 @@ use crate::{
     app::{
         infra,
         services::{
-            asset::AssetService, market_data::MarketDataService, portfolio::PortfolioService,
+            asset::AssetService,
+            fx_rates::{FxStartupPolicy, YahooFxFetcher, ensure_fx_rates},
+            market_data::MarketDataService,
+            portfolio::PortfolioService,
         },
         workers::{market_discovery::MarketDiscoveryWorker, price_updater::PriceUpdaterWorker},
     },
@@ -38,8 +37,8 @@ use crate::{
         inbound::rest,
         outbound::{
             adapter::{
-                CryptoWatchProvider, IpApi, KrakenAssetProvider, KrakenProvider, PriceProviders,
-                ProviderRoutedAssetProvider, YahooProvider,
+                CatalogFiatAssetProvider, CryptoWatchProvider, IpApi, KrakenAssetProvider,
+                KrakenProvider, PriceProviders, ProviderRoutedAssetProvider, YahooProvider,
             },
             repository::{
                 ImportedRepository, MiscRepository, StatsRepository,
@@ -57,24 +56,17 @@ pub mod app;
 pub mod config;
 pub mod error;
 pub mod ports;
+#[cfg(test)]
+mod v1_regression;
 
 /// The timestamp type shared by API and persistence models.
 pub type DateTime = Timestamp;
-
-/// Redis connection settings used by backend integrations.
-pub struct RedisConfig {
-    /// Redis host name.
-    pub hostname: String,
-    /// Redis port.
-    pub port: u32,
-}
 
 #[allow(dead_code)]
 /// Shared application state made available to HTTP handlers and workers.
 pub struct AppContextInner {
     config: Arc<Config>,
     http: reqwest::Client,
-    redis: Pool,
     postgres: PgPool,
     openapi_value: serde_json::Value,
     services: Services,
@@ -146,15 +138,13 @@ impl DcaServer {
 
         let rquest = rquest::Client::builder().default_headers(headers).build()?;
 
-        let redis = build_redis_pool(&config.server.redis)?;
-
         let postgres = build_postgres_pool(&config.server.postgres).await?;
 
         let repos = Arc::new(Repository {
-            misc: Arc::new(MiscRepository::new(redis.clone())),
-            mkt_data: Arc::new(MarketDataRepository::new(redis.clone())),
-            stats: Arc::new(StatsRepository::new(redis.clone())),
-            imported: Arc::new(ImportedRepository::new(redis.clone())),
+            misc: Arc::new(MiscRepository::new(postgres.clone())),
+            mkt_data: Arc::new(MarketDataRepository::new(postgres.clone())),
+            stats: Arc::new(StatsRepository::new(postgres.clone())),
+            imported: Arc::new(ImportedRepository::new(postgres.clone())),
             portfolio: Arc::new(SqlxPortfolioRepository::new(postgres.clone())),
             asset: Arc::new(SqlxAssetDirectory::new(postgres.clone())),
             user: Arc::new(SqlxUserRepository::new(postgres.clone())),
@@ -173,7 +163,7 @@ impl DcaServer {
         let asset_service = Arc::new(AssetService::new(
             repos.asset.clone(),
             Arc::new(ProviderRoutedAssetProvider::new(
-                providers.yahoo.clone(),
+                Arc::new(CatalogFiatAssetProvider::new(providers.yahoo.clone())),
                 Arc::new(KrakenAssetProvider::new(repos.mkt_data.clone())),
             )),
         ));
@@ -193,7 +183,6 @@ impl DcaServer {
         let ctx = Arc::new(AppContextInner {
             config: config.clone(),
             http,
-            redis,
             postgres,
             openapi_value,
             services,
@@ -244,6 +233,17 @@ impl DcaServer {
         info!("Initializing metrics");
         self.init_metrics().await;
 
+        // Conversions depend on the FX rates, so the server does not go online without them.
+        info!("Ensuring FX rates are available");
+        ensure_fx_rates(
+            &self.ctx.repos.mkt_data,
+            &self.ctx.services.mkt_data,
+            &YahooFxFetcher::new(self.ctx.providers.clone()),
+            self.ctx.config.app.providers.price_provider,
+            FxStartupPolicy::default(),
+        )
+        .await?;
+
         info!("Starting MarketDiscovery worker");
         {
             let ctx = self.ctx.clone();
@@ -278,7 +278,7 @@ impl DcaServer {
         Ok(())
     }
 
-    /// Registers backend metrics and refreshes counters stored in Redis.
+    /// Registers backend metrics and refreshes counters stored in PostgreSQL.
     pub async fn init_metrics(&self) {
         describe_counter!(
             infra::stats::VISITORS_TOTAL,
@@ -354,28 +354,6 @@ impl DcaServer {
     }
 }
 
-fn build_redis_pool(config: &config::Redis) -> Result<deadpool_redis::Pool> {
-    let url = config.connection_url();
-    let redis_pool = deadpool_redis::Config::from_url(url)
-        .builder()
-        .map_err(|e| {
-            DcaError::StartupFailure(
-                format!(
-                    "Error in building Redis poll config (user={}, hostname={}, port={})",
-                    config.user, config.hostname, config.port
-                ),
-                e.into(),
-            )
-        })?
-        .runtime(Runtime::Tokio1)
-        .build()
-        .map_err(|e| {
-            DcaError::StartupFailure("Failed to build Redis connection pool".into(), e.into())
-        })?;
-
-    Ok(redis_pool)
-}
-
 async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
     let url = config.connection_url();
     let pool = PgPoolOptions::new()
@@ -403,7 +381,7 @@ async fn build_postgres_pool(config: &Postgres) -> Result<PgPool> {
     Ok(pool)
 }
 
-/// Restores aggregate visitor counters from the persisted per-IP visit hash.
+/// Restores aggregate visitor counters from the persisted per-IP visit counts.
 async fn refresh_visitors_stats(stats_repo: &StatsRepository) -> Result<()> {
     let visitors = stats_repo.fetch_all_visitors().await?;
     let (total_visits, unique_visitors) = visitors.values().fold(

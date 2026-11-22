@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicU64, Ordering},
     },
 };
 
 use jiff::Timestamp;
+use moka::{policy::EvictionPolicy, sync::Cache};
 use parking_lot::RwLock;
 use tracing::{error, info, warn};
 
@@ -21,30 +22,53 @@ use crate::{
 
 const MAX_MARKET_LOAD_ATTEMPTS: usize = 3;
 
+/// Number of non-FX markets (with their last price) kept in memory by default.
+pub const DEFAULT_LAST_PRICE_CAPACITY: u64 = 10_000;
+
 /// Provides cached access to market assets, markets, and conversion rates.
+///
+/// Markets are cached together with their last price in two [`moka`] caches:
+/// FX markets (fiat against fiat) are never evicted, because every cross-currency
+/// conversion depends on them and there are only a few hundred; all other markets
+/// live in a size-bounded cache that evicts the least recently used entry. Neither
+/// cache has a time-to-live: the price worker replaces cached prices in place.
 pub struct MarketDataService {
     repo: Arc<MarketDataRepository>,
-    markets: RwLock<HashMap<MarketId, Arc<Market>>>,
+    fx_markets: Cache<MarketId, Arc<Market>>,
+    markets: Cache<MarketId, Arc<Market>>,
     market_cache_generation: AtomicU64,
+    // Held for reading while a loaded market is inserted and for writing while the
+    // caches are invalidated, so an invalidation can never be followed by a stale insert.
+    invalidation_lock: RwLock<()>,
     pricers: RwLock<HashMap<(AssetId, AssetId), Option<Price>>>,
     price_deps: RwLock<HashMap<MarketId, Vec<(AssetId, AssetId)>>>,
     assets_cache: RwLock<AssetsCache>,
 }
 
 impl MarketDataService {
+    /// Creates a service that keeps up to [`DEFAULT_LAST_PRICE_CAPACITY`] non-FX markets in memory.
     pub fn new(repo: Arc<MarketDataRepository>) -> Self {
-        let markets = RwLock::new(HashMap::new());
-        let pricers = RwLock::new(HashMap::new());
-        let assets_cache = RwLock::new(AssetsCache::new());
-        let price_deps = RwLock::new(HashMap::new());
+        Self::with_last_price_capacity(repo, DEFAULT_LAST_PRICE_CAPACITY)
+    }
+
+    /// Creates a service whose non-FX market cache holds at most `capacity` entries.
+    pub fn with_last_price_capacity(repo: Arc<MarketDataRepository>, capacity: u64) -> Self {
+        // No capacity bound and no TTL: FX markets are replaced in place, never evicted.
+        let fx_markets = Cache::builder().build();
+        let markets = Cache::builder()
+            .max_capacity(capacity)
+            .eviction_policy(EvictionPolicy::lru())
+            .build();
 
         Self {
             repo,
+            fx_markets,
             markets,
             market_cache_generation: AtomicU64::new(0),
-            pricers,
-            price_deps,
-            assets_cache,
+            invalidation_lock: RwLock::new(()),
+            pricers: RwLock::new(HashMap::new()),
+            price_deps: RwLock::new(HashMap::new()),
+            assets_cache: RwLock::new(AssetsCache::new()),
         }
     }
 
@@ -96,20 +120,21 @@ impl MarketDataService {
 
     /// Clears cached markets and conversion rates after market reconciliation.
     pub fn invalidate_market_cache(&self) {
+        let _guard = self.invalidation_lock.write();
         self.market_cache_generation.fetch_add(1, Ordering::AcqRel);
-        self.markets.write().clear();
+        self.fx_markets.invalidate_all();
+        self.markets.invalidate_all();
         self.pricers.write().clear();
         self.price_deps.write().clear();
     }
 
     /// Removes deleted markets and conversion rates that depend on them.
     pub fn invalidate_markets(&self, ids: &[MarketId]) {
+        let _guard = self.invalidation_lock.write();
         self.market_cache_generation.fetch_add(1, Ordering::AcqRel);
-        {
-            let mut markets = self.markets.write();
-            for id in ids {
-                markets.remove(id);
-            }
+        for id in ids {
+            self.fx_markets.invalidate(id);
+            self.markets.invalidate(id);
         }
 
         let mut pricers = self.pricers.write();
@@ -123,17 +148,28 @@ impl MarketDataService {
         }
     }
 
+    /// Returns the cached market, refreshing its recency in the bounded cache.
+    fn cached_market(&self, id: &MarketId) -> Option<Arc<Market>> {
+        self.fx_markets.get(id).or_else(|| self.markets.get(id))
+    }
+
+    /// Caches a market in the FX cache when both sides are fiat, in the bounded cache otherwise.
+    fn cache_for(&self, market: &Market) -> &Cache<MarketId, Arc<Market>> {
+        if market.is_fiat() {
+            &self.fx_markets
+        } else {
+            &self.markets
+        }
+    }
+
     /// Lookup a [`Market`] by [`MarketId`]
     pub async fn get_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
         for _ in 0..MAX_MARKET_LOAD_ATTEMPTS {
             let generation = self.market_cache_generation.load(Ordering::Acquire);
+            if let Some(market) = self.cached_market(id)
+                && self.market_cache_generation.load(Ordering::Acquire) == generation
             {
-                let markets = self.markets.read();
-                if let Some(market) = markets.get(id)
-                    && self.market_cache_generation.load(Ordering::Acquire) == generation
-                {
-                    return Ok(Some(market.clone()));
-                }
+                return Ok(Some(market));
             }
 
             let market = match self.load_market(id).await {
@@ -148,11 +184,11 @@ impl MarketDataService {
                 return Ok(None);
             };
 
-            let mut markets = self.markets.write();
+            let _guard = self.invalidation_lock.read();
             if self.market_cache_generation.load(Ordering::Acquire) != generation {
                 continue;
             }
-            markets.insert(id.clone(), market.clone());
+            self.cache_for(&market).insert(id.clone(), market.clone());
             return Ok(Some(market));
         }
 
@@ -178,22 +214,17 @@ impl MarketDataService {
         }
     }
 
+    /// Replaces the price of a cached market in place; returns whether the market was cached.
     pub fn set_price(&self, id: &MarketId, price: Price) -> bool {
-        // Get a Market copy
-        let mut updated = {
-            let markets = self.markets.read();
-            let Some(market) = markets.get(id) else {
-                return false;
-            };
-            market.as_ref().clone()
+        let Some(market) = self.cached_market(id) else {
+            return false;
         };
 
         // Update Market price
-        {
-            let mut markets = self.markets.write();
-            updated.set_price(price);
-            markets.insert(id.clone(), Arc::new(updated));
-        }
+        let mut updated = market.as_ref().clone();
+        updated.set_price(price);
+        self.cache_for(&updated)
+            .insert(id.clone(), Arc::new(updated));
 
         // Invalidate dependent syntetic rates
         let mut pricers = self.pricers.write();
@@ -308,7 +339,7 @@ impl MarketDataService {
                 "Computed conversion rate for market {} triangulating between markets",
                 base_quote_id
             );
-            return Ok(Some((rate, vec![base_quote_id, usd_quote_id])));
+            return Ok(Some((rate, vec![base_usd_id, quote_usd_id])));
         }
 
         warn!(
@@ -376,11 +407,8 @@ impl MarketDataService {
 }
 
 fn normalized_asset(id: &AssetId) -> AssetId {
-    lazy_static::lazy_static! {
-        static ref NORMALIZED: HashMap<&'static str, &'static str> = {
-            [("eth2", "eth"), ("eth2.s", "eth")].into_iter().collect()
-        };
-    }
+    static NORMALIZED: LazyLock<HashMap<&'static str, &'static str>> =
+        LazyLock::new(|| [("eth2", "eth"), ("eth2.s", "eth")].into_iter().collect());
 
     NORMALIZED
         .get(id.as_str())
@@ -404,37 +432,157 @@ impl AssetsCache {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use sqlx::PgPool;
 
     use super::*;
+    use crate::{
+        app::domain::entity::{Crypto, Fiat},
+        config::PriceProvider,
+    };
 
-    #[test]
-    fn invalidating_a_market_removes_it_and_dependent_conversion_rates() {
-        // GIVEN a cached market and a synthetic conversion rate that depends on it
-        let pool = deadpool_redis::Config::from_url("redis://localhost/")
-            .builder()
-            .unwrap()
-            .build()
-            .unwrap();
+    fn crypto(id: &str) -> Asset {
+        Asset::Crypto(Crypto::new_with_id(id.into()))
+    }
+
+    fn fiat(id: &str) -> Asset {
+        Asset::Fiat(Fiat::new(id.into(), id.to_uppercase()))
+    }
+
+    /// Stores every asset and market (quote is always the fiat `eur`) and returns a service
+    /// whose non-FX cache holds `capacity` markets.
+    async fn service_with(
+        pool: PgPool,
+        capacity: u64,
+        markets: &[(&str, &str)],
+    ) -> MarketDataService {
         let repo = Arc::new(MarketDataRepository::new(pool));
-        let service = MarketDataService::new(repo);
+        for (base, quote) in markets {
+            for asset in [base, quote] {
+                let asset = if ["eur", "usd", "gbp"].contains(asset) {
+                    fiat(asset)
+                } else {
+                    crypto(asset)
+                };
+                repo.store_asset(&asset).await.unwrap();
+            }
+            let (b, q) = (
+                repo.find_asset(&base.to_string()).await.unwrap().unwrap(),
+                repo.find_asset(&quote.to_string()).await.unwrap().unwrap(),
+            );
+            let market = Market::new(
+                format!("{base}{quote}"),
+                b,
+                q,
+                Some(Price::new(1., Timestamp::now())),
+            );
+            repo.store_market(&market, PriceProvider::Kraken)
+                .await
+                .unwrap();
+        }
+        MarketDataService::with_last_price_capacity(repo, capacity)
+    }
+
+    fn cached(service: &MarketDataService, id: &str) -> bool {
+        service.cached_market(&id.to_string()).is_some()
+    }
+
+    /// GIVEN a bounded cache of two entries and several FX markets,
+    /// WHEN more markets than the capacity are loaded,
+    /// THEN every FX market stays cached while the least recently used other market is evicted.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn fx_markets_are_never_evicted_and_others_are_lru(pool: PgPool) {
+        let service = service_with(
+            pool,
+            2,
+            &[
+                ("usd", "eur"),
+                ("eur", "usd"),
+                ("btc", "eur"),
+                ("eth", "eur"),
+                ("ltc", "eur"),
+            ],
+        )
+        .await;
+        let get = |id: &'static str| async {
+            service.get_market(&id.to_string()).await.unwrap().unwrap();
+            service.markets.run_pending_tasks();
+        };
+
+        get("usdeur").await;
+        get("eurusd").await;
+        get("btceur").await;
+        get("etheur").await;
+        // Reading btceur again makes etheur the least recently used entry.
+        get("btceur").await;
+        get("ltceur").await;
+        service.fx_markets.run_pending_tasks();
+
+        assert!(cached(&service, "usdeur") && cached(&service, "eurusd"));
+        assert!(cached(&service, "btceur") && cached(&service, "ltceur"));
+        assert!(!cached(&service, "etheur"));
+        assert_eq!(service.markets.entry_count(), 2);
+    }
+
+    /// GIVEN cached FX and non-FX markets, WHEN the price worker sets a new price,
+    /// THEN each market keeps its cache and holds the new price in place.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn set_price_replaces_the_cached_price_in_place(pool: PgPool) {
+        let service = service_with(pool, 10, &[("usd", "eur"), ("btc", "eur")]).await;
+        for id in ["usdeur", "btceur"] {
+            service.get_market(&id.to_string()).await.unwrap();
+        }
+
+        let fresh = Price::new(42., Timestamp::now());
+        assert!(service.set_price(&"usdeur".to_string(), fresh));
+        assert!(service.set_price(&"btceur".to_string(), fresh));
+        assert!(!service.set_price(&"unknown".to_string(), fresh));
+
+        assert!(
+            service.fx_markets.contains_key("usdeur") && !service.markets.contains_key("usdeur")
+        );
+        assert!(
+            service.markets.contains_key("btceur") && !service.fx_markets.contains_key("btceur")
+        );
+        let market = service
+            .get_market(&"usdeur".to_string())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(market.price().unwrap().price, 42.);
+    }
+
+    /// GIVEN cached markets of both kinds, WHEN reconciliation invalidates the whole market cache
+    /// or deleted markets, THEN they are reloaded from the database on the next lookup.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn invalidation_clears_both_caches(pool: PgPool) {
+        let service = service_with(pool, 10, &[("usd", "eur"), ("btc", "eur")]).await;
+        for id in ["usdeur", "btceur"] {
+            service.get_market(&id.to_string()).await.unwrap();
+        }
+
+        service.invalidate_markets(&["btceur".to_string()]);
+        assert!(cached(&service, "usdeur") && !cached(&service, "btceur"));
+
+        service.invalidate_market_cache();
+        assert!(!cached(&service, "usdeur"));
+        assert!(
+            service
+                .get_market(&"usdeur".to_string())
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    /// GIVEN a cached market and a synthetic conversion rate that depends on it,
+    /// WHEN the deleted market is invalidated,
+    /// THEN the market and its dependent conversion rate are no longer cached.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn invalidating_a_market_removes_it_and_dependent_conversion_rates(pool: PgPool) {
+        let service = service_with(pool, 10, &[("uni", "eur")]).await;
         let market_id = "unieur".to_string();
         let dependency = ("uni".to_string(), "eur".to_string());
-        let market = Market::new(
-            market_id.clone(),
-            Asset::Crypto(crate::app::domain::entity::Crypto::new_with_id(
-                "uni".into(),
-            )),
-            Asset::Fiat(crate::app::domain::entity::Fiat::new(
-                "eur".into(),
-                "Euro".into(),
-            )),
-            None,
-        );
-        service
-            .markets
-            .write()
-            .insert(market_id.clone(), Arc::new(market));
+        service.get_market(&market_id).await.unwrap();
         service
             .pricers
             .write()
@@ -444,12 +592,33 @@ mod tests {
             .write()
             .insert(market_id.clone(), vec![dependency.clone()]);
 
-        // WHEN the deleted market is invalidated
         service.invalidate_markets(std::slice::from_ref(&market_id));
 
-        // THEN the market and its dependent conversion rate are no longer cached
-        assert!(!service.markets.read().contains_key(&market_id));
+        assert!(!cached(&service, "unieur"));
         assert!(!service.pricers.read().contains_key(&dependency));
         assert!(!service.price_deps.read().contains_key(&market_id));
+    }
+
+    /// GIVEN EUR/GBP is converted by triangulating through `eurusd` and `gbpusd`
+    /// (no direct, inverse or `usd{quote}` market exists),
+    /// WHEN the price worker refreshes `gbpusd`,
+    /// THEN the cached EUR/GBP rate that depended on it is dropped.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn triangulated_rate_through_the_quote_usd_market_depends_on_both_usd_markets(
+        pool: PgPool,
+    ) {
+        let service = service_with(pool, 10, &[("eur", "usd"), ("gbp", "usd")]).await;
+        let query = ConversionRateQuery {
+            base: fiat("eur"),
+            quote: fiat("gbp"),
+        };
+        let pair = ("eur".to_string(), "gbp".to_string());
+        assert!(service.get_conversion_rate(query).await.unwrap().is_some());
+        assert!(service.pricers.read().contains_key(&pair));
+
+        service.get_market(&"gbpusd".to_string()).await.unwrap();
+        service.set_price(&"gbpusd".to_string(), Price::new(2., Timestamp::now()));
+
+        assert!(!service.pricers.read().contains_key(&pair));
     }
 }

@@ -7,6 +7,12 @@ rust-version.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# `derive_more` is the project's standard for small mechanical trait derives
+# (see dcapal-backend/AGENTS.md) and is kept for upcoming types even while no
+# module uses it, so Cargo's unused-dependency manifest lint is allowed.
+[lints.cargo]
+unused_dependencies = "allow"
+
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -16,7 +22,6 @@ config = { workspace = true }
 const_format = { workspace = true }
 jiff = { workspace = true }
 jiff-sqlx = { workspace = true }
-deadpool-redis = { workspace = true }
 derive_more = { workspace = true }
 failsafe = { workspace = true }
 futures = { workspace = true }
@@ -26,12 +31,11 @@ ip2location = { workspace = true }
 itertools = { workspace = true }
 jsonschema = { workspace = true }
 jsonwebtoken = { workspace = true }
-lazy_static = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
+moka = { workspace = true }
 num_enum = { workspace = true }
 parking_lot = { workspace = true }
-redis = { workspace = true }
 reqwest = { workspace = true }
 rust_decimal = { workspace = true }
 rustls = { workspace = true }
@@ -57,3 +61,4 @@ rquest = { workspace = true }
 [dev-dependencies]
 migration = { path = "../migration" }
 mockall = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }

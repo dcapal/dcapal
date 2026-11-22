@@ -17,7 +17,6 @@ POSTGRES_PASSWORD ?= postgres
 POSTGRES_USER ?= postgres
 POSTGRES_DB ?= postgres
 POSTGRES_HOST_PORT ?= 5433
-REDIS_HOST_PORT ?= 6379
 BACKEND_PORT ?= 8080
 METRICS_PORT ?= 9000
 FRONTEND_PORT ?= 3000
@@ -37,9 +36,6 @@ export POSTGRES_DB
 endif
 ifneq ($(filter command line environment,$(origin POSTGRES_HOST_PORT)),)
 export POSTGRES_HOST_PORT
-endif
-ifneq ($(filter command line environment,$(origin REDIS_HOST_PORT)),)
-export REDIS_HOST_PORT
 endif
 ifneq ($(filter command line environment,$(origin BACKEND_PORT)),)
 export BACKEND_PORT

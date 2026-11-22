@@ -666,6 +666,123 @@ async fn concurrent_syncs_reuse_shared_data_without_duplicate_relationships(
     Ok(())
 }
 
+/// A legacy v1 cash asset as an old client sends it: provider `DCAPal`, class `CURRENCY`.
+fn legacy_cash(symbol: &str) -> PortfolioAssetRequest {
+    let mut cash = asset(symbol);
+    cash.aclass = "CURRENCY".to_string();
+    cash.provider = "DCAPal".to_string();
+    cash.target_weight = dec!(0.5);
+    cash
+}
+
+/// Returns `(provider, symbol)` of every cash asset of the shared asset table, sorted.
+async fn cash_assets(pool: &PgPool) -> Result<Vec<(i16, String)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT provider, symbol FROM assets_data
+         WHERE asset_class = 3 AND symbol IN ('EUR', 'USDT')
+         ORDER BY symbol, provider",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+#[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
+async fn v1_sync_keeps_legacy_fiat_cash_on_yahoo_and_reports_it_as_yf(
+    pool: PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // GIVEN a Portfolio whose EUR cash lives on a Yahoo row (as after the market-data
+    // migration) next to a USDT cash asset held under the legacy `DCAPal` provider,
+    // both synchronized by an old client that sends `DCAPal` / `CURRENCY`,
+    let service = PortfolioService::new(
+        Arc::new(SqlxPortfolioRepository::new(pool.clone())),
+        asset_service(&pool),
+    );
+    let stored_at = Timestamp::now();
+    let mut portfolio = portfolio_request(vec![legacy_cash("EUR"), legacy_cash("USDT")]);
+    portfolio.id = SECOND_PORTFOLIO_ID;
+    portfolio.last_updated_at = stored_at;
+    service
+        .sync_portfolios(
+            USER_ID,
+            SyncPortfoliosRequest {
+                portfolios: vec![portfolio.clone()],
+                deleted_portfolios: Vec::new(),
+            },
+        )
+        .await?;
+    let relationship_target = |symbol: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, Uuid>(
+                "SELECT pa.assets_data_id FROM portfolio_asset AS pa
+                 JOIN assets_data AS ad ON ad.id = pa.assets_data_id
+                 WHERE pa.portfolio_id = $1 AND ad.symbol = $2",
+            )
+            .bind(SECOND_PORTFOLIO_ID)
+            .bind(symbol)
+            .fetch_one(&pool)
+            .await
+        }
+    };
+    let eur_before = relationship_target("EUR").await?;
+
+    // WHEN the old client syncs the same Portfolio again with an older timestamp (the
+    // server copy wins and is returned) and then with a newer one (the client copy is
+    // stored),
+    let mut stale = portfolio.clone();
+    stale.last_updated_at = stored_at - jiff::Span::new().minutes(1);
+    let pulled = service
+        .sync_portfolios(
+            USER_ID,
+            SyncPortfoliosRequest {
+                portfolios: vec![stale],
+                deleted_portfolios: Vec::new(),
+            },
+        )
+        .await?;
+    let mut newer = portfolio.clone();
+    newer.last_updated_at = stored_at + jiff::Span::new().minutes(1);
+    service
+        .sync_portfolios(
+            USER_ID,
+            SyncPortfoliosRequest {
+                portfolios: vec![newer],
+                deleted_portfolios: Vec::new(),
+            },
+        )
+        .await?;
+
+    // THEN the response reports the fiat cash with provider `YF` and the non-fiat cash
+    // with `DCAPal`,
+    let returned = pulled
+        .updated_portfolios
+        .iter()
+        .find(|portfolio| portfolio.id == SECOND_PORTFOLIO_ID)
+        .expect("the newer server copy is returned");
+    let providers = returned
+        .assets
+        .iter()
+        .map(|asset| (asset.symbol.as_str(), asset.provider.as_str()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        providers,
+        [("EUR", "YF"), ("USDT", "DCAPal")].into_iter().collect()
+    );
+    // the relationship still points at the same Yahoo asset after the client copy is
+    // stored again,
+    assert_eq!(relationship_target("EUR").await?, eur_before);
+    // and no Kraken cash row for a fiat symbol was created.
+    assert_eq!(
+        cash_assets(&pool).await?,
+        vec![
+            (i16::from(Provider::YF), "EUR".to_string()),
+            (i16::from(Provider::Kraken), "USDT".to_string()),
+        ]
+    );
+
+    Ok(())
+}
+
 #[sqlx::test(migrations = "../../migrations", fixtures("users", "portfolio"))]
 async fn provider_is_part_of_shared_asset_identity(
     pool: PgPool,

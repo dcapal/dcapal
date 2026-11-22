@@ -2,6 +2,7 @@
 
 mod asset_provider;
 mod cw;
+mod fiat_asset;
 mod ipapi;
 mod kraken;
 mod kraken_asset;
@@ -16,6 +17,7 @@ use failsafe::{
     backoff::EqualJittered,
     failure_policy::{ConsecutiveFailures, OrElse, SuccessRateOverTimeWindow},
 };
+pub use fiat_asset::CatalogFiatAssetProvider;
 pub use ipapi::*;
 pub use kraken::*;
 pub use kraken_asset::KrakenAssetProvider;

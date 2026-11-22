@@ -1,12 +1,11 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
+    sync::LazyLock,
 };
 
 use failsafe::futures::CircuitBreaker;
-use futures::StreamExt;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
 use tracing::{debug, error, warn};
@@ -14,7 +13,10 @@ use tracing::{debug, error, warn};
 use super::DefaultCircuitBreaker;
 use crate::{
     DateTime,
-    app::domain::entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+    app::domain::{
+        entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+        fiat::{fiat_name, is_fiat},
+    },
     app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
     config,
     error::{DcaError, Result},
@@ -253,6 +255,10 @@ impl KrakenProvider {
         (markets, assets)
     }
 
+    /// Resolves currencies with their catalog or CoinMarketCap metadata.
+    ///
+    /// Classified like [`fetch_assets`]: catalog fiat is fiat, everything else
+    /// (including non-fiat quotes of cross-crypto pairs) is Kraken crypto.
     async fn fetch_assets_cmc(
         &self,
         ccys: &HashSet<AssetId>,
@@ -260,24 +266,27 @@ impl KrakenProvider {
     ) -> BTreeMap<String, Asset> {
         let mut assets = BTreeMap::new();
         let mut to_fetch = Vec::new();
-        for ccy in ccys {
-            match repo.find_asset(ccy).await {
-                Ok(asset) => {
-                    if let Some(a) = asset {
-                        assets.insert(a.id().clone(), a);
-                    } else if fiat::is_fiat(ccy) {
-                        assets.insert(
-                            ccy.clone(),
-                            Asset::Fiat(Fiat::new(ccy.clone(), fiat::get_name(ccy).to_string())),
-                        );
-                    } else {
-                        to_fetch.push(ccy);
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to find asset '{ccy}': {e}");
-                    continue;
-                }
+        let ccys = ccys.iter().collect::<Vec<_>>();
+        let found = match repo.find_assets(&ccys).await {
+            Ok(found) => found,
+            Err(e) => {
+                error!("Failed to find {} assets: {e}", ccys.len());
+                return assets;
+            }
+        };
+        for (ccy, asset) in ccys.into_iter().zip(found) {
+            if let Some(a) = asset {
+                assets.insert(a.id().clone(), a);
+            } else if is_fiat(ccy) {
+                assets.insert(
+                    ccy.clone(),
+                    Asset::Fiat(Fiat::new(
+                        ccy.clone(),
+                        fiat_name(ccy).unwrap_or(ccy).to_string(),
+                    )),
+                );
+            } else {
+                to_fetch.push(ccy);
             }
         }
 
@@ -330,14 +339,14 @@ impl KrakenProvider {
     }
 
     async fn fetch_crypto_cmc(&self, ccys: &[&AssetId]) -> Result<Vec<Asset>> {
-        lazy_static! {
-            static ref CMC_ALIAS: HashMap<&'static str, &'static str> = HashMap::from([
+        static CMC_ALIAS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
+            HashMap::from([
                 ("eth2.s", "eth"),
                 ("repv2", "rep"),
                 ("luna2", "luna"),
-                ("waxl", "axl")
-            ]);
-        }
+                ("waxl", "axl"),
+            ])
+        });
 
         // Skip currencies not known by CMC for now. Better to fallback than send
         // confusing asset names
@@ -538,6 +547,10 @@ fn parse_online_market_symbols(response: &AssetPairsResponse) -> Result<Vec<Stri
                 warn!(symbol, "Ignoring malformed online Kraken market");
                 return None;
             };
+            // Fiat against fiat pairs are priced by Yahoo, not discovered from Kraken.
+            if is_fiat(parsed.base) && is_fiat(parsed.quote) {
+                return None;
+            }
             Some(format!("{}/{}", parsed.base, parsed.quote))
         })
         .collect::<Vec<_>>();
@@ -587,14 +600,31 @@ fn split_base_quote(market_symbols: &[String]) -> Vec<MarketPair> {
         .collect()
 }
 
+/// Returns the pairs that are not stored as markets yet, found with one lookup.
+///
+/// When the lookup fails every pair is considered new, so discovery stores them
+/// rather than skipping markets.
 async fn get_new_markets(
     market_symbols: &[String],
     repo: &MarketDataRepository,
 ) -> Vec<MarketPair> {
-    futures::stream::iter(split_base_quote(market_symbols))
-        .filter(|(base, quote)| is_new_market(format!("{base}{quote}"), repo))
-        .collect::<_>()
-        .await
+    let pairs = split_base_quote(market_symbols);
+    let ids = pairs
+        .iter()
+        .map(|(base, quote)| format!("{base}{quote}"))
+        .collect::<Vec<_>>();
+
+    match repo.find_markets(&ids).await {
+        Ok(found) => pairs
+            .into_iter()
+            .zip(found)
+            .filter_map(|(pair, market)| market.is_none().then_some(pair))
+            .collect(),
+        Err(e) => {
+            error!("Error occurred in searching {} markets: {e}", ids.len());
+            pairs
+        }
+    }
 }
 
 fn get_unique_ccys(market_pairs: &[MarketPair]) -> HashSet<AssetId> {
@@ -604,70 +634,43 @@ fn get_unique_ccys(market_pairs: &[MarketPair]) -> HashSet<AssetId> {
         .collect::<_>()
 }
 
+/// Resolves the currencies of discovered Kraken pairs into assets.
+///
+/// Only the eight catalog fiat currencies are classified as fiat; every other
+/// currency is a Kraken crypto asset. This includes the non-fiat quotes of
+/// Kraken pairs (`btc` in `ethbtc`, stablecoins such as `usdt`, and currencies
+/// such as `zar`, `mxn` or `try`), so those pairs are crypto against crypto
+/// markets: both assets are stored as Kraken/Crypto and the market is priced by
+/// Kraken, never by Yahoo, which only prices fiat against fiat.
 async fn fetch_assets(
     ccys: &HashSet<AssetId>,
     repo: &MarketDataRepository,
 ) -> BTreeMap<String, Asset> {
     let mut assets = BTreeMap::new();
-    for ccy in ccys {
-        match repo.find_asset(ccy).await {
-            Ok(asset) => {
-                if let Some(a) = asset {
-                    assets.insert(a.id().clone(), a);
-                } else {
-                    let a = match fiat::is_fiat(ccy) {
-                        true => Asset::Fiat(Fiat {
-                            id: ccy.to_string(),
-                            symbol: fiat::get_name(ccy).to_string(),
-                        }),
-                        false => Asset::Crypto(Crypto::new_with_id(ccy.clone())),
-                    };
-                    assets.insert(ccy.clone(), a);
-                }
-            }
-            Err(e) => {
-                error!("Failed to find asset '{ccy}': {e}");
-                continue;
-            }
+    let ccys = ccys.iter().collect::<Vec<_>>();
+    let found = match repo.find_assets(&ccys).await {
+        Ok(found) => found,
+        Err(e) => {
+            error!("Failed to find {} assets: {e}", ccys.len());
+            return assets;
+        }
+    };
+
+    for (ccy, asset) in ccys.into_iter().zip(found) {
+        if let Some(a) = asset {
+            assets.insert(a.id().clone(), a);
+        } else {
+            let a = match is_fiat(ccy) {
+                true => Asset::Fiat(Fiat {
+                    id: ccy.to_string(),
+                    symbol: fiat_name(ccy).unwrap_or(ccy).to_string(),
+                }),
+                false => Asset::Crypto(Crypto::new_with_id(ccy.clone())),
+            };
+            assets.insert(ccy.clone(), a);
         }
     }
     assets
-}
-
-mod fiat {
-    use std::collections::HashMap;
-
-    use lazy_static::lazy_static;
-
-    lazy_static! {
-        static ref FIAT_IDS: HashMap<&'static str, &'static str> = HashMap::from([
-            ("aed", "United Arab Emirates Dirham"),
-            ("aud", "Australian Dollar"),
-            ("cad", "Canadian Dollar"),
-            ("chf", "Swiss franc"),
-            ("eur", "Euro"),
-            ("gbp", "British Pound"),
-            ("jpy", "Japanese Yen"),
-            ("usd", "United States Dollar")
-        ]);
-    }
-
-    pub fn is_fiat(id: &str) -> bool {
-        FIAT_IDS.contains_key(id)
-    }
-
-    pub fn get_name(id: &str) -> &'static str {
-        FIAT_IDS.get(id).unwrap()
-    }
-}
-
-async fn is_new_market(id: MarketId, repo: &MarketDataRepository) -> bool {
-    let mkt = repo.find_market(&id).await.unwrap_or_else(|e| {
-        error!("Error occurred in searching market '{}': {}", id, e);
-        None
-    });
-
-    mkt.is_none()
 }
 
 fn get_kraken_api_periods(freq: OHLCFrequency) -> &'static str {
@@ -750,7 +753,11 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use crate::{
-        app::domain::entity::{Asset, Crypto, Fiat, Market},
+        app::domain::{
+            entity::{Asset, Fiat, Market},
+            market_data_utils::price_provider_for,
+        },
+        config::PriceProvider,
         ports::outbound::repository::market_data::MarketDataRepository,
     };
 
@@ -759,88 +766,72 @@ mod tests {
         market_ids_from_symbols, parse_market_symbol, parse_online_market_symbols,
     };
 
-    #[tokio::test]
-    #[ignore = "requires a disposable Redis instance; set DCAPAL_TEST_REDIS_URL"]
-    async fn discovery_repairs_an_existing_market_with_a_missing_asset() {
-        // GIVEN Redis contains pearlusd, but only its quote asset is in the catalog
-        let url = std::env::var("DCAPAL_TEST_REDIS_URL")
-            .expect("DCAPAL_TEST_REDIS_URL must point to a disposable Redis instance");
-        let pool = deadpool_redis::Config::from_url(url)
-            .builder()
-            .expect("Redis pool config should be valid")
-            .build()
-            .expect("Redis pool should be constructible");
-        let repo = MarketDataRepository::new(pool.clone());
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn cross_crypto_pairs_are_crypto_markets_priced_by_kraken(pool: sqlx::PgPool) {
+        // GIVEN Kraken lists the cross-crypto pair ETH/BTC, whose quote is not fiat,
+        let repo = MarketDataRepository::new(pool);
+
+        // WHEN its currencies are classified and the market is built,
+        let pairs = get_new_markets(&["eth/btc".to_string()], &repo).await;
+        let assets = fetch_assets(&super::get_unique_ccys(&pairs), &repo).await;
+        let market = Market::new(
+            "ethbtc".to_string(),
+            assets["eth"].clone(),
+            assets["btc"].clone(),
+            None,
+        );
+
+        // THEN both assets are crypto, the market is not an FX market, and Kraken
+        // (the configured crypto provider) prices it rather than Yahoo.
+        assert!(matches!(assets["eth"], Asset::Crypto(_)));
+        assert!(matches!(assets["btc"], Asset::Crypto(_)));
+        assert!(!market.is_fiat());
+        assert!(matches!(
+            price_provider_for(&market, PriceProvider::Kraken),
+            PriceProvider::Kraken
+        ));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn discovery_selects_a_market_whose_base_asset_is_missing(pool: sqlx::PgPool) {
+        // GIVEN only the USD quote asset is in the catalog and PEARL/USD has no market
+        let repo = MarketDataRepository::new(pool);
         let quote = Asset::Fiat(Fiat::new("usd".to_string(), "US Dollar".to_string()));
         repo.store_asset(&quote)
             .await
             .expect("USD should be stored");
-        let market = Market::new(
-            "pearlusd".to_string(),
-            Asset::Crypto(Crypto::new_with_id("pearl".to_string())),
-            quote,
-            None,
-        );
-        repo.store_market(&market)
-            .await
-            .expect("incomplete PEARL/USD market record should be stored");
-        let mut connection = pool.get().await.expect("Redis should be available");
-        let _: () = redis::cmd("HSET")
-            .arg("dcapal:be:market")
-            .arg("malformed")
-            .arg("{invalid json")
-            .query_async(&mut connection)
-            .await
-            .expect("malformed fixture should be stored");
-        let integrity = repo
-            .market_asset_integrity()
-            .await
-            .expect("integrity scan should tolerate malformed market data");
-        assert_eq!(integrity.markets_with_missing_assets, 1);
-        assert_eq!(integrity.malformed_market_records, 1);
 
         // WHEN the current Kraken snapshot is reconciled and missing currencies are loaded
         let pairs = get_new_markets(&["pearl/usd".to_string()], &repo).await;
         let assets = fetch_assets(&super::get_unique_ccys(&pairs), &repo).await;
 
-        // THEN the incomplete market is selected and its missing base is reconstructed
+        // THEN the missing market is selected and its missing base is reconstructed
         assert_eq!(pairs, vec![("pearl".to_string(), "usd".to_string())]);
         assert_eq!(
             assets.get("pearl").map(Asset::id).map(String::as_str),
             Some("pearl")
         );
 
+        // AND storing the discovered assets and market leaves the catalog consistent
         for asset in assets.values() {
             repo.store_asset(asset)
                 .await
-                .expect("discovered asset should be restored");
+                .expect("discovered asset should be stored");
         }
-        let repaired_market = Market::new(
+        let market = Market::new(
             "pearlusd".to_string(),
             assets.get("pearl").unwrap().clone(),
             assets.get("usd").unwrap().clone(),
             None,
         );
-        repo.store_market(&repaired_market)
+        repo.store_market(&market, crate::config::PriceProvider::Kraken)
             .await
-            .expect("repaired market should be stored");
+            .expect("market should be stored");
         assert!(
             repo.find_market(&"pearlusd".to_string())
                 .await
-                .expect("repaired market should resolve")
+                .expect("market should resolve")
                 .is_some()
-        );
-        let _: () = redis::cmd("HDEL")
-            .arg("dcapal:be:market")
-            .arg("malformed")
-            .query_async(&mut connection)
-            .await
-            .expect("malformed fixture should be removed");
-        assert_eq!(
-            repo.market_asset_integrity()
-                .await
-                .expect("integrity scan should succeed after repair"),
-            Default::default()
         );
     }
 
@@ -903,6 +894,29 @@ mod tests {
             .into_iter()
             .collect()
         );
+    }
+
+    #[test]
+    fn fiat_against_fiat_pairs_are_not_discovered_from_kraken() {
+        // GIVEN Kraken lists a crypto pair and fiat against fiat pairs,
+        // WHEN the online pairs are parsed,
+        // THEN only the crypto pair is kept, because Yahoo prices FX.
+        let pair = |wsname: &str| Pair {
+            wsname: wsname.to_string(),
+            status: "online".to_string(),
+        };
+        let response = AssetPairsResponse {
+            error: vec![],
+            result: HashMap::from([
+                ("a".to_string(), pair("EUR/USD")),
+                ("b".to_string(), pair("USD/JPY")),
+                ("c".to_string(), pair("BTC/EUR")),
+            ]),
+        };
+
+        let symbols = parse_online_market_symbols(&response).unwrap();
+
+        assert_eq!(symbols, ["btc/eur"]);
     }
 
     #[test]

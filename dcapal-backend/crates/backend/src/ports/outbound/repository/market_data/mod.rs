@@ -1,132 +1,636 @@
-mod redis_asset;
-mod redis_market;
+//! PostgreSQL-backed storage for the market-asset catalog, markets and their
+//! latest prices.
+//!
+//! Market assets are rows of the shared `assets_data` table: crypto assets listed
+//! by Kraken (provider Kraken, class Crypto) and the fiat currencies of the fixed
+//! catalog (provider Yahoo, class Cash). A market is a row of `market_price`
+//! keyed by its base and quote `assets_data` ids. The v1 REST API still exposes
+//! the lower-case symbol as asset id and the concatenation of base and quote ids
+//! as market id, so lookups by those ids compare against `LOWER(symbol)`.
+//!
+//! Only provider-confirmed rows belong to the catalog: assets that clients
+//! supplied through synchronization never show up in it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use self::{redis_asset::RedisAsset, redis_market::RedisMarket};
+use itertools::Itertools;
+use jiff_sqlx::ToSqlx;
+use sqlx::{PgPool, Postgres, Transaction, query, query_as, query_scalar};
+use tracing::{debug, warn};
+use uuid::Uuid;
+
 use crate::{
-    app::domain::entity::{Asset, AssetId, AssetKind, Market, MarketId},
+    app::domain::{
+        entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
+        fiat::fiat_symbols,
+    },
+    config::PriceProvider,
     error::{DcaError, Result},
+    ports::outbound::repository::postgres::types::{
+        AssetClass as DbAssetClass, MetadataSource as DbMetadataSource, Provider as DbProvider,
+    },
 };
 
-/// Summarizes whether cached markets can resolve both of their catalog assets.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct MarketAssetIntegrity {
-    /// Number of valid market records with a missing base or quote asset.
-    pub markets_with_missing_assets: usize,
-    /// Number of malformed market records that could not be checked.
-    pub malformed_market_records: usize,
+/// A freshly observed price for one market, ready to be stored.
+#[derive(Debug, Clone, Copy)]
+pub struct MarketPriceUpdate<'a> {
+    /// The market the price belongs to.
+    pub market_id: &'a MarketId,
+    /// The observed price and its observation time.
+    pub price: Price,
+    /// The provider that supplied the price.
+    pub provider: PriceProvider,
 }
 
-impl MarketAssetIntegrity {
-    /// Reports whether discovery should retry to repair market data.
-    pub fn requires_recovery(self) -> bool {
-        self.markets_with_missing_assets > 0 || self.malformed_market_records > 0
-    }
-}
-
+/// Reads and writes the market-asset catalog, markets and latest prices.
 #[derive(Clone)]
 pub struct MarketDataRepository {
-    redis: deadpool_redis::Pool,
+    pool: PgPool,
 }
 
+/// A market's two catalog assets and, when present, its latest price.
+#[derive(sqlx::FromRow)]
+struct MarketRow {
+    base_provider: DbProvider,
+    base_class: DbAssetClass,
+    base_symbol: String,
+    base_name: String,
+    quote_provider: DbProvider,
+    quote_class: DbAssetClass,
+    quote_symbol: String,
+    quote_name: String,
+    price: Option<f64>,
+    observed_at: Option<jiff_sqlx::Timestamp>,
+}
+
+#[derive(sqlx::FromRow)]
+struct AssetRow {
+    provider: DbProvider,
+    asset_class: DbAssetClass,
+    symbol: String,
+    name: String,
+}
+
+/// SQL expression of the v1 market id of a joined `market_price` row.
+macro_rules! market_id_sql {
+    () => {
+        "LOWER(b.symbol) || LOWER(q.symbol)"
+    };
+}
+
+/// Markets joined with their two assets and prices; callers append a `WHERE`.
+const SELECT_MARKETS: &str = r#"
+    SELECT b.provider AS base_provider, b.asset_class AS base_class,
+           b.symbol AS base_symbol, b.name AS base_name,
+           q.provider AS quote_provider, q.asset_class AS quote_class,
+           q.symbol AS quote_symbol, q.name AS quote_name,
+           p.price::float8 AS price, p.observed_at
+    FROM market_price AS p
+    JOIN assets_data AS b ON b.id = p.base_asset_id
+    JOIN assets_data AS q ON q.id = p.quote_asset_id
+"#;
+
+/// Selects the catalog assets; callers append a catalog predicate. The columns
+/// are the same for every query, only the predicate's parameters differ.
+const SELECT_ASSETS: &str =
+    "SELECT ad.provider, ad.asset_class, ad.symbol, ad.name FROM assets_data AS ad";
+
+/// Catalog crypto: confirmed Kraken crypto. Parameters: provider, class, source.
+const CRYPTO_PREDICATE: &str =
+    "ad.provider = $1 AND ad.asset_class = $2 AND ad.metadata_source = $3";
+
+/// Catalog fiat: confirmed Yahoo cash among the fiat catalog symbols.
+/// Parameters: provider, class, symbols, source.
+const FIAT_PREDICATE: &str =
+    "ad.provider = $1 AND ad.asset_class = $2 AND ad.symbol = ANY($3) AND ad.metadata_source = $4";
+
 impl MarketDataRepository {
-    pub fn new(redis: deadpool_redis::Pool) -> Self {
-        Self { redis }
+    /// Creates a repository backed by the provided PostgreSQL pool.
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
+    /// Finds a catalog asset by its lower-case id (the lower-cased symbol).
     pub async fn find_asset(&self, id: &AssetId) -> Result<Option<Asset>> {
-        let mut redis = self.redis.get().await?;
-
-        Asset::find_by_id(id, &mut redis).await
+        Ok(self
+            .find_assets(std::slice::from_ref(id))
+            .await?
+            .pop()
+            .flatten())
     }
 
-    pub async fn load_assets_by_type(&self, kind: AssetKind) -> Result<Vec<Asset>> {
-        let mut redis = self.redis.get().await?;
-
-        Asset::load_by_type(kind, &mut redis).await
-    }
-
-    /// Tells whether the catalog holds at least one crypto or fiat asset.
+    /// Finds several catalog assets with one query, matching ids case-insensitively.
     ///
-    /// Only the per-kind indexes are probed, so no asset is loaded and the
-    /// check stops at the first non-empty kind.
-    pub async fn has_assets(&self) -> Result<bool> {
-        let mut redis = self.redis.get().await?;
+    /// The result is aligned with `ids`: unknown assets are `None`.
+    pub async fn find_assets(&self, ids: &[impl AsRef<str>]) -> Result<Vec<Option<Asset>>> {
+        let wanted = ids
+            .iter()
+            .map(|id| id.as_ref().to_uppercase())
+            .collect::<Vec<_>>();
+        let rows = query_as::<_, AssetRow>(const_format::formatcp!(
+            "{SELECT_ASSETS} WHERE ad.symbol = ANY($1) AND ad.metadata_source = $5 AND (
+                 (ad.provider = $2 AND ad.asset_class = $3)
+                 OR (ad.provider = $6 AND ad.asset_class = $7 AND ad.symbol = ANY($4)))"
+        ))
+        .bind(&wanted)
+        .bind(DbProvider::Kraken)
+        .bind(DbAssetClass::Crypto)
+        .bind(fiat_symbols())
+        .bind(DbMetadataSource::ProviderConfirmed)
+        .bind(DbProvider::YF)
+        .bind(DbAssetClass::Cash)
+        .fetch_all(&self.pool)
+        .await?;
 
-        for kind in [AssetKind::Crypto, AssetKind::Fiat] {
-            if Asset::exists_by_type(kind, &mut redis).await? {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        let found = rows
+            .into_iter()
+            .map(|row| Asset::try_from(row).map(|asset| (asset.id().to_uppercase(), asset)))
+            .collect::<Result<HashMap<_, _>>>()?;
+
+        // Ids may repeat (a conversion from an asset to itself), so clone instead of remove.
+        Ok(wanted.iter().map(|id| found.get(id).cloned()).collect())
     }
 
+    /// Loads every catalog asset of a kind, in no particular order.
+    pub async fn load_assets_by_type(&self, kind: AssetKind) -> Result<Vec<Asset>> {
+        let rows = match kind {
+            AssetKind::Crypto => {
+                query_as::<_, AssetRow>(const_format::formatcp!(
+                    "{SELECT_ASSETS} WHERE {CRYPTO_PREDICATE}"
+                ))
+                .bind(DbProvider::Kraken)
+                .bind(DbAssetClass::Crypto)
+                .bind(DbMetadataSource::ProviderConfirmed)
+                .fetch_all(&self.pool)
+                .await?
+            }
+            AssetKind::Fiat => {
+                query_as::<_, AssetRow>(const_format::formatcp!(
+                    "{SELECT_ASSETS} WHERE {FIAT_PREDICATE}"
+                ))
+                .bind(DbProvider::YF)
+                .bind(DbAssetClass::Cash)
+                .bind(fiat_symbols())
+                .bind(DbMetadataSource::ProviderConfirmed)
+                .fetch_all(&self.pool)
+                .await?
+            }
+        };
+
+        rows.into_iter().map(Asset::try_from).collect()
+    }
+
+    /// Tells whether at least one provider-confirmed Kraken crypto asset is known.
+    ///
+    /// `false` means market discovery has not completed yet (cold start).
+    pub async fn has_crypto_assets(&self) -> Result<bool> {
+        Ok(query_scalar::<_, bool>(const_format::formatcp!(
+            "SELECT EXISTS (SELECT 1 FROM assets_data AS ad WHERE {CRYPTO_PREDICATE})"
+        ))
+        .bind(DbProvider::Kraken)
+        .bind(DbAssetClass::Crypto)
+        .bind(DbMetadataSource::ProviderConfirmed)
+        .fetch_one(&self.pool)
+        .await?)
+    }
+
+    /// Stores a catalog asset in `assets_data`; see [`Self::store_assets`].
     pub async fn store_asset(&self, asset: &Asset) -> Result<()> {
-        let mut redis = self.redis.get().await?;
+        self.store_assets(std::slice::from_ref(asset)).await
+    }
 
-        asset.store(&mut redis).await?;
-
+    /// Stores catalog assets in `assets_data` with one statement, atomically.
+    ///
+    /// Missing assets are inserted as provider-confirmed. Provider-confirmed rows
+    /// are never changed. A client-supplied fiat row is replaced by the catalog's
+    /// English name and class; a client-supplied crypto row keeps the name the
+    /// client chose (Kraken only knows the symbol) and is just marked confirmed.
+    /// When an asset appears several times the first occurrence wins.
+    pub async fn store_assets(&self, assets: &[Asset]) -> Result<()> {
+        upsert_assets(&self.pool, assets).await?;
+        debug!("Successfully stored {} market assets", assets.len());
         Ok(())
     }
 
-    pub async fn find_market(&self, id: &MarketId) -> Result<Option<Market>> {
-        let mut redis = self.redis.get().await?;
-
-        Market::find_by_id(id, &mut redis, self).await
-    }
-
-    /// Summarizes stored market records whose catalog references are incomplete.
-    pub async fn market_asset_integrity(&self) -> Result<MarketAssetIntegrity> {
-        let mut redis = self.redis.get().await?;
-
-        Market::asset_integrity(&mut redis).await
-    }
-
-    pub async fn find_markets(&self, ids: &[&MarketId]) -> Result<Vec<Option<Market>>> {
-        let mut redis = self.redis.get().await?;
-
-        Market::find_by_ids(ids, &mut redis, self).await
-    }
-
-    pub async fn store_market(&self, market: &Market) -> Result<()> {
-        let mut redis = self.redis.get().await?;
-
-        if market.store(&mut redis).await? {
-            Ok(())
-        } else {
-            Err(DcaError::RepositoryStoreFailure(market.id.clone()))
-        }
-    }
-
-    /// Deletes market fields that are absent from a complete Kraken snapshot.
+    /// Stores catalog assets and then markets in one transaction.
     ///
-    /// Redis is inspected directly because the service market cache is lazy and
-    /// does not necessarily contain every stored market.
+    /// Either everything is stored or nothing is. See [`Self::store_assets`] and
+    /// [`Self::store_markets`] for the semantics of each part.
+    pub async fn store_catalog(
+        &self,
+        assets: &[Asset],
+        markets: &[(&Market, PriceProvider)],
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        upsert_assets(&mut *tx, assets).await?;
+        insert_markets(&mut tx, markets).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Finds a market, with its latest price when one has been stored.
+    pub async fn find_market(&self, id: &MarketId) -> Result<Option<Market>> {
+        let row = query_as::<_, MarketRow>(const_format::formatcp!(
+            "{SELECT_MARKETS} WHERE {} = $1",
+            market_id_sql!()
+        ))
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(Market::try_from).transpose()
+    }
+
+    /// Finds several markets at once.
+    ///
+    /// The result is aligned with `ids`: unknown markets are `None`.
+    pub async fn find_markets(&self, ids: &[impl AsRef<str>]) -> Result<Vec<Option<Market>>> {
+        let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+        let rows = query_as::<_, MarketRow>(const_format::formatcp!(
+            "{SELECT_MARKETS} WHERE {} = ANY($1)",
+            market_id_sql!()
+        ))
+        .bind(&wanted)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut found = rows
+            .into_iter()
+            .map(|row| Market::try_from(row).map(|m| (m.id.clone(), m)))
+            .collect::<Result<std::collections::HashMap<_, _>>>()?;
+
+        Ok(ids.iter().map(|id| found.remove(id.as_ref())).collect())
+    }
+
+    /// Stores one market; see [`Self::store_markets`].
+    pub async fn store_market(&self, market: &Market, provider: PriceProvider) -> Result<()> {
+        self.store_markets(&[(market, provider)]).await
+    }
+
+    /// Inserts the markets that do not exist yet and stores the prices they carry,
+    /// in one transaction and a constant number of statements.
+    ///
+    /// All catalog assets must already be stored; otherwise nothing is written and
+    /// the first market with a missing asset is reported. `provider` is the provider
+    /// that prices each market; an existing market keeps its stored provider until
+    /// a price is stored. When a market appears several times the last price wins.
+    pub async fn store_markets(&self, markets: &[(&Market, PriceProvider)]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        insert_markets(&mut tx, markets).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Deletes crypto markets absent from a complete Kraken snapshot, with their prices.
+    ///
+    /// Fiat against fiat markets (priced by Yahoo, never listed by Kraken) are never
+    /// deleted. Returns the deleted market ids. An empty snapshot is rejected so that
+    /// a failed provider call can never wipe every market.
     pub async fn delete_markets_not_in(
         &self,
         market_ids: &HashSet<MarketId>,
     ) -> Result<Vec<MarketId>> {
-        let mut redis = self.redis.get().await?;
-
-        Market::delete_not_in(market_ids, &mut redis).await
-    }
-
-    pub async fn update_mkt_price(&self, market: &Market) -> Result<()> {
-        if market.price().is_none() {
-            return Ok(());
+        if market_ids.is_empty() {
+            return Err(DcaError::Generic(
+                "Cannot reconcile markets from an empty Kraken snapshot".to_string(),
+            ));
         }
 
-        let mut redis = self.redis.get().await?;
+        let keep = market_ids.iter().map(String::as_str).collect::<Vec<_>>();
+        let deleted = query_scalar::<_, String>(const_format::formatcp!(
+            "DELETE FROM market_price AS p
+             USING assets_data AS b, assets_data AS q
+             WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
+               AND NOT EXISTS (SELECT 1 FROM UNNEST($1::text[]) AS k(id) WHERE k.id = {id})
+               AND NOT (b.provider = $2 AND b.asset_class = $3 AND b.symbol = ANY($4)
+                    AND q.provider = $2 AND q.asset_class = $3 AND q.symbol = ANY($4))
+             RETURNING {id}",
+            id = market_id_sql!()
+        ))
+        .bind(&keep)
+        .bind(DbProvider::YF)
+        .bind(DbAssetClass::Cash)
+        .bind(fiat_symbols())
+        .fetch_all(&self.pool)
+        .await?;
 
-        market.store(&mut redis).await?;
-
-        Ok(())
+        if !deleted.is_empty() {
+            debug!("Removed {} stale markets", deleted.len());
+        }
+        Ok(deleted)
     }
 
-    pub async fn load_markets(&self) -> Result<Vec<Market>> {
-        let mut redis = self.redis.get().await?;
+    /// Stores the latest price of many markets with a single statement per chunk.
+    ///
+    /// Prices of markets that no longer exist, and non-finite prices, are skipped. When
+    /// a market appears several times the last price wins. Returns the number of stored prices.
+    pub async fn upsert_prices(&self, updates: &[MarketPriceUpdate<'_>]) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let stored = upsert_prices(&mut tx, updates).await?;
+        tx.commit().await?;
+        Ok(stored)
+    }
 
-        Market::load_all(&mut redis, self).await
+    /// Loads every market with its latest price, in no particular order.
+    pub async fn load_markets(&self) -> Result<Vec<Market>> {
+        let rows = query_as::<_, MarketRow>(SELECT_MARKETS)
+            .fetch_all(&self.pool)
+            .await?;
+
+        rows.into_iter().map(Market::try_from).collect()
+    }
+}
+
+/// Number of prices written by one statement, so a long pass never holds one huge statement.
+const PRICE_CHUNK_SIZE: usize = 50;
+
+/// Replaces the stored price of existing markets, skipping unknown markets.
+async fn upsert_prices(
+    tx: &mut Transaction<'_, Postgres>,
+    updates: &[MarketPriceUpdate<'_>],
+) -> Result<u64> {
+    // A single statement cannot touch one row twice: keep the last price of each market.
+    let updates = updates
+        .iter()
+        .rev()
+        .filter(|u| {
+            let finite = u.price.price.is_finite();
+            if !finite {
+                warn!(mkt = u.market_id, "Skipping non-finite price");
+            }
+            finite
+        })
+        .unique_by(|u| u.market_id)
+        .collect::<Vec<_>>();
+
+    let mut stored = 0;
+    for chunk in updates.chunks(PRICE_CHUNK_SIZE) {
+        let ids = chunk
+            .iter()
+            .map(|u| u.market_id.as_str())
+            .collect::<Vec<_>>();
+        // The shortest round-trip decimal text keeps the f64 exactly through NUMERIC.
+        let prices = chunk
+            .iter()
+            .map(|u| u.price.price.to_string())
+            .collect::<Vec<_>>();
+        let observed = chunk
+            .iter()
+            .map(|u| u.price.ts.to_sqlx())
+            .collect::<Vec<_>>();
+        let providers = chunk
+            .iter()
+            .map(|u| stored_provider(u.provider))
+            .collect::<Result<Vec<_>>>()?;
+
+        let result = query(const_format::formatcp!(
+            "UPDATE market_price AS p
+             SET price = u.price::numeric,
+                 provider = u.provider,
+                 observed_at = u.observed_at,
+                 fetched_at = NOW(),
+                 last_error = NULL,
+                 last_error_at = NULL
+             FROM UNNEST($1::text[], $2::text[], $3::timestamptz[], $4::smallint[])
+                  AS u(market_id, price, observed_at, provider),
+                  assets_data AS b, assets_data AS q
+             WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
+               AND {} = u.market_id",
+            market_id_sql!()
+        ))
+        .bind(&ids)
+        .bind(&prices)
+        .bind(&observed)
+        .bind(&providers)
+        .execute(&mut **tx)
+        .await?;
+        stored += result.rows_affected();
+    }
+
+    Ok(stored)
+}
+
+/// Converts the configured price provider into the provider code stored with a price.
+///
+/// CryptoWatch has no code in `assets_data.provider`, so its prices cannot be stored.
+fn stored_provider(provider: PriceProvider) -> Result<DbProvider> {
+    match provider {
+        PriceProvider::Kraken => Ok(DbProvider::Kraken),
+        PriceProvider::Yahoo => Ok(DbProvider::YF),
+        PriceProvider::CryptoWatch => Err(DcaError::Generic(
+            "CryptoWatch prices cannot be stored: it has no provider code".to_string(),
+        )),
+    }
+}
+
+/// Returns the `assets_data` key (provider and upper-case symbol) of a catalog asset.
+fn catalog_key(asset: &Asset) -> (DbProvider, String) {
+    let provider = match asset {
+        Asset::Crypto(_) => DbProvider::Kraken,
+        Asset::Fiat(_) => DbProvider::YF,
+    };
+    (provider, asset.id().to_uppercase())
+}
+
+/// Upserts catalog assets with one set-based statement.
+///
+/// Fiat rows (Yahoo cash) replace the metadata of a client-supplied row; crypto
+/// rows only mark it confirmed. Provider-confirmed rows are never changed.
+async fn upsert_assets<'e>(executor: impl sqlx::PgExecutor<'e>, assets: &[Asset]) -> Result<()> {
+    // A single statement cannot touch one row twice: keep the first of each key.
+    let assets = assets
+        .iter()
+        .unique_by(|asset| catalog_key(asset))
+        .collect::<Vec<_>>();
+    if assets.is_empty() {
+        return Ok(());
+    }
+
+    let mut ids = Vec::with_capacity(assets.len());
+    let mut providers = Vec::with_capacity(assets.len());
+    let mut symbols = Vec::with_capacity(assets.len());
+    let mut names = Vec::with_capacity(assets.len());
+    let mut classes = Vec::with_capacity(assets.len());
+    for asset in &assets {
+        let (provider, symbol) = catalog_key(asset);
+        let (class, name) = match asset {
+            Asset::Crypto(a) => (DbAssetClass::Crypto, a.symbol.as_str()),
+            Asset::Fiat(a) => (DbAssetClass::Cash, a.symbol.as_str()),
+        };
+        ids.push(Uuid::now_v7());
+        providers.push(i16::from(provider));
+        symbols.push(symbol);
+        names.push(name);
+        classes.push(i16::from(class));
+    }
+
+    // The currency of a catalog asset is its own symbol.
+    query(
+        "INSERT INTO assets_data
+             (id, provider, symbol, name, currency, asset_class, metadata_source,
+              created_at, updated_at)
+         SELECT u.id, u.provider, u.symbol, u.name, u.symbol, u.asset_class, $6, NOW(), NOW()
+         FROM UNNEST($1::uuid[], $2::smallint[], $3::text[], $4::text[], $5::smallint[])
+              AS u(id, provider, symbol, name, asset_class)
+         ON CONFLICT (provider, symbol) DO UPDATE SET
+             name = CASE WHEN assets_data.provider = $7
+                         THEN EXCLUDED.name ELSE assets_data.name END,
+             currency = CASE WHEN assets_data.provider = $7
+                             THEN EXCLUDED.currency ELSE assets_data.currency END,
+             asset_class = CASE WHEN assets_data.provider = $7
+                                THEN EXCLUDED.asset_class ELSE assets_data.asset_class END,
+             metadata_source = EXCLUDED.metadata_source,
+             updated_at = EXCLUDED.updated_at
+         WHERE assets_data.metadata_source = $8",
+    )
+    .bind(&ids)
+    .bind(&providers)
+    .bind(&symbols)
+    .bind(&names)
+    .bind(&classes)
+    .bind(DbMetadataSource::ProviderConfirmed)
+    .bind(DbProvider::YF)
+    .bind(DbMetadataSource::ClientSupplied)
+    .execute(executor)
+    .await?;
+
+    Ok(())
+}
+
+/// Inserts the markets that do not exist yet and stores their prices inside `tx`.
+///
+/// Fails, leaving `tx` to roll back, when a market's catalog asset is missing.
+async fn insert_markets(
+    tx: &mut Transaction<'_, Postgres>,
+    markets: &[(&Market, PriceProvider)],
+) -> Result<()> {
+    if markets.is_empty() {
+        return Ok(());
+    }
+
+    let mut market_ids = Vec::with_capacity(markets.len());
+    let mut base_providers = Vec::with_capacity(markets.len());
+    let mut base_symbols = Vec::with_capacity(markets.len());
+    let mut quote_providers = Vec::with_capacity(markets.len());
+    let mut quote_symbols = Vec::with_capacity(markets.len());
+    let mut providers = Vec::with_capacity(markets.len());
+    for (market, provider) in markets {
+        let (base_provider, base_symbol) = catalog_key(&market.base);
+        let (quote_provider, quote_symbol) = catalog_key(&market.quote);
+        market_ids.push(market.id.as_str());
+        base_providers.push(i16::from(base_provider));
+        base_symbols.push(base_symbol);
+        quote_providers.push(i16::from(quote_provider));
+        quote_symbols.push(quote_symbol);
+        providers.push(i16::from(stored_provider(*provider)?));
+    }
+
+    // One statement resolves the assets, inserts the resolvable markets and reports
+    // the markets whose assets are missing.
+    let missing = query_scalar::<_, String>(
+        "WITH w AS (
+             SELECT * FROM UNNEST($1::text[], $2::smallint[], $3::text[], $4::smallint[],
+                                  $5::text[], $6::smallint[])
+                  AS w(market_id, base_provider, base_symbol, quote_provider, quote_symbol, provider)
+         ), resolved AS (
+             SELECT w.market_id, b.id AS base_id, q.id AS quote_id, w.provider
+             FROM w
+             LEFT JOIN assets_data AS b
+               ON b.provider = w.base_provider AND b.symbol = w.base_symbol
+             LEFT JOIN assets_data AS q
+               ON q.provider = w.quote_provider AND q.symbol = w.quote_symbol
+         ), inserted AS (
+             INSERT INTO market_price (base_asset_id, quote_asset_id, provider)
+             SELECT base_id, quote_id, provider FROM resolved
+             WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
+             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING
+         )
+         SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
+    )
+    .bind(&market_ids)
+    .bind(&base_providers)
+    .bind(&base_symbols)
+    .bind(&quote_providers)
+    .bind(&quote_symbols)
+    .bind(&providers)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|e| {
+        warn!("Failed to store {} markets: {e}", markets.len());
+        DcaError::RepositoryStoreFailure(market_ids[0].to_string())
+    })?;
+    if let Some(first) = missing.first() {
+        warn!(mkt = first, "Failed to store market: asset not stored");
+        return Err(DcaError::RepositoryStoreFailure(first.clone()));
+    }
+
+    let updates = markets
+        .iter()
+        .filter_map(|(market, provider)| {
+            (*market.price()).map(|price| MarketPriceUpdate {
+                market_id: &market.id,
+                price,
+                provider: *provider,
+            })
+        })
+        .collect::<Vec<_>>();
+    upsert_prices(tx, &updates).await?;
+
+    debug!("Successfully stored {} markets", markets.len());
+    Ok(())
+}
+
+impl TryFrom<AssetRow> for Asset {
+    type Error = DcaError;
+
+    /// Builds a catalog asset from a stored row, rejecting rows outside the catalog.
+    fn try_from(row: AssetRow) -> Result<Self> {
+        asset_from_parts(row.provider, row.asset_class, row.symbol, row.name)
+    }
+}
+
+/// Builds a catalog asset from its stored columns: Kraken crypto or Yahoo cash.
+fn asset_from_parts(
+    provider: DbProvider,
+    asset_class: DbAssetClass,
+    symbol: String,
+    name: String,
+) -> Result<Asset> {
+    let id = symbol.to_lowercase();
+    match (provider, asset_class) {
+        (DbProvider::Kraken, DbAssetClass::Crypto) => {
+            Ok(Asset::Crypto(Crypto { id, symbol: name }))
+        }
+        (DbProvider::YF, DbAssetClass::Cash) => Ok(Asset::Fiat(Fiat { id, symbol: name })),
+        _ => Err(DcaError::Generic(format!(
+            "Stored asset '{id}' is not a market asset (provider {provider:?}, class {asset_class:?})"
+        ))),
+    }
+}
+
+impl TryFrom<MarketRow> for Market {
+    type Error = DcaError;
+
+    /// Builds a market, with its catalog assets and latest price, from a joined row.
+    fn try_from(row: MarketRow) -> Result<Self> {
+        let base = asset_from_parts(
+            row.base_provider,
+            row.base_class,
+            row.base_symbol,
+            row.base_name,
+        )?;
+        let quote = asset_from_parts(
+            row.quote_provider,
+            row.quote_class,
+            row.quote_symbol,
+            row.quote_name,
+        )?;
+        let price = row
+            .price
+            .zip(row.observed_at)
+            .map(|(price, ts)| Price::new(price, ts.to_jiff()));
+
+        let id = format!("{}{}", base.id(), quote.id());
+        Ok(Market::new(id, base, quote, price))
     }
 }

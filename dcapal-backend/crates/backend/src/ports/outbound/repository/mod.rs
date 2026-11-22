@@ -1,177 +1,172 @@
 //! The [`repository`](self) module contains interfaces to persistent storage
-//! services, like Redis.
+//! services, like PostgreSQL.
 
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use jiff::Timestamp;
-use redis::AsyncCommands;
+use jiff_sqlx::ToSqlx;
+use sqlx::{PgPool, query, query_as, query_scalar};
 use uuid::Uuid;
 
-use crate::{DateTime, app::services::ip2location::GeoData, error::Result};
+use crate::{DateTime, error::Result};
 pub mod asset;
-pub mod dto;
 pub mod market_data;
 pub mod portfolio;
 /// PostgreSQL-backed repository implementations.
 pub mod postgres;
 pub mod user;
 
-const REDIS_BASE: &str = "dcapal:be";
-
+/// Stores when periodic workers last completed.
 #[derive(Clone)]
 pub struct MiscRepository {
-    redis: deadpool_redis::Pool,
+    pool: PgPool,
 }
 
 impl MiscRepository {
-    const ENTITY: &'static str = concatcp!(REDIS_BASE, ':', "misc");
     const CW_LAST_FETCHED: &'static str = "cw-last-fetched";
 
-    pub fn new(redis: deadpool_redis::Pool) -> Self {
-        Self { redis }
+    /// Creates a repository backed by the provided PostgreSQL pool.
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
+    /// Returns when market discovery last completed, if it ever did.
     pub async fn get_cw_last_fetched(&self) -> Result<Option<DateTime>> {
-        let mut redis = self.redis.get().await?;
-        let last_fetched: Option<i64> = redis.hget(Self::ENTITY, Self::CW_LAST_FETCHED).await?;
-
-        if last_fetched.is_none() {
-            return Ok(None);
-        }
-
-        let last_fetched = Timestamp::from_second(last_fetched.unwrap()).unwrap();
-        Ok(Some(last_fetched))
+        let completed_at: Option<jiff_sqlx::Timestamp> =
+            query_scalar("SELECT completed_at FROM worker_marker WHERE name = $1")
+                .bind(Self::CW_LAST_FETCHED)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(completed_at.map(jiff_sqlx::Timestamp::to_jiff))
     }
 
+    /// Records when market discovery last completed.
     pub async fn set_cw_last_fetched(&self, ts: DateTime) -> Result<()> {
-        let mut redis = self.redis.get().await?;
-
-        let ts = ts.as_second();
-        let _: () = redis.hset(Self::ENTITY, Self::CW_LAST_FETCHED, ts).await?;
+        query(
+            "INSERT INTO worker_marker (name, completed_at) VALUES ($1, $2)
+             ON CONFLICT (name) DO UPDATE SET completed_at = EXCLUDED.completed_at",
+        )
+        .bind(Self::CW_LAST_FETCHED)
+        .bind(ts.to_sqlx())
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
 }
 
+/// Stores visitor and import counters exposed as metrics.
 #[derive(Clone)]
 pub struct StatsRepository {
-    redis: deadpool_redis::Pool,
+    pool: PgPool,
 }
 
 impl StatsRepository {
-    const STATS: &'static str = concatcp!(REDIS_BASE, ':', "stats");
     const IMPORTED_PORTFOLIO_KEY: &'static str = "imported-portfolio-total";
 
-    const VISITORS: &'static str = concatcp!(StatsRepository::STATS, ':', "visitors");
-    const VISITOR_IP: &'static str = concatcp!(StatsRepository::STATS, ':', "visitor-ip");
-
-    pub fn new(redis: deadpool_redis::Pool) -> Self {
-        Self { redis }
+    /// Creates a repository backed by the provided PostgreSQL pool.
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
+    /// Counts one more visit of an IP address and returns its visit total.
     pub async fn bump_visit(&self, ip: &str) -> Result<i64> {
-        let mut redis = self.redis.get().await?;
-        let count = redis::cmd("HINCRBY")
-            .arg(&[Self::VISITORS, ip])
-            .arg(1)
-            .query_async(&mut redis)
+        Ok(query_scalar(
+            "INSERT INTO visitor (ip, visits) VALUES ($1, 1)
+             ON CONFLICT (ip) DO UPDATE SET visits = visitor.visits + 1
+             RETURNING visits",
+        )
+        .bind(ip)
+        .fetch_one(&self.pool)
+        .await?)
+    }
+
+    /// Returns the visit total of every known IP address.
+    pub async fn fetch_all_visitors(&self) -> Result<HashMap<String, i64>> {
+        let rows: Vec<(String, i64)> = query_as("SELECT ip, visits FROM visitor")
+            .fetch_all(&self.pool)
             .await?;
 
-        Ok(count)
+        Ok(rows.into_iter().collect())
     }
 
-    pub async fn find_visitor_ip(&self, ip: &str) -> Result<Option<GeoData>> {
-        let mut redis = self.redis.get().await?;
-        let geo: Option<String> = redis.hget(Self::VISITOR_IP, ip).await?;
-
-        if let Some(geo) = geo {
-            Ok(Some(serde_json::from_str(&geo).unwrap()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub async fn store_visitor_ip(&self, ip: &str, geo: &GeoData) -> Result<bool> {
-        let mut redis = self.redis.get().await?;
-
-        let geo = serde_json::to_string(geo).unwrap();
-        let n_records: u32 = redis.hset_nx(Self::VISITOR_IP, ip, geo).await?;
-
-        Ok(n_records > 0)
-    }
-
-    pub async fn fetch_all_visitors(&self) -> Result<HashMap<String, i32>> {
-        let mut redis = self.redis.get().await?;
-
-        Ok(redis.hgetall(Self::VISITORS).await?)
-    }
-
+    /// Counts one more imported portfolio and returns the new total.
     pub async fn increase_imported_portfolio_count(&self) -> Result<i64> {
-        let mut redis = self.redis.get().await?;
-
-        let count: i64 = redis
-            .hincr(Self::STATS, Self::IMPORTED_PORTFOLIO_KEY, 1)
-            .await?;
-
-        Ok(count)
+        Ok(query_scalar(
+            "INSERT INTO app_counter (name, value) VALUES ($1, 1)
+             ON CONFLICT (name) DO UPDATE SET value = app_counter.value + 1
+             RETURNING value",
+        )
+        .bind(Self::IMPORTED_PORTFOLIO_KEY)
+        .fetch_one(&self.pool)
+        .await?)
     }
 
+    /// Returns how many portfolios were imported so far.
     pub async fn get_imported_portfolio_count(&self) -> Result<i64> {
-        let mut redis = self.redis.get().await?;
-
-        let count: Option<i64> = redis
-            .hget(Self::STATS, Self::IMPORTED_PORTFOLIO_KEY)
+        let count: Option<i64> = query_scalar("SELECT value FROM app_counter WHERE name = $1")
+            .bind(Self::IMPORTED_PORTFOLIO_KEY)
+            .fetch_optional(&self.pool)
             .await?;
 
         Ok(count.unwrap_or_default())
     }
 }
 
+/// Stores short-lived portfolio transfers created by the import endpoint.
 #[derive(Clone)]
 pub struct ImportedRepository {
-    redis: deadpool_redis::Pool,
+    pool: PgPool,
 }
 
+/// A stored portfolio transfer and the instant it stops being readable.
 pub struct ImportedPortfolio {
     pub id: Uuid,
     pub expires_at: DateTime,
 }
 
 impl ImportedRepository {
-    const IMPORTED: &'static str = concatcp!(REDIS_BASE, ':', "imported");
+    /// How long an imported portfolio can be fetched.
+    const TTL: std::time::Duration = std::time::Duration::from_secs(60);
 
-    pub fn new(redis: deadpool_redis::Pool) -> Self {
-        Self { redis }
+    /// Creates a repository backed by the provided PostgreSQL pool.
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
+    /// Stores a portfolio for [`Self::TTL`] and purges the transfers that already expired.
     pub async fn store_portfolio(&self, pfolio: &serde_json::Value) -> Result<ImportedPortfolio> {
-        let mut redis = self.redis.get().await?;
-
+        // Whole seconds, like the expiry the clients were given before.
+        let expires_at = Timestamp::from_second((Timestamp::now() + Self::TTL).as_second())
+            .unwrap_or_else(|_| Timestamp::now());
         let id = Uuid::new_v4();
-        let key = Self::redis_imported_key(id.simple());
-        let value = serde_json::to_string(&pfolio).unwrap();
 
-        let _: () = redis.set_ex(&key, value, 60).await?;
-
-        let expires_at: i64 = redis::cmd("EXPIRETIME")
-            .arg(&key)
-            .query_async(&mut redis)
-            .await?;
-
-        let expires_at = DateTime::from_second(expires_at).unwrap_or_else(|_| Timestamp::now());
+        // One statement purges and inserts atomically, saving the transaction round-trips.
+        query(
+            "WITH purged AS (DELETE FROM imported_portfolio WHERE expires_at <= NOW())
+             INSERT INTO imported_portfolio (id, payload, expires_at) VALUES ($1, $2, $3)",
+        )
+        .bind(id)
+        .bind(pfolio)
+        .bind(expires_at.to_sqlx())
+        .execute(&self.pool)
+        .await?;
 
         Ok(ImportedPortfolio { id, expires_at })
     }
 
+    /// Returns an imported portfolio unless it expired or never existed.
     pub async fn find_portfolio(&self, id: &str) -> Result<Option<serde_json::Value>> {
-        let mut redis = self.redis.get().await?;
+        // An identifier that is not a UUID cannot name a stored portfolio.
+        let Ok(id) = Uuid::parse_str(id) else {
+            return Ok(None);
+        };
 
-        let key = Self::redis_imported_key(id);
-        let portfolio: Option<String> = redis.get(key).await?;
-        Ok(portfolio.map(|s| serde_json::from_str(&s).unwrap()))
-    }
-
-    fn redis_imported_key(id: impl Display) -> String {
-        format!("{}:{}", Self::IMPORTED, id)
+        Ok(query_scalar(
+            "SELECT payload FROM imported_portfolio WHERE id = $1 AND expires_at > NOW()",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?)
     }
 }

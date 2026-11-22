@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use tokio::time::Instant;
@@ -7,19 +7,23 @@ use tracing::{debug, error, info};
 use crate::{
     AppContext, DateTime,
     app::{
-        domain::entity::Asset,
-        domain::market_data_utils::fetch_market_price,
+        domain::{
+            entity::Market,
+            market_data_utils::{fetch_market_price, price_provider_for},
+        },
         infra::utils::{StopToken, should_stop},
-        services::market_data::MarketDataService,
+        services::{fx_rates::seed_fx_catalog, market_data::MarketDataService},
     },
     config::PriceProvider,
-    error::{DcaError, Result},
+    error::Result,
     ports::outbound::{
         adapter::PriceProviders,
         repository::{MiscRepository, market_data::MarketDataRepository},
     },
 };
 
+/// Number of priced markets stored per transaction during discovery.
+const MARKET_FLUSH_SIZE: usize = 50;
 const INITIAL_DELAY: Duration = Duration::from_millis(50);
 const DAILY_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 const HOURLY_INTERVAL: Duration = Duration::from_secs(60 * 60);
@@ -53,6 +57,13 @@ impl MarketDiscoveryWorker {
     }
 
     pub async fn run(&self, mut stop_token: StopToken) {
+        // FX never depends on Kraken: seed it before any Kraken call is made. The
+        // startup gate has normally priced the FX markets already and the price
+        // updater keeps them fresh, so seeding is idempotent and stores no prices.
+        if let Err(e) = self.seed_fx_catalog().await {
+            error!("Failed to seed the fiat catalog and FX markets: {:?}", e);
+        }
+
         let mut reconciliation_stop_token = stop_token.clone();
         let reconciliation = self.run_market_reconciliation(&mut reconciliation_stop_token);
         let discovery = self.run_market_discovery(&mut stop_token);
@@ -79,18 +90,10 @@ impl MarketDiscoveryWorker {
     async fn run_market_discovery(&self, stop_token: &mut StopToken) {
         let mut interval =
             tokio::time::interval_at(Instant::now() + INITIAL_DELAY, DAILY_CHECK_INTERVAL);
-        let initial_integrity = self.market_data_repo.market_asset_integrity().await;
         let mut recovery_backoff = Duration::ZERO;
         let mut next_recovery_attempt = Instant::now();
-        let mut recovery_pending = match initial_integrity {
-            Ok(integrity) => integrity.requires_recovery(),
-            Err(error) => {
-                error!("Failed to check Kraken market asset references: {error}");
-                recovery_backoff = INITIAL_RECOVERY_BACKOFF;
-                next_recovery_attempt = Instant::now() + recovery_backoff;
-                true
-            }
-        };
+        // Set while a failed discovery waits to be retried with backoff.
+        let mut recovery_pending = false;
 
         loop {
             tokio::select! {
@@ -156,7 +159,7 @@ impl MarketDiscoveryWorker {
 
         if !deleted.is_empty() {
             info!(
-                "Removed {} stale Kraken markets from Redis: {:?}",
+                "Removed {} stale Kraken markets from the database: {:?}",
                 deleted.len(),
                 deleted
             );
@@ -166,7 +169,20 @@ impl MarketDiscoveryWorker {
         Ok(())
     }
 
+    /// Idempotently stores the fiat catalog and the FX markets (see
+    /// [`seed_fx_catalog`]); prices are the startup gate's and the price updater's job.
+    async fn seed_fx_catalog(&self) -> Result<()> {
+        seed_fx_catalog(
+            &self.market_data_repo,
+            &self.market_data_service,
+            self.price_provider,
+        )
+        .await
+    }
+
     async fn discover_new_markets(&self) -> Result<()> {
+        self.seed_fx_catalog().await?;
+
         // Collect assets and markets from Kraken
         let (assets, markets) = self
             .providers
@@ -174,42 +190,56 @@ impl MarketDiscoveryWorker {
             .fetch_assets(&self.market_data_repo)
             .await?;
 
-        // All market assets must be present before any market record is written.
-        let asset_result = store_discovered_assets(assets, |asset| async move {
-            self.market_data_repo.store_asset(&asset).await
-        })
-        .await;
+        // All market assets must be present before any market record is written;
+        // one atomic statement stores them all.
+        let asset_result = self.market_data_repo.store_assets(&assets).await;
         self.market_data_service.invalidate_asset_cache();
+        if let Err(error) = &asset_result {
+            error!(error = %error, count = assets.len(), "Failed to store discovered assets");
+        }
         asset_result?;
 
-        // Store markets in repository
+        // Fetch prices market by market, storing them in batches instead of one
+        // transaction per market.
+        let mut batch: Vec<(Market, PriceProvider)> = Vec::with_capacity(MARKET_FLUSH_SIZE);
         for mut m in markets {
             info!("Fetching price for market '{}'", m.id);
-            let Some(price) = fetch_market_price(&m, &self.providers, self.price_provider).await
-            else {
+            let provider = price_provider_for(&m, self.price_provider);
+            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
                 continue;
             };
 
             m.set_price(price);
+            batch.push((m, provider));
 
-            info!("Storing market '{}'", m.id);
-            if let Err(error) = self.market_data_repo.store_market(&m).await {
-                self.market_data_service.invalidate_market_cache();
-                return Err(error);
+            if batch.len() >= MARKET_FLUSH_SIZE {
+                self.flush_markets(&mut batch).await?;
             }
         }
+        self.flush_markets(&mut batch).await?;
 
         self.market_data_service.invalidate_market_cache();
 
-        let integrity = self.market_data_repo.market_asset_integrity().await?;
-        if integrity.requires_recovery() {
-            return Err(DcaError::Generic(format!(
-                "Kraken discovery left {} markets with missing assets and {} malformed market records",
-                integrity.markets_with_missing_assets, integrity.malformed_market_records,
-            )));
+        Ok(())
+    }
+
+    /// Stores and clears the pending priced markets in one transaction.
+    ///
+    /// The market cache is invalidated even when the write fails.
+    async fn flush_markets(&self, batch: &mut Vec<(Market, PriceProvider)>) -> Result<()> {
+        if batch.is_empty() {
+            return Ok(());
         }
 
-        Ok(())
+        info!("Storing {} markets", batch.len());
+        let markets = batch
+            .iter()
+            .map(|(market, provider)| (market, *provider))
+            .collect::<Vec<_>>();
+        let result = self.market_data_repo.store_markets(&markets).await;
+        self.market_data_service.invalidate_market_cache();
+        batch.clear();
+        result
     }
 }
 
@@ -219,29 +249,6 @@ fn next_recovery_backoff(previous: Duration) -> Duration {
     }
 
     previous.saturating_mul(2).min(MAX_RECOVERY_BACKOFF)
-}
-
-async fn store_discovered_assets<F, Fut>(assets: Vec<Asset>, mut store: F) -> Result<()>
-where
-    F: FnMut(Asset) -> Fut,
-    Fut: Future<Output = Result<()>>,
-{
-    for asset in assets {
-        let asset_id = asset.id().clone();
-        let serialized = serde_json::to_string(&asset).unwrap();
-        info!("Storing asset '{}'", asset_id);
-        if let Err(error) = store(asset).await {
-            error!(
-                asset_id,
-                error = %error,
-                asset = %serialized,
-                "Failed to store discovered asset"
-            );
-            return Err(error);
-        }
-    }
-
-    Ok(())
 }
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
@@ -258,18 +265,11 @@ fn is_outdated_at(last_fetched: Option<DateTime>, today: Date) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use jiff::{civil::date, tz::TimeZone};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    use crate::{
-        app::domain::entity::{Asset, Crypto},
-        error::DcaError,
-    };
-
     use super::{
         HOURLY_INTERVAL, INITIAL_RECOVERY_BACKOFF, MAX_RECOVERY_BACKOFF, is_outdated_at,
-        next_recovery_backoff, store_discovered_assets,
+        next_recovery_backoff,
     };
+    use jiff::{civil::date, tz::TimeZone};
 
     #[test]
     fn missing_daily_marker_is_outdated() {
@@ -319,27 +319,6 @@ mod tests {
         // WHEN its interval is read
         // THEN the worker waits one hour between runs
         assert_eq!(HOURLY_INTERVAL, std::time::Duration::from_secs(3600));
-    }
-
-    #[tokio::test]
-    async fn failed_asset_store_stops_remaining_asset_writes() {
-        // GIVEN discovery has multiple assets to persist and one write fails
-        let attempted_writes = AtomicUsize::new(0);
-        let assets = vec![
-            Asset::Crypto(Crypto::new_with_id("pearl".to_string())),
-            Asset::Crypto(Crypto::new_with_id("other".to_string())),
-        ];
-
-        // WHEN the asset write sequence runs
-        let result = store_discovered_assets(assets, |_| {
-            attempted_writes.fetch_add(1, Ordering::SeqCst);
-            async { Err(DcaError::Generic("Redis write failed".to_string())) }
-        })
-        .await;
-
-        // THEN the failure propagates and subsequent writes are not attempted
-        assert!(result.is_err());
-        assert_eq!(attempted_writes.load(Ordering::SeqCst), 1);
     }
 
     #[test]

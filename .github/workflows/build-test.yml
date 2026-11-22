@@ -591,7 +591,6 @@ jobs:
           export DCAPAL_JWT_JWKS="${SUPABASE_AUTH_JWKS}"
           export DCAPAL_WEB_HOSTNAME=0.0.0.0
           export DCAPAL_METRICS_HOSTNAME=0.0.0.0
-          export DCAPAL_REDIS_HOSTNAME=redis
           export DCAPAL_POSTGRES_HOSTNAME="${POSTGRES_HOST}"
           export DCAPAL_POSTGRES_PORT="${POSTGRES_PORT}"
           export DCAPAL_POSTGRES_USER="${POSTGRES_USER}"
@@ -608,7 +607,7 @@ jobs:
           docker compose -f docker-compose.yml -f ./docker/docker-compose.prod.yml config --format json |
             jq -e '
               (.services.dcapal.volumes | any(.[]; .target == "/var/dcapal/dcapal-backend/data")) and
-              (.services.dcapal.depends_on.redis.condition == "service_healthy") and
+              (.services.dcapal.depends_on | has("redis") | not) and
               (.services.dcapal.depends_on.db.condition == "service_healthy") and
               (.services.dcapal.healthcheck != null)
             '

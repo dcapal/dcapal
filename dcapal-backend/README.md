@@ -24,10 +24,21 @@ run:
 make backend-migrate
 ```
 
+## Startup and Yahoo reachability
+
+Before the backend binds its HTTP port it seeds the eight fiat assets and the
+seven FX markets (idempotent) and makes sure every FX market has a stored price.
+When all seven already have a price, even a stale one, it starts immediately
+without contacting any provider. Otherwise it fetches the missing prices from
+Yahoo, retrying each ticker with exponential backoff (1 s up to 30 s) for at
+most two minutes, and then exits with a non-zero status so the orchestrator
+restarts it. Yahoo must therefore be reachable on the first boot against an
+empty database only; later boots do not depend on it. See ADR 0007.
+
 ## Local development modes
 
 The root Makefile owns the complete local setup. It bootstraps the pinned
-tooling, starts local Supabase, Redis, and TimescaleDB, applies migrations, and
+tooling, starts local Supabase and TimescaleDB, applies migrations, and
 renders the ignored `dcapal.yml`. It does not read configuration from another
 checkout.
 
@@ -75,9 +86,8 @@ The default host ports are:
 | Backend HTTP | 8080 |
 | Backend metrics | 9000 |
 | TimescaleDB | 5433 |
-| Redis | 6379 |
 
 Set these values in the ignored `dcapal-backend/docker/local.env` when another
-local service uses one of the ports. The backend receives `db:5432` and
-`redis:6379` inside the Docker network, while a host-run backend uses the
+local service uses one of the ports. The backend receives `db:5432`
+inside the Docker network, while a host-run backend uses the
 published host ports.

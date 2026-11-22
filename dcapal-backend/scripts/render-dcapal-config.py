@@ -111,16 +111,6 @@ def render(template: str) -> str:
         "@@DCAPAL_METRICS_PORT@@": str(
             integer_environment("DCAPAL_METRICS_PORT", 9000)
         ),
-        "@@DCAPAL_REDIS_HOSTNAME@@": json_value(
-            os.environ.get("DCAPAL_REDIS_HOSTNAME", "127.0.0.1")
-        ),
-        "@@DCAPAL_REDIS_PORT@@": str(integer_environment("DCAPAL_REDIS_PORT", 6379)),
-        "@@DCAPAL_REDIS_USER@@": json_value(
-            os.environ.get("DCAPAL_REDIS_USER", "dcapal")
-        ),
-        "@@DCAPAL_REDIS_PASSWORD@@": json_value(
-            os.environ.get("DCAPAL_REDIS_PASSWORD", "dcapal")
-        ),
         "@@DCAPAL_POSTGRES_HOSTNAME@@": json_value(
             os.environ.get("DCAPAL_POSTGRES_HOSTNAME", "127.0.0.1")
         ),
