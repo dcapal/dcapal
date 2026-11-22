@@ -452,7 +452,8 @@ impl KrakenProvider {
         let assets = res
             .data
             .into_values()
-            .map(|mut d| d.swap_remove(0))
+            .flatten()
+            .filter_map(|mut d| (!d.is_empty()).then(|| d.swap_remove(0)))
             .map(|d| {
                 Asset::Crypto(Crypto {
                     id: d.symbol.to_lowercase(),
@@ -924,7 +925,9 @@ impl IntOrStr {
 #[derive(Debug, Clone, Deserialize)]
 struct CMCInfoResult {
     status: CMCInfoStatus,
-    data: HashMap<String, Vec<CMCInfoData>>,
+    /// Records per requested symbol. With `skip_invalid=true` CoinMarketCap still
+    /// lists symbols it does not know, with an empty or null record list.
+    data: HashMap<String, Option<Vec<CMCInfoData>>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -976,7 +979,9 @@ mod tests {
     };
 
     /// Starts a local CoinMarketCap stub that answers every request with `status`
-    /// and, for 200, a body naming each requested symbol `Name<SYMBOL>`.
+    /// and, for 200, a body naming each requested symbol `Name<SYMBOL>`. Symbols
+    /// starting with `unknown` get an empty record list and those starting with
+    /// `nothing` a null one, like CoinMarketCap answers with `skip_invalid=true`.
     /// Returns its base URL and a counter of the requests it received.
     async fn cmc_stub(status: u16) -> (String, Arc<AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1001,10 +1006,14 @@ mod tests {
                         let data = symbols
                             .split(',')
                             .map(|sym| {
-                                format!(
-                                    r#""{u}":[{{"id":1,"symbol":"{u}","name":"Name{u}"}}]"#,
-                                    u = sym.to_uppercase()
-                                )
+                                let u = sym.to_uppercase();
+                                if sym.starts_with("unknown") {
+                                    format!(r#""{u}":[]"#)
+                                } else if sym.starts_with("nothing") {
+                                    format!(r#""{u}":null"#)
+                                } else {
+                                    format!(r#""{u}":[{{"id":1,"symbol":"{u}","name":"Name{u}"}}]"#)
+                                }
                             })
                             .collect::<Vec<_>>()
                             .join(",");
@@ -1092,6 +1101,29 @@ mod tests {
         assert!(unresolved.is_empty());
         assert_eq!(assets.len(), 150);
         assert_eq!(name_of(&assets["c0000"]), "NameC0000");
+    }
+
+    #[tokio::test]
+    async fn cmc_symbols_without_records_fall_back_to_defaults_without_panicking() {
+        // GIVEN CoinMarketCap answers a skip_invalid request listing unknown
+        // symbols with an empty or null record list,
+        let (base, _hits) = cmc_stub(200).await;
+        let provider = provider(base);
+        let symbols = ["ldo", "unknownone", "nothingtwo"].map(String::from);
+        let to_fetch = symbols.iter().collect::<Vec<_>>();
+        let mut assets = BTreeMap::new();
+
+        // WHEN the symbols are resolved,
+        let unresolved = provider
+            .resolve_cmc_chunks(&to_fetch, &mut assets, Duration::ZERO)
+            .await;
+
+        // THEN the known symbol gets its provider name, the unknown ones get
+        // stored defaults, and nothing is flagged unresolved.
+        assert!(unresolved.is_empty());
+        assert_eq!(name_of(&assets["ldo"]), "NameLDO");
+        assert_eq!(name_of(&assets["unknownone"]), "UNKNOWNONE");
+        assert_eq!(name_of(&assets["nothingtwo"]), "NOTHINGTWO");
     }
 
     #[test]
