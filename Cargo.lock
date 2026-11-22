@@ -840,7 +840,7 @@ dependencies = [
  "hyper",
  "ip2location",
  "itertools 0.15.0",
- "jiff 0.2.46",
+ "jiff 1.0.1",
  "jiff-sqlx",
  "jsonschema",
  "jsonwebtoken",

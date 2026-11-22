@@ -33,7 +33,7 @@ axum-extra = { version = "0.12.6", features = ["typed-header"] }
 config = "0.15.27"
 console_error_panic_hook = { version = "0.1.7" }
 const_format = "0.2.37"
-jiff = { version = "0.2.0", features = ["serde"] }
+jiff = { version = "1.0.1", features = ["serde"] }
 jiff-sqlx = { version = "0.2.0", features = ["postgres"] }
 derive_more = { version = "2.1.1", features = ["display"] }
 env_logger = "0.11.12"
