@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+use futures::future::join_all;
 use jiff::Timestamp;
 use moka::{policy::EvictionPolicy, sync::Cache};
 use parking_lot::RwLock;
@@ -13,11 +14,19 @@ use tracing::{error, info, warn};
 
 use crate::{
     app::{
-        domain::entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
+        domain::{
+            asset::AssetRef,
+            entity::{Asset, AssetId, AssetKind, Market, MarketId, Price},
+            market_quote::{
+                FxRate, PriceFailure, PriceQuote, QuoteSource, QuoteStatus, StoredQuote,
+                derive_fx_rate, fx_candidate_markets,
+            },
+            portfolio::Provider,
+        },
         services::command::ConversionRateQuery,
     },
-    error::{DcaError, Result},
-    ports::outbound::repository::market_data::MarketDataRepository,
+    error::Result,
+    ports::outbound::{adapter::LivePriceProvider, repository::market_data::MarketDataRepository},
 };
 
 const MAX_MARKET_LOAD_ATTEMPTS: usize = 3;
@@ -43,7 +52,11 @@ pub struct MarketDataService {
     pricers: RwLock<HashMap<(AssetId, AssetId), Option<Price>>>,
     price_deps: RwLock<HashMap<MarketId, Vec<(AssetId, AssetId)>>>,
     assets_cache: RwLock<AssetsCache>,
+    live_prices: Option<Arc<dyn LivePriceProvider>>,
 }
+
+/// Quote currency of the prices reported for Kraken crypto assets.
+const CRYPTO_QUOTE_CURRENCY: &str = "usd";
 
 impl MarketDataService {
     /// Creates a service that keeps up to [`DEFAULT_LAST_PRICE_CAPACITY`] non-FX markets in memory.
@@ -69,7 +82,84 @@ impl MarketDataService {
             pricers: RwLock::new(HashMap::new()),
             price_deps: RwLock::new(HashMap::new()),
             assets_cache: RwLock::new(AssetsCache::new()),
+            live_prices: None,
         }
+    }
+
+    /// Sets the provider that answers current prices of Yahoo-listed symbols on demand.
+    pub fn with_live_prices(mut self, provider: Arc<dyn LivePriceProvider>) -> Self {
+        self.live_prices = Some(provider);
+        self
+    }
+
+    /// Reports the current price of each asset, in request order, with its provenance.
+    ///
+    /// The asset's own provider answers, chosen by an explicit `match`; no provider
+    /// ever stands in for another and no price is converted.
+    /// - Kraken crypto is read from the stored `{symbol}usd` market, in USD, so a
+    ///   failed refresh shows next to the last known price.
+    /// - Yahoo symbols are fetched live, in the currency Yahoo lists them in.
+    ///
+    /// A price that cannot be produced is a quote with a failure, not an error; an
+    /// `Err` means the storage failed.
+    pub async fn current_prices(&self, assets: &[AssetRef]) -> Result<Vec<PriceQuote>> {
+        let kraken_markets = assets
+            .iter()
+            .filter(|asset| asset.provider() == Provider::Kraken)
+            .map(crypto_market_id)
+            .collect::<Vec<_>>();
+        let stored = if kraken_markets.is_empty() {
+            HashMap::new()
+        } else {
+            self.repo.find_market_quotes(&kraken_markets).await?
+        };
+
+        // Live quotes of every Yahoo symbol run concurrently; the shared limiter paces them.
+        Ok(join_all(assets.iter().map(|asset| async {
+            match asset.provider() {
+                Provider::Kraken => stored_crypto_quote(asset, &stored),
+                Provider::YF => self.live_quote(asset).await,
+            }
+        }))
+        .await)
+    }
+
+    /// Asks Yahoo for the current price of a symbol.
+    async fn live_quote(&self, asset: &AssetRef) -> PriceQuote {
+        let Some(live) = &self.live_prices else {
+            return PriceQuote::failed(
+                asset.clone(),
+                PriceFailure::provider_error("no live price provider is configured"),
+            );
+        };
+
+        match live.current_price(asset.symbol()).await {
+            Ok(quote) => PriceQuote {
+                asset: asset.clone(),
+                provider: Provider::YF,
+                currency: Some(quote.currency),
+                price: Some(quote.price),
+                observed_at: quote.observed_at,
+                fetched_at: Some(Timestamp::now()),
+                source: Some(QuoteSource::Provider),
+                status: QuoteStatus::Usable,
+                failure: None,
+                failed_at: None,
+            },
+            Err(failure) => PriceQuote::failed(asset.clone(), failure),
+        }
+    }
+
+    /// Derives the FX rate between two catalog fiat currencies from the stored FX markets.
+    ///
+    /// The rate carries the providers and observation times of the markets it was
+    /// derived from; an `Err` means the storage failed.
+    pub async fn fx_rate(&self, base: &str, quote: &str) -> Result<FxRate> {
+        let stored = self
+            .repo
+            .find_market_quotes(&fx_candidate_markets(base, quote))
+            .await?;
+        Ok(derive_fx_rate(base, quote, &stored))
     }
 
     pub async fn get_assets_by_type(&self, kind: AssetKind) -> Arc<Vec<Asset>> {
@@ -162,7 +252,9 @@ impl MarketDataService {
         }
     }
 
-    /// Lookup a [`Market`] by [`MarketId`]
+    /// Looks up a [`Market`] by [`MarketId`].
+    ///
+    /// `Ok(None)` means the market does not exist; a storage failure is an `Err`.
     pub async fn get_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
         for _ in 0..MAX_MARKET_LOAD_ATTEMPTS {
             let generation = self.market_cache_generation.load(Ordering::Acquire);
@@ -172,15 +264,7 @@ impl MarketDataService {
                 return Ok(Some(market));
             }
 
-            let market = match self.load_market(id).await {
-                Ok(m) => m,
-                Err(e) => {
-                    error!("{:?}", e);
-                    None
-                }
-            };
-
-            let Some(market) = market else {
+            let Some(market) = self.load_market(id).await? else {
                 return Ok(None);
             };
 
@@ -199,10 +283,10 @@ impl MarketDataService {
         Ok(None)
     }
 
+    /// Loads a market from storage; a storage failure is an error, not a missing market.
     async fn load_market(&self, id: &MarketId) -> Result<Option<Arc<Market>>> {
-        let mkt = self.repo.find_market(id).await.map_err(|e| {
+        let mkt = self.repo.find_market(id).await.inspect_err(|e| {
             error!(mkt = id, "Error occured in loading market: {}", e);
-            DcaError::MarketNotFound(id.clone())
         })?;
 
         match mkt {
@@ -406,6 +490,28 @@ impl MarketDataService {
     }
 }
 
+/// Id of the stored market that prices a crypto asset in [`CRYPTO_QUOTE_CURRENCY`].
+fn crypto_market_id(asset: &AssetRef) -> MarketId {
+    format!("{}{CRYPTO_QUOTE_CURRENCY}", asset.symbol().to_lowercase())
+}
+
+/// Builds the quote of a Kraken crypto asset from its stored market, if there is one.
+fn stored_crypto_quote(asset: &AssetRef, stored: &HashMap<MarketId, StoredQuote>) -> PriceQuote {
+    match stored.get(&crypto_market_id(asset)) {
+        Some(market) => {
+            PriceQuote::from_stored(asset.clone(), &CRYPTO_QUOTE_CURRENCY.to_uppercase(), market)
+        }
+        None => PriceQuote::failed(
+            asset.clone(),
+            PriceFailure::unavailable(format!(
+                "Kraken lists no {}/{} market",
+                asset.symbol(),
+                CRYPTO_QUOTE_CURRENCY.to_uppercase()
+            )),
+        ),
+    }
+}
+
 fn normalized_asset(id: &AssetId) -> AssetId {
     static NORMALIZED: LazyLock<HashMap<&'static str, &'static str>> =
         LazyLock::new(|| [("eth2", "eth"), ("eth2.s", "eth")].into_iter().collect());
@@ -438,6 +544,11 @@ mod tests {
     use crate::{
         app::domain::entity::{Crypto, Fiat},
         config::PriceProvider,
+        error::DcaError,
+        ports::outbound::{
+            adapter::{LivePrice, MockLivePriceProvider},
+            repository::market_data::MarketPriceFailure,
+        },
     };
 
     fn crypto(id: &str) -> Asset {
@@ -620,5 +731,169 @@ mod tests {
         service.set_price(&"gbpusd".to_string(), Price::new(2., Timestamp::now()));
 
         assert!(!service.pricers.read().contains_key(&pair));
+    }
+
+    /// Stores the catalog assets `btc`, `eur` and `usd` and returns a service on `pool`.
+    async fn quote_service(pool: PgPool) -> (MarketDataService, Arc<MarketDataRepository>) {
+        let repo = Arc::new(MarketDataRepository::new(pool));
+        for asset in [crypto("btc"), fiat("eur"), fiat("usd")] {
+            repo.store_asset(&asset).await.unwrap();
+        }
+        (MarketDataService::new(repo.clone()), repo)
+    }
+
+    async fn store_priced(repo: &MarketDataRepository, base: &str, quote: &str, price: f64) {
+        let find = |id: &str| {
+            let id = id.to_string();
+            async move { repo.find_asset(&id).await.unwrap().unwrap() }
+        };
+        let market = Market::new(
+            format!("{base}{quote}"),
+            find(base).await,
+            find(quote).await,
+            Some(Price::new(
+                price,
+                Timestamp::from_second(1_700_000_000).unwrap(),
+            )),
+        );
+        let provider = if market.is_fiat() {
+            PriceProvider::Yahoo
+        } else {
+            PriceProvider::Kraken
+        };
+        repo.store_market(&market, provider).await.unwrap();
+    }
+
+    fn kraken(symbol: &str) -> AssetRef {
+        AssetRef::new(Provider::Kraken, symbol)
+    }
+
+    /// GIVEN a storage that fails,
+    /// WHEN a market is looked up,
+    /// THEN the storage failure is returned instead of "market not found".
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn market_lookup_reports_storage_failures(pool: PgPool) {
+        let (service, _) = quote_service(pool.clone()).await;
+        pool.close().await;
+
+        let result = service.get_market(&"btcusd".to_string()).await;
+
+        assert!(
+            matches!(result, Err(DcaError::DatabaseError(_))),
+            "{result:?}"
+        );
+    }
+
+    /// GIVEN stored BTC/USD with a price, ETH-like markets that were never priced or
+    /// do not exist, and a refresh failure recorded for BTC/USD,
+    /// WHEN Kraken asset prices are requested,
+    /// THEN the price is usable from the provider, then last known with the failure,
+    /// and unpriced or unknown markets are pending or unavailable.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn kraken_prices_show_provenance_and_failures(pool: PgPool) {
+        let (service, repo) = quote_service(pool).await;
+        store_priced(&repo, "btc", "usd", 44_000.25).await;
+        let refs = [kraken("btc"), kraken("doge")];
+
+        let fresh = service.current_prices(&refs).await.unwrap();
+
+        assert_eq!(fresh[0].price, Some(44_000.25));
+        assert_eq!(fresh[0].currency.as_deref(), Some("USD"));
+        assert_eq!(fresh[0].provider, Provider::Kraken);
+        assert_eq!(
+            (fresh[0].status, fresh[0].source),
+            (QuoteStatus::Usable, Some(QuoteSource::Provider))
+        );
+        assert!(fresh[0].fetched_at.is_some() && fresh[0].observed_at.is_some());
+        assert_eq!(fresh[1].status, QuoteStatus::Unavailable);
+        assert_eq!(fresh[1].price, None);
+
+        let id = "btcusd".to_string();
+        let failure = PriceFailure::provider_error("Kraken answered HTTP 503");
+        repo.record_price_failures(&[MarketPriceFailure {
+            market_id: &id,
+            failure: &failure,
+        }])
+        .await
+        .unwrap();
+
+        let stale = service.current_prices(&refs[..1]).await.unwrap();
+        assert_eq!(stale[0].price, Some(44_000.25));
+        assert_eq!(stale[0].source, Some(QuoteSource::LastKnown));
+        assert_eq!(stale[0].failure, Some(failure));
+        assert!(stale[0].failed_at.is_some());
+    }
+
+    /// GIVEN a Yahoo live provider that answers one symbol and fails another, and a
+    /// Kraken asset,
+    /// WHEN prices of all three are requested,
+    /// THEN Yahoo symbols are quoted live in their own currency, the failure is reported
+    /// on its quote only, and the Kraken asset never reaches Yahoo.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn yahoo_prices_are_live_and_never_substituted(pool: PgPool) {
+        let (service, _) = quote_service(pool).await;
+        let mut live = MockLivePriceProvider::new();
+        live.expect_current_price()
+            .times(2)
+            .returning(|symbol| match symbol {
+                "VWCE.DE" => Ok(LivePrice {
+                    price: 131.2,
+                    currency: "EUR".into(),
+                    observed_at: None,
+                }),
+                _ => Err(PriceFailure::malformed("bad chart")),
+            });
+        let service = service.with_live_prices(Arc::new(live));
+        let refs = [
+            AssetRef::new(Provider::YF, "vwce.de"),
+            kraken("btc"),
+            AssetRef::new(Provider::YF, "broken"),
+        ];
+
+        let quotes = service.current_prices(&refs).await.unwrap();
+
+        assert_eq!(
+            quotes.iter().map(|q| q.asset.clone()).collect::<Vec<_>>(),
+            refs
+        );
+        assert_eq!(
+            (quotes[0].price, quotes[0].currency.as_deref()),
+            (Some(131.2), Some("EUR"))
+        );
+        assert_eq!(quotes[0].provider, Provider::YF);
+        assert_eq!(quotes[1].status, QuoteStatus::Unavailable);
+        assert_eq!(quotes[2].status, QuoteStatus::Malformed);
+    }
+
+    /// GIVEN stored EUR/USD and GBP/USD prices, with a refresh failure on GBP/USD,
+    /// WHEN the EUR/GBP rate is requested,
+    /// THEN it is triangulated through USD from both stored legs and flagged last known.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn fx_rate_is_derived_from_stored_markets(pool: PgPool) {
+        let (service, repo) = quote_service(pool).await;
+        repo.store_asset(&fiat("gbp")).await.unwrap();
+        store_priced(&repo, "eur", "usd", 1.25).await;
+        store_priced(&repo, "gbp", "usd", 1.5).await;
+
+        let rate = service.fx_rate("EUR", "GBP").await.unwrap();
+        assert_eq!(
+            rate.synthetic,
+            crate::app::domain::market_quote::Synthetic::Triangulated
+        );
+        assert_eq!(rate.provider, Some(Provider::YF));
+        assert_eq!(rate.source, Some(QuoteSource::Provider));
+
+        let id = "gbpusd".to_string();
+        let failure = PriceFailure::provider_error("HTTP 503");
+        repo.record_price_failures(&[MarketPriceFailure {
+            market_id: &id,
+            failure: &failure,
+        }])
+        .await
+        .unwrap();
+        let stale = service.fx_rate("EUR", "GBP").await.unwrap();
+        assert_eq!(stale.rate, rate.rate);
+        assert_eq!(stale.source, Some(QuoteSource::LastKnown));
+        assert_eq!(stale.failure, Some(failure));
     }
 }

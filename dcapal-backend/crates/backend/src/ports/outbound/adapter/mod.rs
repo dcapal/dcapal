@@ -6,6 +6,7 @@ mod fiat_asset;
 mod ipapi;
 mod kraken;
 mod kraken_asset;
+mod live_price;
 mod yahoo;
 
 use std::sync::Arc;
@@ -21,6 +22,7 @@ pub use fiat_asset::CatalogFiatAssetProvider;
 pub use ipapi::*;
 pub use kraken::*;
 pub use kraken_asset::KrakenAssetProvider;
+pub use live_price::*;
 pub use yahoo::*;
 
 use crate::app::domain::market_quote::{FailureKind, PriceFailure};

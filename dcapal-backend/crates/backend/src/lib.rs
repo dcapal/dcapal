@@ -173,7 +173,10 @@ impl DcaServer {
             )),
         ));
         let services = Services {
-            mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
+            mkt_data: Arc::new(
+                MarketDataService::new(repos.mkt_data.clone())
+                    .with_live_prices(providers.yahoo.clone()),
+            ),
             portfolio: Arc::new(PortfolioService::new(
                 repos.portfolio.clone(),
                 asset_service.clone(),

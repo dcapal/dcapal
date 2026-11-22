@@ -14,7 +14,7 @@ use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use tracing::{debug, error, warn};
 
 use super::{
-    PriceCallError,
+    LivePrice, LivePriceProvider, PriceCallError,
     asset_provider::{AssetProvider, AssetProviderError, ProviderAsset},
 };
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
     app::domain::{
         asset::{AssetRef, ResolvedAsset},
         entity::{Market, OHLCFrequency},
-        market_quote::{FailureKind, PriceFailure},
+        market_quote::{FailureKind, PriceFailure, validate_price},
         portfolio::{AssetClass, Provider},
     },
     app::infra::stats::{
@@ -504,6 +504,98 @@ fn lookup_url(
         .map_err(AssetProviderError::Malformed)
 }
 
+/// Upper bound on one live quote, rate-limiter wait included.
+const LIVE_QUOTE_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[async_trait]
+impl LivePriceProvider for YahooProvider {
+    /// Reads the regular-market price from the `meta` block of a one-day chart.
+    ///
+    /// Recorded as one `price` provider call.
+    async fn current_price(&self, symbol: &str) -> std::result::Result<LivePrice, PriceFailure> {
+        observe_provider(
+            MetricProvider::Yahoo,
+            ProviderOp::Price,
+            self.current_price_inner(symbol),
+            PriceCallError::outcome,
+        )
+        .await
+        .map_err(|e| e.failure)
+    }
+}
+
+impl YahooProvider {
+    async fn current_price_inner(
+        &self,
+        symbol: &str,
+    ) -> std::result::Result<LivePrice, PriceCallError> {
+        let url = self
+            .endpoints
+            .chart_url(symbol, &[("range", "1d"), ("interval", "1d")])
+            .map_err(PriceFailure::malformed)?;
+        let (status, body) = tokio::time::timeout(
+            LIVE_QUOTE_TIMEOUT,
+            self.read_body(url.as_str(), LIVE_QUOTE_TIMEOUT),
+        )
+        .await
+        .map_err(|_| PriceCallError::timeout("Yahoo quote timed out"))??;
+
+        Ok(parse_live_price(status, &body)?)
+    }
+}
+
+/// Reads the current price and currency from a Yahoo chart reply's `meta` block.
+///
+/// Unknown symbols (404, 400, 422 or a `Not Found` chart error) and a missing or
+/// non-positive `regularMarketPrice` are unavailable; other statuses and chart
+/// errors are provider errors; an undecodable reply, or one without a currency, is
+/// malformed.
+fn parse_live_price(status: u16, body: &[u8]) -> std::result::Result<LivePrice, PriceFailure> {
+    if matches!(status, 400 | 404 | 422) {
+        return Err(PriceFailure::unavailable("Yahoo does not list the symbol"));
+    }
+    if !(200..300).contains(&status) {
+        return Err(PriceFailure::provider_error(format!(
+            "Yahoo answered with HTTP status {status}"
+        )));
+    }
+
+    let response: lookup::Response = serde_json::from_slice(body)
+        .map_err(|e| PriceFailure::malformed(format!("undecodable chart body: {e}")))?;
+    if let Some(error) = response.chart.error {
+        return Err(if error.code.eq_ignore_ascii_case("not found") {
+            PriceFailure::unavailable("Yahoo does not list the symbol")
+        } else {
+            PriceFailure::provider_error(format!(
+                "Yahoo chart error {}: {}",
+                error.code,
+                error.description.unwrap_or_default()
+            ))
+        });
+    }
+
+    let meta = response
+        .chart
+        .result
+        .and_then(|results| results.into_iter().next())
+        .map(|result| result.meta)
+        .ok_or_else(|| PriceFailure::malformed("empty chart.result"))?;
+    let currency =
+        non_blank(meta.currency).ok_or_else(|| PriceFailure::malformed("missing meta.currency"))?;
+    let price = meta
+        .regular_market_price
+        .ok_or_else(|| PriceFailure::unavailable("Yahoo reports no market price"))
+        .and_then(validate_price)?;
+
+    Ok(LivePrice {
+        price,
+        currency,
+        observed_at: meta
+            .regular_market_time
+            .and_then(|t| jiff::Timestamp::from_second(t).ok()),
+    })
+}
+
 /// Turns a Yahoo chart reply into the metadata of the requested asset.
 ///
 /// HTTP 400, 404 and 422, or a `Not Found` chart error, mean Yahoo does not
@@ -619,6 +711,8 @@ mod lookup {
         pub long_name: Option<String>,
         pub short_name: Option<String>,
         pub instrument_type: Option<String>,
+        pub regular_market_price: Option<f64>,
+        pub regular_market_time: Option<i64>,
     }
 }
 
@@ -1275,5 +1369,51 @@ mod price_tests {
             requests[1].starts_with("/v8/finance/chart/A%2FB%3FC?period1=1&period2=2"),
             "{requests:?}"
         );
+    }
+
+    fn meta_chart(meta: &str) -> String {
+        format!(r#"{{"chart":{{"result":[{{"meta":{meta}}}],"error":null}}}}"#)
+    }
+
+    /// GIVEN Yahoo answers chart metadata for an equity, a zero price, a reply without
+    /// currency, and an unknown symbol,
+    /// WHEN current prices are requested,
+    /// THEN the first is a price in Yahoo's own currency spelling with its observation
+    /// time, the zero price is unavailable, the reply without currency is malformed, and
+    /// the unknown symbol is unavailable.
+    #[tokio::test]
+    async fn live_quotes_read_the_chart_metadata() {
+        let fake = FakeProvider::start(|target| {
+            if target.contains("/VOD.L") {
+                Reply::ok(meta_chart(
+                    r#"{"currency":"GBp","regularMarketPrice":71.5,"regularMarketTime":1700000000}"#,
+                ))
+            } else if target.contains("/ZERO") {
+                Reply::ok(meta_chart(r#"{"currency":"USD","regularMarketPrice":0}"#))
+            } else if target.contains("/NOCCY") {
+                Reply::ok(meta_chart(r#"{"regularMarketPrice":3}"#))
+            } else {
+                Reply::status(404, "{}")
+            }
+        })
+        .await;
+        let provider = provider_at(&fake);
+
+        let live = provider.current_price("VOD.L").await.unwrap();
+        assert_eq!((live.price, live.currency.as_str()), (71.5, "GBp"));
+        assert_eq!(live.observed_at.map(|t| t.as_second()), Some(1_700_000_000));
+        assert_eq!(
+            provider.current_price("ZERO").await.unwrap_err().kind,
+            FailureKind::Unavailable
+        );
+        assert_eq!(
+            provider.current_price("NOCCY").await.unwrap_err().kind,
+            FailureKind::Malformed
+        );
+        assert_eq!(
+            provider.current_price("NOPE").await.unwrap_err().kind,
+            FailureKind::Unavailable
+        );
+        assert!(fake.requests()[0].ends_with("/VOD.L?range=1d&interval=1d"));
     }
 }

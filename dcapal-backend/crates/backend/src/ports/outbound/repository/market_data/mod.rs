@@ -23,7 +23,8 @@ use crate::{
     app::domain::{
         entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
         fiat::fiat_symbols,
-        market_quote::PriceFailure,
+        market_quote::{PriceFailure, StoredQuote},
+        portfolio::Provider as AppProvider,
     },
     config::PriceProvider,
     error::{DcaError, Result},
@@ -71,6 +72,20 @@ struct MarketRow {
     quote_name: String,
     price: Option<f64>,
     observed_at: Option<jiff_sqlx::Timestamp>,
+}
+
+/// A market's latest price with its refresh failure, as stored in `market_price`.
+#[derive(sqlx::FromRow)]
+struct QuoteRow {
+    market_id: String,
+    base_symbol: String,
+    quote_symbol: String,
+    provider: DbProvider,
+    price: Option<f64>,
+    observed_at: Option<jiff_sqlx::Timestamp>,
+    fetched_at: Option<jiff_sqlx::Timestamp>,
+    last_error: Option<String>,
+    last_error_at: Option<jiff_sqlx::Timestamp>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -270,6 +285,36 @@ impl MarketDataRepository {
             .collect::<Result<std::collections::HashMap<_, _>>>()?;
 
         Ok(ids.iter().map(|id| found.remove(id.as_ref())).collect())
+    }
+
+    /// Reads the latest price, provenance and refresh failure of several markets.
+    ///
+    /// Markets are keyed by their v1 id; unknown markets are absent from the result.
+    /// Unlike [`Self::find_markets`] this does not require catalog assets, so it reports
+    /// the stored state as is.
+    pub async fn find_market_quotes(
+        &self,
+        ids: &[impl AsRef<str>],
+    ) -> Result<HashMap<MarketId, StoredQuote>> {
+        let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+        let rows = query_as::<_, QuoteRow>(const_format::formatcp!(
+            "SELECT {id} AS market_id, b.symbol AS base_symbol, q.symbol AS quote_symbol,
+                    p.provider, p.price::float8 AS price, p.observed_at, p.fetched_at,
+                    p.last_error, p.last_error_at
+             FROM market_price AS p
+             JOIN assets_data AS b ON b.id = p.base_asset_id
+             JOIN assets_data AS q ON q.id = p.quote_asset_id
+             WHERE {id} = ANY($1)",
+            id = market_id_sql!()
+        ))
+        .bind(&wanted)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.market_id.clone(), StoredQuote::from(row)))
+            .collect())
     }
 
     /// Stores one market; see [`Self::store_markets`].
@@ -636,6 +681,25 @@ async fn insert_markets(
 
     debug!("Successfully stored {} markets", markets.len());
     Ok(())
+}
+
+impl From<QuoteRow> for StoredQuote {
+    /// Builds the stored quote of a market from its `market_price` row.
+    fn from(row: QuoteRow) -> Self {
+        Self {
+            base: row.base_symbol.to_lowercase(),
+            quote: row.quote_symbol.to_lowercase(),
+            provider: match row.provider {
+                DbProvider::YF => AppProvider::YF,
+                DbProvider::Kraken => AppProvider::Kraken,
+            },
+            price: row.price,
+            observed_at: row.observed_at.map(|t| t.to_jiff()),
+            fetched_at: row.fetched_at.map(|t| t.to_jiff()),
+            failure: row.last_error.as_deref().map(PriceFailure::from_stored),
+            failed_at: row.last_error_at.map(|t| t.to_jiff()),
+        }
+    }
 }
 
 impl TryFrom<AssetRow> for Asset {
