@@ -1,8 +1,13 @@
 use jiff::Timestamp;
 use tracing::{error, warn};
 
-use super::entity::{Market, Price};
-use crate::{config::PriceProvider, ports::outbound::adapter::PriceProviders};
+use super::{
+    entity::{Market, Price},
+    market_quote::{FailureKind, PriceFailure, validate_price},
+};
+use crate::{
+    config::PriceProvider, error::Result as AppResult, ports::outbound::adapter::PriceProviders,
+};
 
 /// Chooses the provider that prices a market.
 ///
@@ -16,42 +21,75 @@ pub fn price_provider_for(market: &Market, crypto_provider: PriceProvider) -> Pr
     }
 }
 
-/// Fetches the latest price of a market from the given provider, logging failures.
+/// Fetches the latest price of a market from the given provider.
+///
+/// A price that is missing, zero, negative or non-finite is a failure, never a value:
+/// the caller keeps the last known price and records why the refresh failed.
 pub async fn fetch_market_price(
     market: &Market,
     providers: &PriceProviders,
     provider: PriceProvider,
-) -> Option<Price> {
+) -> Result<Price, PriceFailure> {
     let now = Timestamp::now();
-    let price = match provider {
+    let fetched = match provider {
         PriceProvider::CryptoWatch => providers.cw.fetch_market_price(market, now).await,
         PriceProvider::Kraken => providers.kraken.fetch_market_price(market, now).await,
         PriceProvider::Yahoo => providers.yahoo.fetch_market_price(market, now).await,
     };
 
-    match price {
-        Ok(Some(px)) => Some(Price::new(px, now)),
-        Ok(None) => {
-            warn!(
-                "Cannot fetch {} price for any frequency (ts={now})",
-                market.id
-            );
-            None
+    let outcome = classify_price(fetched).map(|px| Price::new(px, now));
+    match &outcome {
+        Ok(_) => {}
+        Err(failure) if failure.kind == FailureKind::Unavailable => {
+            warn!(mkt = market.id, "Price not available (ts={now}): {failure}");
         }
-        Err(e) => {
-            error!(
-                "Cannot fetch {} price for any frequency (ts={now}): {e:?}",
-                market.id
-            );
-            None
+        Err(failure) => {
+            error!(mkt = market.id, "Cannot fetch price (ts={now}): {failure}");
         }
+    }
+    outcome
+}
+
+/// Turns the raw answer of a price adapter into a validated price or a visible failure.
+fn classify_price(fetched: AppResult<Option<f64>>) -> Result<f64, PriceFailure> {
+    match fetched {
+        Ok(Some(px)) => validate_price(px),
+        Ok(None) => Err(PriceFailure::unavailable(
+            "provider has no price for the market",
+        )),
+        Err(e) => Err(PriceFailure::provider_error(format!("{e:?}"))),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::domain::entity::{Asset, Crypto, Fiat};
+    use crate::{
+        app::domain::entity::{Asset, Crypto, Fiat},
+        error::DcaError,
+    };
+
+    /// GIVEN adapter answers that are a price, no price, an error and a zero price,
+    /// WHEN they are classified,
+    /// THEN only the positive price is a value; the rest are failures of distinct kinds.
+    #[test]
+    fn adapter_answers_are_classified_into_prices_and_failures() {
+        assert_eq!(classify_price(Ok(Some(2.5))).unwrap(), 2.5);
+        assert_eq!(
+            classify_price(Ok(None)).unwrap_err().kind,
+            FailureKind::Unavailable
+        );
+        assert_eq!(
+            classify_price(Ok(Some(0.0))).unwrap_err().kind,
+            FailureKind::Unavailable
+        );
+        assert_eq!(
+            classify_price(Err(DcaError::Generic("boom".into())))
+                .unwrap_err()
+                .kind,
+            FailureKind::ProviderError
+        );
+    }
 
     fn market(base: Asset, quote: Asset) -> Market {
         Market::new("m".to_string(), base, quote, None)

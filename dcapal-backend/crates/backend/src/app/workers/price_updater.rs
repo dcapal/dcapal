@@ -9,6 +9,7 @@ use crate::{
         domain::{
             entity::{MarketId, Price},
             market_data_utils::{fetch_market_price, price_provider_for},
+            market_quote::PriceFailure,
         },
         infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
@@ -17,7 +18,7 @@ use crate::{
     error::Result,
     ports::outbound::{
         adapter::PriceProviders,
-        repository::market_data::{MarketDataRepository, MarketPriceUpdate},
+        repository::market_data::{MarketDataRepository, MarketPriceFailure, MarketPriceUpdate},
     },
 };
 
@@ -77,11 +78,19 @@ impl PriceUpdaterWorker {
         let markets = self.market_data_repo.load_markets().await?;
 
         let mut batch: Vec<(MarketId, Price, PriceProvider)> = Vec::with_capacity(FLUSH_BATCH_SIZE);
+        let mut failures: Vec<(MarketId, PriceFailure)> = Vec::new();
         for m in markets {
             let provider = price_provider_for(&m, self.price_provider);
-            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
-                warn!("Failed to fetch price update for market {}", m.id);
-                continue;
+            let price = match fetch_market_price(&m, &self.providers, provider).await {
+                Ok(price) => price,
+                Err(failure) => {
+                    warn!("Failed to fetch price update for market {}", m.id);
+                    failures.push((m.id, failure));
+                    if failures.len() >= FLUSH_BATCH_SIZE {
+                        self.flush_failures(&mut failures).await;
+                    }
+                    continue;
+                }
             };
 
             self.market_data_service.set_price(&m.id, price);
@@ -96,8 +105,30 @@ impl PriceUpdaterWorker {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         self.flush(&mut batch).await;
+        self.flush_failures(&mut failures).await;
 
         Ok(())
+    }
+
+    /// Records and clears the pending refresh failures, keeping the last known prices.
+    ///
+    /// Logs instead of failing the pass.
+    async fn flush_failures(&self, failures: &mut Vec<(MarketId, PriceFailure)>) {
+        if failures.is_empty() {
+            return;
+        }
+
+        let pending = failures
+            .iter()
+            .map(|(market_id, failure)| MarketPriceFailure { market_id, failure })
+            .collect::<Vec<_>>();
+        if let Err(e) = self.market_data_repo.record_price_failures(&pending).await {
+            error!(
+                "Failed to record {} market price failures: {e:?}",
+                failures.len()
+            );
+        }
+        failures.clear();
     }
 
     /// Stores and clears the pending prices, logging instead of failing the pass.

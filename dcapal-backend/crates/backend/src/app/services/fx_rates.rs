@@ -55,7 +55,9 @@ impl YahooFxFetcher {
 #[async_trait]
 impl FxPriceFetcher for YahooFxFetcher {
     async fn fetch(&self, market: &Market) -> Option<Price> {
-        fetch_market_price(market, &self.providers, PriceProvider::Yahoo).await
+        fetch_market_price(market, &self.providers, PriceProvider::Yahoo)
+            .await
+            .ok()
     }
 }
 

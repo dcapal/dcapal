@@ -23,6 +23,7 @@ use crate::{
     app::domain::{
         entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
         fiat::fiat_symbols,
+        market_quote::PriceFailure,
     },
     config::PriceProvider,
     error::{DcaError, Result},
@@ -40,6 +41,15 @@ pub struct MarketPriceUpdate<'a> {
     pub price: Price,
     /// The provider that supplied the price.
     pub provider: PriceProvider,
+}
+
+/// A failed price refresh of one market, ready to be recorded next to its last known price.
+#[derive(Debug, Clone, Copy)]
+pub struct MarketPriceFailure<'a> {
+    /// The market whose refresh failed.
+    pub market_id: &'a MarketId,
+    /// Why the refresh failed.
+    pub failure: &'a PriceFailure,
 }
 
 /// Reads and writes the market-asset catalog, markets and latest prices.
@@ -322,13 +332,58 @@ impl MarketDataRepository {
 
     /// Stores the latest price of many markets with a single statement per chunk.
     ///
-    /// Prices of markets that no longer exist, and non-finite prices, are skipped. When
+    /// Prices of markets that no longer exist, and non-positive or non-finite prices, are skipped. When
     /// a market appears several times the last price wins. Returns the number of stored prices.
     pub async fn upsert_prices(&self, updates: &[MarketPriceUpdate<'_>]) -> Result<u64> {
         let mut tx = self.pool.begin().await?;
         let stored = upsert_prices(&mut tx, updates).await?;
         tx.commit().await?;
         Ok(stored)
+    }
+
+    /// Records why the latest refresh of many markets failed, with one statement per chunk.
+    ///
+    /// Only `last_error` and `last_error_at` change: the last known price, its
+    /// timestamps and its provider stay readable. Failures of markets that no longer
+    /// exist are skipped; when a market appears several times the last failure wins.
+    /// Returns the number of recorded failures.
+    pub async fn record_price_failures(&self, failures: &[MarketPriceFailure<'_>]) -> Result<u64> {
+        // A single statement cannot touch one row twice: keep the last failure of each market.
+        let failures = failures
+            .iter()
+            .rev()
+            .unique_by(|f| f.market_id)
+            .collect::<Vec<_>>();
+
+        let mut tx = self.pool.begin().await?;
+        let mut recorded = 0;
+        for chunk in failures.chunks(PRICE_CHUNK_SIZE) {
+            let ids = chunk
+                .iter()
+                .map(|f| f.market_id.as_str())
+                .collect::<Vec<_>>();
+            let errors = chunk
+                .iter()
+                .map(|f| f.failure.to_stored())
+                .collect::<Vec<_>>();
+
+            let result = query(const_format::formatcp!(
+                "UPDATE market_price AS p
+                 SET last_error = u.error, last_error_at = NOW()
+                 FROM UNNEST($1::text[], $2::text[]) AS u(market_id, error),
+                      assets_data AS b, assets_data AS q
+                 WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
+                   AND {} = u.market_id",
+                market_id_sql!()
+            ))
+            .bind(&ids)
+            .bind(&errors)
+            .execute(&mut *tx)
+            .await?;
+            recorded += result.rows_affected();
+        }
+        tx.commit().await?;
+        Ok(recorded)
     }
 
     /// Loads every market with its latest price, in no particular order.
@@ -354,11 +409,14 @@ async fn upsert_prices(
         .iter()
         .rev()
         .filter(|u| {
-            let finite = u.price.price.is_finite();
-            if !finite {
-                warn!(mkt = u.market_id, "Skipping non-finite price");
+            let usable = u.price.price.is_finite() && u.price.price > 0.0;
+            if !usable {
+                warn!(
+                    mkt = u.market_id,
+                    "Skipping non-positive or non-finite price"
+                );
             }
-            finite
+            usable
         })
         .unique_by(|u| u.market_id)
         .collect::<Vec<_>>();

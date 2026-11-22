@@ -205,7 +205,7 @@ impl MarketDiscoveryWorker {
         for mut m in markets {
             info!("Fetching price for market '{}'", m.id);
             let provider = price_provider_for(&m, self.price_provider);
-            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
+            let Ok(price) = fetch_market_price(&m, &self.providers, provider).await else {
                 continue;
             };
 

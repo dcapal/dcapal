@@ -525,3 +525,95 @@ async fn runtime_state_is_persisted(pool: PgPool) -> TestResult {
     assert_eq!(imported.find_portfolio(&id).await?, None);
     Ok(())
 }
+
+/// Reads `(price, last_error, last_error_at is set)` of the `btceur` market.
+async fn price_and_error(pool: &PgPool) -> sqlx::Result<(Option<String>, Option<String>, bool)> {
+    sqlx::query_as("SELECT price::text, last_error, last_error_at IS NOT NULL FROM market_price")
+        .fetch_one(pool)
+        .await
+}
+
+/// GIVEN a market with a stored price,
+/// WHEN a refresh failure is recorded, and later a fresh price is stored,
+/// THEN the failure sits next to the unchanged last known price, and the fresh price
+/// clears the failure.
+#[sqlx::test(migrations = "../../migrations")]
+async fn recorded_failure_keeps_the_last_known_price_until_a_new_price_clears_it(
+    pool: PgPool,
+) -> TestResult {
+    use dcapal_backend::{
+        app::domain::market_quote::PriceFailure,
+        ports::outbound::repository::market_data::MarketPriceFailure,
+    };
+    let repo = MarketDataRepository::new(pool.clone());
+    seed_catalog(&repo).await?;
+    seed_market(
+        &repo,
+        &crypto("btc"),
+        &fiat("eur", "Euro"),
+        Some(price(40_000.5, 1)),
+    )
+    .await?;
+    let market_id = "btceur".to_string();
+    let failure = PriceFailure::provider_error("Kraken answered HTTP 503");
+
+    let recorded = repo
+        .record_price_failures(&[
+            MarketPriceFailure {
+                market_id: &market_id,
+                failure: &failure,
+            },
+            MarketPriceFailure {
+                market_id: &"unknown".to_string(),
+                failure: &failure,
+            },
+        ])
+        .await?;
+
+    assert_eq!(recorded, 1);
+    let (stored_price, error, has_error_time) = price_and_error(&pool).await?;
+    assert_eq!(stored_price.as_deref(), Some("40000.5"));
+    assert_eq!(
+        error.as_deref(),
+        Some("providerError: Kraken answered HTTP 503")
+    );
+    assert!(has_error_time);
+
+    let fresh = [update(
+        &market_id,
+        price(41_000.0, 5),
+        PriceProvider::Kraken,
+    )];
+    repo.upsert_prices(&fresh).await?;
+    let (stored_price, error, has_error_time) = price_and_error(&pool).await?;
+    assert_eq!(stored_price.as_deref(), Some("41000"));
+    assert_eq!((error, has_error_time), (None, false));
+    Ok(())
+}
+
+/// GIVEN a market with a stored price,
+/// WHEN zero, negative and non-finite prices are submitted,
+/// THEN none is stored and the last known price is kept.
+#[sqlx::test(migrations = "../../migrations")]
+async fn non_positive_prices_are_never_stored(pool: PgPool) -> TestResult {
+    let repo = MarketDataRepository::new(pool.clone());
+    seed_catalog(&repo).await?;
+    seed_market(
+        &repo,
+        &crypto("btc"),
+        &fiat("eur", "Euro"),
+        Some(price(10.0, 1)),
+    )
+    .await?;
+    let id = "btceur".to_string();
+
+    for bad in [0.0, -3.0, f64::NAN, f64::INFINITY] {
+        let stored = repo
+            .upsert_prices(&[update(&id, price(bad, 9), PriceProvider::Kraken)])
+            .await?;
+        assert_eq!(stored, 0, "{bad}");
+    }
+
+    assert_eq!(price_and_error(&pool).await?.0.as_deref(), Some("10"));
+    Ok(())
+}
