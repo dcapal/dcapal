@@ -1,7 +1,6 @@
 app:
   providers:
     priceProvider: @@DCAPAL_PRICE_PROVIDER@@
-    cwApiKey: @@DCAPAL_CW_API_KEY@@
     ipApiKey: @@DCAPAL_IP_API_KEY@@
     cmcApiKey: @@DCAPAL_CMC_API_KEY@@
   auth:

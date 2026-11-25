@@ -93,6 +93,39 @@
         ],
         "type": "object"
       },
+      "FailureKindV2": {
+        "description": "Why a price, rate or search has no usable value.",
+        "enum": [
+          "unavailable",
+          "providerError",
+          "malformed"
+        ],
+        "type": "string"
+      },
+      "FailureV2": {
+        "description": "A visible failure: what went wrong and, when recorded, when.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FailureKindV2"
+          },
+          "message": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "description": "RFC 3339 time the failure was recorded, when known.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "message"
+        ],
+        "type": "object"
+      },
       "FeeStructure": {
         "description": "Transaction-fee policy exchanged by the REST API.\n\nDecimal values are serialized as strings so clients do not lose precision\nwhile crossing the JSON boundary.",
         "oneOf": [
@@ -238,6 +271,176 @@
         "required": [
           "id",
           "symbol"
+        ],
+        "type": "object"
+      },
+      "FoundAssetV2": {
+        "description": "One asset found by a search; `provider` and `symbol` are its stable identity.",
+        "properties": {
+          "aclass": {
+            "enum": [
+              "equity",
+              "bond",
+              "cash",
+              "crypto",
+              "commodity",
+              "other"
+            ],
+            "type": "string"
+          },
+          "currency": {
+            "description": "Currency prices are expressed in, when the search knows it (Yahoo searches do not).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priceAvailability": {
+            "$ref": "#/components/schemas/PriceAvailabilityV2"
+          },
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "venue": {
+            "description": "Exchange or market, when the provider says so.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "symbol",
+          "aclass",
+          "priceAvailability"
+        ],
+        "type": "object"
+      },
+      "FxLegV2": {
+        "description": "A stored market an FX rate was derived from.",
+        "properties": {
+          "base": {
+            "type": "string"
+          },
+          "observedAt": {
+            "description": "RFC 3339 time the provider observed the leg.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "provider"
+        ],
+        "type": "object"
+      },
+      "FxRateV2Response": {
+        "description": "The value of one unit of `base` in `quote`, with its provenance.",
+        "properties": {
+          "base": {
+            "type": "string"
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FailureV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fetchedAt": {
+            "description": "Oldest backend storage time among the legs, RFC 3339.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/FxLegV2"
+            },
+            "type": "array"
+          },
+          "observedAt": {
+            "description": "Oldest provider observation time among the legs, RFC 3339.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "description": "Provider of the legs, when they all share one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quote": {
+            "type": "string"
+          },
+          "rate": {
+            "description": "Positive decimal string; null unless `status` is `usable`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteSourceV2",
+                "description": "`provider` for a fresh value, `lastKnown` when a leg's latest refresh failed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuoteStatusV2"
+          },
+          "synthetic": {
+            "$ref": "#/components/schemas/SyntheticV2"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "synthetic",
+          "legs",
+          "status"
         ],
         "type": "object"
       },
@@ -788,6 +991,126 @@
         ],
         "type": "object"
       },
+      "PriceAvailabilityV2": {
+        "description": "Whether a price is expected to be available for a found asset.",
+        "enum": [
+          "available",
+          "unavailable",
+          "unknown"
+        ],
+        "type": "string"
+      },
+      "PriceV2": {
+        "description": "The current price of one requested asset with its provenance.",
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefV2",
+            "description": "The requested asset, normalized."
+          },
+          "currency": {
+            "description": "Currency the price is expressed in, as the provider spells it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FailureV2",
+                "description": "Why the price is missing, or why a last-known value is stale."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fetchedAt": {
+            "description": "RFC 3339 time the backend obtained the price.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observedAt": {
+            "description": "RFC 3339 time the provider observed the price.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "description": "Positive decimal string; null unless `status` is `usable`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteSourceV2",
+                "description": "`provider` for a fresh value, `lastKnown` when the latest refresh failed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuoteStatusV2"
+          }
+        },
+        "required": [
+          "asset",
+          "provider",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PricesV2Response": {
+        "description": "Prices of the requested assets, in request order.",
+        "properties": {
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/PriceV2"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "prices"
+        ],
+        "type": "object"
+      },
+      "QuoteSourceV2": {
+        "description": "Where a price comes from.",
+        "enum": [
+          "provider",
+          "lastKnown"
+        ],
+        "type": "string"
+      },
+      "QuoteStatusV2": {
+        "description": "Outcome of one price or rate.",
+        "enum": [
+          "usable",
+          "unavailable",
+          "providerError",
+          "malformed",
+          "pending"
+        ],
+        "type": "string"
+      },
       "ResolvedAssetV2Response": {
         "description": "Shared metadata of one cached asset returned by the lookup.",
         "properties": {
@@ -827,6 +1150,58 @@
           "aclass"
         ],
         "type": "object"
+      },
+      "SearchAssetsV2Response": {
+        "description": "The answer to a search.",
+        "properties": {
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FailureV2",
+                "description": "Why the provider gave no answer."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SearchOutcomeV2"
+          },
+          "provider": {
+            "enum": [
+              "yf",
+              "kraken"
+            ],
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/FoundAssetV2"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "provider",
+          "query",
+          "outcome",
+          "results"
+        ],
+        "type": "object"
+      },
+      "SearchOutcomeV2": {
+        "description": "Overall outcome of a search.",
+        "enum": [
+          "usable",
+          "empty",
+          "providerError",
+          "malformed"
+        ],
+        "type": "string"
       },
       "StrategicAllocationV2Request": {
         "description": "Strategic class and relative Portfolio Asset targets.",
@@ -1059,6 +1434,15 @@
           "deletedPortfolios"
         ],
         "type": "object"
+      },
+      "SyntheticV2": {
+        "description": "How an FX rate was derived.",
+        "enum": [
+          "none",
+          "inverse",
+          "triangulated"
+        ],
+        "type": "string"
       },
       "TransactionFeesRequest": {
         "description": "Portfolio- or asset-level transaction-fee settings.",
@@ -1867,6 +2251,213 @@
           }
         },
         "summary": "Reads the cached metadata of up to 20 assets without contacting providers."
+      }
+    },
+    "/markets/v2/assets/{provider}/search": {
+      "get": {
+        "operationId": "search_assets_v2",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Provider whose listings are searched: `yf` or `kraken`.",
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Free text matched against symbols and names, at most 100 characters. Required.",
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchAssetsV2Response"
+                }
+              }
+            },
+            "description": "Search answer; `outcome` tells usable, empty, providerError or malformed"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported provider or invalid query"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "The provider rate limit is exhausted"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Catalog failure"
+          }
+        },
+        "summary": "Searches the assets listed by one provider, reporting failures in the outcome."
+      }
+    },
+    "/markets/v2/fx": {
+      "get": {
+        "description": "Clients convert values themselves (price times rate) and should cache each pair\nfor the `Cache-Control` max-age, which matches the price validity window.",
+        "operationId": "get_fx_rate_v2",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Base currency: a catalog fiat code such as `EUR`. Required.",
+            "in": "query",
+            "name": "base",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Quote currency: a catalog fiat code such as `USD`. Required.",
+            "in": "query",
+            "name": "quote",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxRateV2Response"
+                }
+              }
+            },
+            "description": "FX rate or the reason it is missing"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or unsupported currency"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Price storage failure"
+          }
+        },
+        "summary": "Reports the rate between two catalog fiat currencies."
+      }
+    },
+    "/markets/v2/prices": {
+      "get": {
+        "description": "Each asset is priced by its own provider; nothing is converted or substituted.\n`Cache-Control` allows caching until the stalest usable price crosses its\nfive-minute window, and forbids reuse when any price is missing.",
+        "operationId": "get_prices_v2",
+        "parameters": [
+          {
+            "description": "Bearer JWT token",
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Asset reference as `<provider>:<symbol>` with provider `yf` or `kraken`. Repeat the parameter for several assets (1 to 20 per call). Kraken assets are priced in USD; Yahoo symbols in their listing currency.",
+            "in": "query",
+            "name": "asset",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricesV2Response"
+                }
+              }
+            },
+            "description": "One price entry per distinct requested asset"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid asset references"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2ErrorResponse"
+                }
+              }
+            },
+            "description": "Price storage failure"
+          }
+        },
+        "summary": "Reports the current price of up to 20 assets in the asset's own currency."
       }
     },
     "/price/{asset}": {

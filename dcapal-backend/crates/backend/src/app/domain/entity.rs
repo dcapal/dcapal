@@ -7,8 +7,17 @@ use crate::{DateTime, app::infra::utils::Expiring};
 /// Stable identifier used for a supported asset.
 pub type AssetId = String;
 
-/// Stable identifier used for a tradable base/quote market pair.
+/// Stable identifier used for a tradable base/quote market pair: the lower-case base and
+/// quote asset ids joined by `/` (`btc/eur`).
 pub type MarketId = String;
+
+/// Builds the id of the market that prices `base` in `quote`.
+///
+/// Both arguments are lower-case asset ids. Asset ids never contain `/`, so distinct pairs
+/// always have distinct market ids (`ab`+`cd` and `a`+`bcd` do not collide).
+pub fn market_id(base: &str, quote: &str) -> MarketId {
+    format!("{base}/{quote}")
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 /// A cryptocurrency identified by its provider id and display symbol.

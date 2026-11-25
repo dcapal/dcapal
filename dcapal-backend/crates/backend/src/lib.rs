@@ -25,6 +25,7 @@ use crate::{
         infra::{self, utils::spawn_supervised},
         services::{
             asset::AssetService,
+            asset_search::AssetSearchService,
             fx_rates::{FxStartupPolicy, YahooFxFetcher, ensure_fx_rates},
             market_data::MarketDataService,
             portfolio::PortfolioService,
@@ -37,8 +38,8 @@ use crate::{
         inbound::rest,
         outbound::{
             adapter::{
-                CatalogFiatAssetProvider, CryptoWatchProvider, IpApi, KrakenAssetProvider,
-                KrakenProvider, PriceProviders, ProviderRoutedAssetProvider, YahooProvider,
+                CatalogFiatAssetProvider, IpApi, KrakenAssetProvider, KrakenProvider,
+                PriceProviders, ProviderRoutedAssetProvider, YahooProvider,
             },
             repository::{
                 ImportedRepository, MiscRepository, StatsRepository,
@@ -57,7 +58,7 @@ pub mod config;
 pub mod error;
 pub mod ports;
 #[cfg(test)]
-mod v1_regression;
+mod test_support;
 
 /// The timestamp type shared by API and persistence models.
 pub type DateTime = Timestamp;
@@ -82,6 +83,7 @@ struct Services {
     mkt_data: Arc<MarketDataService>,
     portfolio: Arc<PortfolioService>,
     asset: Arc<AssetService>,
+    asset_search: Arc<AssetSearchService>,
 }
 
 #[derive(Clone)]
@@ -151,12 +153,11 @@ impl DcaServer {
         });
 
         let providers = Arc::new(PriceProviders {
-            cw: Arc::new(CryptoWatchProvider::new(
-                http.clone(),
-                &config.app.providers,
-            )),
             kraken: Arc::new(KrakenProvider::new(http.clone(), &config.app.providers)),
-            yahoo: Arc::new(YahooProvider::new(rquest.clone())),
+            yahoo: Arc::new(match &config.app.providers.yahoo_base_url {
+                Some(base) => YahooProvider::new(rquest.clone()).with_base_url(base),
+                None => YahooProvider::new(rquest.clone()),
+            }),
             ipapi: Arc::new(IpApi::new(http.clone(), &config.app.providers)),
         });
 
@@ -168,12 +169,19 @@ impl DcaServer {
             )),
         ));
         let services = Services {
-            mkt_data: Arc::new(MarketDataService::new(repos.mkt_data.clone())),
+            mkt_data: Arc::new(
+                MarketDataService::new(repos.mkt_data.clone())
+                    .with_live_prices(providers.yahoo.clone()),
+            ),
             portfolio: Arc::new(PortfolioService::new(
                 repos.portfolio.clone(),
                 asset_service.clone(),
             )),
             asset: asset_service,
+            asset_search: Arc::new(AssetSearchService::new(
+                repos.mkt_data.clone(),
+                providers.yahoo.clone(),
+            )),
         };
 
         let (api_routes, openapi) = rest::build_openapi_router();
@@ -271,6 +279,14 @@ impl DcaServer {
             .await
             .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))?;
 
+        self.serve_on(listener).await
+    }
+
+    /// Serves the HTTP API on an already bound listener until the server fails.
+    ///
+    /// Unlike [`Self::start`] it neither requires FX rates nor starts the background
+    /// workers, so tests can serve a server built by [`Self::try_new`] on an ephemeral port.
+    pub async fn serve_on(&self, listener: TcpListener) -> Result<()> {
         axum::serve(listener, self.app.clone())
             .await
             .map_err(|e| DcaError::StartupFailure("Failed to start DcaServer".into(), e.into()))?;

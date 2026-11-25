@@ -32,7 +32,7 @@ pub enum DcaError {
     #[error("Market '{0}' not found")]
     MarketNotFound(MarketId),
     #[error("Failed to store in Repository: {0}")]
-    RepositoryStoreFailure(String),
+    RepositoryStoreFailure(String, #[source] Option<sqlx::Error>),
     #[error("External service died: {0}")]
     ExternalServiceDied(String),
     /// A provider answered with a non-success HTTP status.
@@ -53,8 +53,8 @@ pub enum DcaError {
     JsonDeserializationFailure(String, String, #[source] serde_json::Error),
     #[error("Third-party API reqwest failed")]
     Reqwest(#[from] reqwest::Error),
-    #[error("IP2Location internal error: {0:?}")]
-    Ip2Location(ip2location::error::Error),
+    #[error("IP2Location internal error")]
+    Ip2Location(#[source] ip2location::error::Error),
     #[error(transparent)]
     TypeHeaderError(#[from] axum_extra::typed_header::TypedHeaderRejection),
     #[error(transparent)]
@@ -69,13 +69,7 @@ pub enum DcaError {
 
 impl Debug for DcaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{self}"))?;
-
-        for e in self.iter_sources() {
-            f.write_fmt(format_args!(" -- Caused by: {e}"))?;
-        }
-
-        Ok(())
+        write!(f, "{}", ErrorChain(self))
     }
 }
 
@@ -106,11 +100,33 @@ impl IntoResponse for DcaError {
             DcaError::BadRequest(_) | DcaError::ValidationFailure { .. } => {
                 (StatusCode::BAD_REQUEST, format!("{self}")).into_response()
             }
+            DcaError::TypeHeaderError(_) | DcaError::JwtError(_) => {
+                (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+            }
             DcaError::PriceNotAvailable(_, _) => {
                 (StatusCode::NOT_FOUND, format!("{self}")).into_response()
             }
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
         }
+    }
+}
+
+/// Renders an error followed by every error in its `source` chain, as
+/// `error -- Caused by: cause -- Caused by: root cause`.
+///
+/// Use it wherever an error is logged or turned into a message, so the underlying
+/// cause is never lost to a `Display` that prints only the outermost error.
+pub struct ErrorChain<'a>(pub &'a (dyn std::error::Error + 'static));
+
+impl std::fmt::Display for ErrorChain<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)?;
+        for cause in (ErrorIter {
+            current: self.0.source(),
+        }) {
+            write!(f, " -- Caused by: {cause}")?;
+        }
+        Ok(())
     }
 }
 
@@ -133,5 +149,67 @@ impl<'a> Iterator for ErrorIter<'a> {
 impl From<ip2location::error::Error> for DcaError {
     fn from(e: ip2location::error::Error) -> Self {
         DcaError::Ip2Location(e)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("{message}")]
+    struct Layer {
+        message: &'static str,
+        #[source]
+        source: Option<Box<Layer>>,
+    }
+
+    /// GIVEN an error with two nested causes,
+    /// WHEN it is rendered with `ErrorChain`,
+    /// THEN every cause follows the outermost message, separated by "-- Caused by:".
+    #[test]
+    fn error_chain_renders_every_source() {
+        let root = Layer {
+            message: "root",
+            source: None,
+        };
+        let mid = Layer {
+            message: "mid",
+            source: Some(Box::new(root)),
+        };
+        let top = Layer {
+            message: "top",
+            source: Some(Box::new(mid)),
+        };
+
+        assert_eq!(
+            ErrorChain(&top).to_string(),
+            "top -- Caused by: mid -- Caused by: root"
+        );
+    }
+
+    /// GIVEN a repository failure carrying a database error,
+    /// WHEN it is debug-printed and its source inspected,
+    /// THEN the log text includes the database cause and the cause stays available as `source`.
+    #[test]
+    fn store_failure_keeps_its_database_cause() {
+        let error =
+            DcaError::RepositoryStoreFailure("btc/eur".into(), Some(sqlx::Error::PoolClosed));
+
+        assert!(format!("{error:?}").contains("-- Caused by:"));
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    /// GIVEN an IP2Location failure,
+    /// WHEN the error is rendered as a chain,
+    /// THEN the cause appears exactly once, as the source, not also in the message.
+    #[test]
+    fn ip2location_cause_is_rendered_once() {
+        let error = DcaError::Ip2Location(ip2location::error::Error::RecordNotFound);
+
+        let rendered = ErrorChain(&error).to_string();
+
+        assert_eq!(rendered.matches("RecordNotFound").count(), 1, "{rendered}");
+        assert!(rendered.starts_with("IP2Location internal error -- Caused by:"));
     }
 }

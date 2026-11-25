@@ -23,7 +23,7 @@ pub struct MiscRepository {
 }
 
 impl MiscRepository {
-    const CW_LAST_FETCHED: &'static str = "cw-last-fetched";
+    const DISCOVERY_COMPLETED: &'static str = "kraken-discovery-completed";
 
     /// Creates a repository backed by the provided PostgreSQL pool.
     pub fn new(pool: PgPool) -> Self {
@@ -31,22 +31,22 @@ impl MiscRepository {
     }
 
     /// Returns when market discovery last completed, if it ever did.
-    pub async fn get_cw_last_fetched(&self) -> Result<Option<DateTime>> {
+    pub async fn get_discovery_completed(&self) -> Result<Option<DateTime>> {
         let completed_at: Option<jiff_sqlx::Timestamp> =
             query_scalar("SELECT completed_at FROM worker_marker WHERE name = $1")
-                .bind(Self::CW_LAST_FETCHED)
+                .bind(Self::DISCOVERY_COMPLETED)
                 .fetch_optional(&self.pool)
                 .await?;
         Ok(completed_at.map(jiff_sqlx::Timestamp::to_jiff))
     }
 
     /// Records when market discovery last completed.
-    pub async fn set_cw_last_fetched(&self, ts: DateTime) -> Result<()> {
+    pub async fn set_discovery_completed(&self, ts: DateTime) -> Result<()> {
         query(
             "INSERT INTO worker_marker (name, completed_at) VALUES ($1, $2)
              ON CONFLICT (name) DO UPDATE SET completed_at = EXCLUDED.completed_at",
         )
-        .bind(Self::CW_LAST_FETCHED)
+        .bind(Self::DISCOVERY_COMPLETED)
         .bind(ts.to_sqlx())
         .execute(&self.pool)
         .await?;

@@ -15,7 +15,7 @@ use crate::{
         services::{fx_rates::seed_fx_catalog, market_data::MarketDataService},
     },
     config::PriceProvider,
-    error::Result,
+    error::{ErrorChain, Result},
     ports::outbound::{
         adapter::PriceProviders,
         repository::{MiscRepository, market_data::MarketDataRepository},
@@ -146,7 +146,11 @@ impl MarketDiscoveryWorker {
                     recovery_backoff = next_recovery_backoff(recovery_backoff);
                     next_recovery_attempt = Instant::now() + recovery_backoff;
                 }
-                Ok(()) => match self.misc_repo.set_cw_last_fetched(Timestamp::now()).await {
+                Ok(()) => match self
+                    .misc_repo
+                    .set_discovery_completed(Timestamp::now())
+                    .await
+                {
                     Ok(()) => {
                         recovery_pending = false;
                         recovery_backoff = Duration::ZERO;
@@ -208,17 +212,25 @@ impl MarketDiscoveryWorker {
         let asset_result = self.market_data_repo.store_assets(&assets).await;
         self.market_data_service.invalidate_asset_cache();
         if let Err(error) = &asset_result {
-            error!(error = %error, count = assets.len(), "Failed to store discovered assets");
+            error!(error = %ErrorChain(error), count = assets.len(), "Failed to store discovered assets");
         }
         asset_result?;
 
-        // Fetch prices market by market, storing them in batches instead of one
-        // transaction per market.
+        // The market cache is dropped once, after everything was written (or the write
+        // failed part-way), instead of after each batch.
+        let stored = self.store_priced_markets(markets).await;
+        self.market_data_service.invalidate_market_cache();
+        stored
+    }
+
+    /// Fetches the price of each market and stores them in batches instead of one
+    /// transaction per market.
+    async fn store_priced_markets(&self, markets: Vec<Market>) -> Result<()> {
         let mut batch: Vec<(Market, PriceProvider)> = Vec::with_capacity(MARKET_FLUSH_SIZE);
         for mut m in markets {
             info!("Fetching price for market '{}'", m.id);
             let provider = price_provider_for(&m, self.price_provider);
-            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
+            let Ok(price) = fetch_market_price(&m, &self.providers, provider).await else {
                 continue;
             };
 
@@ -229,16 +241,11 @@ impl MarketDiscoveryWorker {
                 self.flush_markets(&mut batch).await?;
             }
         }
-        self.flush_markets(&mut batch).await?;
-
-        self.market_data_service.invalidate_market_cache();
-
-        Ok(())
+        self.flush_markets(&mut batch).await
     }
 
     /// Stores and clears the pending priced markets in one transaction.
     ///
-    /// The market cache is invalidated even when the write fails.
     async fn flush_markets(&self, batch: &mut Vec<(Market, PriceProvider)>) -> Result<()> {
         if batch.is_empty() {
             return Ok(());
@@ -250,7 +257,6 @@ impl MarketDiscoveryWorker {
             .map(|(market, provider)| (market, *provider))
             .collect::<Vec<_>>();
         let result = self.market_data_repo.store_markets(&markets).await;
-        self.market_data_service.invalidate_market_cache();
         batch.clear();
         result
     }
@@ -265,7 +271,7 @@ fn next_recovery_backoff(previous: Duration) -> Duration {
 }
 
 async fn is_outdated(misc: &MiscRepository) -> Result<(bool, Option<DateTime>)> {
-    let last_fetched = misc.get_cw_last_fetched().await?;
+    let last_fetched = misc.get_discovery_completed().await?;
     let today = Timestamp::now().to_zoned_datetime(TimeZone::UTC).date();
     Ok((is_outdated_at(last_fetched, today), last_fetched))
 }

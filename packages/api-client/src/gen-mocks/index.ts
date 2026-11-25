@@ -25,14 +25,20 @@ import type {
 
 import type {
   Asset,
+  FxRateV2Response,
   GetAssetsChartParams,
   GetAssetsDataParams,
+  GetFxRateV2Params,
   GetPriceParams,
+  GetPricesV2Params,
   ImportPortfolioBody,
   ImportPortfolioResponse,
   LookupAssetsV2Params,
   LookupAssetsV2Response,
   Price,
+  PricesV2Response,
+  SearchAssetsV2Params,
+  SearchAssetsV2Response,
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
   SyncPortfoliosV2Request,
@@ -1093,6 +1099,462 @@ export function useLookupAssetsV2<TData = Awaited<ReturnType<typeof lookupAssets
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getLookupAssetsV2QueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type searchAssetsV2Response200 = {
+  data: SearchAssetsV2Response
+  status: 200
+}
+
+export type searchAssetsV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type searchAssetsV2Response429 = {
+  data: V2ErrorResponse
+  status: 429
+}
+
+export type searchAssetsV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type searchAssetsV2ResponseSuccess = (searchAssetsV2Response200) & {
+  headers: Headers;
+};
+export type searchAssetsV2ResponseError = (searchAssetsV2Response400 | searchAssetsV2Response429 | searchAssetsV2Response500) & {
+  headers: Headers;
+};
+
+export const getSearchAssetsV2Url = (provider: string,
+    params?: SearchAssetsV2Params,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/markets/v2/assets/${provider}/search?${stringifiedParams}` : `/markets/v2/assets/${provider}/search`
+}
+
+/**
+ * @summary Searches the assets listed by one provider, reporting failures in the outcome.
+ */
+export const searchAssetsV2 = async (provider: string,
+    params?: SearchAssetsV2Params, options?: RequestInit): Promise<searchAssetsV2ResponseSuccess> => {
+
+  const res = await fetch(getSearchAssetsV2Url(provider,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  if (!res.ok) {
+
+    const err: globalThis.Error & {info?: searchAssetsV2ResponseError['data'], status?: number} = new globalThis.Error();
+    const data : searchAssetsV2ResponseError['data'] = body ? JSON.parse(body) : {}
+    err.info = data;
+    err.status = res.status;
+    throw err;
+  }
+  const data: searchAssetsV2ResponseSuccess['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as searchAssetsV2ResponseSuccess
+}
+
+
+
+
+
+export const getSearchAssetsV2QueryKey = (provider: string,
+    params?: SearchAssetsV2Params,) => {
+    return [
+    `/markets/v2/assets/${provider}/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchAssetsV2QueryOptions = <TData = Awaited<ReturnType<typeof searchAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(provider: string,
+    params?: SearchAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAssetsV2>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchAssetsV2QueryKey(provider,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAssetsV2>>> = ({ signal }) => searchAssetsV2(provider,params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: provider !== null && provider !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchAssetsV2>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchAssetsV2QueryResult = NonNullable<Awaited<ReturnType<typeof searchAssetsV2>>>
+export type SearchAssetsV2QueryError = globalThis.Error & { info?: V2ErrorResponse; status?: number }
+
+
+export function useSearchAssetsV2<TData = Awaited<ReturnType<typeof searchAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ provider: string,
+    params: undefined |  SearchAssetsV2Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAssetsV2>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAssetsV2>>,
+          TError,
+          Awaited<ReturnType<typeof searchAssetsV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAssetsV2<TData = Awaited<ReturnType<typeof searchAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ provider: string,
+    params?: SearchAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAssetsV2>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAssetsV2>>,
+          TError,
+          Awaited<ReturnType<typeof searchAssetsV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAssetsV2<TData = Awaited<ReturnType<typeof searchAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ provider: string,
+    params?: SearchAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAssetsV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Searches the assets listed by one provider, reporting failures in the outcome.
+ */
+
+export function useSearchAssetsV2<TData = Awaited<ReturnType<typeof searchAssetsV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ provider: string,
+    params?: SearchAssetsV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAssetsV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchAssetsV2QueryOptions(provider,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type getFxRateV2Response200 = {
+  data: FxRateV2Response
+  status: 200
+}
+
+export type getFxRateV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type getFxRateV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type getFxRateV2ResponseSuccess = (getFxRateV2Response200) & {
+  headers: Headers;
+};
+export type getFxRateV2ResponseError = (getFxRateV2Response400 | getFxRateV2Response500) & {
+  headers: Headers;
+};
+
+export const getGetFxRateV2Url = (params?: GetFxRateV2Params,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/markets/v2/fx?${stringifiedParams}` : `/markets/v2/fx`
+}
+
+/**
+ * Clients convert values themselves (price times rate) and should cache each pair
+ * for the `Cache-Control` max-age, which matches the price validity window.
+ * @summary Reports the rate between two catalog fiat currencies.
+ */
+export const getFxRateV2 = async (params?: GetFxRateV2Params, options?: RequestInit): Promise<getFxRateV2ResponseSuccess> => {
+
+  const res = await fetch(getGetFxRateV2Url(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  if (!res.ok) {
+
+    const err: globalThis.Error & {info?: getFxRateV2ResponseError['data'], status?: number} = new globalThis.Error();
+    const data : getFxRateV2ResponseError['data'] = body ? JSON.parse(body) : {}
+    err.info = data;
+    err.status = res.status;
+    throw err;
+  }
+  const data: getFxRateV2ResponseSuccess['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getFxRateV2ResponseSuccess
+}
+
+
+
+
+
+export const getGetFxRateV2QueryKey = (params?: GetFxRateV2Params,) => {
+    return [
+    `/markets/v2/fx`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFxRateV2QueryOptions = <TData = Awaited<ReturnType<typeof getFxRateV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(params?: GetFxRateV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFxRateV2>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFxRateV2QueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFxRateV2>>> = ({ signal }) => getFxRateV2(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFxRateV2>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetFxRateV2QueryResult = NonNullable<Awaited<ReturnType<typeof getFxRateV2>>>
+export type GetFxRateV2QueryError = globalThis.Error & { info?: V2ErrorResponse; status?: number }
+
+
+export function useGetFxRateV2<TData = Awaited<ReturnType<typeof getFxRateV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: undefined |  GetFxRateV2Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFxRateV2>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFxRateV2>>,
+          TError,
+          Awaited<ReturnType<typeof getFxRateV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFxRateV2<TData = Awaited<ReturnType<typeof getFxRateV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params?: GetFxRateV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFxRateV2>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFxRateV2>>,
+          TError,
+          Awaited<ReturnType<typeof getFxRateV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFxRateV2<TData = Awaited<ReturnType<typeof getFxRateV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params?: GetFxRateV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFxRateV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Reports the rate between two catalog fiat currencies.
+ */
+
+export function useGetFxRateV2<TData = Awaited<ReturnType<typeof getFxRateV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params?: GetFxRateV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFxRateV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetFxRateV2QueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type getPricesV2Response200 = {
+  data: PricesV2Response
+  status: 200
+}
+
+export type getPricesV2Response400 = {
+  data: V2ErrorResponse
+  status: 400
+}
+
+export type getPricesV2Response500 = {
+  data: V2ErrorResponse
+  status: 500
+}
+
+export type getPricesV2ResponseSuccess = (getPricesV2Response200) & {
+  headers: Headers;
+};
+export type getPricesV2ResponseError = (getPricesV2Response400 | getPricesV2Response500) & {
+  headers: Headers;
+};
+
+export const getGetPricesV2Url = (params: GetPricesV2Params,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["asset"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/markets/v2/prices?${stringifiedParams}` : `/markets/v2/prices`
+}
+
+/**
+ * Each asset is priced by its own provider; nothing is converted or substituted.
+ * `Cache-Control` allows caching until the stalest usable price crosses its
+ * five-minute window, and forbids reuse when any price is missing.
+ * @summary Reports the current price of up to 20 assets in the asset's own currency.
+ */
+export const getPricesV2 = async (params: GetPricesV2Params, options?: RequestInit): Promise<getPricesV2ResponseSuccess> => {
+
+  const res = await fetch(getGetPricesV2Url(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  if (!res.ok) {
+
+    const err: globalThis.Error & {info?: getPricesV2ResponseError['data'], status?: number} = new globalThis.Error();
+    const data : getPricesV2ResponseError['data'] = body ? JSON.parse(body) : {}
+    err.info = data;
+    err.status = res.status;
+    throw err;
+  }
+  const data: getPricesV2ResponseSuccess['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getPricesV2ResponseSuccess
+}
+
+
+
+
+
+export const getGetPricesV2QueryKey = (params?: GetPricesV2Params,) => {
+    return [
+    `/markets/v2/prices`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPricesV2QueryOptions = <TData = Awaited<ReturnType<typeof getPricesV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(params: GetPricesV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPricesV2>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPricesV2QueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPricesV2>>> = ({ signal }) => getPricesV2(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPricesV2>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPricesV2QueryResult = NonNullable<Awaited<ReturnType<typeof getPricesV2>>>
+export type GetPricesV2QueryError = globalThis.Error & { info?: V2ErrorResponse; status?: number }
+
+
+export function useGetPricesV2<TData = Awaited<ReturnType<typeof getPricesV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: GetPricesV2Params, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPricesV2>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPricesV2>>,
+          TError,
+          Awaited<ReturnType<typeof getPricesV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPricesV2<TData = Awaited<ReturnType<typeof getPricesV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: GetPricesV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPricesV2>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPricesV2>>,
+          TError,
+          Awaited<ReturnType<typeof getPricesV2>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPricesV2<TData = Awaited<ReturnType<typeof getPricesV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: GetPricesV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPricesV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Reports the current price of up to 20 assets in the asset's own currency.
+ */
+
+export function useGetPricesV2<TData = Awaited<ReturnType<typeof getPricesV2>>, TError = globalThis.Error & { info?: V2ErrorResponse; status?: number }>(
+ params: GetPricesV2Params, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPricesV2>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPricesV2QueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

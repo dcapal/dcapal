@@ -5,8 +5,8 @@
 //! by Kraken (provider Kraken, class Crypto) and the fiat currencies of the fixed
 //! catalog (provider Yahoo, class Cash). A market is a row of `market_price`
 //! keyed by its base and quote `assets_data` ids. The v1 REST API still exposes
-//! the lower-case symbol as asset id and the concatenation of base and quote ids
-//! as market id, so lookups by those ids compare against `LOWER(symbol)`.
+//! the lower-case symbol as asset id; the market id is `{base}/{quote}` (`btc/eur`), stored
+//! on each `market_price` row as `market_id`.
 //!
 //! Only provider-confirmed rows belong to the catalog: assets that clients
 //! supplied through synchronization never show up in it.
@@ -21,11 +21,13 @@ use uuid::Uuid;
 
 use crate::{
     app::domain::{
-        entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price},
+        entity::{Asset, AssetId, AssetKind, Crypto, Fiat, Market, MarketId, Price, market_id},
         fiat::fiat_symbols,
+        market_quote::{PriceFailure, StoredQuote, validate_price},
+        portfolio::Provider as AppProvider,
     },
     config::PriceProvider,
-    error::{DcaError, Result},
+    error::{DcaError, ErrorChain, Result},
     ports::outbound::repository::postgres::types::{
         AssetClass as DbAssetClass, MetadataSource as DbMetadataSource, Provider as DbProvider,
     },
@@ -40,6 +42,33 @@ pub struct MarketPriceUpdate<'a> {
     pub price: Price,
     /// The provider that supplied the price.
     pub provider: PriceProvider,
+}
+
+/// A failed price refresh of one market, ready to be recorded next to its last known price.
+#[derive(Debug, Clone, Copy)]
+pub struct MarketPriceFailure<'a> {
+    /// The market whose refresh failed.
+    pub market_id: &'a MarketId,
+    /// Why the refresh failed.
+    pub failure: &'a PriceFailure,
+}
+
+/// A Kraken catalog crypto asset found by a catalog search.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct CatalogSearchHit {
+    /// Upper-case Kraken symbol.
+    pub symbol: String,
+    /// Display name.
+    pub name: String,
+    /// Whether a USD market of the asset has a stored price.
+    pub priced: bool,
+}
+
+/// Escapes the `LIKE` wildcards of user text, with `\` as the escape character.
+fn escape_like(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 /// Reads and writes the market-asset catalog, markets and latest prices.
@@ -63,19 +92,26 @@ struct MarketRow {
     observed_at: Option<jiff_sqlx::Timestamp>,
 }
 
+/// A market's latest price with its refresh failure, as stored in `market_price`.
+#[derive(sqlx::FromRow)]
+struct QuoteRow {
+    market_id: String,
+    base_symbol: String,
+    quote_symbol: String,
+    provider: DbProvider,
+    price: Option<f64>,
+    observed_at: Option<jiff_sqlx::Timestamp>,
+    fetched_at: Option<jiff_sqlx::Timestamp>,
+    last_error: Option<String>,
+    last_error_at: Option<jiff_sqlx::Timestamp>,
+}
+
 #[derive(sqlx::FromRow)]
 struct AssetRow {
     provider: DbProvider,
     asset_class: DbAssetClass,
     symbol: String,
     name: String,
-}
-
-/// SQL expression of the v1 market id of a joined `market_price` row.
-macro_rules! market_id_sql {
-    () => {
-        "LOWER(b.symbol) || LOWER(q.symbol)"
-    };
 }
 
 /// Markets joined with their two assets and prices; callers append a `WHERE`.
@@ -180,6 +216,50 @@ impl MarketDataRepository {
         rows.into_iter().map(Asset::try_from).collect()
     }
 
+    /// Searches the provider-confirmed Kraken crypto catalog by symbol or name.
+    ///
+    /// The match is a case-insensitive substring of either column with `%` and `_`
+    /// taken literally. An exact symbol match comes first, then symbol order; at most
+    /// `limit` assets are returned, and price availability is computed only for those.
+    /// `priced` tells whether the asset has a USD market
+    /// with a stored price.
+    pub async fn search_crypto_catalog(
+        &self,
+        text: &str,
+        limit: i64,
+    ) -> Result<Vec<CatalogSearchHit>> {
+        let hits = query_as::<_, CatalogSearchHit>(const_format::formatcp!(
+            "WITH hits AS (
+                 SELECT ad.id, ad.symbol, ad.name
+                 FROM assets_data AS ad
+                 WHERE {CRYPTO_PREDICATE}
+                   AND (ad.symbol ILIKE $7 ESCAPE '\\' OR ad.name ILIKE $7 ESCAPE '\\')
+                 ORDER BY (ad.symbol = $8) DESC, ad.symbol
+                 LIMIT $9
+             )
+             SELECT h.symbol, h.name,
+                    EXISTS (SELECT 1 FROM market_price AS p
+                            JOIN assets_data AS q ON q.id = p.quote_asset_id
+                            WHERE p.base_asset_id = h.id AND p.price IS NOT NULL
+                              AND q.provider = $4 AND q.asset_class = $5 AND q.symbol = $6
+                           ) AS priced
+             FROM hits AS h
+             ORDER BY (h.symbol = $8) DESC, h.symbol"
+        ))
+        .bind(DbProvider::Kraken)
+        .bind(DbAssetClass::Crypto)
+        .bind(DbMetadataSource::ProviderConfirmed)
+        .bind(DbProvider::YF)
+        .bind(DbAssetClass::Cash)
+        .bind("USD")
+        .bind(format!("%{}%", escape_like(text)))
+        .bind(text.to_ascii_uppercase())
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(hits)
+    }
+
     /// Tells whether at least one provider-confirmed Kraken crypto asset is known.
     ///
     /// `false` means market discovery has not completed yet (cold start).
@@ -231,8 +311,7 @@ impl MarketDataRepository {
     /// Finds a market, with its latest price when one has been stored.
     pub async fn find_market(&self, id: &MarketId) -> Result<Option<Market>> {
         let row = query_as::<_, MarketRow>(const_format::formatcp!(
-            "{SELECT_MARKETS} WHERE {} = $1",
-            market_id_sql!()
+            "{SELECT_MARKETS} WHERE p.market_id = $1"
         ))
         .bind(id)
         .fetch_optional(&self.pool)
@@ -247,8 +326,7 @@ impl MarketDataRepository {
     pub async fn find_markets(&self, ids: &[impl AsRef<str>]) -> Result<Vec<Option<Market>>> {
         let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         let rows = query_as::<_, MarketRow>(const_format::formatcp!(
-            "{SELECT_MARKETS} WHERE {} = ANY($1)",
-            market_id_sql!()
+            "{SELECT_MARKETS} WHERE p.market_id = ANY($1)"
         ))
         .bind(&wanted)
         .fetch_all(&self.pool)
@@ -260,6 +338,35 @@ impl MarketDataRepository {
             .collect::<Result<std::collections::HashMap<_, _>>>()?;
 
         Ok(ids.iter().map(|id| found.remove(id.as_ref())).collect())
+    }
+
+    /// Reads the latest price, provenance and refresh failure of several markets.
+    ///
+    /// Markets are keyed by their v1 id; unknown markets are absent from the result.
+    /// Unlike [`Self::find_markets`] this does not require catalog assets, so it reports
+    /// the stored state as is.
+    pub async fn find_market_quotes(
+        &self,
+        ids: &[impl AsRef<str>],
+    ) -> Result<HashMap<MarketId, StoredQuote>> {
+        let wanted = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+        let rows = query_as::<_, QuoteRow>(const_format::formatcp!(
+            "SELECT p.market_id, b.symbol AS base_symbol, q.symbol AS quote_symbol,
+                    p.provider, p.price::float8 AS price, p.observed_at, p.fetched_at,
+                    p.last_error, p.last_error_at
+             FROM market_price AS p
+             JOIN assets_data AS b ON b.id = p.base_asset_id
+             JOIN assets_data AS q ON q.id = p.quote_asset_id
+             WHERE p.market_id = ANY($1)"
+        ))
+        .bind(&wanted)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.market_id.clone(), StoredQuote::from(row)))
+            .collect())
     }
 
     /// Stores one market; see [`Self::store_markets`].
@@ -301,11 +408,10 @@ impl MarketDataRepository {
             "DELETE FROM market_price AS p
              USING assets_data AS b, assets_data AS q
              WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
-               AND NOT EXISTS (SELECT 1 FROM UNNEST($1::text[]) AS k(id) WHERE k.id = {id})
+               AND NOT EXISTS (SELECT 1 FROM UNNEST($1::text[]) AS k(id) WHERE k.id = p.market_id)
                AND NOT (b.provider = $2 AND b.asset_class = $3 AND b.symbol = ANY($4)
                     AND q.provider = $2 AND q.asset_class = $3 AND q.symbol = ANY($4))
-             RETURNING {id}",
-            id = market_id_sql!()
+             RETURNING p.market_id"
         ))
         .bind(&keep)
         .bind(DbProvider::YF)
@@ -322,13 +428,55 @@ impl MarketDataRepository {
 
     /// Stores the latest price of many markets with a single statement per chunk.
     ///
-    /// Prices of markets that no longer exist, and non-finite prices, are skipped. When
+    /// Prices of markets that no longer exist, and non-positive or non-finite prices, are skipped. When
     /// a market appears several times the last price wins. Returns the number of stored prices.
     pub async fn upsert_prices(&self, updates: &[MarketPriceUpdate<'_>]) -> Result<u64> {
         let mut tx = self.pool.begin().await?;
         let stored = upsert_prices(&mut tx, updates).await?;
         tx.commit().await?;
         Ok(stored)
+    }
+
+    /// Records why the latest refresh of many markets failed, with one statement per chunk.
+    ///
+    /// Only `last_error` and `last_error_at` change: the last known price, its
+    /// timestamps and its provider stay readable. Failures of markets that no longer
+    /// exist are skipped; when a market appears several times the last failure wins.
+    /// Returns the number of recorded failures.
+    pub async fn record_price_failures(&self, failures: &[MarketPriceFailure<'_>]) -> Result<u64> {
+        // A single statement cannot touch one row twice: keep the last failure of each market.
+        let failures = failures
+            .iter()
+            .rev()
+            .unique_by(|f| f.market_id)
+            .collect::<Vec<_>>();
+
+        let mut tx = self.pool.begin().await?;
+        let mut recorded = 0;
+        for chunk in failures.chunks(PRICE_CHUNK_SIZE) {
+            let ids = chunk
+                .iter()
+                .map(|f| f.market_id.as_str())
+                .collect::<Vec<_>>();
+            let errors = chunk
+                .iter()
+                .map(|f| f.failure.to_stored())
+                .collect::<Vec<_>>();
+
+            let result = query(const_format::formatcp!(
+                "UPDATE market_price AS p
+                 SET last_error = u.error, last_error_at = NOW()
+                 FROM UNNEST($1::text[], $2::text[]) AS u(market_id, error)
+                 WHERE p.market_id = u.market_id"
+            ))
+            .bind(&ids)
+            .bind(&errors)
+            .execute(&mut *tx)
+            .await?;
+            recorded += result.rows_affected();
+        }
+        tx.commit().await?;
+        Ok(recorded)
     }
 
     /// Loads every market with its latest price, in no particular order.
@@ -354,11 +502,14 @@ async fn upsert_prices(
         .iter()
         .rev()
         .filter(|u| {
-            let finite = u.price.price.is_finite();
-            if !finite {
-                warn!(mkt = u.market_id, "Skipping non-finite price");
+            let usable = u.price.price.is_finite() && u.price.price > 0.0;
+            if !usable {
+                warn!(
+                    mkt = u.market_id,
+                    "Skipping non-positive or non-finite price"
+                );
             }
-            finite
+            usable
         })
         .unique_by(|u| u.market_id)
         .collect::<Vec<_>>();
@@ -381,7 +532,7 @@ async fn upsert_prices(
         let providers = chunk
             .iter()
             .map(|u| stored_provider(u.provider))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
         let result = query(const_format::formatcp!(
             "UPDATE market_price AS p
@@ -392,11 +543,8 @@ async fn upsert_prices(
                  last_error = NULL,
                  last_error_at = NULL
              FROM UNNEST($1::text[], $2::text[], $3::timestamptz[], $4::smallint[])
-                  AS u(market_id, price, observed_at, provider),
-                  assets_data AS b, assets_data AS q
-             WHERE b.id = p.base_asset_id AND q.id = p.quote_asset_id
-               AND {} = u.market_id",
-            market_id_sql!()
+                  AS u(market_id, price, observed_at, provider)
+             WHERE p.market_id = u.market_id"
         ))
         .bind(&ids)
         .bind(&prices)
@@ -410,16 +558,11 @@ async fn upsert_prices(
     Ok(stored)
 }
 
-/// Converts the configured price provider into the provider code stored with a price.
-///
-/// CryptoWatch has no code in `assets_data.provider`, so its prices cannot be stored.
-fn stored_provider(provider: PriceProvider) -> Result<DbProvider> {
+/// Converts the price provider into the provider code stored with a price.
+fn stored_provider(provider: PriceProvider) -> DbProvider {
     match provider {
-        PriceProvider::Kraken => Ok(DbProvider::Kraken),
-        PriceProvider::Yahoo => Ok(DbProvider::YF),
-        PriceProvider::CryptoWatch => Err(DcaError::Generic(
-            "CryptoWatch prices cannot be stored: it has no provider code".to_string(),
-        )),
+        PriceProvider::Kraken => DbProvider::Kraken,
+        PriceProvider::Yahoo => DbProvider::YF,
     }
 }
 
@@ -437,9 +580,20 @@ fn catalog_key(asset: &Asset) -> (DbProvider, String) {
 /// Fiat rows (Yahoo cash) replace the metadata of a client-supplied row; crypto
 /// rows only mark it confirmed. Provider-confirmed rows are never changed.
 async fn upsert_assets<'e>(executor: impl sqlx::PgExecutor<'e>, assets: &[Asset]) -> Result<()> {
-    // A single statement cannot touch one row twice: keep the first of each key.
+    // A single statement cannot touch one row twice: keep the first of each key. Assets
+    // whose id contains `/` are skipped: it separates the sides of a market id.
     let assets = assets
         .iter()
+        .filter(|asset| {
+            let valid = !asset.id().contains('/');
+            if !valid {
+                warn!(
+                    asset = asset.id(),
+                    "Skipping asset whose symbol contains '/'"
+                );
+            }
+            valid
+        })
         .unique_by(|asset| catalog_key(asset))
         .collect::<Vec<_>>();
     if assets.is_empty() {
@@ -522,7 +676,7 @@ async fn insert_markets(
         base_symbols.push(base_symbol);
         quote_providers.push(i16::from(quote_provider));
         quote_symbols.push(quote_symbol);
-        providers.push(i16::from(stored_provider(*provider)?));
+        providers.push(i16::from(stored_provider(*provider)));
     }
 
     // One statement resolves the assets, inserts the resolvable markets and reports
@@ -540,10 +694,10 @@ async fn insert_markets(
              LEFT JOIN assets_data AS q
                ON q.provider = w.quote_provider AND q.symbol = w.quote_symbol
          ), inserted AS (
-             INSERT INTO market_price (base_asset_id, quote_asset_id, provider)
-             SELECT base_id, quote_id, provider FROM resolved
+             INSERT INTO market_price (market_id, base_asset_id, quote_asset_id, provider)
+             SELECT market_id, base_id, quote_id, provider FROM resolved
              WHERE base_id IS NOT NULL AND quote_id IS NOT NULL
-             ON CONFLICT (base_asset_id, quote_asset_id) DO NOTHING
+             ON CONFLICT DO NOTHING
          )
          SELECT market_id FROM resolved WHERE base_id IS NULL OR quote_id IS NULL",
     )
@@ -556,12 +710,12 @@ async fn insert_markets(
     .fetch_all(&mut **tx)
     .await
     .map_err(|e| {
-        warn!("Failed to store {} markets: {e}", markets.len());
-        DcaError::RepositoryStoreFailure(market_ids[0].to_string())
+        warn!("Failed to store {} markets: {}", markets.len(), ErrorChain(&e));
+        DcaError::RepositoryStoreFailure(market_ids[0].to_string(), Some(e))
     })?;
     if let Some(first) = missing.first() {
         warn!(mkt = first, "Failed to store market: asset not stored");
-        return Err(DcaError::RepositoryStoreFailure(first.clone()));
+        return Err(DcaError::RepositoryStoreFailure(first.clone(), None));
     }
 
     let updates = markets
@@ -578,6 +732,36 @@ async fn insert_markets(
 
     debug!("Successfully stored {} markets", markets.len());
     Ok(())
+}
+
+impl From<QuoteRow> for StoredQuote {
+    /// Builds the stored quote of a market from its `market_price` row.
+    fn from(row: QuoteRow) -> Self {
+        let mut failure = row.last_error.as_deref().map(PriceFailure::from_stored);
+        let mut failed_at = row.last_error_at.map(|t| t.to_jiff());
+        // A stored zero, negative or non-finite price (legacy rows) is no price.
+        let price = row.price.and_then(|p| match validate_price(p) {
+            Ok(p) => Some(p),
+            Err(invalid) => {
+                failure.get_or_insert(invalid);
+                failed_at = failed_at.or_else(|| row.fetched_at.map(|t| t.to_jiff()));
+                None
+            }
+        });
+        Self {
+            base: row.base_symbol.to_lowercase(),
+            quote: row.quote_symbol.to_lowercase(),
+            provider: match row.provider {
+                DbProvider::YF => AppProvider::YF,
+                DbProvider::Kraken => AppProvider::Kraken,
+            },
+            price,
+            observed_at: row.observed_at.map(|t| t.to_jiff()),
+            fetched_at: row.fetched_at.map(|t| t.to_jiff()),
+            failure,
+            failed_at,
+        }
+    }
 }
 
 impl TryFrom<AssetRow> for Asset {
@@ -630,7 +814,7 @@ impl TryFrom<MarketRow> for Market {
             .zip(row.observed_at)
             .map(|(price, ts)| Price::new(price, ts.to_jiff()));
 
-        let id = format!("{}{}", base.id(), quote.id());
+        let id = market_id(base.id(), quote.id());
         Ok(Market::new(id, base, quote, price))
     }
 }

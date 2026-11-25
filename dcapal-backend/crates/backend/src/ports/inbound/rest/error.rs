@@ -7,11 +7,12 @@ use hyper::StatusCode;
 use crate::{
     app::{
         commands::{
-            lookup_assets::LookupAssetsCommandError,
+            lookup_assets::LookupAssetsCommandError, market_quotes::MarketCommandError,
             sync_portfolios_v2::SyncPortfoliosV2CommandError,
         },
-        services::portfolio::PortfolioServiceError,
+        services::{asset_search::AssetSearchServiceError, portfolio::PortfolioServiceError},
     },
+    error::{DcaError, ErrorChain},
     ports::{
         inbound::rest::types::v2_common::{
             V2ErrorResponse, V2FieldError, V2ValidationError, VALIDATION_CODE,
@@ -30,6 +31,10 @@ const INTERNAL_CODE: &str = "internal_error";
 const INTERNAL_MESSAGE: &str = "The Portfolio could not be synchronized.";
 const LOOKUP_INVALID_MESSAGE: &str = "The asset lookup request is invalid.";
 const ASSET_INTERNAL_MESSAGE: &str = "The assets could not be resolved.";
+const MARKET_INVALID_MESSAGE: &str = "The market-data request is invalid.";
+const MARKET_INTERNAL_MESSAGE: &str = "The market data could not be read.";
+const RATE_LIMITED_CODE: &str = "rate_limited";
+const RATE_LIMITED_MESSAGE: &str = "The provider rate limit is exhausted; retry later.";
 const PROVIDER_UNAVAILABLE_CODE: &str = "provider_unavailable";
 const PROVIDER_UNAVAILABLE_MESSAGE: &str =
     "An asset provider is unavailable; retry the request later.";
@@ -47,6 +52,12 @@ pub enum V2HttpError {
     LookupCommand(#[from] LookupAssetsCommandError),
     #[error("v2 asset directory failed")]
     Asset(#[from] AssetDirectoryError),
+    #[error("v2 market-data request is invalid")]
+    MarketCommand(#[from] MarketCommandError),
+    #[error("v2 asset search failed")]
+    Search(#[from] AssetSearchServiceError),
+    #[error("v2 market data could not be read")]
+    MarketData(#[from] DcaError),
 }
 
 /// Builds a response with the given code, message and field-level errors.
@@ -109,6 +120,8 @@ fn ownership(field: String) -> (StatusCode, V2ErrorResponse) {
 
 impl IntoResponse for V2HttpError {
     fn into_response(self) -> Response {
+        // Rendered up front because matching consumes the error; only server errors log it.
+        let chain = ErrorChain(&self).to_string();
         let (status, body) = match self {
             Self::Validation(error) => (StatusCode::BAD_REQUEST, error.response()),
             Self::Command(SyncPortfoliosV2CommandError::Validation(error)) => (
@@ -147,11 +160,35 @@ impl IntoResponse for V2HttpError {
                     vec![V2FieldError { field, message }],
                 )
             }
+            Self::MarketCommand(error) => plain(
+                StatusCode::BAD_REQUEST,
+                VALIDATION_CODE,
+                MARKET_INVALID_MESSAGE,
+                vec![V2FieldError {
+                    field: error.field().to_string(),
+                    message: error.to_string(),
+                }],
+            ),
+            Self::Search(AssetSearchServiceError::RateLimited) => plain(
+                StatusCode::TOO_MANY_REQUESTS,
+                RATE_LIMITED_CODE,
+                RATE_LIMITED_MESSAGE,
+                Vec::new(),
+            ),
+            Self::Search(AssetSearchServiceError::Storage(_)) | Self::MarketData(_) => plain(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                INTERNAL_CODE,
+                MARKET_INTERNAL_MESSAGE,
+                Vec::new(),
+            ),
             Self::Command(SyncPortfoliosV2CommandError::Repository(_)) | Self::Service(_) => {
                 sync_internal()
             }
         };
 
+        if status.is_server_error() {
+            tracing::error!(%status, error = %chain, "v2 request failed");
+        }
         (status, Json(body)).into_response()
     }
 }

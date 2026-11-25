@@ -44,7 +44,11 @@ fn build_v2_openapi_router() -> OpenApiRouter<AppContext> {
 }
 
 fn build_markets_v2_openapi_router() -> OpenApiRouter<AppContext> {
-    OpenApiRouter::new().routes(routes!(handlers::lookup_assets_v2::lookup_assets))
+    OpenApiRouter::new()
+        .routes(routes!(handlers::lookup_assets_v2::lookup_assets))
+        .routes(routes!(handlers::markets_v2::assets::search::search_assets))
+        .routes(routes!(handlers::markets_v2::prices::get_prices))
+        .routes(routes!(handlers::markets_v2::fx::get_fx_rate))
 }
 
 fn base_openapi() -> OpenApi {

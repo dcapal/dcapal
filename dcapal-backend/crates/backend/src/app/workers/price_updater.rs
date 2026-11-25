@@ -9,17 +9,21 @@ use crate::{
         domain::{
             entity::{MarketId, Price},
             market_data_utils::{fetch_market_price, price_provider_for},
+            market_quote::PriceFailure,
         },
         infra::utils::{StopToken, should_stop},
         services::market_data::MarketDataService,
     },
     config::PriceProvider,
-    error::Result,
+    error::{ErrorChain, Result},
     ports::outbound::{
-        adapter::PriceProviders,
-        repository::market_data::{MarketDataRepository, MarketPriceUpdate},
+        adapter::{AsYahooMarket, PriceProviders},
+        repository::market_data::{MarketDataRepository, MarketPriceFailure, MarketPriceUpdate},
     },
 };
+
+/// Pause after each market of a pass (about two markets per second).
+const MARKET_PACING: Duration = Duration::from_millis(500);
 
 /// Number of fetched prices written to the database by a single flush.
 const FLUSH_BATCH_SIZE: usize = 50;
@@ -74,16 +78,39 @@ impl PriceUpdaterWorker {
     ///
     /// Prices are flushed every [`FLUSH_BATCH_SIZE`] markets instead of one write per
     /// market, so a pass costs a handful of statements rather than hundreds.
+    ///
+    /// Every market whose provider was asked, priced or failed, is followed by a pause of
+    /// [`MARKET_PACING`], so a pass lasts at least `markets * MARKET_PACING` (about twenty
+    /// minutes for 2,400 markets). Markets that fail without any request, such as fiat
+    /// pairs Yahoo has no ticker for, are not paced. A pass can exceed the five-minute
+    /// period: the worker waits one period after a pass ends, so passes never overlap and
+    /// prices are refreshed once per pass.
     async fn update_prices(&self) -> Result<()> {
         // Get all known markets
         let markets = self.market_data_repo.load_markets().await?;
 
         let mut batch: Vec<(MarketId, Price, PriceProvider)> = Vec::with_capacity(FLUSH_BATCH_SIZE);
+        let mut failures: Vec<(MarketId, PriceFailure)> = Vec::new();
         for m in markets {
             let provider = price_provider_for(&m, self.price_provider);
-            let Some(price) = fetch_market_price(&m, &self.providers, provider).await else {
-                warn!("Failed to fetch price update for market {}", m.id);
-                continue;
+            // Yahoo is never asked about a market it has no ticker for.
+            let reaches_provider =
+                !matches!(provider, PriceProvider::Yahoo) || m.as_yahoo().is_some();
+            let price = match fetch_market_price(&m, &self.providers, provider).await {
+                Ok(price) => price,
+                Err(failure) => {
+                    warn!("Failed to fetch price update for market {}", m.id);
+                    failures.push((m.id, failure));
+                    if failures.len() >= FLUSH_BATCH_SIZE {
+                        self.flush_failures(&mut failures).await;
+                    }
+                    // A failed attempt that reached the provider is paced like a priced
+                    // one, so an outage cannot turn the pass into a request burst.
+                    if reaches_provider {
+                        tokio::time::sleep(MARKET_PACING).await;
+                    }
+                    continue;
+                }
             };
 
             self.market_data_service.set_price(&m.id, price);
@@ -95,11 +122,40 @@ impl PriceUpdaterWorker {
 
             // Space out markets (~2 requests per second) so a pass leaves most of the
             // shared Yahoo rate-limit budget to user-driven lookups.
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            tokio::time::sleep(MARKET_PACING).await;
         }
         self.flush(&mut batch).await;
+        self.flush_failures(&mut failures).await;
 
         Ok(())
+    }
+
+    /// Records and clears the pending refresh failures, keeping the last known prices.
+    ///
+    /// Logs instead of failing the pass.
+    async fn flush_failures(&self, failures: &mut Vec<(MarketId, PriceFailure)>) {
+        if failures.is_empty() {
+            return;
+        }
+
+        let pending = failures
+            .iter()
+            .map(|(market_id, failure)| MarketPriceFailure { market_id, failure })
+            .collect::<Vec<_>>();
+        if let Err(e) = self.market_data_repo.record_price_failures(&pending).await {
+            error!(
+                "Failed to record {} market price failures: {}",
+                failures.len(),
+                ErrorChain(&e)
+            );
+        }
+        // Readers of the v2 endpoints must see the recorded failure at their next read.
+        let ids = failures
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        self.market_data_service.invalidate_quotes(&ids);
+        failures.clear();
     }
 
     /// Stores and clears the pending prices, logging instead of failing the pass.
@@ -119,10 +175,13 @@ impl PriceUpdaterWorker {
 
         if let Err(e) = self.market_data_repo.upsert_prices(&updates).await {
             error!(
-                "Failed to store {} market price updates: {e:?}",
-                batch.len()
+                "Failed to store {} market price updates: {}",
+                batch.len(),
+                ErrorChain(&e)
             );
         }
+        let ids = batch.iter().map(|(id, ..)| id.clone()).collect::<Vec<_>>();
+        self.market_data_service.invalidate_quotes(&ids);
         batch.clear();
     }
 }

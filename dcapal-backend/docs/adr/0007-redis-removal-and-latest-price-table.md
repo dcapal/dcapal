@@ -23,7 +23,7 @@ the last value) that Redis cannot give.
   Kraken, class Crypto, provider-confirmed. Fiat currencies (AED, AUD, CAD, CHF,
   EUR, GBP, JPY, USD, with English names) are provider Yahoo, class Cash,
   provider-confirmed. The v1 REST ids remain the lower-cased symbol (asset) and
-  the concatenation of base and quote ids (market); the catalog lists contain
+  the concatenation of base and quote ids (market; see the update below); the catalog lists contain
   only provider-confirmed rows, and for fiat only the eight catalog symbols, so
   client-supplied rows and other Yahoo currency tickers never appear in
   `/assets/crypto` or `/assets/fiat`.
@@ -40,7 +40,8 @@ the last value) that Redis cannot give.
   place and the table is deliberately not a hypertable: the TimescaleDB
   hypertable is reserved for the durable daily history of #779. The error
   columns are created now and written by #774. Market id lookups compare
-  `LOWER(symbol)` concatenations; the table has a few thousand rows at most.
+  `LOWER(symbol)` concatenations (replaced by a stored `market_id`, see below); the table
+  has a few thousand rows at most.
 - FX (fiat against fiat) is priced by Yahoo, not Kraken. Seven tickers are
   hardcoded next to the Yahoo adapter (`EURUSD=X`, `GBPUSD=X`, `AUDUSD=X`,
   `CADUSD=X`, `CHFUSD=X`, `JPYUSD=X`, `AEDUSD=X`, each USD per unit); inverse and
@@ -103,3 +104,18 @@ the last value) that Redis cannot give.
 - Every non-loopback request now performs one PostgreSQL upsert for the visitor
   counter, where it performed one Redis `HINCRBY`.
 - Deployment secrets `REDIS_*` and the `config/redis` files are no longer used.
+
+## Update (2026-11-22)
+
+CryptoWatch has been removed entirely (adapter, `PriceProvider::CryptoWatch`, the
+`cwApiKey` setting and the `DCAPAL_CW_API_KEY` deployment secret); Kraken is the only
+crypto price provider. A configuration with `priceProvider: cryptowatch` now fails at
+startup. The discovery freshness marker `cw-last-fetched` was renamed to
+`kraken-discovery-completed` by a forward migration.
+
+The market id is `{base}/{quote}` in lower case (`btc/eur`, `eur/usd`) and is stored as
+the unique column `market_price.market_id` (migration `20260923000000`). The `/`
+separator makes ids unique by construction, unlike the former plain concatenation
+where `ab`+`cd` and `a`+`bcd` collided. Asset symbols containing `/` are not stored.
+Kraken pair names are still sent without a separator to the Kraken API. The v1 REST
+API does not expose market ids.

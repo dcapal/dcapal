@@ -15,7 +15,7 @@ async fn sqlx_migrations_normalize_a_pre_shared_schema(pool: PgPool) -> sqlx::Re
     let migration_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
         .fetch_one(&pool)
         .await?;
-    assert_eq!(migration_count, 11);
+    assert_eq!(migration_count, 13);
 
     let average_buy_price: Option<String> = sqlx::query_scalar(
         "SELECT data_type
@@ -632,5 +632,44 @@ async fn kraken_cash_assets_move_to_yahoo_without_merging_holdings(
             (KRAKEN, "USDT".to_string()),
         ]
     );
+    Ok(())
+}
+
+/// GIVEN a database migrated up to the discovery-marker rename, holding a legacy discovery
+/// marker, a BTC/EUR market and the formerly colliding pairs AB/CD and A/BCD,
+/// WHEN the remaining migrations run,
+/// THEN every market keeps its row and gets its lower-case `base/quote` id, and the marker
+/// is renamed.
+#[sqlx::test(migrations = false)]
+async fn market_id_migration_backfills_slash_separated_ids(pool: PgPool) -> sqlx::Result<()> {
+    MIGRATOR.run_to(20260914000000, &pool).await?;
+    sqlx::query(
+        "INSERT INTO assets_data (id, provider, symbol, name, currency, asset_class, metadata_source)
+         SELECT uuidv7(), 1, s, s, s, 4, 1 FROM UNNEST(ARRAY['AB','CD','A','BCD','BTC','EUR']) AS s",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query(
+        "INSERT INTO market_price (base_asset_id, quote_asset_id, provider, fetched_at)
+         SELECT b.id, q.id, 1, NOW() - (x.age || ' minutes')::interval
+         FROM (VALUES ('AB','CD','10'), ('A','BCD','1'), ('BTC','EUR','5')) AS x(b, q, age)
+         JOIN assets_data b ON b.symbol = x.b JOIN assets_data q ON q.symbol = x.q",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("INSERT INTO worker_marker (name, completed_at) VALUES ('cw-last-fetched', NOW())")
+        .execute(&pool)
+        .await?;
+
+    MIGRATOR.run(&pool).await?;
+
+    let ids: Vec<String> = sqlx::query_scalar("SELECT market_id FROM market_price ORDER BY 1")
+        .fetch_all(&pool)
+        .await?;
+    assert_eq!(ids, ["a/bcd", "ab/cd", "btc/eur"]);
+    let markers: Vec<String> = sqlx::query_scalar("SELECT name FROM worker_marker")
+        .fetch_all(&pool)
+        .await?;
+    assert_eq!(markers, ["kraken-discovery-completed"]);
     Ok(())
 }

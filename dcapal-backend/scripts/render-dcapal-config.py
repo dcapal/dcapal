@@ -80,9 +80,6 @@ def render(template: str) -> str:
         "@@DCAPAL_PRICE_PROVIDER@@": json_value(
             os.environ.get("DCAPAL_PRICE_PROVIDER", "kraken")
         ),
-        "@@DCAPAL_CW_API_KEY@@": json_value(
-            os.environ.get("DCAPAL_CW_API_KEY", "CW_API_KEY")
-        ),
         "@@DCAPAL_IP_API_KEY@@": json_value(
             os.environ.get("DCAPAL_IP_API_KEY", "IP_API_KEY")
         ),

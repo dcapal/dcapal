@@ -110,3 +110,15 @@ _Avoid_: Imported portfolio expiry; archive
 **Portfolio asset provider**:
 The provider identity carried by shared asset metadata. It is different from the market data provider role used by the backend to discover markets and refresh market prices, even when the same external service supplies both.
 _Avoid_: Market data provider; broker
+
+**Price quote**:
+The current price of one asset reference, in the asset's own currency, with the provider that supplied it, when it was observed and fetched, its source (`provider`, or `lastKnown` when the latest refresh failed) and a status (`usable`, `unavailable`, `providerError`, `malformed` or `pending`). A missing, zero, negative or non-finite price is unavailable, never zero (see ADR 0008).
+_Avoid_: Manual price, which belongs to a Portfolio Asset; historical price
+
+**FX rate**:
+The value of one unit of a fiat currency in another, read directly, inverted or triangulated through USD from stored Yahoo markets, reported with its legs and oldest observation. Clients convert values by multiplying a price by the rate.
+_Avoid_: Conversion of holdings on the server
+
+**Price failure**:
+The visible reason a price could not be produced or refreshed: `unavailable`, `providerError` or `malformed`. It is stored next to the last known price and never replaced by another provider's value.
+_Avoid_: Silent fallback; provider substitution

@@ -11,18 +11,22 @@ use reqwest::StatusCode;
 use serde::{Deserialize, de::DeserializeOwned};
 use tracing::{debug, error, info, warn};
 
-use super::DefaultCircuitBreaker;
+use super::{DefaultCircuitBreaker, PriceCallError};
 use crate::{
     DateTime,
     app::domain::{
-        entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency},
+        entity::{Asset, AssetId, Crypto, Fiat, Market, MarketId, OHLCFrequency, market_id},
         fiat::{fiat_name, is_fiat},
+        market_quote::{FailureKind, PriceFailure},
     },
     app::infra::stats::{MetricProvider, ProviderOp, ProviderOutcome, observe_provider},
     config,
-    error::{DcaError, Result},
+    error::{DcaError, ErrorChain, Result},
     ports::outbound::repository::market_data::MarketDataRepository,
 };
+
+/// Root URL of the public Kraken API.
+const DEFAULT_BASE_URL: &str = "https://api.kraken.com";
 
 /// Number of symbols requested from CoinMarketCap in one call.
 const CMC_CHUNK_SIZE: usize = 100;
@@ -37,6 +41,8 @@ const CMC_BASE_URL: &str = "https://pro-api.coinmarketcap.com";
 #[derive(Clone)]
 pub struct KrakenProvider {
     http: reqwest::Client,
+    /// Root URL of the Kraken public API, without a trailing slash.
+    base_url: String,
     cmc_api_key: Option<String>,
     cmc_base_url: String,
     kraken_circuit_breaker: DefaultCircuitBreaker,
@@ -48,8 +54,16 @@ impl KrakenProvider {
         let kraken_circuit_breaker = failsafe::Config::new().build();
         let cmc_circuit_breaker = failsafe::Config::new().build();
 
+        let base_url = config
+            .kraken_base_url
+            .as_deref()
+            .unwrap_or(DEFAULT_BASE_URL)
+            .trim_end_matches('/')
+            .to_string();
+
         Self {
             http,
+            base_url,
             cmc_api_key: config.cmc_api_key.clone(),
             cmc_base_url: CMC_BASE_URL.to_string(),
             kraken_circuit_breaker,
@@ -76,11 +90,11 @@ impl KrakenProvider {
         &self,
         repo: &MarketDataRepository,
     ) -> Result<(Vec<Asset>, Vec<Market>)> {
-        static URL: &str = "https://api.kraken.com/0/public/AssetPairs";
+        let url = self.asset_pairs_url();
 
         // Fetch Kraken markets
-        debug!(url = URL, "Fetching markets from Kraken");
-        let market_symbols = self.fetch_online_market_symbols(URL).await?;
+        debug!(url = url, "Fetching markets from Kraken");
+        let market_symbols = self.fetch_online_market_symbols(&url).await?;
 
         let (markets, assets) = if self.cmc_api_key.is_some() {
             // If CoinMarketCap API key is available, enrich assets data with human-friendly
@@ -111,10 +125,10 @@ impl KrakenProvider {
     }
 
     async fn fetch_tradable_market_ids_inner(&self) -> Result<HashSet<MarketId>> {
-        static URL: &str = "https://api.kraken.com/0/public/AssetPairs";
+        let url = self.asset_pairs_url();
 
-        debug!(url = URL, "Fetching market snapshot from Kraken");
-        let market_symbols = self.fetch_online_market_symbols(URL).await?;
+        debug!(url = url, "Fetching market snapshot from Kraken");
+        let market_symbols = self.fetch_online_market_symbols(&url).await?;
         market_ids_from_symbols(&market_symbols)
     }
 
@@ -131,35 +145,58 @@ impl KrakenProvider {
         parse_online_market_symbols(&res)
     }
 
+    /// URL listing every Kraken asset pair.
+    fn asset_pairs_url(&self) -> String {
+        format!("{}/0/public/AssetPairs", self.base_url)
+    }
+
+    /// Builds the OHLC URL of a pair, percent-encoding the pair as a query value.
+    fn ohlc_url(
+        &self,
+        pair: &str,
+        since: i64,
+        interval: &str,
+    ) -> std::result::Result<url::Url, String> {
+        let mut url = url::Url::parse(&format!("{}/0/public/OHLC", self.base_url))
+            .map_err(|e| e.to_string())?;
+        url.query_pairs_mut()
+            .append_pair("pair", pair)
+            .append_pair("since", &since.to_string())
+            .append_pair("interval", interval);
+        Ok(url)
+    }
+
     /// Fetches the latest price of a market, falling back from 5-minute to daily
     /// candles. Recorded as one `price` provider call (both attempts included).
-    pub async fn fetch_market_price(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
+    ///
+    /// Only Kraken is asked: a failure is reported, never answered from another
+    /// provider. The daily fallback only follows a 5-minute answer without a price.
+    pub async fn fetch_market_price(
+        &self,
+        mkt: &Market,
+        ts: DateTime,
+    ) -> std::result::Result<f64, PriceFailure> {
         observe_provider(
             MetricProvider::Kraken,
             ProviderOp::Price,
             self.fetch_market_price_inner(mkt, ts),
-            |result| match result {
-                Ok(Some(_)) => ProviderOutcome::Ok,
-                Ok(None) => ProviderOutcome::NotFound,
-                Err(e) => outcome_of_error(e),
-            },
+            PriceCallError::outcome,
         )
         .await
+        .map_err(|e| e.failure)
     }
 
-    async fn fetch_market_price_inner(&self, mkt: &Market, ts: DateTime) -> Result<Option<f64>> {
-        if let Some(px) = self
-            .fetch_price(&mkt.id, OHLCFrequency::Minutes5, ts)
-            .await?
-        {
-            return Ok(Some(px));
+    async fn fetch_market_price_inner(
+        &self,
+        mkt: &Market,
+        ts: DateTime,
+    ) -> std::result::Result<f64, PriceCallError> {
+        match self.fetch_price(&mkt.id, OHLCFrequency::Minutes5, ts).await {
+            Err(e) if e.failure.kind == FailureKind::Unavailable => {
+                self.fetch_price(&mkt.id, OHLCFrequency::Daily, ts).await
+            }
+            other => other,
         }
-
-        if let Some(px) = self.fetch_price(&mkt.id, OHLCFrequency::Daily, ts).await? {
-            return Ok(Some(px));
-        }
-
-        Ok(None)
     }
 
     async fn fetch_price(
@@ -167,69 +204,29 @@ impl KrakenProvider {
         id: &MarketId,
         freq: OHLCFrequency,
         ts: DateTime,
-    ) -> Result<Option<f64>> {
+    ) -> std::result::Result<f64, PriceCallError> {
         let (r_lo, r_hi) = freq.ohlc_range(ts);
         let (after_ts, before_ts) = (r_lo.as_second(), r_hi.as_second());
-        let periods = get_kraken_api_periods(freq);
-        let url = format!(
-            "https://api.kraken.com/0/public/OHLC?pair={id}&since={after_ts}&interval={periods}"
-        );
+        let url = self
+            // Kraken names pairs without a separator (`btceur`).
+            .ohlc_url(&id.replace('/', ""), after_ts, get_kraken_api_periods(freq))
+            .map_err(PriceFailure::malformed)?;
 
         debug!(
-            url = url,
+            url = url.as_str(),
             "Fetching {freq} OHLC candlestick for market '{id}' since {r_lo}"
         );
 
-        let Some(mut res) = self.fetch_kraken_api::<OHLCResult>(&url).await? else {
-            return Ok(None);
+        let fetched = self.fetch_kraken_api::<OHLCResult>(url.as_str()).await;
+        let res = match fetched {
+            Ok(Some(res)) => res,
+            Ok(None) => {
+                return Err(PriceFailure::unavailable("Kraken does not list the market").into());
+            }
+            Err(e) => return Err(call_error_of(&e)),
         };
 
-        if !res.error.is_empty() {
-            error!("Error occurred while fetching '{id}': {:?}", res.error);
-            return Err(DcaError::Generic(format!("{:?}", res.error)));
-        }
-
-        let Some(ref mut result) = res.result else {
-            return Err(DcaError::Generic(
-                "Unexpected empty 'result' field".to_string(),
-            ));
-        };
-
-        if result.is_empty() || result.len() < 2 {
-            return Err(DcaError::Generic(format!(
-                "Malformed response. Unexpected empty result: {res:?}"
-            )));
-        }
-
-        result.remove("last"); // Drop fucking weird 'last' entry
-        let Payload::CandleSticks(csticks) = result.values().next().unwrap() else {
-            return Err(DcaError::Generic(format!(
-                "Malformed response. Cannot find candlesticks: {res:?}"
-            )));
-        };
-
-        if csticks.0.is_empty() {
-            return Err(DcaError::Generic(format!(
-                "Malformed response. Unexpected empty result: {res:?}"
-            )));
-        }
-
-        // Get most recent candlestick before `before_ts` or most recent
-        let cstick = csticks
-            .0
-            .iter()
-            .rev()
-            .find(|c| c[0].as_i64().unwrap_or(i64::MAX) <= before_ts)
-            .unwrap_or_else(|| csticks.0.iter().last().unwrap());
-
-        let Some(close_px) = cstick[4].as_f64() else {
-            return Err(DcaError::Generic(format!(
-                "Cannot parse '{:?}' into f64",
-                cstick[4]
-            )));
-        };
-
-        Ok(Some(close_px))
+        Ok(parse_ohlc_price(res, before_ts)?)
     }
 
     async fn resolve_assets_data(
@@ -266,17 +263,17 @@ impl KrakenProvider {
             .into_iter()
             .filter_map(|(base_id, quote_id)| {
                 let Some(base) = assets_map.get(&base_id) else {
-                    error!("Skipping market {base_id}{quote_id}: base asset data not found");
+                    error!("Skipping market {base_id}/{quote_id}: base asset data not found");
                     return None;
                 };
 
                 let Some(quote) = assets_map.get(&quote_id) else {
-                    error!("Skipping market {base_id}{quote_id}: quote asset data not found");
+                    error!("Skipping market {base_id}/{quote_id}: quote asset data not found");
                     return None;
                 };
 
                 Some(Market::new(
-                    format!("{base_id}{quote_id}"),
+                    market_id(&base_id, &quote_id),
                     base.clone(),
                     quote.clone(),
                     None,
@@ -308,7 +305,7 @@ impl KrakenProvider {
         let found = match repo.find_assets(&ccys).await {
             Ok(found) => found,
             Err(e) => {
-                error!("Failed to find {} assets: {e}", ccys.len());
+                error!("Failed to find {} assets: {}", ccys.len(), ErrorChain(&e));
                 return (assets, HashSet::new());
             }
         };
@@ -557,6 +554,64 @@ struct AssetPairsResponse {
     result: HashMap<String, Pair>,
 }
 
+/// Describes a failed Kraken request as a visible failure: undecodable replies are
+/// malformed, everything else (transport, status, open circuit) is a provider error.
+fn call_error_of(error: &DcaError) -> PriceCallError {
+    match error {
+        DcaError::Reqwest(e) if e.is_timeout() => {
+            PriceCallError::timeout("Kraken request timed out")
+        }
+        DcaError::Reqwest(e) if e.is_decode() => {
+            PriceFailure::malformed(format!("undecodable Kraken reply: {}", ErrorChain(e))).into()
+        }
+        other => PriceFailure::provider_error(format!("Kraken request failed: {other:?}")).into(),
+    }
+}
+
+/// Extracts the close of the most recent candle at or before `before_ts` from an OHLC reply.
+///
+/// Kraken's `EQuery:Unknown asset pair` means the market is not listed (unavailable);
+/// any other reported error is a provider error. A reply without candles is
+/// unavailable; a reply whose structure or close cannot be read is malformed.
+fn parse_ohlc_price(mut res: OHLCResult, before_ts: i64) -> std::result::Result<f64, PriceFailure> {
+    if !res.error.is_empty() {
+        let unknown_pair = res
+            .error
+            .iter()
+            .any(|e| e.starts_with("EQuery:Unknown asset pair"));
+        return Err(if unknown_pair {
+            PriceFailure::unavailable("Kraken does not list the market")
+        } else {
+            PriceFailure::provider_error(format!("Kraken reported {:?}", res.error))
+        });
+    }
+
+    let Some(ref mut result) = res.result else {
+        return Err(PriceFailure::malformed("unexpected empty 'result' field"));
+    };
+
+    // The reply carries one candle list next to a numeric `last` marker.
+    result.remove("last");
+    let Some(Payload::CandleSticks(csticks)) = result.values().next() else {
+        return Err(PriceFailure::malformed("cannot find candlesticks"));
+    };
+    let Some(newest) = csticks.0.last() else {
+        return Err(PriceFailure::unavailable("Kraken returned no candles"));
+    };
+
+    // Most recent candlestick before `before_ts`, or the most recent one.
+    let cstick = csticks
+        .0
+        .iter()
+        .rev()
+        .find(|c| c[0].as_i64().unwrap_or(i64::MAX) <= before_ts)
+        .unwrap_or(newest);
+
+    cstick[4]
+        .as_f64()
+        .ok_or_else(|| PriceFailure::malformed(format!("cannot parse close '{:?}'", cstick[4])))
+}
+
 /// Classifies a failed Kraken or CoinMarketCap call for the provider metrics:
 /// an open circuit breaker is `circuit_open`, HTTP 429 is `rate_limited` and
 /// timeouts are `timeout`.
@@ -610,17 +665,17 @@ async fn resolve_assets_data_kraken_only(
         .into_iter()
         .filter_map(|(base_id, quote_id)| {
             let Some(base) = assets_map.get(&base_id) else {
-                error!("Skipping market {base_id}{quote_id}: base asset data not found");
+                error!("Skipping market {base_id}/{quote_id}: base asset data not found");
                 return None;
             };
 
             let Some(quote) = assets_map.get(&quote_id) else {
-                error!("Skipping market {base_id}{quote_id}: quote asset data not found");
+                error!("Skipping market {base_id}/{quote_id}: quote asset data not found");
                 return None;
             };
 
             Some(Market::new(
-                format!("{base_id}{quote_id}"),
+                market_id(&base_id, &quote_id),
                 base.clone(),
                 quote.clone(),
                 None,
@@ -708,7 +763,7 @@ fn market_ids_from_symbols(market_symbols: &[String]) -> Result<HashSet<MarketId
                 warn!(symbol, "Ignoring malformed online Kraken market");
                 return None;
             };
-            Some(format!("{}{}", parsed.base, parsed.quote))
+            Some(market_id(parsed.base, parsed.quote))
         })
         .collect::<HashSet<_>>();
 
@@ -747,7 +802,7 @@ async fn get_new_markets(
     let pairs = split_base_quote(market_symbols);
     let ids = pairs
         .iter()
-        .map(|(base, quote)| format!("{base}{quote}"))
+        .map(|(base, quote)| market_id(base, quote))
         .collect::<Vec<_>>();
 
     match repo.find_markets(&ids).await {
@@ -757,7 +812,11 @@ async fn get_new_markets(
             .filter_map(|(pair, market)| market.is_none().then_some(pair))
             .collect(),
         Err(e) => {
-            error!("Error occurred in searching {} markets: {e}", ids.len());
+            error!(
+                "Error occurred in searching {} markets: {}",
+                ids.len(),
+                ErrorChain(&e)
+            );
             pairs
         }
     }
@@ -787,7 +846,7 @@ async fn fetch_assets(
     let found = match repo.find_assets(&ccys).await {
         Ok(found) => found,
         Err(e) => {
-            error!("Failed to find {} assets: {e}", ccys.len());
+            error!("Failed to find {} assets: {}", ccys.len(), ErrorChain(&e));
             return assets;
         }
     };
@@ -981,6 +1040,7 @@ mod tests {
         }
         KrakenProvider {
             http: reqwest::Client::new(),
+            base_url: super::DEFAULT_BASE_URL.to_string(),
             cmc_api_key: Some("test-key".to_string()),
             cmc_base_url: base_url,
             kraken_circuit_breaker: failsafe::Config::new().build(),
@@ -1210,9 +1270,9 @@ mod tests {
         assert_eq!(
             ids,
             [
-                "btceur".to_string(),
-                "etheur".to_string(),
-                "adausd".to_string()
+                "btc/eur".to_string(),
+                "eth/eur".to_string(),
+                "ada/usd".to_string()
             ]
             .into_iter()
             .collect()
@@ -1331,5 +1391,139 @@ mod tests {
 
         // THEN the empty snapshot is rejected so it cannot delete every market
         assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod price_tests {
+    use super::*;
+    use crate::{
+        app::domain::entity::{Crypto, Fiat},
+        test_support::{FakeProvider, Reply},
+    };
+
+    fn providers_config(base: &str) -> config::Providers {
+        serde_json::from_value(serde_json::json!({
+            "priceProvider": "kraken",
+            "ipApiKey": "",
+            "krakenBaseUrl": base,
+        }))
+        .unwrap()
+    }
+
+    /// A fresh provider per test, so circuit-breaker state never leaks between tests.
+    fn provider_at(fake: &FakeProvider) -> KrakenProvider {
+        crate::test_support::install_crypto_provider();
+        KrakenProvider::new(reqwest::Client::new(), &providers_config(&fake.base_url()))
+    }
+
+    fn btceur() -> Market {
+        Market::new(
+            "btc/eur".into(),
+            Asset::Crypto(Crypto::new_with_id("btc".into())),
+            Asset::Fiat(Fiat::new("eur".into(), "Euro".into())),
+            None,
+        )
+    }
+
+    fn ohlc(candles: &str) -> String {
+        format!(r#"{{"error":[],"result":{{"XXBTZEUR":[{candles}],"last":1700000000}}}}"#)
+    }
+
+    async fn price_of(fake: &FakeProvider) -> std::result::Result<f64, PriceFailure> {
+        provider_at(fake)
+            .fetch_market_price(&btceur(), jiff::Timestamp::now())
+            .await
+    }
+
+    /// GIVEN Kraken answers an OHLC reply with candles,
+    /// WHEN the market price is fetched,
+    /// THEN the close of the latest candle is the price, requested for the market's pair.
+    #[tokio::test]
+    async fn latest_close_is_the_price() {
+        let now = jiff::Timestamp::now().as_second();
+        let candles = format!(
+            r#"[{},"1","2","0.5","40000.5","1","3",5],[{},"1","2","0.5","40010.25","1","3",5]"#,
+            now - 600,
+            now - 300
+        );
+        let fake = FakeProvider::start(move |_| Reply::ok(ohlc(&candles))).await;
+
+        assert_eq!(price_of(&fake).await, Ok(40010.25));
+
+        let requests = fake.requests();
+        assert_eq!(requests.len(), 1);
+        assert!(
+            requests[0].starts_with("/0/public/OHLC?pair=btceur&since="),
+            "{requests:?}"
+        );
+        assert!(requests[0].ends_with("&interval=5"));
+    }
+
+    /// GIVEN Kraken has no 5-minute candles but has a daily one,
+    /// WHEN the market price is fetched,
+    /// THEN the daily candle is used.
+    #[tokio::test]
+    async fn daily_candles_back_up_missing_five_minute_candles() {
+        let fake = FakeProvider::start(|target| {
+            if target.ends_with("interval=1440") {
+                Reply::ok(ohlc(r#"[1700000000,"1","2","0.5","39000","1","3",5]"#))
+            } else {
+                Reply::ok(ohlc(""))
+            }
+        })
+        .await;
+
+        assert_eq!(price_of(&fake).await, Ok(39000.0));
+    }
+
+    /// GIVEN Kraken reports an unknown pair, a service error, an HTTP error, an
+    /// undecodable body, or a close that is not a number,
+    /// WHEN the market price is fetched,
+    /// THEN the unknown pair is unavailable, errors are provider errors and
+    /// unreadable payloads are malformed.
+    #[tokio::test]
+    async fn failures_are_told_apart() {
+        let cases = [
+            (
+                Reply::ok(r#"{"error":["EQuery:Unknown asset pair"]}"#),
+                FailureKind::Unavailable,
+            ),
+            (
+                Reply::ok(r#"{"error":["EService:Unavailable"]}"#),
+                FailureKind::ProviderError,
+            ),
+            (Reply::status(500, "oops"), FailureKind::ProviderError),
+            (Reply::ok("<html>"), FailureKind::Malformed),
+            (
+                Reply::ok(ohlc(r#"[1700000000,"1","2","0.5","n/a","1","3",5]"#)),
+                FailureKind::Malformed,
+            ),
+        ];
+        for (reply, kind) in cases {
+            let fake = FakeProvider::start({
+                let reply = reply.clone();
+                move |_| reply.clone()
+            })
+            .await;
+
+            assert_eq!(price_of(&fake).await.unwrap_err().kind, kind, "{reply:?}");
+        }
+    }
+
+    /// GIVEN a market id with reserved URL characters,
+    /// WHEN its price is requested,
+    /// THEN the pair is sent as a percent-encoded query value.
+    #[tokio::test]
+    async fn pair_is_percent_encoded() {
+        let fake = FakeProvider::start(|_| Reply::ok(r#"{"error":[]}"#)).await;
+        let mut market = btceur();
+        market.id = "a&b=c".into();
+
+        let _ = provider_at(&fake)
+            .fetch_market_price(&market, jiff::Timestamp::now())
+            .await;
+
+        assert!(fake.requests()[0].starts_with("/0/public/OHLC?pair=a%26b%3Dc&"));
     }
 }

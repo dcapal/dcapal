@@ -19,14 +19,24 @@ import type {
 } from 'msw';
 
 import {
-  AllocationModeWire
+  AllocationModeWire,
+  FailureKindV2,
+  PriceAvailabilityV2,
+  QuoteSourceV2,
+  QuoteStatusV2,
+  SearchOutcomeV2,
+  SyntheticV2
 } from './model';
 import type {
   Asset,
+  FailureV2,
+  FxRateV2Response,
   ImportPortfolioBody,
   ImportPortfolioResponse,
   LookupAssetsV2Response,
   Price,
+  PricesV2Response,
+  SearchAssetsV2Response,
   StrategicAllocationV2Response,
   SyncPortfoliosRequest,
   SyncPortfoliosResponse,
@@ -61,6 +71,18 @@ export const getGetAssetsDataResponseMock = (overrideResponse: Partial<Extract<Y
 export const getImportPortfolioResponseMock = (overrideResponse: Partial<Extract<ImportPortfolioResponse, object>> = {}): ImportPortfolioResponse => ({expires_at: faker.string.alpha({length: {min: 10, max: 20}}), id: faker.string.alpha({length: {min: 10, max: 20}}), ...overrideResponse})
 
 export const getLookupAssetsV2ResponseMock = (overrideResponse: Partial<Extract<LookupAssetsV2Response, object>> = {}): LookupAssetsV2Response => ({assets: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), currency: faker.string.alpha({length: {min: 10, max: 20}}), name: faker.string.alpha({length: {min: 10, max: 20}}), provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})})), notFound: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})})), ...overrideResponse})
+
+export const getSearchAssetsV2ResponseFailureV2Mock = (overrideResponse: Partial<FailureV2> = {}): FailureV2 => ({...{kind: faker.helpers.arrayElement(Object.values(FailureKindV2)), message: faker.string.alpha({length: {min: 10, max: 20}}), occurredAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null])}, ...overrideResponse});
+
+export const getSearchAssetsV2ResponseMock = (overrideResponse: Partial<Extract<SearchAssetsV2Response, object>> = {}): SearchAssetsV2Response => ({error: faker.helpers.arrayElement([{...getSearchAssetsV2ResponseFailureV2Mock()},null,]), outcome: faker.helpers.arrayElement(Object.values(SearchOutcomeV2)), provider: faker.helpers.arrayElement(['yf','kraken'] as const), query: faker.string.alpha({length: {min: 10, max: 20}}), results: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({aclass: faker.helpers.arrayElement(['equity','bond','cash','crypto','commodity','other'] as const), currency: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), name: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), priceAvailability: faker.helpers.arrayElement(Object.values(PriceAvailabilityV2)), provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}}), venue: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null])})), ...overrideResponse})
+
+export const getGetFxRateV2ResponseFailureV2Mock = (overrideResponse: Partial<FailureV2> = {}): FailureV2 => ({...{kind: faker.helpers.arrayElement(Object.values(FailureKindV2)), message: faker.string.alpha({length: {min: 10, max: 20}}), occurredAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null])}, ...overrideResponse});
+
+export const getGetFxRateV2ResponseMock = (overrideResponse: Partial<Extract<FxRateV2Response, object>> = {}): FxRateV2Response => ({base: faker.string.alpha({length: {min: 10, max: 20}}), error: faker.helpers.arrayElement([{...getGetFxRateV2ResponseFailureV2Mock()},null,]), fetchedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), legs: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({base: faker.string.alpha({length: {min: 10, max: 20}}), observedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), provider: faker.helpers.arrayElement(['yf','kraken'] as const), quote: faker.string.alpha({length: {min: 10, max: 20}})})), observedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), provider: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), quote: faker.string.alpha({length: {min: 10, max: 20}}), rate: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), source: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(QuoteSourceV2)),null,]), status: faker.helpers.arrayElement(Object.values(QuoteStatusV2)), synthetic: faker.helpers.arrayElement(Object.values(SyntheticV2)), ...overrideResponse})
+
+export const getGetPricesV2ResponseFailureV2Mock = (overrideResponse: Partial<FailureV2> = {}): FailureV2 => ({...{kind: faker.helpers.arrayElement(Object.values(FailureKindV2)), message: faker.string.alpha({length: {min: 10, max: 20}}), occurredAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null])}, ...overrideResponse});
+
+export const getGetPricesV2ResponseMock = (overrideResponse: Partial<Extract<PricesV2Response, object>> = {}): PricesV2Response => ({prices: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({asset: {provider: faker.helpers.arrayElement(['yf','kraken'] as const), symbol: faker.string.alpha({length: {min: 10, max: 20}})}, currency: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), error: faker.helpers.arrayElement([{...getGetPricesV2ResponseFailureV2Mock()},null,]), fetchedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), observedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), price: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), provider: faker.helpers.arrayElement(['yf','kraken'] as const), source: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(QuoteSourceV2)),null,]), status: faker.helpers.arrayElement(Object.values(QuoteStatusV2))})), ...overrideResponse})
 
 export const getGetPriceResponseMock = (overrideResponse: Partial<Extract<Price, object>> = {}): Price => ({price: faker.number.float({fractionDigits: 2}), ts: faker.number.int(), ...overrideResponse})
 
@@ -170,6 +192,42 @@ export const getLookupAssetsV2MockHandler = (overrideResponse?: LookupAssetsV2Re
   }, options)
 }
 
+export const getSearchAssetsV2MockHandler = (overrideResponse?: SearchAssetsV2Response | ((info: Parameters<HttpResponseResolver<{ provider: string }>>[0]) => Promise<SearchAssetsV2Response> | SearchAssetsV2Response), options?: RequestHandlerOptions) => {
+  return http.get<{ provider: string }>('*/markets/v2/assets/:provider/search', async (info: Parameters<HttpResponseResolver<{ provider: string }>>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getSearchAssetsV2ResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getGetFxRateV2MockHandler = (overrideResponse?: FxRateV2Response | ((info: Parameters<HttpResponseResolver>[0]) => Promise<FxRateV2Response> | FxRateV2Response), options?: RequestHandlerOptions) => {
+  return http.get('*/markets/v2/fx', async (info: Parameters<HttpResponseResolver>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetFxRateV2ResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getGetPricesV2MockHandler = (overrideResponse?: PricesV2Response | ((info: Parameters<HttpResponseResolver>[0]) => Promise<PricesV2Response> | PricesV2Response), options?: RequestHandlerOptions) => {
+  return http.get('*/markets/v2/prices', async (info: Parameters<HttpResponseResolver>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetPricesV2ResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getGetPriceMockHandler = (overrideResponse?: Price | ((info: Parameters<HttpResponseResolver<{ asset: string }>>[0]) => Promise<Price> | Price), options?: RequestHandlerOptions) => {
   return http.get<{ asset: string }>('*/price/:asset', async (info: Parameters<HttpResponseResolver<{ asset: string }>>[0]) => {
 
@@ -214,6 +272,9 @@ export const getDCAPalAPIsMock = () => [
   getImportPortfolioMockHandler(),
   getGetImportedPortfolioMockHandler(),
   getLookupAssetsV2MockHandler(),
+  getSearchAssetsV2MockHandler(),
+  getGetFxRateV2MockHandler(),
+  getGetPricesV2MockHandler(),
   getGetPriceMockHandler(),
   getSyncPortfoliosMockHandler(),
   getSyncPortfoliosV2MockHandler()
